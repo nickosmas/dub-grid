@@ -1265,6 +1265,82 @@ textarea {
   width: 110px;
 }
 
+/* Reordering is available only in the Active tab, where a status column would
+   repeat information the selected tab already provides. */
+.dg-staff-directory-table--without-status .dg-staff-directory-header,
+.dg-staff-directory-table--without-status .dg-staff-directory-row {
+  grid-template-columns: 100px minmax(0, 1fr) 110px 40px;
+}
+
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(3) {
+  border-right: none;
+}
+
+@media (min-width: 768px) {
+  .dg-staff-directory-table--without-status .dg-staff-directory-header,
+  .dg-staff-directory-table--without-status .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      40px;
+  }
+
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(3),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(3),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(4),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(4) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(5),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(5) {
+    border-right: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dg-staff-directory-table--without-status .dg-staff-directory-header,
+  .dg-staff-directory-table--without-status .dg-staff-directory-row {
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
+  }
+
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(5),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(5) {
+    border-right: 1px solid var(--dg-color-border-light);
+  }
+
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-header
+    > .dg-staff-directory-head-cell:nth-child(9),
+  .dg-staff-directory-table--without-status
+    .dg-staff-directory-row
+    > .dg-staff-directory-cell:nth-child(9) {
+    border-right: none;
+  }
+}
+
 .dg-staff-directory-cell--date-joined {
   width: 140px;
 }

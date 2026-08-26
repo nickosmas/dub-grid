@@ -78,3 +78,21 @@ describe("organization-settings open shift visibility", () => {
     ).toBe("Coverage shortages: Always · Call-offs: Hidden");
   });
 });
+
+describe("organization-settings shift detail hover cards", () => {
+  it("defaults the setting to enabled and records an opt-out", () => {
+    const previous = pickOrganizationSettings(makeOrganization());
+    const next = pickOrganizationSettings(makeOrganization({ showShiftDetailHoverCards: false }));
+
+    expect(previous.showShiftDetailHoverCards).toBe(true);
+    expect(buildOrganizationSettingsChanges(previous, next)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "showShiftDetailHoverCards",
+          previousDisplay: "Enabled",
+          nextDisplay: "Disabled",
+        }),
+      ]),
+    );
+  });
+});

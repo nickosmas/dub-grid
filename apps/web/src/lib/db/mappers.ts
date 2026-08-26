@@ -126,6 +126,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     roleLabel: row.role_label ?? "Roles",
     departmentLabel: row.department_label ?? "Scheduled Departments",
     shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? "code",
+    showShiftDetailHoverCards: row.show_shift_detail_hover_cards ?? true,
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,
     archivedAt: row.archived_at ?? null,

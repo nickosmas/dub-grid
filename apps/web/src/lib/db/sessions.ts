@@ -5,7 +5,7 @@ export async function fetchUserSessions() {
   const { data, error } = await supabase
     .from("user_sessions")
     .select(
-      "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash",
+      "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, browser_name, browser_version, ip_address, location_city, location_country, last_active_at, created_at, refresh_token_hash",
     )
     .not("refresh_token_hash", "is", null)
     .order("last_active_at", { ascending: false });
@@ -20,7 +20,11 @@ export async function fetchUserSessions() {
     platform: isUserSessionPlatform(row.platform) ? row.platform : null,
     appVersion: (row.app_version as string | null) ?? null,
     deviceLabel: (row.device_label as string | null) ?? null,
+    browserName: (row.browser_name as string | null) ?? null,
+    browserVersion: (row.browser_version as string | null) ?? null,
     ipAddress: (row.ip_address as string | null) ?? null,
+    locationCity: (row.location_city as string | null) ?? null,
+    locationCountry: (row.location_country as string | null) ?? null,
     lastActiveAt: row.last_active_at as string,
     createdAt: row.created_at as string,
     refreshTokenHash: row.refresh_token_hash as string,

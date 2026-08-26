@@ -37,6 +37,8 @@ interface StaffRowSharedProps {
    *  (canViewStaff only) get a coworker-style roster: NAME / focus areas /
    *  certifications / roles only. */
   canViewEmployeeDetails: boolean;
+  /** Status is useful only when the list includes more than one employee status. */
+  showStatusColumn: boolean;
   /** Whether the name links to the full /people/[id] details page. Regular
    *  users get the inline read-only panel instead, so the link is suppressed. */
   canNavigateToDetailsPage: boolean;
@@ -94,6 +96,7 @@ function StaffRowCells({
   isReordering,
   canManageEmployees,
   canViewEmployeeDetails,
+  showStatusColumn,
   canNavigateToDetailsPage,
   isSelected,
   focusAreas,
@@ -238,8 +241,8 @@ function StaffRowCells({
         </StaffCell>
       )}
 
-      {/* Status — tonal pill with leading dot. Admin/HR detail. */}
-      {canViewEmployeeDetails && (
+      {/* Status is needed only when this list combines employment statuses. */}
+      {canViewEmployeeDetails && showStatusColumn && (
         <StaffCell
           variant={variant}
           tableClassName="py-4 w-[110px] border-[var(--dg-color-border-light)] md:border-r"

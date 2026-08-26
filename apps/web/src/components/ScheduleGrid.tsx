@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatDateKey } from "@/lib/utils";
 import {
   computeDailyTallies,
@@ -57,7 +58,13 @@ import type {
   ScheduleGridInteractionState,
   ScheduleGridModel,
 } from "./schedule-grid/model";
-import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName, fmt12hShort } from "@/lib/utils";
+import {
+  getCertAbbr,
+  getRoleAbbrs,
+  getEmployeeDisplayName,
+  fmt12h,
+  fmt12hShort,
+} from "@/lib/utils";
 import {
   borderColor,
   DESIGNATION_COLORS,
@@ -221,6 +228,8 @@ interface LegacyScheduleGridProps {
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+  /** Whether shift pills reveal full cell details on hover. */
+  showShiftDetailHoverCards?: boolean;
   /** Resolves a user UUID to a display name for publish tooltips */
   resolvePublisherName?: (userId: string) => string | null;
   /** Open shifts grouped by focus area, displayed above employee rows */
@@ -315,6 +324,7 @@ interface SectionBlockProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  showShiftDetailHoverCards?: boolean;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
@@ -330,6 +340,186 @@ interface ActiveOutlineRect {
   top: number;
   width: number;
   height: number;
+}
+
+type ShiftDetailEntry = {
+  label: string;
+  jobName: string | null;
+  focusAreaName: string | null;
+  timeLabel: string | null;
+  isCustomTime: boolean;
+  isMentored: boolean;
+};
+
+function ShiftDetailHoverCard({
+  enabled,
+  employeeName,
+  date,
+  entries,
+  indicators,
+  requestLabel,
+  status,
+  children,
+}: {
+  enabled: boolean;
+  employeeName: string;
+  date: Date;
+  entries: ShiftDetailEntry[];
+  indicators: string[];
+  requestLabel: string | null;
+  status: string | null;
+  children: React.ReactElement<
+    React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
+  >;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+
+  if (!enabled) return children;
+
+  const dateLabel = date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
+  const trigger = React.cloneElement(children, {
+    ref: (node: HTMLDivElement | null) => {
+      triggerRef.current = node;
+    },
+    onMouseEnter: (event: React.MouseEvent<HTMLDivElement>) => {
+      children.props.onMouseEnter?.(event);
+      setIsOpen(true);
+    },
+    onMouseLeave: (event: React.MouseEvent<HTMLDivElement>) => {
+      children.props.onMouseLeave?.(event);
+      setIsOpen(false);
+    },
+  });
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      {trigger}
+      {isOpen && triggerRef.current ? (
+        <PopoverContent
+          anchor={triggerRef}
+          collisionPadding={12}
+          positionMethod="fixed"
+          side="top"
+          sideOffset={10}
+          showArrow
+          style={{
+            display: "block",
+            width: 300,
+            maxWidth: "calc(100vw - 32px)",
+            padding: 0,
+            border: "1px solid var(--dg-color-border)",
+            borderRadius: "var(--dg-radius-md)",
+            background: "var(--dg-color-surface)",
+            color: "var(--dg-color-text-primary)",
+            boxShadow: "var(--tooltip-shadow)",
+            overflow: "visible",
+          }}
+        >
+          <div
+            style={{
+              overflow: "hidden",
+              borderRadius: "inherit",
+            }}
+          >
+            <div
+              style={{
+                padding: "10px 12px",
+                borderBottom: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-bg-secondary)",
+              }}
+            >
+              <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700 }}>{employeeName}</div>
+              <div
+                style={{
+                  marginTop: 2,
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--dg-color-text-muted)",
+                }}
+              >
+                {dateLabel}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>
+              {entries.map((entry, index) => (
+                <div
+                  key={`${entry.label}-${index}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                >
+                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700 }}>
+                    {entry.label}
+                  </div>
+                  {entry.jobName ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-secondary)",
+                      }}
+                    >
+                      {entry.jobName}
+                    </div>
+                  ) : null}
+                  {entry.timeLabel ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      {entry.timeLabel}
+                      {entry.isCustomTime ? " · Custom time" : ""}
+                    </div>
+                  ) : null}
+                  {entry.focusAreaName ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      {entry.focusAreaName}
+                    </div>
+                  ) : null}
+                  {entry.isMentored ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      Mentored shift
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {(indicators.length > 0 || requestLabel || status) && (
+                <div
+                  style={{
+                    paddingTop: 10,
+                    borderTop: "1px solid var(--dg-color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 3,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--dg-color-text-muted)",
+                  }}
+                >
+                  {indicators.length > 0 ? <div>Indicators: {indicators.join(", ")}</div> : null}
+                  {requestLabel ? <div>Request: {requestLabel}</div> : null}
+                  {status ? <div>Status: {status}</div> : null}
+                </div>
+              )}
+            </div>
+          </div>
+        </PopoverContent>
+      ) : null}
+    </Popover>
+  );
 }
 
 const SectionBlock = memo(function SectionBlock({
@@ -379,6 +569,7 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeIdForKey,
   activeRequestForKey,
   shiftDisplayMode = "code",
+  showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
@@ -1389,6 +1580,82 @@ const SectionBlock = memo(function SectionBlock({
                       const activeRequestLabel = activeRequest
                         ? formatActiveRequestLabel(activeRequest)
                         : null;
+                      const hoverDetailEntries: ShiftDetailEntry[] = cellAbsenceType
+                        ? [
+                            {
+                              label: cellAbsenceType.name || cellAbsenceType.label,
+                              jobName: null,
+                              focusAreaName: sectionFocusArea?.name ?? null,
+                              timeLabel: null,
+                              isCustomTime: false,
+                              isMentored: false,
+                            },
+                          ]
+                        : cellCodeIds.map((assignmentId, entryIndex) => {
+                            const assignment = assignmentById.get(assignmentId);
+                            const category =
+                              assignment?.categoryId != null
+                                ? categoryById.get(assignment.categoryId)
+                                : null;
+                            const job =
+                              assignment?.jobId != null ? jobById.get(assignment.jobId) : null;
+                            const customTime =
+                              customTimes?.perPill?.[entryIndex] ??
+                              (entryIndex === 0 && !customTimes?.perPill ? customTimes : null);
+                            const start =
+                              customTime?.start ??
+                              assignment?.defaultStartTime ??
+                              category?.startTime ??
+                              null;
+                            const end =
+                              customTime?.end ??
+                              assignment?.defaultEndTime ??
+                              category?.endTime ??
+                              null;
+                            const focusArea =
+                              assignment?.focusAreaId != null
+                                ? (focusAreas.find((area) => area.id === assignment.focusAreaId)
+                                    ?.name ?? null)
+                                : (sectionFocusArea?.name ?? null);
+                            const isGeneralShift =
+                              assignment?.isGeneral === true ||
+                              (assignment?.focusAreaId == null &&
+                                assignment?.shiftId == null &&
+                                assignment?.categoryId == null);
+                            const generalShiftName =
+                              job?.name ??
+                              assignment?.name ??
+                              assignment?.label ??
+                              shiftLabel?.split("/")[entryIndex] ??
+                              "Shift";
+
+                            return {
+                              label:
+                                (isGeneralShift ? generalShiftName : null) ??
+                                category?.name ??
+                                assignment?.name ??
+                                assignment?.label ??
+                                shiftLabel?.split("/")[entryIndex] ??
+                                "Shift",
+                              jobName: isGeneralShift ? "General shift" : (job?.name ?? null),
+                              focusAreaName: focusArea,
+                              timeLabel: start && end ? `${fmt12h(start)} - ${fmt12h(end)}` : null,
+                              isCustomTime: !!customTime,
+                              isMentored: cellSegments[entryIndex]?.isMentored ?? false,
+                            };
+                          });
+                      const hoverIndicatorNames = indicatorTypes
+                        .filter((indicator) => noteTypes.includes(indicator.id))
+                        .map((indicator) => indicator.name);
+                      const hoverStatus = draftKind
+                        ? draftKind === "new"
+                          ? "Draft new"
+                          : draftKind === "modified"
+                            ? "Draft changes"
+                            : "Marked for deletion"
+                        : showsPublishDiff
+                          ? "Recently published change"
+                          : null;
                       // The lock avatar outranks everything else in the top-right
                       // corner: it is the only mark that explains why a cell will
                       // not open. Everything else there starts past it.
@@ -1920,281 +2187,292 @@ const SectionBlock = memo(function SectionBlock({
                                             })}
                                           />
                                         )}
-                                        <div
-                                          data-shift-pill="single"
-                                          style={{
-                                            position: "absolute",
-                                            top: insetFromVisibleCellTop(singleTopInset),
-                                            right: `${singleSideInset}px`,
-                                            bottom: `${singleBottomInset}px`,
-                                            left: insetFromVisibleCellLeft(singleSideInset),
-                                            background: singleUsesShiftColor
-                                              ? effectiveColor
-                                              : "var(--dg-color-surface)",
-                                            opacity: draftKind === "deleted" ? 0.5 : 1,
-                                            border: effectiveBorder,
-                                            borderRadius: SINGLE_SHIFT_PILL_RADIUS,
-                                            color: singleForegroundColor,
-                                            boxShadow:
-                                              singlePublishRingKind === "new" ||
-                                              singlePublishRingKind === "modified"
-                                                ? getPublishDiffBoxShadow(
-                                                    singlePublishRingKind,
-                                                    borderColor(singleForegroundColor),
-                                                  )
-                                                : "none",
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            padding: isNameMode ? "2px 6px" : "2px 3px",
-                                            paddingTop: 2,
-                                            paddingLeft: singleCrossFocusPill
-                                              ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                              : isNameMode
-                                                ? 6
-                                                : 3,
-                                            paddingRight: isNameMode ? 6 : 3,
-                                            overflow: singlePillBadge ? "visible" : "hidden",
-                                            textDecoration:
-                                              draftKind === "deleted" ? "line-through" : "none",
-                                          }}
+                                        <ShiftDetailHoverCard
+                                          enabled={showShiftDetailHoverCards}
+                                          employeeName={getEmployeeDisplayName(emp)}
+                                          date={date}
+                                          entries={hoverDetailEntries}
+                                          indicators={hoverIndicatorNames}
+                                          requestLabel={activeRequestLabel}
+                                          status={hoverStatus}
                                         >
-                                          {activeRequest && activeRequestLabel && (
-                                            <RequestCornerFold
-                                              status={activeRequest.status}
-                                              label={activeRequestLabel}
-                                            />
-                                          )}
-                                          {singlePillBadge && (
-                                            <GridDiffBadge
-                                              badge={{
-                                                ...singlePillBadge,
-                                                topOffset: -8,
-                                                leftOffset: activeRequest
-                                                  ? REQUEST_FOLD_CLEARANCE
-                                                  : 4,
-                                              }}
-                                            />
-                                          )}
-                                          {singleCrossFocusPill && (
-                                            <span
-                                              style={{
-                                                position: "absolute",
-                                                // Yields its top corner to a
-                                                // left-anchored badge, which
-                                                // hangs 8px into the pill. The
-                                                // initials stay centred in what
-                                                // is left, so the overlap reads
-                                                // as layering, not clipping.
-                                                top: singlePillBadge ? 8 : 0,
-                                                bottom: 0,
-                                                left: 0,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                fontSize: "var(--dg-fs-footnote)",
-                                                fontWeight: 800,
-                                                lineHeight: 1,
-                                                background: singleCrossFocusPalette.background,
-                                                color: singleCrossFocusPalette.color,
-                                                borderRadius: singlePillBadge
-                                                  ? "0 0 0 2px"
-                                                  : "2px 0 0 2px",
-                                                padding: "0 3px",
-                                                letterSpacing: "0.02em",
-                                                pointerEvents: "none",
-                                              }}
-                                            >
-                                              {getFocusAreaInitials(singleCrossFocusPill.name)}
-                                            </span>
-                                          )}
-                                          {singleIsMentored && (
-                                            <MentoredShiftBadge
-                                              rightInset={cornerLockClearance || undefined}
-                                            />
-                                          )}
                                           <div
+                                            data-shift-pill="single"
                                             style={{
+                                              position: "absolute",
+                                              top: insetFromVisibleCellTop(singleTopInset),
+                                              right: `${singleSideInset}px`,
+                                              bottom: `${singleBottomInset}px`,
+                                              left: insetFromVisibleCellLeft(singleSideInset),
+                                              background: singleUsesShiftColor
+                                                ? effectiveColor
+                                                : "var(--dg-color-surface)",
+                                              opacity: draftKind === "deleted" ? 0.5 : 1,
+                                              border: effectiveBorder,
+                                              borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                              color: singleForegroundColor,
+                                              boxShadow:
+                                                singlePublishRingKind === "new" ||
+                                                singlePublishRingKind === "modified"
+                                                  ? getPublishDiffBoxShadow(
+                                                      singlePublishRingKind,
+                                                      borderColor(singleForegroundColor),
+                                                    )
+                                                  : "none",
+                                              cursor: "pointer",
                                               display: "flex",
-                                              flexDirection: singleInlinesSecondary
-                                                ? "row"
-                                                : "column",
-                                              // Inline, the job code sits on the shift code's
-                                              // baseline rather than floating at its optical
-                                              // centre, which reads as one label instead of two.
-                                              alignItems: singleInlinesSecondary
-                                                ? "baseline"
-                                                : "center",
+                                              flexDirection: "column",
+                                              alignItems: "center",
                                               justifyContent: "center",
-                                              flexWrap: "nowrap",
-                                              gap: singleInlinesSecondary
-                                                ? 2
-                                                : showSingleSecondaryLine
-                                                  ? 1
-                                                  : 0,
-                                              maxWidth: "100%",
-                                              minWidth: 0,
-                                              overflow: "hidden",
+                                              padding: isNameMode ? "2px 6px" : "2px 3px",
+                                              paddingTop: 2,
+                                              paddingLeft: singleCrossFocusPill
+                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                : isNameMode
+                                                  ? 6
+                                                  : 3,
+                                              paddingRight: isNameMode ? 6 : 3,
+                                              overflow: singlePillBadge ? "visible" : "hidden",
+                                              textDecoration:
+                                                draftKind === "deleted" ? "line-through" : "none",
                                             }}
                                           >
-                                            <span
-                                              style={
-                                                isNameMode
-                                                  ? {
-                                                      fontSize: "var(--dg-fs-caption)",
-                                                      fontWeight: 800,
-                                                      lineHeight: singleIsThreeRow ? 1.15 : 1.2,
-                                                      textAlign: "center" as const,
-                                                      maxWidth: "100%",
-                                                      overflowWrap: "break-word" as const,
-                                                      display: "-webkit-box",
-                                                      WebkitBoxOrient: "vertical" as const,
-                                                      WebkitLineClamp: showSingleSecondaryLine
-                                                        ? 1
-                                                        : customTimes
-                                                          ? 1
-                                                          : 2,
-                                                      overflow: "hidden",
-                                                    }
-                                                  : {
-                                                      fontSize: "var(--dg-fs-title)",
-                                                      fontWeight: 800,
-                                                      lineHeight: 1.2,
-                                                      whiteSpace: "nowrap",
-                                                      overflow: "hidden",
-                                                      textOverflow: "ellipsis",
-                                                      maxWidth: "100%",
-                                                      minWidth: 0,
-                                                    }
-                                              }
-                                            >
-                                              {singleDisplayLabel}
-                                              {!customTimes && isOvernight && (
-                                                <sup
-                                                  style={{
-                                                    fontSize: "0.5em",
-                                                    fontWeight: 700,
-                                                    opacity: 0.5,
-                                                    marginLeft: 1,
-                                                  }}
-                                                >
-                                                  +1
-                                                </sup>
-                                              )}
-                                            </span>
-                                            {singleInlinesSecondary && (
+                                            {activeRequest && activeRequestLabel && (
+                                              <RequestCornerFold
+                                                status={activeRequest.status}
+                                                label={activeRequestLabel}
+                                              />
+                                            )}
+                                            {singlePillBadge && (
+                                              <GridDiffBadge
+                                                badge={{
+                                                  ...singlePillBadge,
+                                                  topOffset: -8,
+                                                  leftOffset: activeRequest
+                                                    ? REQUEST_FOLD_CLEARANCE
+                                                    : 4,
+                                                }}
+                                              />
+                                            )}
+                                            {singleCrossFocusPill && (
                                               <span
-                                                aria-hidden="true"
                                                 style={{
+                                                  position: "absolute",
+                                                  // Yields its top corner to a
+                                                  // left-anchored badge, which
+                                                  // hangs 8px into the pill. The
+                                                  // initials stay centred in what
+                                                  // is left, so the overlap reads
+                                                  // as layering, not clipping.
+                                                  top: singlePillBadge ? 8 : 0,
+                                                  bottom: 0,
+                                                  left: 0,
+                                                  display: "flex",
+                                                  alignItems: "center",
                                                   fontSize: "var(--dg-fs-footnote)",
-                                                  fontWeight: 700,
-                                                  lineHeight: 1.3,
-                                                  opacity: 0.5,
-                                                  flexShrink: 0,
+                                                  fontWeight: 800,
+                                                  lineHeight: 1,
+                                                  background: singleCrossFocusPalette.background,
+                                                  color: singleCrossFocusPalette.color,
+                                                  borderRadius: singlePillBadge
+                                                    ? "0 0 0 2px"
+                                                    : "2px 0 0 2px",
+                                                  padding: "0 3px",
+                                                  letterSpacing: "0.02em",
+                                                  pointerEvents: "none",
                                                 }}
                                               >
-                                                ·
+                                                {getFocusAreaInitials(singleCrossFocusPill.name)}
                                               </span>
                                             )}
-                                            {showSingleSecondaryLine ? (
+                                            {singleIsMentored && (
+                                              <MentoredShiftBadge
+                                                rightInset={cornerLockClearance || undefined}
+                                              />
+                                            )}
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                flexDirection: singleInlinesSecondary
+                                                  ? "row"
+                                                  : "column",
+                                                // Inline, the job code sits on the shift code's
+                                                // baseline rather than floating at its optical
+                                                // centre, which reads as one label instead of two.
+                                                alignItems: singleInlinesSecondary
+                                                  ? "baseline"
+                                                  : "center",
+                                                justifyContent: "center",
+                                                flexWrap: "nowrap",
+                                                gap: singleInlinesSecondary
+                                                  ? 2
+                                                  : showSingleSecondaryLine
+                                                    ? 1
+                                                    : 0,
+                                                maxWidth: "100%",
+                                                minWidth: 0,
+                                                overflow: "hidden",
+                                              }}
+                                            >
+                                              <span
+                                                style={
+                                                  isNameMode
+                                                    ? {
+                                                        fontSize: "var(--dg-fs-caption)",
+                                                        fontWeight: 800,
+                                                        lineHeight: singleIsThreeRow ? 1.15 : 1.2,
+                                                        textAlign: "center" as const,
+                                                        maxWidth: "100%",
+                                                        overflowWrap: "break-word" as const,
+                                                        display: "-webkit-box",
+                                                        WebkitBoxOrient: "vertical" as const,
+                                                        WebkitLineClamp: showSingleSecondaryLine
+                                                          ? 1
+                                                          : customTimes
+                                                            ? 1
+                                                            : 2,
+                                                        overflow: "hidden",
+                                                      }
+                                                    : {
+                                                        fontSize: "var(--dg-fs-title)",
+                                                        fontWeight: 800,
+                                                        lineHeight: 1.2,
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        maxWidth: "100%",
+                                                        minWidth: 0,
+                                                      }
+                                                }
+                                              >
+                                                {singleDisplayLabel}
+                                                {!customTimes && isOvernight && (
+                                                  <sup
+                                                    style={{
+                                                      fontSize: "0.5em",
+                                                      fontWeight: 700,
+                                                      opacity: 0.5,
+                                                      marginLeft: 1,
+                                                    }}
+                                                  >
+                                                    +1
+                                                  </sup>
+                                                )}
+                                              </span>
+                                              {singleInlinesSecondary && (
+                                                <span
+                                                  aria-hidden="true"
+                                                  style={{
+                                                    fontSize: "var(--dg-fs-footnote)",
+                                                    fontWeight: 700,
+                                                    lineHeight: 1.3,
+                                                    opacity: 0.5,
+                                                    flexShrink: 0,
+                                                  }}
+                                                >
+                                                  ·
+                                                </span>
+                                              )}
+                                              {showSingleSecondaryLine ? (
+                                                <span
+                                                  style={{
+                                                    fontSize: singleIsThreeRow
+                                                      ? "var(--dg-fs-micro)"
+                                                      : "var(--dg-fs-footnote)",
+                                                    fontWeight: 700,
+                                                    lineHeight: singleIsThreeRow ? 1.2 : 1.3,
+                                                    opacity: 0.78,
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    maxWidth: "100%",
+                                                    minWidth: 0,
+                                                  }}
+                                                >
+                                                  {displayParts.secondaryLabel}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            {customTimes && (
                                               <span
                                                 style={{
                                                   fontSize: singleIsThreeRow
                                                     ? "var(--dg-fs-micro)"
                                                     : "var(--dg-fs-footnote)",
-                                                  fontWeight: 700,
-                                                  lineHeight: singleIsThreeRow ? 1.2 : 1.3,
-                                                  opacity: 0.78,
-                                                  whiteSpace: "nowrap",
-                                                  overflow: "hidden",
-                                                  textOverflow: "ellipsis",
-                                                  maxWidth: "100%",
-                                                  minWidth: 0,
+                                                  fontWeight: 500,
+                                                  lineHeight: 1,
+                                                  marginTop: singleIsThreeRow ? 2 : 4,
+                                                  opacity: 0.7,
+                                                  letterSpacing: "0.02em",
                                                 }}
                                               >
-                                                {displayParts.secondaryLabel}
-                                              </span>
-                                            ) : null}
-                                          </div>
-                                          {customTimes && (
-                                            <span
-                                              style={{
-                                                fontSize: singleIsThreeRow
-                                                  ? "var(--dg-fs-micro)"
-                                                  : "var(--dg-fs-footnote)",
-                                                fontWeight: 500,
-                                                lineHeight: 1,
-                                                marginTop: singleIsThreeRow ? 2 : 4,
-                                                opacity: 0.7,
-                                                letterSpacing: "0.02em",
-                                              }}
-                                            >
-                                              {fmt12hShort(customTimes.start)}–
-                                              {fmt12hShort(customTimes.end)}
-                                              {isOvernight && (
-                                                <sup
-                                                  style={{
-                                                    fontSize: "0.7em",
-                                                    fontWeight: 700,
-                                                    marginLeft: 1,
-                                                    opacity: 1,
-                                                  }}
-                                                >
-                                                  +1
-                                                </sup>
-                                              )}
-                                            </span>
-                                          )}
-                                          {noteTypes.length > 0 && (
-                                            <div
-                                              style={{
-                                                position: "absolute",
-                                                bottom: shouldShowAuthorName ? 18 : 3,
-                                                right: 4,
-                                                display: "flex",
-                                                gap: 2,
-                                              }}
-                                            >
-                                              {indicatorTypes
-                                                .filter((ind) => noteTypes.includes(ind.id))
-                                                .map((ind) => (
-                                                  <MaybeHint
-                                                    key={ind.name}
-                                                    content={ind.name}
-                                                    side="top"
+                                                {fmt12hShort(customTimes.start)}–
+                                                {fmt12hShort(customTimes.end)}
+                                                {isOvernight && (
+                                                  <sup
+                                                    style={{
+                                                      fontSize: "0.7em",
+                                                      fontWeight: 700,
+                                                      marginLeft: 1,
+                                                      opacity: 1,
+                                                    }}
                                                   >
-                                                    <div
-                                                      style={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        borderRadius: "50%",
-                                                        background: ind.color,
-                                                        border: "1.5px solid rgba(255,255,255,0.9)",
-                                                        flexShrink: 0,
-                                                      }}
-                                                    />
-                                                  </MaybeHint>
-                                                ))}
-                                            </div>
-                                          )}
-                                          {(draftBadge || publishBadge) && (
-                                            <GridDiffBadge
-                                              badge={{
-                                                ...(draftBadge ?? publishBadge!),
-                                                topOffset: -8,
-                                                // Past the lock avatar first,
-                                                // then past the "M" that has
-                                                // itself been pushed past it.
-                                                rightOffset:
-                                                  cornerLockClearance +
-                                                  (singleIsMentored
-                                                    ? MENTORED_CORNER_CLEARANCE
-                                                    : 4),
-                                              }}
-                                            />
-                                          )}
-                                        </div>
+                                                    +1
+                                                  </sup>
+                                                )}
+                                              </span>
+                                            )}
+                                            {noteTypes.length > 0 && (
+                                              <div
+                                                style={{
+                                                  position: "absolute",
+                                                  bottom: shouldShowAuthorName ? 18 : 3,
+                                                  right: 4,
+                                                  display: "flex",
+                                                  gap: 2,
+                                                }}
+                                              >
+                                                {indicatorTypes
+                                                  .filter((ind) => noteTypes.includes(ind.id))
+                                                  .map((ind) => (
+                                                    <MaybeHint
+                                                      key={ind.name}
+                                                      content={ind.name}
+                                                      side="top"
+                                                    >
+                                                      <div
+                                                        style={{
+                                                          width: 10,
+                                                          height: 10,
+                                                          borderRadius: "50%",
+                                                          background: ind.color,
+                                                          border:
+                                                            "1.5px solid rgba(255,255,255,0.9)",
+                                                          flexShrink: 0,
+                                                        }}
+                                                      />
+                                                    </MaybeHint>
+                                                  ))}
+                                              </div>
+                                            )}
+                                            {(draftBadge || publishBadge) && (
+                                              <GridDiffBadge
+                                                badge={{
+                                                  ...(draftBadge ?? publishBadge!),
+                                                  topOffset: -8,
+                                                  // Past the lock avatar first,
+                                                  // then past the "M" that has
+                                                  // itself been pushed past it.
+                                                  rightOffset:
+                                                    cornerLockClearance +
+                                                    (singleIsMentored
+                                                      ? MENTORED_CORNER_CLEARANCE
+                                                      : 4),
+                                                }}
+                                              />
+                                            )}
+                                          </div>
+                                        </ShiftDetailHoverCard>
                                         {shouldShowAuthorName && auditName && (
                                           <AuthorBadge
                                             name={auditName}
@@ -2208,11 +2486,32 @@ const SectionBlock = memo(function SectionBlock({
                                   }
 
                                   // Multi-pill: render each shift as a separate vertical pill.
-                                  // Keep the inset stable regardless of diff state so split
-                                  // shifts stay the same height as non-split cells; the diff
-                                  // badge floats above with topOffset: -8 and the cell allows
-                                  // overflow.
-                                  const multiTopInset = 3;
+                                  // Every raised badge needs real room above the pills. Letting it
+                                  // hang from the standard 3px inset pushed its top 5px outside
+                                  // the cell, where neighbouring rows could cover it.
+                                  const multiPillBadges = labels.map(
+                                    (_, labelIndex) =>
+                                      (showsDraftBadge && draftBadge == null
+                                        ? buildPillBadge({
+                                            source: "draft",
+                                            descriptor: draftDiff?.pillDiffs[labelIndex]?.badge,
+                                          })
+                                        : null) ??
+                                      (publishBadge == null
+                                        ? buildPillBadge({
+                                            source: "publish",
+                                            descriptor:
+                                              publishDiffSummary?.pillDiffs[labelIndex]?.badge,
+                                          })
+                                        : null),
+                                  );
+                                  const multiHasRaisedDiffBadge =
+                                    multiPillBadges.some((badge) => badge != null) ||
+                                    draftBadge != null ||
+                                    publishBadge != null;
+                                  const multiTopInset = multiHasRaisedDiffBadge
+                                    ? RAISED_DIFF_BADGE_TOP_INSET
+                                    : 3;
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
@@ -2255,416 +2554,418 @@ const SectionBlock = memo(function SectionBlock({
                                           })}
                                         />
                                       )}
-                                      <div
-                                        style={{
-                                          position: "absolute",
-                                          top: insetFromVisibleCellTop(multiTopInset),
-                                          right: `${multiSideInset}px`,
-                                          bottom: `${multiBottomInset}px`,
-                                          left: insetFromVisibleCellLeft(multiSideInset),
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          gap: 1,
-                                          alignItems: "stretch",
-                                          opacity: draftKind === "deleted" ? 0.5 : 1,
-                                        }}
+                                      <ShiftDetailHoverCard
+                                        enabled={showShiftDetailHoverCards}
+                                        employeeName={getEmployeeDisplayName(emp)}
+                                        date={date}
+                                        entries={hoverDetailEntries}
+                                        indicators={hoverIndicatorNames}
+                                        requestLabel={activeRequestLabel}
+                                        status={hoverStatus}
                                       >
-                                        {activeRequest && activeRequestLabel && (
-                                          <RequestCornerFold
-                                            status={activeRequest.status}
-                                            label={activeRequestLabel}
-                                          />
-                                        )}
                                         <div
                                           style={{
+                                            position: "absolute",
+                                            top: insetFromVisibleCellTop(multiTopInset),
+                                            right: `${multiSideInset}px`,
+                                            bottom: `${multiBottomInset}px`,
+                                            left: insetFromVisibleCellLeft(multiSideInset),
                                             display: "flex",
-                                            flexDirection: "row",
-                                            // Two hairlines butted together read
-                                            // as one thick rule; 2px keeps the
-                                            // pills legibly separate.
-                                            gap: 2,
-                                            flex: 1,
-                                            minHeight: 0,
+                                            flexDirection: "column",
+                                            gap: 1,
                                             alignItems: "stretch",
+                                            opacity: draftKind === "deleted" ? 0.5 : 1,
                                           }}
                                         >
-                                          {labels.map((label, li) => {
-                                            const style = getStyleByIdOrLabel(
-                                              label,
-                                              cellCodeIds[li],
-                                            );
-                                            const darkPillStyleLi = isDarkTheme
-                                              ? toDarkPillColors(style.color)
-                                              : null;
-                                            const effectiveColorLi =
-                                              darkPillStyleLi?.bg ?? style.color;
-                                            const effectiveTextLi =
-                                              darkPillStyleLi?.text ?? style.text;
-                                            const codeEntryLi =
-                                              cellCodeIds[li] != null
-                                                ? assignmentById.get(cellCodeIds[li])
+                                          {activeRequest && activeRequestLabel && (
+                                            <RequestCornerFold
+                                              status={activeRequest.status}
+                                              label={activeRequestLabel}
+                                            />
+                                          )}
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              flexDirection: "row",
+                                              // Two hairlines butted together read
+                                              // as one thick rule; 2px keeps the
+                                              // pills legibly separate.
+                                              gap: 2,
+                                              flex: 1,
+                                              minHeight: 0,
+                                              alignItems: "stretch",
+                                            }}
+                                          >
+                                            {labels.map((label, li) => {
+                                              const style = getStyleByIdOrLabel(
+                                                label,
+                                                cellCodeIds[li],
+                                              );
+                                              const darkPillStyleLi = isDarkTheme
+                                                ? toDarkPillColors(style.color)
+                                                : null;
+                                              const effectiveColorLi =
+                                                darkPillStyleLi?.bg ?? style.color;
+                                              const effectiveTextLi =
+                                                darkPillStyleLi?.text ?? style.text;
+                                              const codeEntryLi =
+                                                cellCodeIds[li] != null
+                                                  ? assignmentById.get(cellCodeIds[li])
+                                                  : undefined;
+                                              const isCross =
+                                                label !== "X" &&
+                                                codeEntryLi?.focusAreaId != null &&
+                                                sectionFocusArea != null &&
+                                                codeEntryLi.focusAreaId !== sectionFocusArea.id;
+                                              const displayParts = getDisplayPartsByIdOrLabel(
+                                                label,
+                                                cellCodeIds[li],
+                                              );
+                                              const crossHomeFaLi = isCross
+                                                ? focusAreas.find(
+                                                    (fa) => fa.id === codeEntryLi!.focusAreaId,
+                                                  )
                                                 : undefined;
-                                            const isCross =
-                                              label !== "X" &&
-                                              codeEntryLi?.focusAreaId != null &&
-                                              sectionFocusArea != null &&
-                                              codeEntryLi.focusAreaId !== sectionFocusArea.id;
-                                            const displayParts = getDisplayPartsByIdOrLabel(
-                                              label,
-                                              cellCodeIds[li],
-                                            );
-                                            const crossHomeFaLi = isCross
-                                              ? focusAreas.find(
-                                                  (fa) => fa.id === codeEntryLi!.focusAreaId,
-                                                )
-                                              : undefined;
-                                            const draftPillDiff = draftDiff?.pillDiffs[li] ?? {
-                                              borderKind:
-                                                draftKind === "new" || draftKind === "modified"
-                                                  ? draftKind
-                                                  : null,
-                                              badge: null,
-                                            };
-                                            const draftPillBorderKind: DraftKind = draftDiff
-                                              ? draftPillDiff.borderKind
-                                              : (draftPillDiff.borderKind ?? draftKind);
-                                            const publishRingStatus =
-                                              publishDiffSummary?.pillDiffs[li]?.borderKind ?? null;
-                                            const multiUsesShiftColor =
-                                              shouldUseShiftColorForDiffState({
-                                                isCross,
-                                              });
-                                            const multiForegroundColor = multiUsesShiftColor
-                                              ? effectiveTextLi
-                                              : getReadableTextOnSurface(
-                                                  effectiveColorLi,
-                                                  effectiveTextLi,
-                                                  themeSurface,
-                                                );
-                                            const pillBadge =
-                                              (showsDraftBadge && draftBadge == null
-                                                ? buildPillBadge({
-                                                    source: "draft",
-                                                    descriptor: draftDiff?.pillDiffs[li]?.badge,
-                                                  })
-                                                : null) ??
-                                              (publishBadge == null
-                                                ? buildPillBadge({
-                                                    source: "publish",
-                                                    descriptor:
-                                                      publishDiffSummary?.pillDiffs[li]?.badge,
-                                                  })
-                                                : null);
-                                            const pillBorder = draftPillBorderKind
-                                              ? getDraftBorder(
-                                                  draftPillBorderKind,
-                                                  `1px solid ${borderColor(multiForegroundColor)}`,
-                                                )
-                                              : `1px solid ${borderColor(multiForegroundColor)}`;
-                                            const pillTime =
-                                              customTimes?.perPill?.[li] ??
-                                              (li === 0 && !customTimes?.perPill
-                                                ? customTimes
-                                                : null);
-                                            const hasTime =
-                                              pillTime && (pillTime.start || pillTime.end);
-                                            const catLi =
-                                              codeEntryLi?.categoryId != null
-                                                ? categoryById.get(codeEntryLi.categoryId)
-                                                : undefined;
-                                            const isPillOvernight = isOvernightTimes(
-                                              pillTime?.start ??
-                                                codeEntryLi?.defaultStartTime ??
-                                                catLi?.startTime,
-                                              pillTime?.end ??
-                                                codeEntryLi?.defaultEndTime ??
-                                                catLi?.endTime,
-                                            );
-                                            const multiCrossFocusPill =
-                                              isCross && crossHomeFaLi ? crossHomeFaLi : null;
-                                            const multiCrossFocusPalette =
-                                              getCrossFocusBadgePalette({
-                                                color: effectiveColorLi,
-                                                text: effectiveTextLi,
-                                              });
-                                            const showMultiSecondaryLine =
-                                              !!displayParts.secondaryLabel;
-                                            // Same split as the single pill: a row per item in
-                                            // name mode, shift · job on one line in code mode.
-                                            const multiIsThreeRow =
-                                              showMultiSecondaryLine && !!hasTime && isNameMode;
-                                            const multiInlinesSecondary =
-                                              showMultiSecondaryLine && !isNameMode;
-                                            const multiDisplayLabel = displayParts.primaryLabel;
-                                            const isMentoredPill =
-                                              cellSegments[li]?.isMentored ?? false;
+                                              const draftPillDiff = draftDiff?.pillDiffs[li] ?? {
+                                                borderKind:
+                                                  draftKind === "new" || draftKind === "modified"
+                                                    ? draftKind
+                                                    : null,
+                                                badge: null,
+                                              };
+                                              const draftPillBorderKind: DraftKind = draftDiff
+                                                ? draftPillDiff.borderKind
+                                                : (draftPillDiff.borderKind ?? draftKind);
+                                              const publishRingStatus =
+                                                publishDiffSummary?.pillDiffs[li]?.borderKind ??
+                                                null;
+                                              const multiUsesShiftColor =
+                                                shouldUseShiftColorForDiffState({
+                                                  isCross,
+                                                });
+                                              const multiForegroundColor = multiUsesShiftColor
+                                                ? effectiveTextLi
+                                                : getReadableTextOnSurface(
+                                                    effectiveColorLi,
+                                                    effectiveTextLi,
+                                                    themeSurface,
+                                                  );
+                                              const pillBadge = multiPillBadges[li];
+                                              const pillBorder = draftPillBorderKind
+                                                ? getDraftBorder(
+                                                    draftPillBorderKind,
+                                                    `1px solid ${borderColor(multiForegroundColor)}`,
+                                                  )
+                                                : `1px solid ${borderColor(multiForegroundColor)}`;
+                                              const pillTime =
+                                                customTimes?.perPill?.[li] ??
+                                                (li === 0 && !customTimes?.perPill
+                                                  ? customTimes
+                                                  : null);
+                                              const hasTime =
+                                                pillTime && (pillTime.start || pillTime.end);
+                                              const catLi =
+                                                codeEntryLi?.categoryId != null
+                                                  ? categoryById.get(codeEntryLi.categoryId)
+                                                  : undefined;
+                                              const isPillOvernight = isOvernightTimes(
+                                                pillTime?.start ??
+                                                  codeEntryLi?.defaultStartTime ??
+                                                  catLi?.startTime,
+                                                pillTime?.end ??
+                                                  codeEntryLi?.defaultEndTime ??
+                                                  catLi?.endTime,
+                                              );
+                                              const multiCrossFocusPill =
+                                                isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                                              const multiCrossFocusPalette =
+                                                getCrossFocusBadgePalette({
+                                                  color: effectiveColorLi,
+                                                  text: effectiveTextLi,
+                                                });
+                                              const showMultiSecondaryLine =
+                                                !!displayParts.secondaryLabel;
+                                              // Same split as the single pill: a row per item in
+                                              // name mode, shift · job on one line in code mode.
+                                              const multiIsThreeRow =
+                                                showMultiSecondaryLine && !!hasTime && isNameMode;
+                                              const multiInlinesSecondary =
+                                                showMultiSecondaryLine && !isNameMode;
+                                              const multiDisplayLabel = displayParts.primaryLabel;
+                                              const isMentoredPill =
+                                                cellSegments[li]?.isMentored ?? false;
 
-                                            return (
-                                              <div
-                                                key={li}
-                                                data-shift-pill="multi"
-                                                style={{
-                                                  flex: 1,
-                                                  background: multiUsesShiftColor
-                                                    ? effectiveColorLi
-                                                    : "var(--dg-color-surface)",
-                                                  border: pillBorder,
-                                                  borderRadius: MULTI_SHIFT_PILL_RADIUS,
-                                                  color: multiForegroundColor,
-                                                  boxShadow:
-                                                    publishRingStatus === "new" ||
-                                                    publishRingStatus === "modified"
-                                                      ? getPublishDiffInsetRing(
-                                                          publishRingStatus,
-                                                          borderColor(multiForegroundColor),
-                                                        )
-                                                      : "none",
-                                                  display: "flex",
-                                                  flexDirection: "column",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                  gap: 1,
-                                                  fontSize: isNameMode
-                                                    ? "var(--dg-fs-micro)"
-                                                    : "var(--dg-fs-caption)",
-                                                  fontWeight: 800,
-                                                  position: "relative",
-                                                  cursor: "pointer",
-                                                  textDecoration:
-                                                    draftKind === "deleted"
-                                                      ? "line-through"
-                                                      : "none",
-                                                  lineHeight: 1.2,
-                                                  overflow: pillBadge ? "visible" : "hidden",
-                                                  minWidth: 0,
-                                                  padding: isNameMode ? "2px 4px" : "2px 3px",
-                                                  paddingTop: 2,
-                                                  paddingLeft: multiCrossFocusPill
-                                                    ? MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                                    : isNameMode
-                                                      ? 4
-                                                      : 3,
-                                                  paddingRight: isNameMode ? 4 : 3,
-                                                }}
-                                              >
-                                                {pillBadge && (
-                                                  <GridDiffBadge
-                                                    badge={{
-                                                      ...pillBadge,
-                                                      topOffset: -8,
-                                                      leftOffset: 4,
-                                                    }}
-                                                  />
-                                                )}
-                                                {multiCrossFocusPill && (
-                                                  <span
-                                                    style={{
-                                                      position: "absolute",
-                                                      top: pillBadge ? 8 : 0,
-                                                      bottom: 0,
-                                                      left: 0,
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      fontSize: "var(--dg-fs-micro)",
-                                                      fontWeight: 800,
-                                                      lineHeight: 1,
-                                                      background: multiCrossFocusPalette.background,
-                                                      color: multiCrossFocusPalette.color,
-                                                      borderRadius: pillBadge
-                                                        ? "0 0 0 2px"
-                                                        : "2px 0 0 2px",
-                                                      padding: "0 2px",
-                                                      letterSpacing: "0.02em",
-                                                      pointerEvents: "none",
-                                                    }}
-                                                  >
-                                                    {getFocusAreaInitials(multiCrossFocusPill.name)}
-                                                  </span>
-                                                )}
-                                                {isMentoredPill && (
-                                                  <MentoredShiftBadge
-                                                    compact
-                                                    rightInset={
-                                                      // Only the last pill shares
-                                                      // the cell's corner with
-                                                      // the lock avatar.
-                                                      li === labels.length - 1
-                                                        ? cornerLockClearance || undefined
-                                                        : undefined
-                                                    }
-                                                  />
-                                                )}
+                                              return (
                                                 <div
+                                                  key={li}
+                                                  data-shift-pill="multi"
                                                   style={{
+                                                    flex: 1,
+                                                    background: multiUsesShiftColor
+                                                      ? effectiveColorLi
+                                                      : "var(--dg-color-surface)",
+                                                    border: pillBorder,
+                                                    borderRadius: MULTI_SHIFT_PILL_RADIUS,
+                                                    color: multiForegroundColor,
+                                                    boxShadow:
+                                                      publishRingStatus === "new" ||
+                                                      publishRingStatus === "modified"
+                                                        ? getPublishDiffInsetRing(
+                                                            publishRingStatus,
+                                                            borderColor(multiForegroundColor),
+                                                          )
+                                                        : "none",
                                                     display: "flex",
-                                                    flexDirection: multiInlinesSecondary
-                                                      ? "row"
-                                                      : "column",
-                                                    alignItems: multiInlinesSecondary
-                                                      ? "baseline"
-                                                      : "center",
+                                                    flexDirection: "column",
+                                                    alignItems: "center",
                                                     justifyContent: "center",
-                                                    flexWrap: "nowrap",
-                                                    gap: multiInlinesSecondary
-                                                      ? 2
-                                                      : showMultiSecondaryLine
-                                                        ? 1
-                                                        : 0,
-                                                    maxWidth: "100%",
+                                                    gap: 1,
+                                                    fontSize: isNameMode
+                                                      ? "var(--dg-fs-micro)"
+                                                      : "var(--dg-fs-caption)",
+                                                    fontWeight: 800,
+                                                    position: "relative",
+                                                    cursor: "pointer",
+                                                    textDecoration:
+                                                      draftKind === "deleted"
+                                                        ? "line-through"
+                                                        : "none",
+                                                    lineHeight: 1.2,
+                                                    overflow: pillBadge ? "visible" : "hidden",
                                                     minWidth: 0,
-                                                    overflow: "hidden",
+                                                    padding: isNameMode ? "2px 4px" : "2px 3px",
+                                                    paddingTop: 2,
+                                                    paddingLeft: multiCrossFocusPill
+                                                      ? MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                      : isNameMode
+                                                        ? 4
+                                                        : 3,
+                                                    paddingRight: isNameMode ? 4 : 3,
                                                   }}
                                                 >
-                                                  <span
-                                                    style={
-                                                      isNameMode
-                                                        ? {
-                                                            textAlign: "center" as const,
-                                                            maxWidth: "100%",
-                                                            overflowWrap: "break-word" as const,
-                                                            display: "-webkit-box",
-                                                            WebkitBoxOrient: "vertical" as const,
-                                                            WebkitLineClamp: showMultiSecondaryLine
-                                                              ? 1
-                                                              : hasTime
-                                                                ? 1
-                                                                : 2,
-                                                            overflow: "hidden",
-                                                            lineHeight: 1.2,
-                                                          }
-                                                        : {
-                                                            whiteSpace: "nowrap",
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis",
-                                                            maxWidth: "100%",
-                                                            minWidth: 0,
-                                                          }
-                                                    }
-                                                  >
-                                                    {multiDisplayLabel}
-                                                    {!hasTime && isPillOvernight && (
-                                                      <sup
-                                                        style={{
-                                                          fontSize: "0.65em",
-                                                          fontWeight: 700,
-                                                          opacity: 0.5,
-                                                          marginLeft: 1,
-                                                        }}
-                                                      >
-                                                        +1
-                                                      </sup>
-                                                    )}
-                                                  </span>
-                                                  {multiInlinesSecondary && (
+                                                  {pillBadge && (
+                                                    <GridDiffBadge
+                                                      badge={{
+                                                        ...pillBadge,
+                                                        topOffset: -8,
+                                                        leftOffset: 4,
+                                                      }}
+                                                    />
+                                                  )}
+                                                  {multiCrossFocusPill && (
                                                     <span
-                                                      aria-hidden="true"
                                                       style={{
+                                                        position: "absolute",
+                                                        top: pillBadge ? 8 : 0,
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        display: "flex",
+                                                        alignItems: "center",
                                                         fontSize: "var(--dg-fs-micro)",
-                                                        fontWeight: 700,
-                                                        opacity: 0.5,
-                                                        lineHeight: 1.3,
-                                                        flexShrink: 0,
+                                                        fontWeight: 800,
+                                                        lineHeight: 1,
+                                                        background:
+                                                          multiCrossFocusPalette.background,
+                                                        color: multiCrossFocusPalette.color,
+                                                        borderRadius: pillBadge
+                                                          ? "0 0 0 2px"
+                                                          : "2px 0 0 2px",
+                                                        padding: "0 2px",
+                                                        letterSpacing: "0.02em",
+                                                        pointerEvents: "none",
                                                       }}
                                                     >
-                                                      ·
+                                                      {getFocusAreaInitials(
+                                                        multiCrossFocusPill.name,
+                                                      )}
                                                     </span>
                                                   )}
-                                                  {showMultiSecondaryLine ? (
+                                                  {isMentoredPill && (
+                                                    <MentoredShiftBadge
+                                                      compact
+                                                      rightInset={
+                                                        // Only the last pill shares
+                                                        // the cell's corner with
+                                                        // the lock avatar.
+                                                        li === labels.length - 1
+                                                          ? cornerLockClearance || undefined
+                                                          : undefined
+                                                      }
+                                                    />
+                                                  )}
+                                                  <div
+                                                    style={{
+                                                      display: "flex",
+                                                      flexDirection: multiInlinesSecondary
+                                                        ? "row"
+                                                        : "column",
+                                                      alignItems: multiInlinesSecondary
+                                                        ? "baseline"
+                                                        : "center",
+                                                      justifyContent: "center",
+                                                      flexWrap: "nowrap",
+                                                      gap: multiInlinesSecondary
+                                                        ? 2
+                                                        : showMultiSecondaryLine
+                                                          ? 1
+                                                          : 0,
+                                                      maxWidth: "100%",
+                                                      minWidth: 0,
+                                                      overflow: "hidden",
+                                                    }}
+                                                  >
+                                                    <span
+                                                      style={
+                                                        isNameMode
+                                                          ? {
+                                                              textAlign: "center" as const,
+                                                              maxWidth: "100%",
+                                                              overflowWrap: "break-word" as const,
+                                                              display: "-webkit-box",
+                                                              WebkitBoxOrient: "vertical" as const,
+                                                              WebkitLineClamp:
+                                                                showMultiSecondaryLine
+                                                                  ? 1
+                                                                  : hasTime
+                                                                    ? 1
+                                                                    : 2,
+                                                              overflow: "hidden",
+                                                              lineHeight: 1.2,
+                                                            }
+                                                          : {
+                                                              whiteSpace: "nowrap",
+                                                              overflow: "hidden",
+                                                              textOverflow: "ellipsis",
+                                                              maxWidth: "100%",
+                                                              minWidth: 0,
+                                                            }
+                                                      }
+                                                    >
+                                                      {multiDisplayLabel}
+                                                      {!hasTime && isPillOvernight && (
+                                                        <sup
+                                                          style={{
+                                                            fontSize: "0.65em",
+                                                            fontWeight: 700,
+                                                            opacity: 0.5,
+                                                            marginLeft: 1,
+                                                          }}
+                                                        >
+                                                          +1
+                                                        </sup>
+                                                      )}
+                                                    </span>
+                                                    {multiInlinesSecondary && (
+                                                      <span
+                                                        aria-hidden="true"
+                                                        style={{
+                                                          fontSize: "var(--dg-fs-micro)",
+                                                          fontWeight: 700,
+                                                          opacity: 0.5,
+                                                          lineHeight: 1.3,
+                                                          flexShrink: 0,
+                                                        }}
+                                                      >
+                                                        ·
+                                                      </span>
+                                                    )}
+                                                    {showMultiSecondaryLine ? (
+                                                      <span
+                                                        style={{
+                                                          fontSize: "var(--dg-fs-micro)",
+                                                          fontWeight: 700,
+                                                          opacity: 0.78,
+                                                          // A split shift is half the width but the
+                                                          // full cell height, so three rows fit on
+                                                          // the same budget as the single pill.
+                                                          lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                          whiteSpace: "nowrap",
+                                                          overflow: "hidden",
+                                                          textOverflow: "ellipsis",
+                                                          maxWidth: "100%",
+                                                        }}
+                                                      >
+                                                        {displayParts.secondaryLabel}
+                                                      </span>
+                                                    ) : null}
+                                                  </div>
+                                                  {hasTime && (
                                                     <span
                                                       style={{
                                                         fontSize: "var(--dg-fs-micro)",
-                                                        fontWeight: 700,
-                                                        opacity: 0.78,
-                                                        // A split shift is half the width but the
-                                                        // full cell height, so three rows fit on
-                                                        // the same budget as the single pill.
-                                                        lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                        fontWeight: 500,
+                                                        opacity: 0.7,
+                                                        lineHeight: 1,
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
                                                         textOverflow: "ellipsis",
                                                         maxWidth: "100%",
                                                       }}
                                                     >
-                                                      {displayParts.secondaryLabel}
+                                                      {fmt12hShort(pillTime!.start)}–
+                                                      {fmt12hShort(pillTime!.end)}
+                                                      {isPillOvernight && (
+                                                        <sup
+                                                          style={{
+                                                            fontSize: "0.65em",
+                                                            fontWeight: 700,
+                                                            marginLeft: 1,
+                                                            opacity: 1,
+                                                          }}
+                                                        >
+                                                          +1
+                                                        </sup>
+                                                      )}
                                                     </span>
-                                                  ) : null}
+                                                  )}
                                                 </div>
-                                                {hasTime && (
-                                                  <span
-                                                    style={{
-                                                      fontSize: "var(--dg-fs-micro)",
-                                                      fontWeight: 500,
-                                                      opacity: 0.7,
-                                                      lineHeight: 1,
-                                                      whiteSpace: "nowrap",
-                                                      overflow: "hidden",
-                                                      textOverflow: "ellipsis",
-                                                      maxWidth: "100%",
-                                                    }}
-                                                  >
-                                                    {fmt12hShort(pillTime!.start)}–
-                                                    {fmt12hShort(pillTime!.end)}
-                                                    {isPillOvernight && (
-                                                      <sup
-                                                        style={{
-                                                          fontSize: "0.65em",
-                                                          fontWeight: 700,
-                                                          marginLeft: 1,
-                                                          opacity: 1,
-                                                        }}
-                                                      >
-                                                        +1
-                                                      </sup>
-                                                    )}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                        {noteTypes.length > 0 && (
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: 2,
-                                              right: multiNotesRightOffset,
-                                              display: "flex",
-                                              gap: NOTE_DOT_GAP,
-                                              zIndex: 1,
-                                            }}
-                                          >
-                                            {indicatorTypes
-                                              .filter((ind) => noteTypes.includes(ind.id))
-                                              .map((ind) => (
-                                                <MaybeHint
-                                                  key={ind.name}
-                                                  content={ind.name}
-                                                  side="top"
-                                                >
-                                                  <div
-                                                    style={{
-                                                      width: 10,
-                                                      height: 10,
-                                                      borderRadius: "50%",
-                                                      background: ind.color,
-                                                      border: "1.5px solid rgba(255,255,255,0.9)",
-                                                      flexShrink: 0,
-                                                    }}
-                                                  />
-                                                </MaybeHint>
-                                              ))}
+                                              );
+                                            })}
                                           </div>
-                                        )}
-                                        {(draftBadge || publishBadge) && (
-                                          <GridDiffBadge
-                                            badge={{
-                                              ...(draftBadge ?? publishBadge!),
-                                              topOffset: -8,
-                                              rightOffset: multiBadgeRightOffset,
-                                            }}
-                                          />
-                                        )}
-                                      </div>
+                                          {noteTypes.length > 0 && (
+                                            <div
+                                              style={{
+                                                position: "absolute",
+                                                top: 2,
+                                                right: multiNotesRightOffset,
+                                                display: "flex",
+                                                gap: NOTE_DOT_GAP,
+                                                zIndex: 1,
+                                              }}
+                                            >
+                                              {indicatorTypes
+                                                .filter((ind) => noteTypes.includes(ind.id))
+                                                .map((ind) => (
+                                                  <MaybeHint
+                                                    key={ind.name}
+                                                    content={ind.name}
+                                                    side="top"
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        width: 10,
+                                                        height: 10,
+                                                        borderRadius: "50%",
+                                                        background: ind.color,
+                                                        border: "1.5px solid rgba(255,255,255,0.9)",
+                                                        flexShrink: 0,
+                                                      }}
+                                                    />
+                                                  </MaybeHint>
+                                                ))}
+                                            </div>
+                                          )}
+                                          {(draftBadge || publishBadge) && (
+                                            <GridDiffBadge
+                                              badge={{
+                                                ...(draftBadge ?? publishBadge!),
+                                                topOffset: -8,
+                                                rightOffset: multiBadgeRightOffset,
+                                              }}
+                                            />
+                                          )}
+                                        </div>
+                                      </ShiftDetailHoverCard>
                                       {shouldShowAuthorName && auditName && (
                                         <AuthorBadge
                                           name={auditName}
@@ -3167,6 +3468,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   absenceTypeIdForKey,
   activeRequestForKey,
   shiftDisplayMode = "code",
+  showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
@@ -3492,6 +3794,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     absenceTypeIdForKey={absenceTypeIdForKey}
                     activeRequestForKey={activeRequestForKey}
                     shiftDisplayMode={shiftDisplayMode}
+                    showShiftDetailHoverCards={showShiftDetailHoverCards}
                     resolvePublisherName={resolvePublisherName}
                     openShifts={openShifts?.filter(
                       (os) => sectionId != null && os.focusAreaId === sectionId,
@@ -3712,6 +4015,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
         activeRequestForKey={model.accessors.activeRequestForKey}
         shiftDisplayMode={model.options.shiftDisplayMode}
+        showShiftDetailHoverCards={model.options.showShiftDetailHoverCards}
         resolvePublisherName={model.resolvePublisherName}
         openShifts={model.openShifts}
         onClaimOpenShift={handlers.onClaimOpenShift}

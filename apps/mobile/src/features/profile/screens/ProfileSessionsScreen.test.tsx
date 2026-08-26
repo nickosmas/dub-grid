@@ -65,7 +65,11 @@ const currentSession = {
   platform: "ios",
   appVersion: "1.4.0",
   deviceLabel: "Mina's iPhone",
+  browserName: null,
+  browserVersion: null,
   ipAddress: "203.0.113.7",
+  locationCity: "Nairobi",
+  locationCountry: "Kenya",
   lastActiveAt: "2026-08-17T09:00:00.000Z",
   createdAt: "2026-08-01T09:00:00.000Z",
   refreshTokenHash: "hash-current",
@@ -127,19 +131,19 @@ describe("ProfileSessionsScreen", () => {
     mockSessions({ active: [currentSession, otherSession], stale: [] });
   });
 
-  it("keeps the row to a name and a timestamp, with the detail behind a tap", () => {
+  it("shows device, client, connection, and last-active details in each row", () => {
     render(<ProfileSessionsScreen />);
 
     expect(screen.getByText("Mina's iPhone")).toBeInTheDocument();
-    expect(screen.getByText("Current")).toBeInTheDocument();
-    // The meta that used to crowd every row is not on the page until asked for.
-    expect(screen.queryByText("198.51.100.4")).not.toBeInTheDocument();
+    expect(screen.getByText("This device")).toBeInTheDocument();
+    expect(screen.getByText("DubGrid Mobile 1.3.9")).toBeInTheDocument();
+    expect(screen.getByText("198.51.100.4 (Nairobi, Kenya)")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Pixel 8" }));
 
-    expect(screen.getByText("198.51.100.4")).toBeInTheDocument();
-    expect(screen.getByText("1.3.9")).toBeInTheDocument();
+    expect(screen.getAllByText("198.51.100.4 (Nairobi, Kenya)")).toHaveLength(2);
+    expect(screen.getAllByText("DubGrid Mobile 1.3.9")).toHaveLength(2);
     expect(screen.getByText("First signed in")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out this device" })).toBeInTheDocument();
   });
@@ -149,7 +153,7 @@ describe("ProfileSessionsScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mina's iPhone" }));
 
-    expect(screen.getByText("This device")).toBeInTheDocument();
+    expect(screen.getAllByText("This device")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Sign out this device" })).not.toBeInTheDocument();
   });
 

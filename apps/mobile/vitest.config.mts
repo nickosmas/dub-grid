@@ -60,6 +60,7 @@ export default defineConfig(async () => {
         ...[
           "haptics",
           "constants",
+          "device",
           "secure-store",
           "network",
           "tracking-transparency",

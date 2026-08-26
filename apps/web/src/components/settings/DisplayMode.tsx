@@ -15,6 +15,7 @@ import { resolveJobColorsForShift } from "@/lib/job-placement";
 import { useTheme } from "next-themes";
 import { borderColor, resolveShiftPillColors } from "@/lib/colors";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Switch } from "@/components/ui/switch";
 
 const PREVIEW_DAYS = [
   { shortLabel: "Mon", dateNumber: "21" },
@@ -371,8 +372,13 @@ export default function DisplayMode({
   onSave: (org: Organization) => void;
 }) {
   const [selected, setSelected] = useState<ShiftDisplayMode>(organization.shiftDisplayMode);
+  const [showShiftDetailHoverCards, setShowShiftDetailHoverCards] = useState(
+    organization.showShiftDetailHoverCards ?? true,
+  );
   const [saving, setSaving] = useState(false);
-  const isModified = selected !== organization.shiftDisplayMode;
+  const isModified =
+    selected !== organization.shiftDisplayMode ||
+    showShiftDetailHoverCards !== (organization.showShiftDetailHoverCards ?? true);
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -385,6 +391,7 @@ export default function DisplayMode({
         orgId: organization.id,
         expectedUpdatedAt: organization.updatedAt,
         shiftDisplayMode: selected,
+        showShiftDetailHoverCards,
       });
       onSave(updated);
       toast.success("Display mode updated");
@@ -392,6 +399,7 @@ export default function DisplayMode({
       if (err instanceof OrganizationSettingsConflictError) {
         onSave(err.latestOrganization);
         setSelected(err.latestOrganization.shiftDisplayMode);
+        setShowShiftDetailHoverCards(err.latestOrganization.showShiftDetailHoverCards ?? true);
         toast.error("Display mode changed elsewhere. Review the latest value and try again.");
       } else {
         Sentry.captureException(err);
@@ -400,11 +408,12 @@ export default function DisplayMode({
     } finally {
       setSaving(false);
     }
-  }, [organization, selected, onSave]);
+  }, [organization, selected, showShiftDetailHoverCards, onSave]);
 
   const handleCancel = useCallback(() => {
     setSelected(organization.shiftDisplayMode);
-  }, [organization.shiftDisplayMode]);
+    setShowShiftDetailHoverCards(organization.showShiftDetailHoverCards ?? true);
+  }, [organization.shiftDisplayMode, organization.showShiftDetailHoverCards]);
 
   const modes = DISPLAY_MODES;
 
@@ -528,6 +537,46 @@ export default function DisplayMode({
               );
             })}
           </div>
+        </div>
+
+        <div
+          style={{
+            padding: "16px 18px",
+            borderTop: "1px solid var(--dg-color-border-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 18,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 700,
+                color: "var(--dg-color-text-primary)",
+              }}
+            >
+              Shift detail hover cards
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                lineHeight: 1.5,
+              }}
+            >
+              Show the complete shift, time, assignment, and cell status when someone hovers a shift
+              pill on the schedule.
+            </div>
+          </div>
+          <Switch
+            checked={showShiftDetailHoverCards}
+            onChange={setShowShiftDetailHoverCards}
+            disabled={saving}
+            ariaLabel="Show shift detail hover cards"
+          />
         </div>
 
         <div

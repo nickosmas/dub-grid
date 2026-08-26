@@ -35,8 +35,10 @@ import { SessionDetailSheet } from "../components/SessionDetailSheet";
 import { SignOutScopeSheet, type SignOutScope } from "../components/SignOutScopeSheet";
 import {
   formatSessionDeviceLabel,
+  formatSessionClient,
+  formatSessionLastActive,
   formatSessionPlatform,
-  formatSessionTimestamp,
+  formatSessionLocation,
 } from "../components/session-format";
 
 type SessionConfirmation =
@@ -309,13 +311,15 @@ function SessionRow({
           </Text>
           {session.isCurrent ? (
             <View style={styles.sessionCurrentBadge}>
-              <Text style={styles.sessionCurrentBadgeText}>Current</Text>
+              <Text style={styles.sessionCurrentBadgeText}>This device</Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.sessionBody}>
-          Last active {formatSessionTimestamp(session.lastActiveAt)}
+        <Text style={styles.sessionBody}>{formatSessionClient(session)}</Text>
+        <Text numberOfLines={1} style={styles.sessionBody}>
+          {formatSessionLocation(session)}
         </Text>
+        <Text style={styles.sessionBody}>{formatSessionLastActive(session.lastActiveAt)}</Text>
       </View>
       <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
     </PressableRow>
@@ -335,7 +339,7 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 12,
-      minHeight: 70,
+      minHeight: 112,
       paddingHorizontal: 16,
       paddingVertical: 12,
     },

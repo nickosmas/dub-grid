@@ -194,7 +194,7 @@ export async function createSandboxForUser(input: {
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
     .select(
-      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, feature_overrides",
+      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, show_shift_detail_hover_cards, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, feature_overrides",
     )
     .eq("id", sourceOrgId)
     .maybeSingle();
@@ -219,6 +219,7 @@ export async function createSandboxForUser(input: {
         role_label: sourceOrg?.role_label ?? null,
         department_label: sourceOrg?.department_label ?? null,
         shift_display_mode: sourceOrg?.shift_display_mode ?? "code",
+        show_shift_detail_hover_cards: sourceOrg?.show_shift_detail_hover_cards ?? true,
         timezone: sourceOrg?.timezone ?? "UTC",
         pay_period_start_date: sourceOrg?.pay_period_start_date ?? null,
         // Address + contact (so the sandbox feels like a real org)

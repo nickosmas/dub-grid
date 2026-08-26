@@ -26,16 +26,7 @@ const arrowBaseStyle = {
 } satisfies React.CSSProperties;
 
 const defaultArrowRender = (
-  <svg
-    viewBox="0 0 16 16"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    style={{
-      display: "block",
-      width: "100%",
-      height: "100%",
-    }}
-  >
+  <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1.5 9.5L8 2.5L14.5 9.5V16H1.5Z" fill="var(--dg-color-surface)" />
     <path
       d="M1.5 9.5L8 2.5L14.5 9.5"
