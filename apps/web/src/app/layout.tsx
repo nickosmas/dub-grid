@@ -4,6 +4,7 @@ import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import "@/lib/env.server";
+import { clientEnv } from "@/lib/env";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -18,7 +19,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com"),
+  metadataBase: new URL(clientEnv?.NEXT_PUBLIC_SITE_URL ?? "https://dubgrid.com"),
   title: "DubGrid",
   description: "Staff scheduling, built for care teams.",
   openGraph: {
