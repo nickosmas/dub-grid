@@ -26,9 +26,44 @@ export function formatSessionDeviceLabel(session: MobileProfileSession): string 
   return session.deviceLabel || session.platform || "Unknown device";
 }
 
+export function formatSessionClient(session: MobileProfileSession): string {
+  if (session.platform === "web") {
+    return [session.browserName, session.browserVersion].filter(Boolean).join(" ") || "Web browser";
+  }
+
+  return ["DubGrid Mobile", session.appVersion].filter(Boolean).join(" ");
+}
+
+export function formatSessionLocation(session: MobileProfileSession): string {
+  const ipAddress = session.ipAddress === "::1" ? "localhost" : (session.ipAddress ?? "Unknown IP");
+  const location = [session.locationCity, session.locationCountry].filter(Boolean).join(", ");
+  return location ? `${ipAddress} (${location})` : ipAddress;
+}
+
 /** "Last active" / "First seen" timestamps, in the device's own locale. */
 export function formatSessionTimestamp(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+export function formatSessionLastActive(value: string): string {
+  const date = new Date(value);
+  const now = new Date();
+  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
+    date,
+  );
+  const startOf = (candidate: Date) =>
+    new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate());
+  const dayDifference = Math.round((startOf(now).getTime() - startOf(date).getTime()) / 86_400_000);
+
+  if (dayDifference === 0) return `Today at ${time}`;
+  if (dayDifference === 1) return `Yesterday at ${time}`;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 /** The trailing value on the hub's Devices row. */

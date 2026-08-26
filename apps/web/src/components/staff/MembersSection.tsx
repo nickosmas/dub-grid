@@ -1003,44 +1003,6 @@ export function MembersSection({
                 />
               )}
 
-              <Button
-                ref={filterBtnRef}
-                onClick={() => setFilterOpen((current) => !current)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-                style={{ position: "relative" }}
-              >
-                <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
-                {isMobile ? "" : "Filter"}
-                {/* The dot counts the half you're looking at, so it never
-                    reports filters the visible list isn't being narrowed by. */}
-                {(showManagement ? managementHasActiveFilters : hasActiveFilters) && (
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--dg-color-brand)]" />
-                )}
-              </Button>
-
-              {canShowReorder && (
-                <Button
-                  onClick={() => {
-                    if (!hasReorderableStaffRows) return;
-                    handleEnterReorder();
-                    setExpandedEmpId(null);
-                    setPage(1);
-                  }}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                  disabled={!hasReorderableStaffRows}
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                    <rect x="3" y="2" width="2" height="2" rx="1" />
-                    <rect x="9" y="2" width="2" height="2" rx="1" />
-                    <rect x="3" y="6" width="2" height="2" rx="1" />
-                    <rect x="9" y="6" width="2" height="2" rx="1" />
-                    <rect x="3" y="10" width="2" height="2" rx="1" />
-                    <rect x="9" y="10" width="2" height="2" rx="1" />
-                  </svg>
-                  {isMobile ? "" : "Reorder"}
-                </Button>
-              )}
-
               {!showManagement && (
                 <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
                   {tabs.map((tab, index) => {
@@ -1182,6 +1144,44 @@ export function MembersSection({
                       );
                     })}
                 </div>
+              )}
+
+              <Button
+                ref={filterBtnRef}
+                onClick={() => setFilterOpen((current) => !current)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                style={{ position: "relative" }}
+              >
+                <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
+                {isMobile ? "" : "Filter"}
+                {/* The dot counts the half you're looking at, so it never
+                    reports filters the visible list isn't being narrowed by. */}
+                {(showManagement ? managementHasActiveFilters : hasActiveFilters) && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--dg-color-brand)]" />
+                )}
+              </Button>
+
+              {canShowReorder && (
+                <Button
+                  onClick={() => {
+                    if (!hasReorderableStaffRows) return;
+                    handleEnterReorder();
+                    setExpandedEmpId(null);
+                    setPage(1);
+                  }}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  disabled={!hasReorderableStaffRows}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <rect x="3" y="2" width="2" height="2" rx="1" />
+                    <rect x="9" y="2" width="2" height="2" rx="1" />
+                    <rect x="3" y="6" width="2" height="2" rx="1" />
+                    <rect x="9" y="6" width="2" height="2" rx="1" />
+                    <rect x="3" y="10" width="2" height="2" rx="1" />
+                    <rect x="9" y="10" width="2" height="2" rx="1" />
+                  </svg>
+                  {isMobile ? "" : "Reorder"}
+                </Button>
               )}
 
               <div className="relative" style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}>
@@ -1458,7 +1458,7 @@ export function MembersSection({
                   className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
                 >
                   {isReordering ? (
-                    <div className="dg-staff-directory-table">
+                    <div className="dg-staff-directory-table dg-staff-directory-table--without-status">
                       <div className="dg-staff-directory-header bg-[var(--dg-color-bg)]">
                         <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex select-none items-center gap-1">
@@ -1476,7 +1476,6 @@ export function MembersSection({
                           </span>
                         </div>
                         <div className="dg-staff-directory-head-cell flex">Employment</div>
-                        <div className="dg-staff-directory-head-cell flex">Status</div>
                         <div className="dg-staff-directory-head-cell hidden md:flex">
                           {focusAreaLabel}
                         </div>
@@ -1510,6 +1509,7 @@ export function MembersSection({
                               dragPhase={isDragging ? (dragPhase ?? undefined) : undefined}
                               canManageEmployees={canManageEmployees}
                               canViewEmployeeDetails={canViewEmployeeDetails}
+                              showStatusColumn={false}
                               canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}
@@ -1578,7 +1578,7 @@ export function MembersSection({
                               Employment
                             </TableHead>
                           )}
-                          {canViewEmployeeDetails && (
+                          {canViewEmployeeDetails && activeTab === "all" && (
                             <TableHead className="w-[110px] border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:border-r">
                               Status
                             </TableHead>
@@ -1625,6 +1625,7 @@ export function MembersSection({
                               isDragging={false}
                               canManageEmployees={canManageEmployees}
                               canViewEmployeeDetails={canViewEmployeeDetails}
+                              showStatusColumn={activeTab === "all"}
                               canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}

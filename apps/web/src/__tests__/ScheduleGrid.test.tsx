@@ -283,6 +283,7 @@ interface RenderGridOptions {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: "code" | "name";
+  showShiftDetailHoverCards?: boolean;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: Array<Record<string, unknown>>;
   activeCellId?: GridCellId | null;
@@ -330,6 +331,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     isCellInteractive: options.isCellInteractive ?? true,
     canDragShifts: options.canDragShifts,
     shiftDisplayMode: options.shiftDisplayMode ?? "code",
+    showShiftDetailHoverCards: options.showShiftDetailHoverCards,
     showPublishDiffOverlay: options.showPublishDiffOverlay,
     showAudit: options.showAudit,
     accessors: {
@@ -1068,6 +1070,12 @@ describe("ScheduleGrid", () => {
     });
     expect(pills[1]?.style.borderColor).toBe("rgb(217, 119, 6)");
     expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    const splitPillContainer = pills[0]?.parentElement?.parentElement as HTMLElement | null;
+    expect(splitPillContainer?.style.top).toBe("10px");
+    expect(
+      Number.parseFloat(splitPillContainer?.style.top ?? "0") +
+        Number.parseFloat(badge?.style.top ?? "0"),
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it("uses the combined published shift label for draft replacement badges", () => {
@@ -2781,8 +2789,8 @@ describe("ScheduleGrid", () => {
     });
   });
 
-  it("does not show a hover tooltip for populated schedule cells", () => {
-    renderGrid({ shiftDisplayMode: "name" });
+  it("does not show shift detail hover cards when the organization disables them", () => {
+    renderGrid({ shiftDisplayMode: "name", showShiftDetailHoverCards: false });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     fireEvent.mouseEnter(firstCell);
@@ -2791,6 +2799,65 @@ describe("ScheduleGrid", () => {
     const visibleShiftLabel = within(firstCell).getByText("Day");
     fireEvent.mouseEnter(visibleShiftLabel);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("shows the general shift name before its type label in the hover card", async () => {
+    const generalAssignment: AssignmentDefinition = {
+      ...assignments[0],
+      label: "O",
+      name: "Office",
+      categoryId: null,
+      focusAreaId: null,
+      jobId: 101,
+      isGeneral: true,
+    };
+    const officeJob: JobDefinition = {
+      id: 101,
+      orgId: "org-1",
+      name: "Office",
+      abbr: "OFF",
+      showOnGrid: true,
+      assignmentMode: "shiftless",
+      eligibilityMode: "and",
+      focusAreaId: null,
+      focusAreaIds: [],
+      departmentIds: [],
+      applicableShiftIds: [],
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      shiftTimeOverrides: {},
+      shiftColorOverrides: {},
+      defaultStartTime: null,
+      defaultEndTime: null,
+      defaultDurationHours: null,
+      defaultDurationMinutes: null,
+      sortOrder: 1,
+      systemKey: null,
+      archivedAt: null,
+    };
+
+    renderGrid({
+      assignments: [generalAssignment],
+      jobs: [officeJob],
+      shiftForKey: () => "O",
+      assignmentIdsForKey: () => [1],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("General shift")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText("Office")).toHaveLength(1);
+    const generalShiftType = screen.getByText("General shift");
+    const entry = generalShiftType.parentElement;
+    expect(entry?.children[0]).toHaveTextContent("Office");
+    expect(entry?.children[1]).toHaveTextContent("General shift");
   });
 
   it("renders category rows with per-day totals", () => {

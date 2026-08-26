@@ -19,8 +19,13 @@ interface UserSession {
   id: string;
   supabaseSessionId: string | null;
   platform: "web" | "ios" | "android" | null;
+  appVersion: string | null;
   deviceLabel: string;
+  browserName: string | null;
+  browserVersion: string | null;
   ipAddress: string | null;
+  locationCity: string | null;
+  locationCountry: string | null;
   lastActiveAt: string;
   refreshTokenHash: string;
   isCurrent: boolean;
@@ -46,8 +51,38 @@ function parseDeviceLabel(
   return { icon: "desktop", label };
 }
 
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString();
+function formatSessionClient(session: UserSession): string {
+  if (session.platform === "web") {
+    return [session.browserName, session.browserVersion].filter(Boolean).join(" ") || "Web browser";
+  }
+
+  return ["DubGrid Mobile", session.appVersion].filter(Boolean).join(" ");
+}
+
+function formatSessionLocation(session: UserSession): string {
+  const ipAddress = session.ipAddress === "::1" ? "localhost" : (session.ipAddress ?? "Unknown IP");
+  const location = [session.locationCity, session.locationCountry].filter(Boolean).join(", ");
+  return location ? `${ipAddress} (${location})` : ipAddress;
+}
+
+function formatLastActive(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
+    date,
+  );
+  const startOf = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  const dayDifference = Math.round((startOf(now).getTime() - startOf(date).getTime()) / 86_400_000);
+
+  if (dayDifference === 0) return `Today at ${time}`;
+  if (dayDifference === 1) return `Yesterday at ${time}`;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function extractSupabaseSessionId(accessToken: string): string | null {
@@ -118,7 +153,7 @@ function SessionRow({
                 lineHeight: 1.5,
               }}
             >
-              Current
+              This device
             </span>
           )}
         </div>
@@ -129,7 +164,7 @@ function SessionRow({
             marginTop: 2,
           }}
         >
-          Last active {formatDateTime(session.lastActiveAt)}
+          {formatSessionClient(session)}
         </div>
         <div
           style={{
@@ -138,7 +173,16 @@ function SessionRow({
             marginTop: 2,
           }}
         >
-          {session.ipAddress === "::1" ? "localhost" : (session.ipAddress ?? "Unknown IP")}
+          {formatSessionLocation(session)}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--dg-color-text-subtle)",
+            marginTop: 2,
+          }}
+        >
+          {formatLastActive(session.lastActiveAt)}
         </div>
       </div>
       {showRevoke && (
@@ -212,8 +256,13 @@ export function SessionList() {
         id: row.id,
         supabaseSessionId: row.supabaseSessionId,
         platform: row.platform,
+        appVersion: row.appVersion,
         deviceLabel: row.deviceLabel ?? "Unknown device",
+        browserName: row.browserName,
+        browserVersion: row.browserVersion,
         ipAddress: row.ipAddress,
+        locationCity: row.locationCity,
+        locationCountry: row.locationCountry,
         lastActiveAt: row.lastActiveAt,
         refreshTokenHash: row.refreshTokenHash,
         isCurrent:

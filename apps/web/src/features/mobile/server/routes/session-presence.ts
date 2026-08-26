@@ -4,6 +4,7 @@ import { trackUserSessionForUser } from "@/features/account/server";
 import { requireMobileAuth } from "@/features/mobile/server";
 import logger from "@/lib/logger";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
+import { getSessionLocation } from "@/features/account/server/session-location";
 
 const CORS_METHODS = ["POST", "OPTIONS"] as const;
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
     null;
+  const location = getSessionLocation(req.headers);
 
   try {
     await trackUserSessionForUser({
@@ -56,6 +58,8 @@ export async function POST(req: NextRequest) {
       deviceLabel: parsed.data.deviceLabel,
       appVersion: parsed.data.appVersion ?? null,
       ipAddress: ip,
+      locationCity: location.city,
+      locationCountry: location.country,
     });
   } catch (error) {
     logger.error({ error }, "mobile session-presence upsert failed");

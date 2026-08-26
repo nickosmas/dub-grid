@@ -154,6 +154,37 @@ describe("POST /api/auth/track-session", () => {
     });
   });
 
+  it("records browser metadata and hosting-provided location", async () => {
+    await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:3000",
+          "x-forwarded-for": "198.51.100.180",
+          "x-vercel-ip-city": "Migori%20Town",
+          "x-vercel-ip-country": "KE",
+        },
+        body: JSON.stringify({
+          platform: "web",
+          deviceLabel: "iPhone",
+          browserName: "Safari",
+          browserVersion: "18.6",
+        }),
+      }),
+    );
+
+    expect(trackUserSessionForUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deviceLabel: "iPhone",
+        browserName: "Safari",
+        browserVersion: "18.6",
+        ipAddress: "198.51.100.180",
+        locationCity: "Migori Town",
+        locationCountry: "Kenya",
+      }),
+    );
+  });
+
   it("skips new-device dispatch when a prior session for the device exists", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {

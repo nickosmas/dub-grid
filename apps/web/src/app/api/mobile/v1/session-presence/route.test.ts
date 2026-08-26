@@ -35,6 +35,8 @@ describe("POST /api/mobile/v1/session-presence", () => {
         method: "POST",
         headers: {
           "x-forwarded-for": "203.0.113.9, 10.0.0.1",
+          "x-vercel-ip-city": "Migori",
+          "x-vercel-ip-country": "KE",
         },
         body: JSON.stringify({
           platform: "ios",
@@ -53,6 +55,8 @@ describe("POST /api/mobile/v1/session-presence", () => {
       deviceLabel: "DubGrid Mobile on iOS",
       appVersion: null,
       ipAddress: "203.0.113.9",
+      locationCity: "Migori",
+      locationCountry: "Kenya",
     });
     expect(payload).toEqual({ success: true });
   });

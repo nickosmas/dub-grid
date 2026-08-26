@@ -2890,6 +2890,15 @@ function SchedulerContent() {
     [canCreateOwnShiftRequest, currentEmpId, hasActiveRequestForShift],
   );
 
+  const canOpenOwnShiftDetails = useCallback(
+    (empId: string, date: Date): boolean => {
+      if (!currentEmpId || empId !== currentEmpId) return false;
+      const label = shiftForKey(empId, date);
+      return !!label && label !== "OFF";
+    },
+    [currentEmpId, shiftForKey],
+  );
+
   const activeIndicatorIdsForKey = useCallback(
     (empId: string, date: Date, focusAreaId?: number): number[] => {
       const dateKey = formatDateKey(date);
@@ -3320,7 +3329,8 @@ function SchedulerContent() {
     (emp: Employee, date: Date, focusAreaName?: string) => {
       const canEditCell = canEditShiftsRef.current || canEditNotes;
       const canOpenRequestPanel = canOpenOwnRequestPanel(emp.id, date);
-      if (!canEditCell && !canOpenRequestPanel) return;
+      const canOpenDetails = canOpenOwnShiftDetails(emp.id, date);
+      if (!canEditCell && !canOpenRequestPanel && !canOpenDetails) return;
       const cellKey = `${emp.id}_${formatDateKey(date)}`;
       if (canEditCell) {
         const activity = getCellActivity(cellKey);
@@ -3350,6 +3360,7 @@ function SchedulerContent() {
     },
     [
       canEditNotes,
+      canOpenOwnShiftDetails,
       canOpenOwnRequestPanel,
       focusAreas,
       getCellActivity,
@@ -5025,6 +5036,7 @@ function SchedulerContent() {
         isCellInteractive: canEditShifts || canEditNotes || !!currentEmpId,
         canDragShifts: canEditShifts,
         shiftDisplayMode: org?.shiftDisplayMode ?? "code",
+        showShiftDetailHoverCards: org?.showShiftDetailHoverCards ?? true,
         showPublishDiffOverlay: showPublishDiff,
         showAudit,
         accessors: {

@@ -69,6 +69,7 @@ describe("StaffReorderListRow", () => {
       isDragging: false,
       canManageEmployees: true,
       canViewEmployeeDetails: true,
+      showStatusColumn: false,
       canNavigateToDetailsPage: true,
       isSelected: false,
       focusAreas: [],
@@ -110,6 +111,7 @@ describe("StaffReorderListRow", () => {
         isDragging={false}
         canManageEmployees
         canViewEmployeeDetails
+        showStatusColumn={false}
         canNavigateToDetailsPage
         isSelected={false}
         focusAreas={[]}
@@ -129,7 +131,7 @@ describe("StaffReorderListRow", () => {
 });
 
 describe("StaffTableRow column gating", () => {
-  function renderRow(canViewEmployeeDetails: boolean) {
+  function renderRow(canViewEmployeeDetails: boolean, showStatusColumn = true) {
     return render(
       <table>
         <tbody>
@@ -148,6 +150,7 @@ describe("StaffTableRow column gating", () => {
             isDragging={false}
             canManageEmployees={false}
             canViewEmployeeDetails={canViewEmployeeDetails}
+            showStatusColumn={showStatusColumn}
             canNavigateToDetailsPage={false}
             isSelected={false}
             focusAreas={[]}
@@ -177,5 +180,11 @@ describe("StaffTableRow column gating", () => {
     expect(queryByText("Full-time")).not.toBeNull();
     expect(queryByText("Active")).not.toBeNull();
     expect(queryByText("Not invited")).not.toBeNull();
+  });
+
+  it("shows status only when the selected tab combines employee statuses", () => {
+    const { queryByText } = renderRow(true, false);
+
+    expect(queryByText("Active")).toBeNull();
   });
 });

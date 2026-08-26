@@ -7,11 +7,14 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import { getSessionLocation } from "@/features/account/server/session-location";
 
 const bodySchema = z.object({
   platform: z.literal("web"),
   deviceLabel: z.string().min(1),
   appVersion: z.string().min(1).optional(),
+  browserName: z.string().min(1).nullable().optional(),
+  browserVersion: z.string().min(1).nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,13 +35,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing session id" }, { status: 400 });
     }
 
-    const { platform, deviceLabel, appVersion } = parsed.data;
+    const { platform, deviceLabel, appVersion, browserName, browserVersion } = parsed.data;
 
     // Extract IP from request headers (Vercel / reverse proxy)
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       req.headers.get("x-real-ip") ??
       null;
+    const location = getSessionLocation(req.headers);
 
     // Detect a previously-unseen device before the upsert. "New" = no prior
     // user_sessions row for (user_id, platform, device_label) — not "no row
@@ -57,7 +61,11 @@ export async function POST(req: NextRequest) {
       platform,
       deviceLabel,
       appVersion: appVersion ?? null,
+      browserName: browserName ?? null,
+      browserVersion: browserVersion ?? null,
       ipAddress: ip,
+      locationCity: location.city,
+      locationCountry: location.country,
     });
 
     if (isNewDevice) {
