@@ -16,6 +16,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- **Edge middleware was never running, and is now.** The monorepo refactor moved
+  `middleware.ts` from repo-root `src/` to `apps/web/middleware.ts`, one level
+  above the `src/` directory Next.js looks in when the app lives at
+  `src/app`. Next kept emitting a `middleware-manifest.json` naming it, so
+  nothing failed loudly — it simply was never invoked. Every guard it owns was
+  inert for the whole life of the monorepo layout: route gating, the
+  unauthenticated redirect, subdomain enforcement, the org
+  suspension/archival checks, billing lock, impersonation-context rewriting,
+  and the per-request Content-Security-Policy (unauthenticated `GET /dashboard`
+  returned a rendered dashboard with no CSP header instead of a 307 to
+  `/login`). Data was not exposed, because this app treats RLS as the real
+  security boundary and every org-scoped table enforces `caller_org_id()` —
+  which is exactly why the gap stayed invisible. Now at
+  `apps/web/src/middleware.ts`, verified executing in both `next dev` and a
+  production `next start`.
+
 - **Supabase API keys migrated to publishable/secret** — the legacy `anon` / `service_role` JWTs both derived from one JWT secret, so neither could be rotated without the other. The new `sb_publishable_…` / `sb_secret_…` keys are revocable individually, and production, CI and any local admin use now hold separate secret keys. Env vars renamed to match (`SUPABASE_SECRET_KEY`, `*_PUBLISHABLE_KEY`); reads go through `apps/web/src/lib/supabase-keys` rather than sixteen scattered `process.env` lookups.
 - **All 28 npm advisories cleared, including two criticals.** Most were caused by _stale_ `overrides` pins that had themselves fallen into the vulnerable ranges (axios 1.17.0, postcss 8.5.12, dompurify 3.4.11, tar, hono). `next` 16.2.10 -> 16.3.0 alone cleared nine Next.js advisories including three highs.
 - **Supply-chain scanner IOCs corrected** — `flat-cache@6.1.24` was missing from the denylist entirely (it is a transitive dependency of eslint, so it reaches far more trees than the cache packages that were listed) and `@cacheable/node-cache` was pinned to a version that could never match. Added host-persistence detection, since the payload's launch agent lives under `$HOME` where scanning a checkout would never find it.

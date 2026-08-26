@@ -245,7 +245,9 @@ function AbsenceTypeRow({
   return (
     <div
       className="dg-list-row"
-      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+      style={{
+        borderBottom: expanded || isLast ? "none" : "1px solid var(--dg-color-border-light)",
+      }}
     >
       <div
         className="dg-hover-row"
@@ -290,7 +292,7 @@ function AbsenceTypeRow({
             flex: 1,
             fontSize: "var(--dg-fs-label)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {form.name || "Untitled absence type"}
@@ -298,7 +300,7 @@ function AbsenceTypeRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -310,9 +312,9 @@ function AbsenceTypeRow({
       {expanded && (
         <div
           style={{
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
             borderRadius: "var(--dg-radius-lg)",
-            border: "1px solid var(--color-border-light)",
+            border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
             padding: "14px 16px",
             display: "flex",
@@ -338,7 +340,7 @@ function AbsenceTypeRow({
                   maxLength={6}
                   placeholder="e.g. PTO"
                   disabled={!canEdit}
-                  style={labelError ? { borderColor: "var(--color-danger)" } : undefined}
+                  style={labelError ? { borderColor: "var(--dg-color-danger)" } : undefined}
                 />
                 {labelError ? (
                   <p
@@ -346,7 +348,7 @@ function AbsenceTypeRow({
                     style={{
                       margin: "4px 0 0",
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                     }}
                   >
                     {labelError}
@@ -363,7 +365,7 @@ function AbsenceTypeRow({
                 maxLength={50}
                 placeholder="e.g. Vacation"
                 disabled={!canEdit}
-                style={nameError ? { borderColor: "var(--color-danger)" } : undefined}
+                style={nameError ? { borderColor: "var(--dg-color-danger)" } : undefined}
               />
               {nameError ? (
                 <p
@@ -371,7 +373,7 @@ function AbsenceTypeRow({
                   style={{
                     margin: "4px 0 0",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-danger)",
+                    color: "var(--dg-color-danger)",
                   }}
                 >
                   {nameError}
@@ -398,7 +400,11 @@ function AbsenceTypeRow({
 
           {duplicateLabel && (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Another absence type already uses that code.
             </p>
@@ -570,19 +576,19 @@ export default function AbsenceTypesSettings({
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-md)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             fontWeight: 700,
             fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
           }}
         >
           Absence Types

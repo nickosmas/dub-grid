@@ -77,9 +77,9 @@ export default function SandboxBanner() {
         gap: 12,
         flexWrap: "wrap",
         padding: "8px 16px",
-        background: "var(--color-danger)",
-        borderBottom: "1px solid var(--color-danger-dark)",
-        color: "var(--color-text-inverse)",
+        background: "var(--dg-color-danger)",
+        borderBottom: "1px solid var(--dg-color-danger-dark)",
+        color: "var(--dg-color-text-inverse)",
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 600,
       }}

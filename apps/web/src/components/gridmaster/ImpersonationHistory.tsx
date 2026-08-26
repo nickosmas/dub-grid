@@ -27,22 +27,22 @@ function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: nu
 
   const config = isActive
     ? {
-        bg: "var(--color-warning-bg)",
-        text: "var(--color-warning)",
-        border: "var(--color-warning-border)",
+        bg: "var(--dg-color-warning-bg)",
+        text: "var(--dg-color-warning)",
+        border: "var(--dg-color-warning-border)",
         label: "Active",
       }
     : isEnded
       ? {
-          bg: "var(--color-success-bg)",
-          text: "var(--color-success)",
-          border: "var(--color-success-border)",
+          bg: "var(--dg-color-success-bg)",
+          text: "var(--dg-color-success)",
+          border: "var(--dg-color-success-border)",
           label: "Ended",
         }
       : {
-          bg: "var(--color-bg-secondary)",
-          text: "var(--color-text-muted)",
-          border: "var(--color-border)",
+          bg: "var(--dg-color-bg-secondary)",
+          text: "var(--dg-color-text-muted)",
+          border: "var(--dg-color-border)",
           label: "Expired",
         };
 
@@ -126,7 +126,7 @@ export default function ImpersonationHistory() {
           margin: "0 0 4px",
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         Impersonation History
@@ -135,7 +135,7 @@ export default function ImpersonationHistory() {
         style={{
           margin: "0 0 16px",
           fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
         }}
       >
         Audit trail of all impersonation sessions.
@@ -145,8 +145,8 @@ export default function ImpersonationHistory() {
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -166,7 +166,7 @@ export default function ImpersonationHistory() {
                 display: "flex",
                 gap: 12,
                 padding: "12px 14px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
               }}
             >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "8%" }} />
@@ -222,7 +222,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                             }}
                           >
                             {e.targetOrgName ?? "—"}
@@ -231,7 +231,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                             }}
                           >
                             {e.gridmasterEmail}
@@ -240,7 +240,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-primary)",
+                              color: "var(--dg-color-text-primary)",
                               maxWidth: 200,
                             }}
                           >
@@ -261,7 +261,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
                               fontFamily: "var(--font-dm-mono), monospace",
                             }}
@@ -280,7 +280,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
                               fontFamily: "var(--font-dm-mono), monospace",
                             }}
@@ -305,7 +305,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               fontFamily: "var(--font-dm-mono, monospace)",
                             }}
                           >
@@ -315,7 +315,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                             }}
                           >
                             {formatReason(e.endReason)}
@@ -324,7 +324,7 @@ export default function ImpersonationHistory() {
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               fontFamily: "var(--font-dm-mono, monospace)",
                             }}
                           >
@@ -378,7 +378,7 @@ export default function ImpersonationHistory() {
             <span
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontFamily: "var(--font-dm-mono), monospace",
               }}
             >

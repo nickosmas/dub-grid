@@ -1,5 +1,18 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["scripts/**/*.ts", "seed.ts", "seed.config.ts"],
+  "compilerOptions": {
+    // Root-level scripts import a handful of helpers straight out of the web
+    // app (`seed.ts` -> apps/web/src/lib/colors, the Vercel domain backfill ->
+    // supabase-service + lib/vercel), and those files use the app's own "@/*"
+    // alias internally. Without this mapping the alias is unresolvable from
+    // here, so `tsc -p tsconfig.json` reported phantom "Cannot find module
+    // '@/types'" errors and the backfill script could only be run from inside
+    // apps/web (see the note in its header). Mapping it makes the existing
+    // coupling checked rather than latent.
+    "paths": {
+      "@/*": ["./apps/web/src/*"]
+    }
+  },
+  "include": ["scripts/**/*.ts", "seed.ts", "seed.config.ts", "e2e/**/*.ts"],
   "exclude": ["node_modules", "supabase/functions/**"]
 }

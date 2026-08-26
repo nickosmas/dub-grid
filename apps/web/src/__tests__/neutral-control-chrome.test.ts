@@ -3,7 +3,6 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { relative, resolve } from "path";
 
 import { buttonVariants } from "@/components/ui/button";
-import { createWebCssVariables } from "@dubgrid/design-tokens";
 
 function resolveRepoRoot(): string {
   const cwd = process.cwd();
@@ -20,7 +19,6 @@ function resolveWebSource(path: string): string {
 }
 
 const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
-const webCssVariables = createWebCssVariables();
 const settingsShell = readFileSync(
   resolveWebSource("components/settings/SettingsShell.tsx"),
   "utf-8",
@@ -72,32 +70,34 @@ function collectSourceFiles(dir: string): string[] {
 
 describe("shared chrome theming", () => {
   it("uses brand blue for the default button variant", () => {
-    expect(buttonVariants({ variant: "default" })).toContain("bg-[var(--color-brand)]");
-    expect(buttonVariants({ variant: "default" })).toContain("hover:bg-[var(--color-brand-light)]");
+    expect(buttonVariants({ variant: "default" })).toContain("bg-[var(--dg-color-brand)]");
+    expect(buttonVariants({ variant: "default" })).toContain(
+      "hover:bg-[var(--dg-color-brand-light)]",
+    );
     expect(buttonVariants({ variant: "default" })).toContain("sm:h-[var(--dg-btn-h)]");
   });
 
   it("exposes an explicit blue brand button variant", () => {
-    expect(buttonVariants({ variant: "brand" })).toContain("bg-[var(--color-brand)]");
+    expect(buttonVariants({ variant: "brand" })).toContain("bg-[var(--dg-color-brand)]");
   });
 
-  it("defines the neutral control token ramp through shared runtime vars", () => {
+  it("defines the neutral control token ramp in the global stylesheet", () => {
     expect(globalsCss).toContain("--color-control-primary: var(--dg-color-control-primary);");
     expect(globalsCss).toContain("--color-control-active-bg: var(--dg-color-control-active-bg);");
     expect(globalsCss).toContain(
       "--color-control-active-border: var(--dg-color-control-active-border);",
     );
-    expect(webCssVariables["--dg-btn-radius"]).toBe("6px");
-    expect(webCssVariables["--dg-btn-h"]).toBe("38px");
-    expect(webCssVariables["--dg-toolbar-h"]).toBe("38px");
-    expect(webCssVariables["--dg-radius-sm"]).toBe("6px");
-    expect(webCssVariables["--dg-radius-md"]).toBe("8px");
-    expect(webCssVariables["--dg-radius-lg"]).toBe("10px");
-    expect(webCssVariables["--dg-radius-xl"]).toBe("12px");
-    expect(webCssVariables["--dg-tab-shell-radius"]).toBe("var(--dg-radius-md)");
-    expect(webCssVariables["--dg-tab-shell-pad"]).toBe("2px");
-    expect(webCssVariables["--dg-tab-inner-radius"]).toBe(
-      "calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad))",
+    expect(globalsCss).toContain("--dg-btn-radius: 6px;");
+    expect(globalsCss).toContain("--dg-btn-h: 38px;");
+    expect(globalsCss).toContain("--dg-toolbar-h: 38px;");
+    expect(globalsCss).toContain("--dg-radius-sm: 6px;");
+    expect(globalsCss).toContain("--dg-radius-md: 8px;");
+    expect(globalsCss).toContain("--dg-radius-lg: 10px;");
+    expect(globalsCss).toContain("--dg-radius-xl: 12px;");
+    expect(globalsCss).toContain("--dg-tab-shell-radius: var(--dg-radius-md);");
+    expect(globalsCss).toContain("--dg-tab-shell-pad: 2px;");
+    expect(globalsCss).toContain(
+      "--dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));",
     );
     expect(globalsCss).toContain(".dg-btn-warning-filled");
   });
@@ -105,8 +105,8 @@ describe("shared chrome theming", () => {
   it("maps compact and filled button variants to the shared button tokens", () => {
     expect(buttonVariants({ size: "sm" })).toContain("sm:h-[var(--dg-btn-h-sm)]");
     expect(buttonVariants({ size: "sm" })).toContain("px-[var(--dg-btn-px-sm)]");
-    expect(buttonVariants({ variant: "warningFilled" })).toContain("bg-[var(--color-warning)]");
-    expect(buttonVariants({ variant: "dangerFilled" })).toContain("bg-[var(--color-danger)]");
+    expect(buttonVariants({ variant: "warningFilled" })).toContain("bg-[var(--dg-color-warning)]");
+    expect(buttonVariants({ variant: "dangerFilled" })).toContain("bg-[var(--dg-color-danger)]");
   });
 
   it("uses the shared toolbar height and radius for tabs and toolbar controls", () => {
@@ -154,8 +154,8 @@ describe("shared chrome theming", () => {
 
     // Gray background + near-black text, not brand blue — see `navActiveBg`
     // in @dubgrid/design-tokens.
-    expect(activeNavTab).toContain("background: var(--color-nav-active-bg);");
-    expect(activeNavTab).toContain("color: var(--color-text-primary);");
+    expect(activeNavTab).toContain("background: var(--dg-color-nav-active-bg);");
+    expect(activeNavTab).toContain("color: var(--dg-color-text-primary);");
     // Highlighting is background + color only — the active tab has no border.
     expect(activeNavTab).not.toMatch(/border/);
   });
@@ -164,13 +164,13 @@ describe("shared chrome theming", () => {
     // SettingsPage delegates its sidebar chrome to SettingsShell, so the
     // highlight recipe lives on the shell now.
     for (const source of [settingsShell, gridmasterPortal, staffView]) {
-      expect(source).toContain("data-[active=true]:bg-[var(--color-nav-active-bg)]");
-      expect(source).toContain("data-[active=true]:text-[var(--color-text-primary)]");
+      expect(source).toContain("data-[active=true]:bg-[var(--dg-color-nav-active-bg)]");
+      expect(source).toContain("data-[active=true]:text-[var(--dg-color-text-primary)]");
       // No border/ring on the active item, matching the navbar tabs.
       expect(source).not.toMatch(/data-\[active=true\]:ring-/);
       // Active sidebar chrome is fully neutral: the icon wrapper follows the
       // label rather than being tinted brand blue.
-      expect(source).not.toMatch(/text-\[var\(--color-brand\)\]/);
+      expect(source).not.toMatch(/text-\[var\(--dg-color-brand\)\]/);
     }
   });
 
@@ -184,15 +184,16 @@ describe("shared chrome theming", () => {
   it("keeps audited primary buttons and selectors on theme blue", () => {
     expect(jobsSettings).toContain('className="dg-btn dg-btn-primary dg-btn-sm"');
     expect(jobsSettings).toContain('className="dg-btn dg-btn-secondary dg-btn-sm"');
-    expect(toolbar).toContain('background: toolsOpen ? "var(--color-brand-bg)" : undefined');
-    expect(toolbar).toContain('color: toolsOpen ? "var(--color-brand)" : undefined');
+    expect(toolbar).toContain('background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined');
+    expect(toolbar).toContain('color: toolsOpen ? "var(--dg-color-brand)" : undefined');
     expect(globalsCss).toMatch(
-      /\.dg-checkbox:checked\s*\{[\s\S]*background: var\(--color-brand\);[\s\S]*border-color: var\(--color-brand\);[\s\S]*\}/,
+      /\.dg-checkbox:checked\s*\{[\s\S]*background: var\(--dg-color-brand\);[\s\S]*border-color: var\(--dg-color-brand\);[\s\S]*\}/,
     );
   });
 
   it("limits neutral control tokens to structural row and drag chrome", () => {
     const allowedFiles = [
+      "apps/web/src/app/globals.css",
       "apps/web/src/components/staff/MembersSection.tsx",
       "apps/web/src/components/staff/StaffContextBar.tsx",
       "apps/web/src/components/staff/StaffTableRow.tsx",
@@ -203,7 +204,7 @@ describe("shared chrome theming", () => {
       ...collectSourceFiles(resolveWebSource("components")),
     ]
       .filter((file) =>
-        /var\(--color-control-primary\)|var\(--color-control-active/.test(
+        /var\(--dg-color-control-primary\)|var\(--dg-color-control-active/.test(
           readFileSync(file, "utf-8"),
         ),
       )

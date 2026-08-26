@@ -11,8 +11,8 @@ export default function BillingRequiredPage() {
         display: "grid",
         placeItems: "center",
         padding: 24,
-        background: "var(--color-bg)",
-        color: "var(--color-text-primary)",
+        background: "var(--dg-color-bg)",
+        color: "var(--dg-color-text-primary)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       }}
     >
@@ -32,7 +32,7 @@ export default function BillingRequiredPage() {
             fontSize: "var(--dg-fs-page-title)",
             lineHeight: 1.15,
             fontWeight: 800,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           Organization unavailable
@@ -42,7 +42,7 @@ export default function BillingRequiredPage() {
             margin: 0,
             fontSize: "var(--dg-fs-body)",
             lineHeight: 1.5,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontWeight: 600,
           }}
         >

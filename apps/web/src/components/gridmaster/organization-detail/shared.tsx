@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 export function StatusDot({ status }: { status: string }) {
   const color =
     status === "active"
-      ? "var(--color-success)"
+      ? "var(--dg-color-success)"
       : status === "inactive"
-        ? "var(--color-warning)"
-        : "var(--color-danger)";
+        ? "var(--dg-color-warning)"
+        : "var(--dg-color-danger)";
   return (
     <span
       style={{
@@ -22,7 +22,7 @@ export function StatusDot({ status }: { status: string }) {
       <span
         style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }}
       />
-      <span style={{ textTransform: "capitalize", color: "var(--color-text-secondary)" }}>
+      <span style={{ textTransform: "capitalize", color: "var(--dg-color-text-secondary)" }}>
         {status}
       </span>
     </span>
@@ -36,14 +36,14 @@ export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 600,
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           minWidth: 120,
           flexShrink: 0,
         }}
       >
         {label}
       </span>
-      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-primary)" }}>
+      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-primary)" }}>
         {value || "—"}
       </span>
     </div>
@@ -56,7 +56,7 @@ export function MiniStat({ label, value }: { label: string; value: number }) {
       style={{
         textAlign: "center",
         padding: "12px 16px",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         borderRadius: 8,
         minWidth: 80,
       }}
@@ -65,7 +65,7 @@ export function MiniStat({ label, value }: { label: string; value: number }) {
         style={{
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         {value}
@@ -73,7 +73,7 @@ export function MiniStat({ label, value }: { label: string; value: number }) {
       <div
         style={{
           fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >

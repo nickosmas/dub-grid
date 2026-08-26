@@ -62,13 +62,13 @@ export function getActionSeverity(action: string): ActionSeverity {
 export function severityColor(severity: ActionSeverity): { bg: string; fg: string } {
   switch (severity) {
     case "create":
-      return { bg: "var(--color-success-bg, #f0fdf4)", fg: "var(--color-success, #16a34a)" };
+      return { bg: "var(--dg-color-success-bg, #f0fdf4)", fg: "var(--dg-color-success, #16a34a)" };
     case "delete":
-      return { bg: "var(--color-danger-bg, #fde8e8)", fg: "var(--color-danger)" };
+      return { bg: "var(--dg-color-danger-bg, #fde8e8)", fg: "var(--dg-color-danger)" };
     case "warning":
-      return { bg: "var(--color-warning-bg, #fff8e6)", fg: "var(--color-warning, #b08800)" };
+      return { bg: "var(--dg-color-warning-bg, #fff8e6)", fg: "var(--dg-color-warning, #b08800)" };
     case "update":
-      return { bg: "var(--color-bg-secondary)", fg: "var(--color-text-secondary)" };
+      return { bg: "var(--dg-color-bg-secondary)", fg: "var(--dg-color-text-secondary)" };
   }
 }
 

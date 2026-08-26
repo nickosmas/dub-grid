@@ -175,7 +175,9 @@ export function NotificationPreferences({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <p style={{ margin: 0, fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)" }}>
+      <p
+        style={{ margin: 0, fontSize: "var(--dg-fs-body-sm)", color: "var(--dg-color-text-muted)" }}
+      >
         Choose how you want to be notified for each category.
       </p>
 
@@ -187,14 +189,14 @@ export function NotificationPreferences({
           gap: 8,
           alignItems: "center",
           paddingBottom: 8,
-          borderBottom: "1px solid var(--color-border-light)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
         }}
       >
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 600,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             textTransform: "uppercase",
             letterSpacing: "0.04em",
           }}
@@ -202,12 +204,12 @@ export function NotificationPreferences({
           Category
         </span>
         <span style={{ ...centeredChannelCellStyle, flexDirection: "column", gap: 3 }}>
-          <Bell size={13} style={{ color: "var(--color-text-muted)" }} />
+          <Bell size={13} style={{ color: "var(--dg-color-text-muted)" }} />
           <span
             style={{
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 600,
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
@@ -216,12 +218,12 @@ export function NotificationPreferences({
           </span>
         </span>
         <span style={{ ...centeredChannelCellStyle, flexDirection: "column", gap: 3 }}>
-          <Mail size={13} style={{ color: "var(--color-text-muted)" }} />
+          <Mail size={13} style={{ color: "var(--dg-color-text-muted)" }} />
           <span
             style={{
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 600,
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
@@ -245,7 +247,7 @@ export function NotificationPreferences({
                 alignItems: "center",
                 padding: "12px 0",
                 borderBottom:
-                  index < filtered.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                  index < filtered.length - 1 ? "1px solid var(--dg-color-border-light)" : "none",
               }}
             >
               <div>
@@ -253,7 +255,7 @@ export function NotificationPreferences({
                   style={{
                     fontSize: "var(--dg-fs-body-sm)",
                     fontWeight: 500,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   {label}
@@ -262,7 +264,7 @@ export function NotificationPreferences({
                   style={{
                     display: "block",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     marginTop: 2,
                   }}
                 >
@@ -300,7 +302,7 @@ export function NotificationPreferences({
             <ButtonLoading
               loading={saving}
               loadingLabel="Saving"
-              spinnerColor="var(--color-text-inverse)"
+              spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={14}
             >
               Save Preferences

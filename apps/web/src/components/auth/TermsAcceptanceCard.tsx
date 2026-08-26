@@ -42,49 +42,13 @@ export default function TermsAcceptanceCard({
   }, [checkAtBottom]);
 
   return (
-    <div
-      style={{
-        background: "var(--color-surface)",
-        borderRadius: "var(--dg-radius-xl)",
-        boxShadow: "var(--dg-shadow-auth-card)",
-        width: "100%",
-        maxWidth: 960,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          padding: "32px 32px 16px",
-          textAlign: "center",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+    <div className="dg-terms-acceptance">
+      <div className="dg-terms-acceptance__header">
         <DubGridLogo size={40} />
-        <h1
-          id="terms-acceptance-title"
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-heading)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-          }}
-        >
+        <h1 id="terms-acceptance-title" className="dg-terms-acceptance__title">
           Updated Terms of Service
         </h1>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-secondary)",
-            lineHeight: 1.6,
-            maxWidth: 520,
-          }}
-        >
+        <p className="dg-terms-acceptance__intro">
           Read the updated Terms of Service in full before continuing.
         </p>
       </div>
@@ -94,73 +58,39 @@ export default function TermsAcceptanceCard({
         onScroll={checkAtBottom}
         aria-label="Terms of Service content"
         tabIndex={0}
-        style={{
-          margin: "0 32px",
-          padding: "16px 24px",
-          background: "var(--color-bg-secondary)",
-          border: "1px solid var(--color-border-light)",
-          borderRadius: "var(--dg-radius-lg)",
-          maxHeight: "min(65vh, 640px)",
-          overflowY: "auto",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        }}
+        className="dg-terms-acceptance__content"
       >
         <TermsContent />
       </div>
 
-      <div
-        style={{
-          padding: "20px 32px 28px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-faint)",
-            textAlign: "center",
-            minHeight: "1.2em",
-            transition: "color 150ms ease",
-          }}
-          aria-live="polite"
-        >
+      <div className="dg-terms-acceptance__actions">
+        <p className="dg-terms-acceptance__scroll-hint" aria-live="polite">
           {reachedBottom ? "" : "Scroll to the bottom of the Terms to continue."}
         </p>
 
         <Button
           onClick={onAccept}
           disabled={!reachedBottom || loading}
-          className="dg-btn dg-btn-primary"
-          style={{ width: "100%", padding: "12px 16px" }}
+          className="dg-btn dg-btn-primary dg-terms-acceptance__button"
           type="button"
         >
           <ButtonLoading
             loading={loading}
             loadingLabel="Accepting"
-            spinnerColor="var(--color-text-inverse)"
+            spinnerColor="var(--dg-color-text-inverse)"
             spinnerSize={18}
           >
             Accept &amp; Continue
           </ButtonLoading>
         </Button>
 
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-faint)",
-            textAlign: "center",
-          }}
-        >
+        <p className="dg-terms-acceptance__meta">
           Terms last updated {TERMS_LAST_UPDATED}. You may also review the{" "}
           <a
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            className="dg-auth-policy-link"
           >
             Terms of Service
           </a>{" "}
@@ -169,7 +99,7 @@ export default function TermsAcceptanceCard({
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            className="dg-auth-policy-link"
           >
             Privacy Policy
           </a>{" "}

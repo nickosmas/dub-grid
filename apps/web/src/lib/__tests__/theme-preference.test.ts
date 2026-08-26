@@ -5,15 +5,18 @@
  * that turns either back into the `localStorage` key next-themes reads.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import {
   THEME_COOKIE_NAME,
   THEME_STORAGE_KEY,
-  createThemeSeedScript,
   isThemePreference,
   readThemeCookie,
   withThemeParam,
   writeThemeCookie,
 } from "@/lib/theme-preference";
+
+const themeSeedScript = readFileSync(resolve(process.cwd(), "public/dg-theme-seed.js"), "utf-8");
 
 function clearCookies() {
   for (const entry of document.cookie.split("; ")) {
@@ -77,7 +80,7 @@ describe("theme cookie", () => {
   });
 });
 
-describe("createThemeSeedScript", () => {
+describe("external theme seed", () => {
   const run = (script: string) => new Function(script)();
 
   beforeEach(() => {
@@ -90,7 +93,7 @@ describe("createThemeSeedScript", () => {
   it("adopts the ?theme= param and strips only that key from the URL", () => {
     window.history.replaceState(null, "", "/login?verified=1&name=Acme%20Co&theme=dark");
 
-    run(createThemeSeedScript());
+    run(themeSeedScript);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     // OrgLogin reads `verified` and `name` off this same URL — they must survive.
@@ -102,7 +105,7 @@ describe("createThemeSeedScript", () => {
   it("falls back to the cookie when there is no param", () => {
     document.cookie = `${THEME_COOKIE_NAME}=system; path=/`;
 
-    run(createThemeSeedScript());
+    run(themeSeedScript);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("system");
   });
@@ -111,7 +114,7 @@ describe("createThemeSeedScript", () => {
     document.cookie = `${THEME_COOKIE_NAME}=light; path=/`;
     window.history.replaceState(null, "", "/login?theme=dark");
 
-    run(createThemeSeedScript());
+    run(themeSeedScript);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
@@ -121,7 +124,7 @@ describe("createThemeSeedScript", () => {
     document.cookie = `${THEME_COOKIE_NAME}=neon; path=/`;
     window.history.replaceState(null, "", "/login?theme=neon");
 
-    run(createThemeSeedScript());
+    run(themeSeedScript);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
   });
@@ -129,7 +132,7 @@ describe("createThemeSeedScript", () => {
   it("leaves localStorage alone when nothing is handed over", () => {
     localStorage.setItem(THEME_STORAGE_KEY, "dark");
 
-    run(createThemeSeedScript());
+    run(themeSeedScript);
 
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
@@ -140,7 +143,7 @@ describe("createThemeSeedScript", () => {
     });
     document.cookie = `${THEME_COOKIE_NAME}=dark; path=/`;
 
-    expect(() => run(createThemeSeedScript())).not.toThrow();
+    expect(() => run(themeSeedScript)).not.toThrow();
     spy.mockRestore();
   });
 });

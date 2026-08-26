@@ -36,10 +36,10 @@ const defaultArrowRender = (
       height: "100%",
     }}
   >
-    <path d="M1.5 9.5L8 2.5L14.5 9.5V16H1.5Z" fill="var(--color-surface)" />
+    <path d="M1.5 9.5L8 2.5L14.5 9.5V16H1.5Z" fill="var(--dg-color-surface)" />
     <path
       d="M1.5 9.5L8 2.5L14.5 9.5"
-      stroke="var(--color-border)"
+      stroke="var(--dg-color-border)"
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="1.5"

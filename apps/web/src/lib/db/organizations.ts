@@ -25,7 +25,7 @@ import { updateOrganizationInvitationGuarded, updateOrganizationMembershipGuarde
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
 
-  // Client-side: scope by subdomain slug if present
+  // Client-side reads stay scoped to the organization subdomain.
   if (typeof window !== "undefined") {
     const { subdomain } = parseHost(window.location.host);
     if (subdomain && subdomain !== "gridmaster") {

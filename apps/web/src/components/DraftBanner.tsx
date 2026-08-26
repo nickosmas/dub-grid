@@ -61,7 +61,7 @@ export default function DraftBanner({
             onClick={onCancel}
             disabled={isDisabled}
             className="dg-btn dg-btn-secondary dg-btn-sm"
-            style={{ color: "var(--color-danger-dark)" }}
+            style={{ color: "var(--dg-color-danger-dark)" }}
           >
             <ButtonLoading
               loading={Boolean(isCanceling)}

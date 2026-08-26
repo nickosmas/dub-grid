@@ -20,9 +20,9 @@ export interface ActionItem {
 }
 
 const URGENCY_DOT: Record<string, string> = {
-  high: "var(--color-danger)",
-  medium: "var(--color-warning)",
-  low: "var(--color-info)",
+  high: "var(--dg-color-danger)",
+  medium: "var(--dg-color-warning)",
+  low: "var(--dg-color-info)",
 };
 
 function getRequestShiftName(request: ShiftRequest): string {
@@ -242,7 +242,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           alignItems: "center",
           gap: 10,
           padding: "10px 18px",
-          borderBottom: showBorder ? "1px solid var(--color-border-light)" : "none",
+          borderBottom: showBorder ? "1px solid var(--dg-color-border-light)" : "none",
         }}
       >
         {/* Urgency dot */}
@@ -262,7 +262,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
             style={{
               fontSize: 12,
               fontWeight: 500,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {item.title}
@@ -270,7 +270,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           <div
             style={{
               fontSize: 10,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               marginTop: 1,
             }}
           >
@@ -290,7 +290,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                   fontWeight: 600,
                   padding: "3px 8px",
                   borderRadius: 5,
-                  background: "var(--color-success)",
+                  background: "var(--dg-color-success)",
                   color: "#fff",
                   border: "none",
                   cursor: isRunning ? "not-allowed" : "pointer",
@@ -309,8 +309,8 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                   padding: "3px 8px",
                   borderRadius: 5,
                   background: "transparent",
-                  color: "var(--color-text-subtle)",
-                  border: "1px solid var(--color-border)",
+                  color: "var(--dg-color-text-subtle)",
+                  border: "1px solid var(--dg-color-border)",
                   cursor: isRunning ? "not-allowed" : "pointer",
                 }}
               >
@@ -325,7 +325,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           <span
             style={{
               fontSize: 11,
-              color: "var(--color-primary)",
+              color: "var(--dg-color-primary)",
               fontWeight: 500,
             }}
           >
@@ -362,10 +362,10 @@ function GroupedItems({ items }: { items: ActionItem[] }) {
               padding: "8px 18px 4px",
               fontSize: "var(--dg-fs-micro)",
               fontWeight: 600,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
-              borderTop: gi > 0 ? "1px solid var(--color-border-light)" : "none",
+              borderTop: gi > 0 ? "1px solid var(--dg-color-border-light)" : "none",
             }}
           >
             {TYPE_LABELS[group.type] || group.type} ({group.items.length})
@@ -413,7 +413,7 @@ export default function ActionQueueCard({
               width: isHero ? 48 : 36,
               height: isHero ? 48 : 36,
               borderRadius: "50%",
-              background: "var(--color-success-bg)",
+              background: "var(--dg-color-success-bg)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -425,7 +425,7 @@ export default function ActionQueueCard({
               height={isHero ? 24 : 18}
               viewBox="0 0 24 24"
               fill="none"
-              stroke="var(--color-success-text)"
+              stroke="var(--dg-color-success-text)"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -437,7 +437,7 @@ export default function ActionQueueCard({
             style={{
               fontSize: isHero ? "var(--dg-fs-body)" : 12,
               fontWeight: 600,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               marginBottom: 2,
             }}
           >
@@ -446,7 +446,7 @@ export default function ActionQueueCard({
           <div
             style={{
               fontSize: "var(--dg-fs-small)",
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
             }}
           >
             No action items right now
@@ -472,7 +472,7 @@ export default function ActionQueueCard({
               ? {
                   fontSize: "var(--dg-fs-body)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }
               : {}),
           }}
@@ -490,8 +490,8 @@ export default function ActionQueueCard({
       <div
         style={{
           borderRadius: "var(--dg-radius-md)",
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border-light)",
+          background: "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border-light)",
           overflow: "hidden",
         }}
       >

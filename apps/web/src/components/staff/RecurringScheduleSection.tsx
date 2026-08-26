@@ -129,8 +129,8 @@ function ShiftCellPopover({
         initialFocus={false}
         finalFocus={false}
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-lg)",
           boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
@@ -157,14 +157,14 @@ function ShiftCellPopover({
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             <span
               style={{
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
               }}
@@ -232,7 +232,7 @@ function ShiftCellPopover({
                 style={{
                   marginTop: 12,
                   width: "100%",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
                 }}
@@ -362,13 +362,13 @@ function RecurringShiftPill({
           left: 4,
           background: "transparent",
           border: isDirty
-            ? "2px dashed var(--color-text-subtle)"
-            : "1px dashed var(--color-border-light)",
+            ? "2px dashed var(--dg-color-text-subtle)"
+            : "1px dashed var(--dg-color-border-light)",
           borderRadius: 8,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--color-text-faint)",
+          color: "var(--dg-color-text-faint)",
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 500,
         }}
@@ -912,8 +912,8 @@ export function RecurringScheduleSection({
             position: "sticky",
             top: 0,
             zIndex: 20,
-            background: "var(--color-info-bg)",
-            border: "1px solid var(--color-info-border)",
+            background: "var(--dg-color-info-bg)",
+            border: "1px solid var(--dg-color-info-border)",
             borderRadius: "var(--dg-radius-lg)",
             padding: isMobile ? "10px 12px" : "10px 20px",
             display: "flex",
@@ -931,7 +931,7 @@ export function RecurringScheduleSection({
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--color-info-text)",
+                  color: "var(--dg-color-info-text)",
                 }}
               >
                 {dirtyCount} unsaved change{dirtyCount !== 1 ? "s" : ""}
@@ -940,7 +940,7 @@ export function RecurringScheduleSection({
                 <span
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-info)",
+                    color: "var(--dg-color-info)",
                     opacity: 0.75,
                   }}
                 >
@@ -970,7 +970,7 @@ export function RecurringScheduleSection({
               style={{
                 padding: "6px 14px",
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-danger)",
+                color: "var(--dg-color-danger)",
               }}
             >
               Discard
@@ -995,7 +995,7 @@ export function RecurringScheduleSection({
             margin: 0,
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           Recurring Shifts
@@ -1004,7 +1004,7 @@ export function RecurringScheduleSection({
           style={{
             margin: "6px 0 0",
             fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
           }}
         >
           Set recurring shift patterns for each staff member. Click any cell to assign a shift.
@@ -1035,7 +1035,7 @@ export function RecurringScheduleSection({
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-text-faint)"
+            stroke="var(--dg-color-text-faint)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -1057,20 +1057,20 @@ export function RecurringScheduleSection({
             onChange={(event) => setSearchQuery(event.target.value)}
             style={{
               padding: `7px ${searchQuery ? 30 : 10}px 7px 32px`,
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
               outline: "none",
               width: isMobile ? "100%" : 180,
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               fontFamily: "inherit",
               transition: "border-color 150ms ease",
             }}
             onFocus={(event) => {
-              event.currentTarget.style.borderColor = "var(--color-border-focus)";
+              event.currentTarget.style.borderColor = "var(--dg-color-border-focus)";
             }}
             onBlur={(event) => {
-              event.currentTarget.style.borderColor = "var(--color-border)";
+              event.currentTarget.style.borderColor = "var(--dg-color-border)";
             }}
           />
           {searchQuery && (
@@ -1125,9 +1125,9 @@ export function RecurringScheduleSection({
       ) : (
         <div
           style={{
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
             borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
             overflowX: "auto",
             boxShadow: BOX_SHADOW_CARD,
             position: "relative",
@@ -1139,8 +1139,8 @@ export function RecurringScheduleSection({
               display: "grid",
               minWidth: isMobile ? 448 : undefined,
               gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
-              background: "var(--color-bg)",
-              borderBottom: "1px solid var(--color-table-divider-strong)",
+              background: "var(--dg-color-bg)",
+              borderBottom: "1px solid var(--dg-color-table-divider-strong)",
             }}
           >
             <div
@@ -1148,14 +1148,14 @@ export function RecurringScheduleSection({
                 padding: "10px 12px",
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 600,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
                 position: isMobile ? undefined : "sticky",
                 left: isMobile ? undefined : 0,
                 zIndex: isMobile ? undefined : 4,
-                background: "var(--color-bg)",
-                borderRight: "1px solid var(--color-border-light)",
+                background: "var(--dg-color-bg)",
+                borderRight: "1px solid var(--dg-color-border-light)",
                 boxShadow: isMobile ? undefined : "2px 0 4px rgba(0,0,0,0.02)",
               }}
             >
@@ -1168,7 +1168,7 @@ export function RecurringScheduleSection({
                   padding: "10px 4px",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 600,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
                   textAlign: "center",
@@ -1185,7 +1185,7 @@ export function RecurringScheduleSection({
               currentUserId &&
               employee.userId === currentUserId
             );
-            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
+            const rowBg = isCurrentUser ? "var(--dg-color-today-bg)" : "var(--dg-color-surface)";
             const certAbbr =
               employee.certificationId != null
                 ? getCertAbbr(employee.certificationId, certifications)
@@ -1202,7 +1202,7 @@ export function RecurringScheduleSection({
                   display: "grid",
                   gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
                   minWidth: isMobile ? 448 : undefined,
-                  borderTop: index === 0 ? "none" : "1px solid var(--color-border-light)",
+                  borderTop: index === 0 ? "none" : "1px solid var(--dg-color-border-light)",
                   background: rowBg,
                   transition: "background 150ms ease",
                 }}
@@ -1213,7 +1213,7 @@ export function RecurringScheduleSection({
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "7px 12px",
-                    borderRight: "1px solid var(--color-border-light)",
+                    borderRight: "1px solid var(--dg-color-border-light)",
                     position: isMobile ? undefined : "sticky",
                     left: isMobile ? undefined : 0,
                     zIndex: isMobile ? undefined : 3,
@@ -1226,7 +1226,7 @@ export function RecurringScheduleSection({
                       style={{
                         fontWeight: 600,
                         fontSize: "var(--dg-fs-label)",
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -1243,8 +1243,8 @@ export function RecurringScheduleSection({
                             fontWeight: 700,
                             padding: "1px 5px",
                             borderRadius: 10,
-                            background: "var(--color-brand-bg)",
-                            color: "var(--color-brand)",
+                            background: "var(--dg-color-brand-bg)",
+                            color: "var(--dg-color-brand)",
                             whiteSpace: "nowrap",
                             flexShrink: 0,
                           }}
@@ -1308,7 +1308,7 @@ export function RecurringScheduleSection({
                       }}
                       style={{
                         height: "var(--dg-grid-cell-height)",
-                        borderLeft: "1px solid var(--color-border-light)",
+                        borderLeft: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       <div className="dg-grid-cell__content">
@@ -1332,10 +1332,10 @@ export function RecurringScheduleSection({
             <div
               style={{
                 padding: "10px 20px",
-                background: "var(--color-danger-bg)",
-                borderTop: "1px solid var(--color-danger-border)",
+                background: "var(--dg-color-danger-bg)",
+                borderTop: "1px solid var(--dg-color-danger-border)",
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-danger)",
+                color: "var(--dg-color-danger)",
               }}
             >
               {error}

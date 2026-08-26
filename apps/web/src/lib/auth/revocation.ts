@@ -1,4 +1,5 @@
 import { CacheKey, TTL, cacheGetMany, cacheSet, cacheDel } from "@/lib/cache";
+import { withTimeout } from "@/lib/with-timeout";
 
 /**
  * The parts of a verified token revocation needs. Narrower than `VerifiedToken`
@@ -63,20 +64,6 @@ const memo = new Map<string, { revoked: boolean; expiresAt: number; userId: stri
  */
 const REVOCATION_LOOKUP_TIMEOUT_MS = 250;
 
-async function withTimeout<T>(work: Promise<T>, fallback: T): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<T>((resolve) => {
-        timer = setTimeout(() => resolve(fallback), REVOCATION_LOOKUP_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 /** Test seam: clears the in-process memo between cases. */
 export function resetRevocationMemo(): void {
   memo.clear();
@@ -108,6 +95,7 @@ export async function isSessionRevoked(token: RevocableToken): Promise<boolean> 
 
   const [revokedAfter, revokedSession] = await withTimeout(
     cacheGetMany<number | string>(keys),
+    REVOCATION_LOOKUP_TIMEOUT_MS,
     keys.map(() => null),
   );
 

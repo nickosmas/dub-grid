@@ -86,8 +86,8 @@ export default function ExpandedStaffHours({
             alignItems: "center",
             padding: 16,
             borderRadius: "var(--dg-radius-md)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-bg)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           {/* Sort buttons */}
@@ -110,9 +110,9 @@ export default function ExpandedStaffHours({
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "1px solid",
-                    borderColor: active ? "var(--color-brand)" : "var(--color-border)",
-                    background: active ? "var(--color-brand)" : "transparent",
-                    color: active ? "#fff" : "var(--color-text-secondary)",
+                    borderColor: active ? "var(--dg-color-brand)" : "var(--dg-color-border)",
+                    background: active ? "var(--dg-color-brand)" : "transparent",
+                    color: active ? "#fff" : "var(--dg-color-text-secondary)",
                     cursor: "pointer",
                   }}
                 >
@@ -132,7 +132,7 @@ export default function ExpandedStaffHours({
             fontSize="var(--dg-fs-label)"
           />
 
-          <span style={{ fontSize: 11, color: "var(--color-text-subtle)", marginLeft: "auto" }}>
+          <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginLeft: "auto" }}>
             {sorted.length} staff &middot; {otCount} OT &middot; {otThreshold}h limit
           </span>
         </div>
@@ -160,9 +160,9 @@ export default function ExpandedStaffHours({
                     alignItems: "center",
                     gap: 12,
                     padding: "14px 16px",
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: "var(--dg-radius-md)",
-                    background: "var(--color-bg)",
+                    background: "var(--dg-color-bg)",
                     marginBottom: 8,
                   }}
                 >
@@ -179,9 +179,11 @@ export default function ExpandedStaffHours({
                       fontWeight: 700,
                       flexShrink: 0,
                       background: h.isOvertime
-                        ? "var(--color-danger-bg)"
-                        : "var(--color-bg-secondary)",
-                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
+                        ? "var(--dg-color-danger-bg)"
+                        : "var(--dg-color-bg-secondary)",
+                      color: h.isOvertime
+                        ? "var(--dg-color-danger)"
+                        : "var(--dg-color-text-secondary)",
                     }}
                   >
                     {initials}
@@ -193,12 +195,12 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 13,
                         fontWeight: 600,
-                        color: "var(--color-text-primary)",
+                        color: "var(--dg-color-text-primary)",
                       }}
                     >
                       {emp.firstName} {emp.lastName}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
+                    <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>
                       {fa?.name ?? ""}
                     </div>
                   </div>
@@ -209,7 +211,7 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 10,
                         fontWeight: 600,
-                        color: delta > 0 ? "var(--color-danger)" : "var(--color-success)",
+                        color: delta > 0 ? "var(--dg-color-danger)" : "var(--dg-color-success)",
                       }}
                     >
                       {delta > 0 ? "+" : ""}
@@ -223,7 +225,9 @@ export default function ExpandedStaffHours({
                       style={{
                         fontSize: 13,
                         fontWeight: 700,
-                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-primary)",
+                        color: h.isOvertime
+                          ? "var(--dg-color-danger)"
+                          : "var(--dg-color-text-primary)",
                       }}
                     >
                       {h.totalHours}h
@@ -231,7 +235,9 @@ export default function ExpandedStaffHours({
                     <div
                       style={{
                         fontSize: 10,
-                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
+                        color: h.isOvertime
+                          ? "var(--dg-color-danger)"
+                          : "var(--dg-color-text-subtle)",
                       }}
                     >
                       {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}

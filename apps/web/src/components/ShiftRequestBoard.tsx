@@ -12,7 +12,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { resolveShiftPillColors, SHIFT_REQUEST_STATUS_COLORS } from "@/lib/colors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,38 +63,9 @@ function timeRemainingLabel(expiresAt: string): string {
   return `${days}d left`;
 }
 
-const STATUS_COLORS: Record<ShiftRequestStatus, { bg: string; text: string; border: string }> = {
-  open: {
-    bg: "var(--color-info-bg)",
-    text: "var(--color-info-text)",
-    border: "var(--color-info-border)",
-  },
-  pending_approval: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning-text)",
-    border: "var(--color-warning-border)",
-  },
-  approved: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success-text)",
-    border: "var(--color-success)",
-  },
-  rejected: {
-    bg: "var(--color-danger-bg)",
-    text: "var(--color-danger-dark)",
-    border: "var(--color-danger-border)",
-  },
-  cancelled: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
-  },
-  expired: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
-  },
-};
+// Lives in lib/colors.ts because the schedule grid's request fold tints itself
+// from the same table — two copies would drift the moment one is restyled.
+const STATUS_COLORS = SHIFT_REQUEST_STATUS_COLORS;
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -215,7 +186,7 @@ export default function ShiftRequestBoard({
         height="14"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="var(--color-text-muted)"
+        stroke="var(--dg-color-text-muted)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -255,11 +226,11 @@ export default function ShiftRequestBoard({
         key={req.id}
         style={{
           border: isCalloff
-            ? "1px solid var(--color-danger-border, #FCA5A5)"
-            : "1px solid var(--color-border)",
+            ? "1px solid var(--dg-color-danger-border, #FCA5A5)"
+            : "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-md)",
           padding: "14px 16px",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -273,7 +244,7 @@ export default function ShiftRequestBoard({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -290,8 +261,8 @@ export default function ShiftRequestBoard({
                   fontWeight: 700,
                   padding: "2px 7px",
                   borderRadius: 6,
-                  background: "var(--color-danger-bg, #FEF2F2)",
-                  color: "var(--color-danger-text, #991B1B)",
+                  background: "var(--dg-color-danger-bg, #FEF2F2)",
+                  color: "var(--dg-color-danger-text, #991B1B)",
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                 }}
@@ -309,7 +280,7 @@ export default function ShiftRequestBoard({
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             {requesterLabel} on {formatShiftDate(req.requesterShiftDate)}
@@ -322,7 +293,7 @@ export default function ShiftRequestBoard({
                 style={{
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                 }}
               >
                 {req.targetName}: {targetLabel} on {formatShiftDate(req.targetShiftDate)}
@@ -337,9 +308,9 @@ export default function ShiftRequestBoard({
                 fontWeight: 600,
                 padding: "2px 8px",
                 borderRadius: 6,
-                background: absenceTypeColors?.color || "var(--color-surface-alt)",
-                color: absenceTypeColors?.text || "var(--color-text-primary)",
-                border: `1px solid ${absenceTypeColors?.border || "var(--color-border)"}`,
+                background: absenceTypeColors?.color || "var(--dg-color-surface-alt)",
+                color: absenceTypeColors?.text || "var(--dg-color-text-primary)",
+                border: `1px solid ${absenceTypeColors?.border || "var(--dg-color-border)"}`,
               }}
             >
               {absenceType.label} — {absenceType.name}
@@ -351,7 +322,7 @@ export default function ShiftRequestBoard({
         <div
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             display: "flex",
             alignItems: "center",
             gap: 4,
@@ -471,7 +442,7 @@ export default function ShiftRequestBoard({
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           Decline
@@ -497,7 +468,7 @@ export default function ShiftRequestBoard({
                 width: "100%",
                 minHeight: 56,
                 padding: "8px 10px",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: 8,
                 fontSize: "var(--dg-fs-caption)",
                 fontFamily: "inherit",
@@ -550,7 +521,7 @@ export default function ShiftRequestBoard({
                 style={{
                   fontSize: "var(--dg-fs-caption)",
                   padding: "7px 14px",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                 }}
               >
                 Back
@@ -591,8 +562,8 @@ export default function ShiftRequestBoard({
             style={{
               fontSize: "var(--dg-fs-caption)",
               padding: "7px 14px",
-              border: "1px solid var(--color-danger-border)",
-              color: "var(--color-danger)",
+              border: "1px solid var(--dg-color-danger-border)",
+              color: "var(--dg-color-danger)",
             }}
           >
             Reject
@@ -627,8 +598,8 @@ export default function ShiftRequestBoard({
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
-            border: "1px solid var(--color-danger-border)",
-            color: "var(--color-danger)",
+            border: "1px solid var(--dg-color-danger-border)",
+            color: "var(--dg-color-danger)",
           }}
         >
           Cancel
@@ -681,12 +652,12 @@ export default function ShiftRequestBoard({
         <div
           style={{
             padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
             display: "flex",
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {isMobile && (
@@ -712,7 +683,7 @@ export default function ShiftRequestBoard({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-text-primary)"
+                stroke="var(--dg-color-text-primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -726,7 +697,7 @@ export default function ShiftRequestBoard({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               Shift Requests
@@ -734,7 +705,7 @@ export default function ShiftRequestBoard({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 2,
               }}
             >
@@ -748,8 +719,8 @@ export default function ShiftRequestBoard({
         <div
           style={{
             padding: "12px 20px",
-            borderBottom: "1px solid var(--color-border)",
-            background: "var(--color-surface)",
+            borderBottom: "1px solid var(--dg-color-border)",
+            background: "var(--dg-color-surface)",
             flexShrink: 0,
           }}
         >
@@ -767,7 +738,7 @@ export default function ShiftRequestBoard({
                         style={{
                           width: 1,
                           height: 16,
-                          background: showDivider ? "var(--color-border)" : "transparent",
+                          background: showDivider ? "var(--dg-color-border)" : "transparent",
                           flexShrink: 0,
                           alignSelf: "center",
                         }}

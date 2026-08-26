@@ -125,7 +125,7 @@ export default function DashboardHeader({
               style={{
                 fontSize: "var(--dg-fs-body-sm)",
                 fontWeight: 600,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 whiteSpace: "nowrap",
               }}
             >
@@ -249,7 +249,7 @@ export default function DashboardHeader({
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 whiteSpace: "nowrap",
               }}
             >
@@ -339,7 +339,7 @@ function ViewModeTabs({
                 style={{
                   width: 1,
                   height: 16,
-                  background: showDivider ? "var(--color-border)" : "transparent",
+                  background: showDivider ? "var(--dg-color-border)" : "transparent",
                   flexShrink: 0,
                   alignSelf: "center",
                 }}

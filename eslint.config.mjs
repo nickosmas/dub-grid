@@ -149,7 +149,11 @@ const eslintConfig = defineConfig([
     // runtime, on the render where the branch flipped. Tests are excluded: a
     // helper there calls a hook directly inside `renderHook`, which is correct
     // there and nowhere else.
-    files: ["apps/web/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}"],
+    files: [
+      "apps/web/src/**/*.{ts,tsx}",
+      "apps/mobile/src/**/*.{ts,tsx}",
+      "apps/mobile/app/**/*.{ts,tsx}",
+    ],
     ignores: ["**/*.test.{ts,tsx}", "**/__tests__/**"],
     plugins: { "react-hooks": reactHooks },
     rules: {
@@ -158,10 +162,11 @@ const eslintConfig = defineConfig([
   },
   {
     // Carries its own `files` on purpose. The Expo Router route files under
-    // apps/mobile/app match no other block's globs, so they are currently
-    // unlinted entirely — and one of the sparkles this rule bans lived there.
-    // Listing the globs here enforces the rule in routes without switching the
-    // full ruleset on for that directory, which is a separate, larger change.
+    // apps/mobile/app match almost no other block's globs — only this rule set
+    // and rules-of-hooks above name them — and one of the sparkles this rule
+    // bans lived there. Listing the globs here enforces the rule in routes
+    // without switching the full ruleset on for that directory, which is a
+    // separate, larger change.
     files: [
       "apps/web/src/**/*.{ts,tsx}",
       "apps/mobile/src/**/*.{ts,tsx}",
@@ -315,6 +320,7 @@ const eslintConfig = defineConfig([
       "apps/web/src/components/**/*.{ts,tsx}",
       "apps/web/src/hooks/**/*.{ts,tsx}",
       "apps/mobile/src/**/*.{ts,tsx}",
+      "apps/mobile/app/**/*.{ts,tsx}",
     ],
     ignores: [
       "apps/web/src/**/*.test.ts",

@@ -233,7 +233,7 @@ export function StaffDetailPanel({
                   style={{
                     fontWeight: 700,
                     fontSize: "var(--dg-fs-body)",
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -255,7 +255,7 @@ export function StaffDetailPanel({
                   <span
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -268,7 +268,7 @@ export function StaffDetailPanel({
                   <span
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-faint)",
+                      color: "var(--dg-color-text-faint)",
                       flexShrink: 0,
                     }}
                   >
@@ -297,7 +297,7 @@ export function StaffDetailPanel({
                     marginTop: 4,
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 600,
-                    color: "var(--color-link)",
+                    color: "var(--dg-color-link)",
                     textDecoration: "none",
                   }}
                 >
@@ -351,7 +351,7 @@ export function StaffDetailPanel({
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                 }}
@@ -365,8 +365,8 @@ export function StaffDetailPanel({
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: 10,
-                    background: "var(--color-warning-bg)",
-                    border: "1px solid var(--color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    border: "1px solid var(--dg-color-warning-border)",
                     borderRadius: "var(--dg-radius-lg)",
                     padding: "10px 14px",
                   }}
@@ -384,7 +384,7 @@ export function StaffDetailPanel({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="var(--color-warning-text)"
+                      stroke="var(--dg-color-warning-text)"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -398,7 +398,7 @@ export function StaffDetailPanel({
                         style={{
                           fontSize: "var(--dg-fs-caption)",
                           fontWeight: 600,
-                          color: "var(--color-warning-text)",
+                          color: "var(--dg-color-warning-text)",
                         }}
                       >
                         Invitation pending
@@ -406,7 +406,7 @@ export function StaffDetailPanel({
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-warning-text)",
+                          color: "var(--dg-color-warning-text)",
                           marginTop: 1,
                         }}
                       >
@@ -421,7 +421,7 @@ export function StaffDetailPanel({
                         onClick={() => setPendingInvitationAction("reinvite")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
-                          color: "var(--color-link)",
+                          color: "var(--dg-color-link)",
                         }}
                         title={
                           isInSandbox
@@ -444,7 +444,7 @@ export function StaffDetailPanel({
                         onClick={() => setPendingInvitationAction("revoke")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
-                          color: "var(--color-danger)",
+                          color: "var(--dg-color-danger)",
                         }}
                         title={
                           isInSandbox
@@ -530,7 +530,7 @@ export function StaffDetailPanel({
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                 }}
@@ -555,7 +555,7 @@ export function StaffDetailPanel({
           style={{
             flexShrink: 0,
             padding: "16px 24px",
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
           }}
         >
           {canEditEmployee ? (

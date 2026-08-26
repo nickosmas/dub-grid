@@ -395,7 +395,7 @@ flowchart TB
 flowchart TD
     REQ["Browser Request\nGET calmhaven.dubgrid.com/schedule"]
 
-    subgraph MW["Edge Middleware (apps/web/middleware.ts)"]
+    subgraph MW["Edge Middleware (apps/web/src/middleware.ts)"]
         direction TB
         PUB{"Public route?\n/login, /forgot-password,\n/accept-invite, /api, etc."}
         SESS["createServerClient.getSession()\nRead + reconstruct multi-chunk sb-*-auth-token cookie"]
@@ -1310,7 +1310,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph L1["Layer 1: Edge"]
-        MW["apps/web/middleware.ts\nRoute guards\nSubdomain enforcement\njwtVerify + decodeJwt fallback\nOrg archived/suspended check (Redis-cached)\nBilling lock + trial_pending gate\nSandbox cookie override"]
+        MW["apps/web/src/middleware.ts\nRoute guards\nSubdomain enforcement\njwtVerify + decodeJwt fallback\nOrg archived/suspended check (Redis-cached)\nBilling lock + trial_pending gate\nSandbox cookie override"]
     end
 
     subgraph L2["Layer 2: Application"]

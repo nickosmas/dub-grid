@@ -167,9 +167,9 @@ export function PillTimeEditor({
             alignItems: "center",
             gap: 5,
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             background: "none",
-            border: "1px dashed var(--color-border)",
+            border: "1px dashed var(--dg-color-border)",
             borderRadius: "var(--dg-radius-md)",
             padding: "6px 10px",
             cursor: "pointer",
@@ -215,8 +215,8 @@ export function PillTimeEditor({
     return (
       <div
         style={{
-          background: "var(--color-bg)",
-          border: "1px solid var(--color-border)",
+          background: "var(--dg-color-bg)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-md)",
           padding: "10px",
           marginTop: 8,
@@ -234,7 +234,7 @@ export function PillTimeEditor({
             style={{
               fontSize: "var(--dg-fs-badge)",
               fontWeight: 700,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               textTransform: "uppercase",
               letterSpacing: "0.06em",
             }}
@@ -248,7 +248,7 @@ export function PillTimeEditor({
               style={{
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 600,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               {fmt12h(customStart)} – {fmt12h(customEnd)}
@@ -257,7 +257,7 @@ export function PillTimeEditor({
               <span
                 style={{
                   fontSize: "var(--dg-fs-badge)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginLeft: 8,
                   fontWeight: 600,
                 }}
@@ -271,9 +271,9 @@ export function PillTimeEditor({
               onClick={() => startEditing()}
               style={{
                 fontSize: "var(--dg-fs-badge)",
-                color: "var(--color-brand)",
-                background: "var(--color-brand-bg)",
-                border: "1px solid var(--color-brand-border)",
+                color: "var(--dg-color-brand)",
+                background: "var(--dg-color-brand-bg)",
+                border: "1px solid var(--dg-color-brand-border)",
                 borderRadius: 6,
                 cursor: "pointer",
                 padding: "4px 10px",
@@ -289,9 +289,9 @@ export function PillTimeEditor({
               }}
               style={{
                 fontSize: "var(--dg-fs-badge)",
-                color: "var(--color-danger)",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
+                color: "var(--dg-color-danger)",
+                background: "var(--dg-color-surface)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: 6,
                 cursor: "pointer",
                 padding: "4px 10px",
@@ -311,8 +311,8 @@ export function PillTimeEditor({
   return (
     <div
       style={{
-        background: "var(--color-bg)",
-        border: "1px solid var(--color-border)",
+        background: "var(--dg-color-bg)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-md)",
         padding: "10px",
         marginTop: 8,
@@ -330,7 +330,7 @@ export function PillTimeEditor({
           style={{
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 700,
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             textTransform: "uppercase",
             letterSpacing: "0.06em",
           }}
@@ -342,9 +342,9 @@ export function PillTimeEditor({
             onClick={handleCancel}
             style={{
               fontSize: "var(--dg-fs-badge)",
-              color: "var(--color-text-secondary)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              color: "var(--dg-color-text-secondary)",
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
               borderRadius: 6,
               cursor: "pointer",
               padding: "4px 10px",
@@ -362,9 +362,9 @@ export function PillTimeEditor({
               }}
               style={{
                 fontSize: "var(--dg-fs-badge)",
-                color: "var(--color-danger)",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
+                color: "var(--dg-color-danger)",
+                background: "var(--dg-color-surface)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: 6,
                 cursor: "pointer",
                 padding: "4px 10px",
@@ -384,7 +384,7 @@ export function PillTimeEditor({
           style={{
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 700,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             width: 40,
             flexShrink: 0,
           }}
@@ -401,7 +401,7 @@ export function PillTimeEditor({
         <span
           style={{
             fontWeight: 700,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontSize: "var(--dg-fs-caption)",
           }}
         >
@@ -427,7 +427,7 @@ export function PillTimeEditor({
           style={{
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 700,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             width: 40,
             flexShrink: 0,
           }}
@@ -444,7 +444,7 @@ export function PillTimeEditor({
         <span
           style={{
             fontWeight: 700,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontSize: "var(--dg-fs-caption)",
           }}
         >
@@ -469,13 +469,13 @@ export function PillTimeEditor({
         <div
           style={{
             fontSize: "var(--dg-fs-badge)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             marginTop: 8,
             fontWeight: 600,
           }}
         >
           Duration:{" "}
-          <span style={{ color: "var(--color-text-secondary)" }}>
+          <span style={{ color: "var(--dg-color-text-secondary)" }}>
             {calcTimeDuration(localStart, localEnd)}
           </span>
         </div>
@@ -485,7 +485,7 @@ export function PillTimeEditor({
       {hasTimeError && (
         <div
           style={{
-            color: "var(--color-danger)",
+            color: "var(--dg-color-danger)",
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 600,
             marginTop: 6,
@@ -497,7 +497,7 @@ export function PillTimeEditor({
       {isStartTooEarly && minTime && (
         <div
           style={{
-            color: "var(--color-danger)",
+            color: "var(--dg-color-danger)",
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 600,
             marginTop: 6,
@@ -509,7 +509,7 @@ export function PillTimeEditor({
       {isEndTooLate && maxTime && (
         <div
           style={{
-            color: "var(--color-danger)",
+            color: "var(--dg-color-danger)",
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 600,
             marginTop: 6,

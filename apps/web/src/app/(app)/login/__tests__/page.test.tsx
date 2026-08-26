@@ -10,7 +10,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import OrgLogin from "@/app/(app)/login/OrgLogin";
+import OrgLogin, { type OrgLoginSeed } from "@/app/(app)/login/OrgLogin";
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,7 +52,10 @@ function submitForm(container: HTMLElement) {
   fireEvent.submit(screen.getByRole("button", { name: /sign in/i }));
 }
 
-/** A validate-domain response so OrgLogin's mount effect resolves the org as found. */
+/** The seed app/login/page.tsx hands down once it has resolved the subdomain. */
+const FOUND: OrgLoginSeed = { status: "found", name: "Test Org" };
+
+/** A validate-domain response, for the unresolved seed's client-side re-ask. */
 function validateDomainResponse() {
   return new Response(JSON.stringify({ valid: true, name: "Test Org" }), {
     status: 200,
@@ -66,6 +69,7 @@ describe("OrgLogin submit states", () => {
       value: {
         host: "test-org.localhost",
         hostname: "test-org.localhost",
+        protocol: "https:",
         replace: vi.fn(),
         reload: vi.fn(),
         href: "",
@@ -90,7 +94,7 @@ describe("OrgLogin submit states", () => {
       return new Promise(() => {});
     });
 
-    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" />);
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
     submitForm(container);
 
     await waitFor(() => {
@@ -115,7 +119,7 @@ describe("OrgLogin submit states", () => {
       );
     });
 
-    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" />);
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
     submitForm(container);
 
     await waitFor(() => {
@@ -127,7 +131,24 @@ describe("OrgLogin submit states", () => {
     expect(button).not.toBeDisabled();
   });
 
-  it("shows an organization-not-found state when validate-domain reports the slug doesn't exist", async () => {
+  it("renders the org name on the first paint, never the raw slug", () => {
+    // The regression this guards: orgName used to be resolved in a mount
+    // effect, so the heading rendered "test-org" for a frame before swapping
+    // to "Test Org". A synchronous assertion (no waitFor) is the point —
+    // nothing may have run yet.
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
+
+    expect(screen.getByText("Test Org")).toBeInTheDocument();
+    expect(screen.queryByText("test-org")).not.toBeInTheDocument();
+    // And no re-ask: the server already answered.
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("leaves for the domain selector when an unresolved seed turns out to be no org", async () => {
+    // There is nothing to sign in to, so the user should not be left on a
+    // sign-in page at all — not even one showing an error.
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ valid: false, name: null }), {
         status: 200,
@@ -135,11 +156,31 @@ describe("OrgLogin submit states", () => {
       }),
     );
 
-    renderWithQueryClient(<OrgLogin orgSlug="nonexistent" />);
+    renderWithQueryClient(<OrgLogin orgSlug="nonexistent" seed={{ status: "unresolved" }} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Organization not found")).toBeInTheDocument();
+      expect(window.location.replace).toHaveBeenCalledWith(
+        "https://localhost/login?org_not_found=1",
+      );
     });
-    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("stays put when the re-ask fails rather than answers", async () => {
+    // A 503 also says `valid: false`. Bouncing a real organization's users off
+    // their own sign-in page because Supabase hiccuped is the worse failure.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ valid: false }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={{ status: "unresolved" }} />);
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled();
+    });
+    expect(window.location.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 });

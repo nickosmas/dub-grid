@@ -12,23 +12,23 @@ export function getPublishDiffTone(kind: PublishDiffPillKind): PublishDiffTone {
     case "new":
       return {
         background: "rgba(22, 163, 74, 0.94)",
-        text: "var(--color-text-inverse)",
+        text: "var(--dg-color-text-inverse)",
       };
     case "modified":
     case "time":
       return {
         background: "rgba(217, 119, 6, 0.94)",
-        text: "var(--color-text-inverse)",
+        text: "var(--dg-color-text-inverse)",
       };
     case "deleted":
       return {
         background: "rgba(220, 38, 38, 0.94)",
-        text: "var(--color-text-inverse)",
+        text: "var(--dg-color-text-inverse)",
       };
     default:
       return {
         background: "rgba(22, 163, 74, 0.94)",
-        text: "var(--color-text-inverse)",
+        text: "var(--dg-color-text-inverse)",
       };
   }
 }

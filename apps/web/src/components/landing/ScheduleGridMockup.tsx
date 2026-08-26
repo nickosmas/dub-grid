@@ -13,12 +13,17 @@
    grid uses (via useShiftPillColors) — rendered as-is, these pastel presets
    read as blown-out, glaring blocks on the dark-mode page. ── */
 
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { resolveShiftPillColors } from "@/lib/colors";
 
 function useMockupIsDark(): boolean {
   const { resolvedTheme } = useTheme();
-  return resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  return mounted && resolvedTheme === "dark";
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -191,10 +196,10 @@ const COVERAGE: {
 /* ── Warning tokens as CSS vars (not hardcoded hex) so the row follows the
    page theme like ScheduleGrid.tsx does — dg-warning-bg etc. remap in dark
    mode via the design-tokens theme block. ── */
-const WARNING_BG = "var(--color-warning-bg, #FFF8E1)";
-const WARNING_BORDER = "var(--color-warning-border, #F59E0B)";
-const WARNING_TEXT = "var(--color-warning-text, #92400E)";
-const WARNING_SOLID = "var(--color-warning)";
+const WARNING_BG = "var(--dg-color-warning-bg, #FFF8E1)";
+const WARNING_BORDER = "var(--dg-color-warning-border, #F59E0B)";
+const WARNING_TEXT = "var(--dg-color-warning-text, #92400E)";
+const WARNING_SOLID = "var(--dg-color-warning)";
 /* Repeating-linear-gradient dashed divider — ScheduleGrid.tsx uses this
    background-image technique (not a literal `border` with style dashed)
    because Chromium clips border/box-shadow decorations on position:sticky
@@ -206,7 +211,7 @@ const WARNING_DASH_DIVIDER: React.CSSProperties = {
   backgroundRepeat: "no-repeat",
   backgroundSize: "100% 2px",
 };
-const TODAY_BG = "color-mix(in srgb, var(--color-brand) 4%, transparent)";
+const TODAY_BG = "color-mix(in srgb, var(--dg-color-brand) 4%, transparent)";
 
 function CertPill({ kind }: { kind: CertCode }) {
   const isDark = useMockupIsDark();
@@ -352,7 +357,7 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
         padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
         borderRadius: 6,
         border: `1.5px dashed ${WARNING_BORDER}`,
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         color: WARNING_TEXT,
         fontSize: 12,
         fontWeight: 600,
@@ -382,7 +387,7 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
           height: 16,
           borderRadius: "50%",
           background: WARNING_SOLID,
-          color: "var(--color-text-inverse)",
+          color: "var(--dg-color-text-inverse)",
           fontSize: 10,
           fontWeight: 700,
           display: "inline-flex",
@@ -441,14 +446,14 @@ function TallyCell({ required, scheduled }: { required: number; scheduled: numbe
         fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
         color: hasRequirement
           ? met
-            ? "var(--color-success-text)"
-            : "var(--color-danger-dark)"
-          : "var(--color-text-muted)",
+            ? "var(--dg-color-success-text)"
+            : "var(--dg-color-danger-dark)"
+          : "var(--dg-color-text-muted)",
         background: hasRequirement
           ? met
             ? "rgba(22, 163, 74, 0.12)"
             : "rgba(220, 38, 38, 0.12)"
-          : "var(--color-surface)",
+          : "var(--dg-color-surface)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -477,8 +482,8 @@ export default function ScheduleGridMockup() {
           padding: "6px 10px 6px 8px",
           marginBottom: 10,
           borderRadius: 6,
-          background: "var(--color-bg-secondary)",
-          color: "var(--color-text-secondary)",
+          background: "var(--dg-color-bg-secondary)",
+          color: "var(--dg-color-text-secondary)",
           fontSize: "var(--dg-fs-heading)",
           fontWeight: 800,
         }}
@@ -489,7 +494,7 @@ export default function ScheduleGridMockup() {
             width: 3,
             height: 18,
             borderRadius: 2,
-            background: "var(--color-brand)",
+            background: "var(--dg-color-brand)",
             flexShrink: 0,
           }}
         />
@@ -503,9 +508,9 @@ export default function ScheduleGridMockup() {
           ScheduleGrid itself, so the mockup omits it rather than fake it. */}
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: 14,
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}
@@ -536,15 +541,15 @@ export default function ScheduleGridMockup() {
               position: "sticky",
               left: 0,
               zIndex: 4,
-              background: "var(--color-bg)",
+              background: "var(--dg-color-bg)",
               padding: "10px 14px",
               fontSize: 11,
               fontWeight: 600,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               letterSpacing: "0.04em",
               textTransform: "uppercase",
-              borderRight: "1px solid var(--color-border-light)",
-              borderBottom: "1px solid var(--color-text-secondary)",
+              borderRight: "1px solid var(--dg-color-border-light)",
+              borderBottom: "1px solid var(--dg-color-text-secondary)",
               display: "flex",
               alignItems: "flex-end",
             }}
@@ -560,16 +565,16 @@ export default function ScheduleGridMockup() {
                   position: "relative",
                   textAlign: "center",
                   padding: "8px 0",
-                  background: isToday ? TODAY_BG : "var(--color-bg)",
-                  borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
-                  borderBottom: "1px solid var(--color-text-secondary)",
+                  background: isToday ? TODAY_BG : "var(--dg-color-bg)",
+                  borderLeft: idx === 0 ? undefined : "1px solid var(--dg-color-border-light)",
+                  borderBottom: "1px solid var(--dg-color-text-secondary)",
                 }}
               >
                 <div
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
-                    color: isToday ? "var(--color-brand)" : "var(--color-text-subtle)",
+                    color: isToday ? "var(--dg-color-brand)" : "var(--dg-color-text-subtle)",
                     letterSpacing: "0.04em",
                   }}
                 >
@@ -579,7 +584,7 @@ export default function ScheduleGridMockup() {
                   style={{
                     fontSize: 18,
                     fontWeight: 700,
-                    color: isToday ? "var(--color-brand)" : "var(--color-text-secondary)",
+                    color: isToday ? "var(--dg-color-brand)" : "var(--dg-color-text-secondary)",
                     lineHeight: 1.1,
                     marginTop: 2,
                   }}
@@ -604,7 +609,7 @@ export default function ScheduleGridMockup() {
               alignItems: "center",
               gap: 6,
               minHeight: ROW_HEIGHT,
-              borderRight: "1px solid var(--color-border-light)",
+              borderRight: "1px solid var(--dg-color-border-light)",
               color: WARNING_TEXT,
               whiteSpace: "nowrap" as const,
               ...WARNING_DASH_DIVIDER,
@@ -644,7 +649,7 @@ export default function ScheduleGridMockup() {
                 padding: "0 5px",
                 borderRadius: 9,
                 background: WARNING_SOLID,
-                color: "var(--color-text-inverse)",
+                color: "var(--dg-color-text-inverse)",
                 fontSize: 11,
                 fontWeight: 700,
                 lineHeight: 1,
@@ -669,7 +674,7 @@ export default function ScheduleGridMockup() {
                   background: isToday
                     ? `linear-gradient(${TODAY_BG}, ${TODAY_BG}), ${WARNING_BG}`
                     : WARNING_BG,
-                  borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
+                  borderLeft: idx === 0 ? undefined : "1px solid var(--dg-color-border-light)",
                   ...WARNING_DASH_DIVIDER,
                 }}
               >
@@ -708,7 +713,7 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
           position: "sticky",
           left: 0,
           zIndex: 3,
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           padding: "8px 14px",
           display: "flex",
           alignItems: "center",
@@ -716,8 +721,8 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
           gap: 8,
           minWidth: 0,
           minHeight: ROW_HEIGHT,
-          borderTop: "1px solid var(--color-border-light)",
-          borderRight: "1px solid var(--color-border-light)",
+          borderTop: "1px solid var(--dg-color-border-light)",
+          borderRight: "1px solid var(--dg-color-border-light)",
         }}
       >
         <div
@@ -732,7 +737,7 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -745,7 +750,7 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
             <span
               style={{
                 fontSize: 11,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -770,9 +775,9 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
               alignItems: "stretch",
               padding: 4,
               minHeight: ROW_HEIGHT,
-              background: isToday ? TODAY_BG : "var(--color-surface)",
-              borderTop: "1px solid var(--color-border-light)",
-              borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
+              background: isToday ? TODAY_BG : "var(--dg-color-surface)",
+              borderTop: "1px solid var(--dg-color-border-light)",
+              borderLeft: idx === 0 ? undefined : "1px solid var(--dg-color-border-light)",
             }}
           >
             <CellContent cell={cell} />
@@ -799,15 +804,15 @@ function CoverageRow({
           position: "sticky",
           left: 0,
           zIndex: 3,
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           padding: "6px 14px",
           fontSize: 12,
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           letterSpacing: "0.04em",
-          borderTop: "1px solid var(--color-border-light)",
-          borderRight: "1px solid var(--color-border-light)",
-          borderBottom: isLast ? undefined : "1px solid var(--color-border-light)",
+          borderTop: "1px solid var(--dg-color-border-light)",
+          borderRight: "1px solid var(--dg-color-border-light)",
+          borderBottom: isLast ? undefined : "1px solid var(--dg-color-border-light)",
           display: "flex",
           alignItems: "center",
         }}
@@ -821,9 +826,9 @@ function CoverageRow({
             key={idx}
             style={{
               position: "relative",
-              borderTop: "1px solid var(--color-border-light)",
-              borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
-              borderBottom: isLast ? undefined : "1px solid var(--color-border-light)",
+              borderTop: "1px solid var(--dg-color-border-light)",
+              borderLeft: idx === 0 ? undefined : "1px solid var(--dg-color-border-light)",
+              borderBottom: isLast ? undefined : "1px solid var(--dg-color-border-light)",
               background: isToday ? TODAY_BG : undefined,
             }}
           >

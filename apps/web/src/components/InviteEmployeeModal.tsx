@@ -281,10 +281,10 @@ export default function InviteEmployeeModal({
           <div
             style={{
               padding: "12px 16px",
-              background: "var(--color-bg-secondary)",
+              background: "var(--dg-color-bg-secondary)",
               borderRadius: 8,
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             {isManagementInvite ? (
@@ -302,7 +302,7 @@ export default function InviteEmployeeModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>
-                  First name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -312,14 +312,14 @@ export default function InviteEmployeeModal({
                   placeholder="Jane"
                   style={
                     fieldErrors.firstName
-                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                       : inputStyle
                   }
                 />
                 {fieldErrors.firstName && (
                   <div
                     style={{
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       fontSize: "var(--dg-fs-footnote)",
                       marginTop: 4,
                     }}
@@ -331,7 +331,7 @@ export default function InviteEmployeeModal({
               </div>
               <div>
                 <label style={labelStyle}>
-                  Last name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -341,14 +341,14 @@ export default function InviteEmployeeModal({
                   placeholder="Smith"
                   style={
                     fieldErrors.lastName
-                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                       : inputStyle
                   }
                 />
                 {fieldErrors.lastName && (
                   <div
                     style={{
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       fontSize: "var(--dg-fs-footnote)",
                       marginTop: 4,
                     }}
@@ -372,14 +372,14 @@ export default function InviteEmployeeModal({
               placeholder="employee@example.com"
               style={
                 fieldErrors.email
-                  ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                  ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                   : inputStyle
               }
             />
             {fieldErrors.email && (
               <div
                 style={{
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-footnote)",
                   marginTop: 4,
                 }}
@@ -395,8 +395,8 @@ export default function InviteEmployeeModal({
                   marginTop: 8,
                   padding: "8px 12px",
                   borderRadius: 6,
-                  background: "var(--color-danger-bg)",
-                  color: "var(--color-danger-text)",
+                  background: "var(--dg-color-danger-bg)",
+                  color: "var(--dg-color-danger-text)",
                   fontSize: "var(--dg-fs-footnote)",
                 }}
               >
@@ -413,8 +413,8 @@ export default function InviteEmployeeModal({
                     marginTop: 8,
                     padding: "8px 12px",
                     borderRadius: 6,
-                    background: "var(--color-info-bg)",
-                    color: "var(--color-info-text)",
+                    background: "var(--dg-color-info-bg)",
+                    color: "var(--dg-color-info-text)",
                     fontSize: "var(--dg-fs-footnote)",
                   }}
                 >
@@ -438,7 +438,7 @@ export default function InviteEmployeeModal({
             <div>
               <label style={labelStyle}>
                 Phone{" "}
-                <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                   (optional)
                 </span>
               </label>
@@ -455,14 +455,14 @@ export default function InviteEmployeeModal({
                 placeholder="+1 555-123-4567"
                 style={
                   fieldErrors.phone
-                    ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                    ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                     : inputStyle
                 }
               />
               {fieldErrors.phone && (
                 <div
                   style={{
-                    color: "var(--color-danger)",
+                    color: "var(--dg-color-danger)",
                     fontSize: "var(--dg-fs-footnote)",
                     marginTop: 4,
                   }}
@@ -478,7 +478,7 @@ export default function InviteEmployeeModal({
           {isManagementInvite && managementDepts.length > 0 && (
             <div>
               <label style={labelStyle}>
-                Management departments <span style={{ color: "var(--color-danger)" }}>*</span>
+                Management departments <span style={{ color: "var(--dg-color-danger)" }}>*</span>
               </label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {managementDepts.map((department) => (
@@ -494,9 +494,9 @@ export default function InviteEmployeeModal({
                       markTouched("departmentIds");
                     }}
                     padding="5px 12px"
-                    unselectedBackground="var(--color-bg-secondary)"
+                    unselectedBackground="var(--dg-color-bg-secondary)"
                     unselectedBorderColor="transparent"
-                    unselectedTextColor="var(--color-text-faint)"
+                    unselectedTextColor="var(--dg-color-text-faint)"
                   >
                     {department.name}
                   </SelectableTag>
@@ -505,7 +505,7 @@ export default function InviteEmployeeModal({
               {fieldErrors.departmentIds && (
                 <div
                   style={{
-                    color: "var(--color-danger)",
+                    color: "var(--dg-color-danger)",
                     fontSize: "var(--dg-fs-footnote)",
                     marginTop: 4,
                   }}
@@ -562,11 +562,11 @@ function ErrorBanner({ message }: { message: string }) {
   return (
     <p
       style={{
-        color: "var(--color-danger-dark)",
+        color: "var(--dg-color-danger-dark)",
         fontSize: "var(--dg-fs-body-sm)",
         margin: 0,
         padding: "8px 12px",
-        background: "var(--color-danger-bg)",
+        background: "var(--dg-color-danger-bg)",
         borderRadius: "var(--dg-radius-md)",
       }}
     >
@@ -579,12 +579,12 @@ function SandboxNotice({ message }: { message: string }) {
   return (
     <p
       style={{
-        color: "var(--color-info-text)",
+        color: "var(--dg-color-info-text)",
         fontSize: "var(--dg-fs-body-sm)",
         margin: 0,
         padding: "8px 12px",
-        background: "var(--color-info-bg)",
-        border: "1px solid var(--color-info-border)",
+        background: "var(--dg-color-info-bg)",
+        border: "1px solid var(--dg-color-info-border)",
         borderRadius: "var(--dg-radius-md)",
       }}
     >
@@ -597,7 +597,7 @@ const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
-  color: "var(--color-text-secondary, #334766)",
+  color: "var(--dg-color-text-secondary, #334766)",
   marginBottom: 6,
 };
 
@@ -606,11 +606,11 @@ const inputStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "var(--color-border, #C8D6EC)",
+  borderColor: "var(--dg-color-border, #C8D6EC)",
   borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-body-sm)",
-  color: "var(--color-text-primary, #0F1724)",
-  background: "var(--color-bg, #fff)",
+  color: "var(--dg-color-text-primary, #0F1724)",
+  background: "var(--dg-color-bg, #fff)",
   outline: "none",
   boxSizing: "border-box",
 };

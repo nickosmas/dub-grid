@@ -30,9 +30,10 @@ export default function ThemeToggleButton({ className = "" }: { className?: stri
 
   // An unrecognised or not-yet-resolved theme falls back to the first entry so
   // the button always has a defined next step.
+  const hydrationSafeTheme = mounted ? theme : "light";
   const index = Math.max(
     0,
-    THEME_CYCLE.findIndex((entry) => entry.value === theme),
+    THEME_CYCLE.findIndex((entry) => entry.value === hydrationSafeTheme),
   );
   const current = THEME_CYCLE[index]!;
   const next = THEME_CYCLE[(index + 1) % THEME_CYCLE.length]!;
@@ -42,10 +43,10 @@ export default function ThemeToggleButton({ className = "" }: { className?: stri
     <Button
       type="button"
       onClick={() => setTheme(next.value)}
-      className={`p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors ${className}`}
+      className={`p-2 text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)] transition-colors ${className}`}
       aria-label={current.label}
     >
-      {!mounted ? <span style={{ display: "block", width: 20, height: 20 }} /> : <Icon size={20} />}
+      {!mounted ? <span className="dg-theme-toggle-placeholder" /> : <Icon size={20} />}
     </Button>
   );
 }

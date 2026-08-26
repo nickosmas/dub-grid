@@ -27,7 +27,7 @@ export function StaffPagination({
         justifyContent: "space-between",
         padding: "12px 16px",
         fontSize: "var(--dg-fs-label)",
-        color: "var(--color-text-muted)",
+        color: "var(--dg-color-text-muted)",
       }}
     >
       <span style={{ fontSize: "var(--dg-fs-caption)" }}>

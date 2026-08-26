@@ -55,9 +55,9 @@ function IdentityStack({ primary, secondary }: { primary: string; secondary?: st
   const showSecondary = secondary && secondary !== primary;
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{primary}</div>
+      <div style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>{primary}</div>
       {showSecondary && (
-        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>
+        <div style={{ color: "var(--dg-color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>
           {secondary}
         </div>
       )}
@@ -67,7 +67,7 @@ function IdentityStack({ primary, secondary }: { primary: string; secondary?: st
 
 function DetailsSummary({ details, action }: { details: Record<string, unknown>; action: string }) {
   if (!details || Object.keys(details).length === 0)
-    return <span style={{ color: "var(--color-text-faint)" }}>—</span>;
+    return <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>;
 
   const entry = {
     id: 0,
@@ -96,7 +96,7 @@ function DetailsSummary({ details, action }: { details: Record<string, unknown>;
       <span
         style={{
           fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           maxWidth: 200,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -176,7 +176,7 @@ export default function AuditLogView({
             margin: 0,
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {title ?? "Audit Log"}
@@ -220,7 +220,7 @@ export default function AuditLogView({
               alignItems: "center",
               gap: 6,
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontWeight: 700,
             }}
           >
@@ -241,8 +241,8 @@ export default function AuditLogView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -262,7 +262,7 @@ export default function AuditLogView({
                 display: "flex",
                 gap: 16,
                 padding: "12px 14px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
               }}
             >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "18%" }} />
@@ -282,21 +282,25 @@ export default function AuditLogView({
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>
+                      <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
                         Timestamp
                       </th>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>
+                      <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
                         Action
                       </th>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Actor</th>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>
+                      <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
+                        Actor
+                      </th>
+                      <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
                         Target
                       </th>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>
+                      <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
                         Details
                       </th>
                       {!orgId && (
-                        <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Org</th>
+                        <th style={{ ...thStyle, background: "var(--dg-color-bg-secondary)" }}>
+                          Org
+                        </th>
                       )}
                     </tr>
                   </thead>
@@ -319,7 +323,7 @@ export default function AuditLogView({
                             }
                           }}
                           style={{
-                            background: idx % 2 === 1 ? "var(--color-row-alt)" : undefined,
+                            background: idx % 2 === 1 ? "var(--dg-color-row-alt)" : undefined,
                             cursor: "pointer",
                           }}
                         >
@@ -327,7 +331,7 @@ export default function AuditLogView({
                             style={{
                               ...tdStyle,
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
                               fontFamily: "var(--font-dm-mono), monospace",
                             }}
@@ -360,7 +364,7 @@ export default function AuditLogView({
                               <span
                                 style={{
                                   fontSize: "var(--dg-fs-footnote)",
-                                  color: "var(--color-text-muted)",
+                                  color: "var(--dg-color-text-muted)",
                                   maxWidth: 220,
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -384,7 +388,7 @@ export default function AuditLogView({
                             />
                             <div
                               style={{
-                                color: "var(--color-text-faint)",
+                                color: "var(--dg-color-text-faint)",
                                 fontSize: "var(--dg-fs-caption)",
                                 marginTop: 2,
                               }}
@@ -400,7 +404,7 @@ export default function AuditLogView({
                               style={{
                                 ...tdStyle,
                                 fontSize: "var(--dg-fs-caption)",
-                                color: "var(--color-text-muted)",
+                                color: "var(--dg-color-text-muted)",
                               }}
                             >
                               {e.orgName ?? (e.orgId ? "Unknown organization" : "Platform-wide")}
@@ -462,7 +466,7 @@ export default function AuditLogView({
             <span
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontFamily: "var(--font-dm-mono), monospace",
               }}
             >
@@ -509,7 +513,7 @@ function AuditEntryDetailsDialog({
           <ActionBadge action={entry.action} />
           <div
             style={{
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-card-title)",
               fontWeight: 800,
             }}
@@ -535,7 +539,7 @@ function AuditEntryDetailsDialog({
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 800,
               textTransform: "uppercase",
@@ -548,7 +552,7 @@ function AuditEntryDetailsDialog({
           ) : (
             <div
               style={{
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
               }}
@@ -584,7 +588,7 @@ function AuditDetailRow({ label, value }: { label: string; value: string }) {
     <>
       <dt
         style={{
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 800,
         }}
@@ -593,7 +597,7 @@ function AuditDetailRow({ label, value }: { label: string; value: string }) {
       </dt>
       <dd
         style={{
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           fontSize: "var(--dg-fs-label)",
           fontWeight: 650,
           margin: 0,

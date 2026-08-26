@@ -35,8 +35,8 @@ export default function CookiePreferencesManager() {
       style={{
         padding: "16px 20px",
         borderRadius: 10,
-        border: "1px solid var(--color-border)",
-        background: "var(--color-surface-hover)",
+        border: "1px solid var(--dg-color-border)",
+        background: "var(--dg-color-surface-hover)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -50,7 +50,7 @@ export default function CookiePreferencesManager() {
             margin: 0,
             fontSize: "var(--dg-fs-body)",
             fontWeight: 600,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           Your current preference
@@ -59,7 +59,7 @@ export default function CookiePreferencesManager() {
           style={{
             margin: "4px 0 0",
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
           }}
         >
           {consent !== "none"

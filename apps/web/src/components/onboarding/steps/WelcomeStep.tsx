@@ -118,7 +118,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
         style={{
           fontSize: 28,
           fontWeight: 800,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           margin: "0 0 12px",
           letterSpacing: "-0.03em",
         }}
@@ -128,7 +128,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
       <p
         style={{
           fontSize: 16,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           lineHeight: 1.6,
           margin: "0 0 36px",
           maxWidth: 420,
@@ -154,9 +154,9 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
             key={f.title}
             style={{
               padding: "16px 18px",
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               display: "flex",
               gap: 14,
               alignItems: "flex-start",
@@ -167,8 +167,8 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
                 width: 36,
                 height: 36,
                 borderRadius: "var(--dg-radius-sm)",
-                background: "var(--color-brand-bg, #eff6ff)",
-                color: "var(--color-brand)",
+                background: "var(--dg-color-brand-bg, #eff6ff)",
+                color: "var(--dg-color-brand)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -182,7 +182,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                   marginBottom: 2,
                 }}
               >
@@ -191,7 +191,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
               <div
                 style={{
                   fontSize: 13,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   lineHeight: 1.4,
                 }}
               >
@@ -212,8 +212,8 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
           padding: "14px 24px",
           borderRadius: 12,
           border: "none",
-          background: "var(--color-brand)",
-          color: "var(--color-text-inverse)",
+          background: "var(--dg-color-brand)",
+          color: "var(--dg-color-text-inverse)",
           fontSize: 16,
           fontWeight: 700,
           cursor: "pointer",

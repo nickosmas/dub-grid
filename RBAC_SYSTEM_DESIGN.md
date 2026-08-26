@@ -20,7 +20,7 @@ Version 2.2 | Updated 2026-05-25 | Confidential
 > consumes these via `apps/web/src/features/permissions/` (`usePermissions.ts`,
 > `core`, `client`, `shared`, `index`); the mobile backend orchestration in
 > `@dubgrid/mobile-api-core` consumes `@dubgrid/authz` directly. Paths in this
-> document reflect the monorepo layout (`apps/web/...`, `apps/web/middleware.ts`).
+> document reflect the monorepo layout (`apps/web/...`, `apps/web/src/middleware.ts`).
 
 ---
 
@@ -793,7 +793,7 @@ $$;
 
 ## 6. Vercel Edge Middleware
 
-The middleware (`apps/web/middleware.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
+The middleware (`apps/web/src/middleware.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
 
 - **Org access check (archived + suspended + billing)** — looks up `suspended_at`,
   `archived_at`, `subscription_status`, and `trial_ends_at` for the caller's org,
@@ -848,7 +848,7 @@ auth-settle gap so the gate / route guards do not bounce a just-logged-in user t
 ### 6.2 Middleware Implementation
 
 ```ts
-// apps/web/middleware.ts (Vercel Edge Runtime)
+// apps/web/src/middleware.ts (Vercel Edge Runtime)
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
@@ -885,7 +885,7 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const subdomain = parseHost(host).subdomain;
 
-  // Public routes — no auth required (full list in apps/web/middleware.ts)
+  // Public routes — no auth required (full list in apps/web/src/middleware.ts)
   if (
     pathname === "/" ||
     pathname === "/login" ||
@@ -933,7 +933,7 @@ export async function middleware(req: NextRequest) {
   // Fallback: if claims are missing, resolve from DB
   if (!claims.platform_role || !claims.org_role) {
     // Fetch from profiles + organization_memberships
-    // (see apps/web/middleware.ts for full implementation)
+    // (see apps/web/src/middleware.ts for full implementation)
   }
 
   const effectiveRole = calculateEffectiveRole(claims);

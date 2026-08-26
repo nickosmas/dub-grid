@@ -71,8 +71,8 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
             borderRadius: 4,
-            background: "var(--color-success-bg)",
-            color: "var(--color-success-text)",
+            background: "var(--dg-color-success-bg)",
+            color: "var(--dg-color-success-text)",
             fontWeight: 600,
           }}
         >
@@ -85,8 +85,8 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
             borderRadius: 4,
-            background: "var(--color-info-bg)",
-            color: "var(--color-info-text)",
+            background: "var(--dg-color-info-bg)",
+            color: "var(--dg-color-info-text)",
             fontWeight: 600,
           }}
         >
@@ -99,8 +99,8 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
             borderRadius: 4,
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger-text)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger-text)",
             fontWeight: 600,
           }}
         >
@@ -265,7 +265,7 @@ function ChangeRow({
   if (change.kind === "new") {
     const timePart = hasTime ? ` (${fmtTimeRange(change.toCustomStart, change.toCustomEnd)})` : "";
     mainDescription = (
-      <span style={{ color: "var(--color-success-text)" }}>
+      <span style={{ color: "var(--dg-color-success-text)" }}>
         {toLabel}
         {timePart}
       </span>
@@ -273,7 +273,7 @@ function ChangeRow({
     timeAnnotation = null; // already shown inline
   } else if (change.kind === "deleted") {
     mainDescription = (
-      <span style={{ color: "var(--color-danger-text)", textDecoration: "line-through" }}>
+      <span style={{ color: "var(--dg-color-danger-text)", textDecoration: "line-through" }}>
         {fromLabel}
       </span>
     );
@@ -297,7 +297,7 @@ function ChangeRow({
     <div
       style={{
         fontSize: "var(--dg-fs-footnote)",
-        color: "var(--color-text-secondary)",
+        color: "var(--dg-color-text-secondary)",
         display: "flex",
         flexDirection: "column",
         gap: 1,
@@ -312,10 +312,10 @@ function ChangeRow({
             flexShrink: 0,
             background:
               change.kind === "new"
-                ? "var(--color-success-text)"
+                ? "var(--dg-color-success-text)"
                 : change.kind === "modified"
-                  ? "var(--color-primary)"
-                  : "var(--color-danger-text)",
+                  ? "var(--dg-color-primary)"
+                  : "var(--dg-color-danger-text)",
           }}
         />
         <span style={{ minWidth: 100 }}>{dateStr}</span>
@@ -327,7 +327,7 @@ function ChangeRow({
           style={{
             paddingLeft: 22,
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontStyle: "italic",
           }}
         >
@@ -381,7 +381,7 @@ function ExpandedChangesGrouped({
               style={{
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 marginBottom: 3,
                 display: "flex",
                 alignItems: "center",
@@ -403,7 +403,7 @@ function ExpandedChangesGrouped({
                 <circle cx="12" cy="7" r="4" />
               </svg>
               {empName}
-              <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+              <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                 ({sorted.length} change{sorted.length !== 1 ? "s" : ""})
               </span>
             </div>
@@ -531,12 +531,12 @@ export default function PublishHistoryPanel({
         <div
           style={{
             padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
             display: "flex",
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {isMobile && (
@@ -562,7 +562,7 @@ export default function PublishHistoryPanel({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-text-primary)"
+                stroke="var(--dg-color-text-primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -576,7 +576,7 @@ export default function PublishHistoryPanel({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               Publish History
@@ -584,7 +584,7 @@ export default function PublishHistoryPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 2,
               }}
             >
@@ -608,7 +608,7 @@ export default function PublishHistoryPanel({
                   key={i}
                   style={{
                     padding: 12,
-                    border: "1px solid var(--color-border-light)",
+                    border: "1px solid var(--dg-color-border-light)",
                     borderRadius: "var(--dg-radius-md)",
                     display: "flex",
                     flexDirection: "column",
@@ -649,7 +649,7 @@ export default function PublishHistoryPanel({
                 key={entry.id}
                 style={{
                   padding: "12px 0",
-                  borderBottom: "1px solid var(--color-border)",
+                  borderBottom: "1px solid var(--dg-color-border)",
                 }}
               >
                 {/* Entry header row */}
@@ -667,7 +667,7 @@ export default function PublishHistoryPanel({
                         style={{
                           fontWeight: 600,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                         }}
                       >
                         {entry.publishedByName}
@@ -675,7 +675,7 @@ export default function PublishHistoryPanel({
                       <span
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {formatRelativeTime(entry.publishedAt)}
@@ -684,7 +684,7 @@ export default function PublishHistoryPanel({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         marginTop: 2,
                       }}
                     >

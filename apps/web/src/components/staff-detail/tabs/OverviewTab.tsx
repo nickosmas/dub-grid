@@ -97,15 +97,15 @@ export function OverviewTab({
     ? {
         label: "Linked account",
         detail: "Can sign in to DubGrid",
-        dotColor: "var(--color-success)",
+        dotColor: "var(--dg-color-success)",
       }
     : pendingInvite
       ? {
           label: "Invitation pending",
           detail: `Sent to ${pendingInvite.email}`,
-          dotColor: "var(--color-warning)",
+          dotColor: "var(--dg-color-warning)",
         }
-      : { label: "No account", detail: "Not invited yet", dotColor: "var(--color-text-faint)" };
+      : { label: "No account", detail: "Not invited yet", dotColor: "var(--dg-color-text-faint)" };
 
   const employmentSummary = {
     label: employee.status.charAt(0).toUpperCase() + employee.status.slice(1),
@@ -116,10 +116,10 @@ export function OverviewTab({
         : "Status change date unavailable",
     dotColor:
       employee.status === "active"
-        ? "var(--color-success)"
+        ? "var(--dg-color-success)"
         : employee.status === "inactive"
-          ? "var(--color-warning)"
-          : "var(--color-danger)",
+          ? "var(--dg-color-warning)"
+          : "var(--dg-color-danger)",
   };
 
   return (
@@ -128,7 +128,7 @@ export function OverviewTab({
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-[var(--color-text-muted)]" />
+              <BarChart3 className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
               Summary
             </div>
             <div className="dg-card-subtitle">
@@ -136,7 +136,7 @@ export function OverviewTab({
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 divide-y divide-[var(--color-border-light)] sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0 lg:divide-x lg:divide-[var(--color-border-light)]">
+        <div className="grid grid-cols-2 divide-y divide-[var(--dg-color-border-light)] sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0 lg:divide-x lg:divide-[var(--dg-color-border-light)]">
           <MetricCell
             value={thisWeekHours ? `${thisWeekHours.totalHours}h` : "—"}
             label="This Week"
@@ -168,7 +168,7 @@ export function OverviewTab({
           title="Account"
           label={accountSummary.label}
           detail={accountSummary.detail}
-          icon={<Shield className="h-4 w-4 text-[var(--color-text-muted)]" />}
+          icon={<Shield className="h-4 w-4 text-[var(--dg-color-text-muted)]" />}
           dotColor={accountSummary.dotColor}
         />
         <StatusCard
@@ -176,7 +176,7 @@ export function OverviewTab({
           label={employmentSummary.label}
           detail={employmentSummary.detail}
           note={employee.statusNote || undefined}
-          icon={<BriefcaseBusiness className="h-4 w-4 text-[var(--color-text-muted)]" />}
+          icon={<BriefcaseBusiness className="h-4 w-4 text-[var(--dg-color-text-muted)]" />}
           dotColor={employmentSummary.dotColor}
         />
       </div>
@@ -187,7 +187,7 @@ export function OverviewTab({
             <div className="dg-card-header">
               <div>
                 <div className="dg-card-title flex items-center gap-2">
-                  <User className="h-4 w-4 text-[var(--color-text-muted)]" />
+                  <User className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
                   Details
                 </div>
                 <div className="dg-card-subtitle">
@@ -198,49 +198,49 @@ export function OverviewTab({
             <div className="dg-card-body">
               <dl className="flex flex-col gap-3">
                 <div>
-                  <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                  <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                     Employment
                   </dt>
-                  <dd className="text-[13px] text-[var(--color-text-primary)]">
+                  <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                     {employmentLabel}
                   </dd>
                 </div>
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                       {focusAreaLabel}
                     </dt>
-                    <dd className="text-[13px] text-[var(--color-text-primary)]">
+                    <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {assignedFocusAreaNames.join(", ")}
                     </dd>
                   </div>
                 )}
                 {certificationName && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                       Certifications
                     </dt>
-                    <dd className="text-[13px] text-[var(--color-text-primary)]">
+                    <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {certificationName}
                     </dd>
                   </div>
                 )}
                 {roleNames.length > 0 && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                       Roles
                     </dt>
-                    <dd className="text-[13px] text-[var(--color-text-primary)]">
+                    <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {roleNames.join(", ")}
                     </dd>
                   </div>
                 )}
                 {employee.contactNotes && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                       Notes
                     </dt>
-                    <dd className="text-[13px] leading-relaxed text-[var(--color-text-primary)]">
+                    <dd className="text-[13px] leading-relaxed text-[var(--dg-color-text-primary)]">
                       {employee.contactNotes}
                     </dd>
                   </div>
@@ -254,7 +254,7 @@ export function OverviewTab({
           <div className="dg-card-header">
             <div>
               <div className="dg-card-title flex items-center gap-2">
-                <Layers className="h-4 w-4 text-[var(--color-text-muted)]" />
+                <Layers className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
                 Assignments
               </div>
               <div className="dg-card-subtitle">
@@ -264,7 +264,7 @@ export function OverviewTab({
           </div>
           <div className="dg-card-body">
             {shiftDistribution.length === 0 ? (
-              <div className="py-8 text-center text-[13px] text-[var(--color-text-muted)]">
+              <div className="py-8 text-center text-[13px] text-[var(--dg-color-text-muted)]">
                 No shift data available
               </div>
             ) : (
@@ -298,13 +298,15 @@ export function OverviewTab({
                           className="h-2.5 w-2.5 shrink-0 rounded-sm"
                           style={{ backgroundColor: item.color }}
                         />
-                        <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                        <span className="text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                           {item.name}
                         </span>
                       </div>
-                      <span className="text-[13px] text-[var(--color-text-muted)]">
+                      <span className="text-[13px] text-[var(--dg-color-text-muted)]">
                         {item.count}{" "}
-                        <span className="text-[var(--color-text-faint)]">({item.percentage}%)</span>
+                        <span className="text-[var(--dg-color-text-faint)]">
+                          ({item.percentage}%)
+                        </span>
                       </span>
                     </div>
                   ))}
@@ -333,15 +335,17 @@ function MetricCell({
     <div className="flex flex-col items-center justify-center px-3 py-4">
       <div
         className="text-xl font-bold leading-none tracking-tight"
-        style={{ color: danger ? "var(--color-danger)" : "var(--color-text-primary)" }}
+        style={{ color: danger ? "var(--dg-color-danger)" : "var(--dg-color-text-primary)" }}
       >
         {value}
       </div>
-      <div className="mt-1.5 text-center text-[11px] font-bold uppercase tracking-[0.04em] text-[var(--color-text-subtle)]">
+      <div className="mt-1.5 text-center text-[11px] font-bold uppercase tracking-[0.04em] text-[var(--dg-color-text-subtle)]">
         {label}
       </div>
       {detail ? (
-        <div className="mt-1 text-center text-[11px] text-[var(--color-text-muted)]">{detail}</div>
+        <div className="mt-1 text-center text-[11px] text-[var(--dg-color-text-muted)]">
+          {detail}
+        </div>
       ) : null}
     </div>
   );
@@ -375,11 +379,13 @@ function StatusCard({
       <div className="dg-card-body">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: dotColor }} />
-          <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">{label}</div>
+          <div className="text-[15px] font-semibold text-[var(--dg-color-text-primary)]">
+            {label}
+          </div>
         </div>
-        <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">{detail}</div>
+        <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">{detail}</div>
         {note ? (
-          <div className="mt-3 rounded-lg bg-[var(--color-bg)] px-3 py-2 text-[12px] italic text-[var(--color-text-muted)]">
+          <div className="mt-3 rounded-lg bg-[var(--dg-color-bg)] px-3 py-2 text-[12px] italic text-[var(--dg-color-text-muted)]">
             {note}
           </div>
         ) : null}

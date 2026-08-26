@@ -33,7 +33,7 @@ function IconTile({ icon }: { icon: AuthIcon }) {
       {icon === "mail" && <Mail size={28} />}
       {icon === "check" && <CheckCircle size={28} />}
       {icon === "shield" && <ShieldCheck size={28} />}
-      {icon === "spinner" && <ButtonSpinner color="var(--color-brand)" size={28} />}
+      {icon === "spinner" && <ButtonSpinner color="var(--dg-color-brand)" size={28} />}
     </div>
   );
 }
@@ -55,21 +55,10 @@ export function AuthStateCard({
     <>
       {icon && <IconTile icon={icon} />}
 
-      <h1 className="dg-auth-heading" style={{ marginBottom: "12px" }}>
-        {heading}
-      </h1>
+      <h1 className="dg-auth-heading dg-auth-state-heading">{heading}</h1>
 
       {message && (
-        <p
-          aria-live="polite"
-          style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-muted)",
-            lineHeight: 1.6,
-            textAlign: "center",
-            marginBottom: "24px",
-          }}
-        >
+        <p aria-live="polite" className="dg-auth-state-message">
           {message}
         </p>
       )}
@@ -80,8 +69,7 @@ export function AuthStateCard({
         (primaryCta.href ? (
           <Link
             href={primaryCta.href}
-            className="dg-btn dg-btn-primary dg-btn-lg"
-            style={{ width: "100%" }}
+            className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
           >
             {primaryCta.label}
           </Link>
@@ -89,20 +77,15 @@ export function AuthStateCard({
           <Button
             type="button"
             onClick={primaryCta.onClick}
-            className="dg-btn dg-btn-primary dg-btn-lg"
-            style={{ width: "100%" }}
+            className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
           >
             {primaryCta.label}
           </Button>
         ))}
 
       {secondaryCta && (
-        <div style={{ marginTop: "16px", textAlign: "center" }}>
-          <Link
-            href={secondaryCta.href}
-            className="dg-auth-link"
-            style={{ color: "var(--color-text-subtle)" }}
-          >
+        <div className="dg-auth-state-secondary">
+          <Link href={secondaryCta.href} className="dg-auth-link dg-auth-link--subtle">
             {secondaryCta.label}
           </Link>
         </div>

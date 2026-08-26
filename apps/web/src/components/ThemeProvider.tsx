@@ -27,7 +27,12 @@ function ThemeCookieSync() {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableColorScheme={false}
+      enableSystem
+    >
       <ThemeCookieSync />
       {children}
     </NextThemesProvider>

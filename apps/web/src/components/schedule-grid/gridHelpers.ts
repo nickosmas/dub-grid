@@ -1,7 +1,13 @@
 import { DRAFT_BORDER_COLORS } from "@/lib/colors";
 import { deriveAssignmentDefinitionIdsFromAssignments } from "@/lib/shift-job-segments";
-import { expandDelimitedTimeRanges, type ShiftDiffTimeRange } from "@/lib/shift-diff-badges";
+import {
+  expandDelimitedTimeRanges,
+  type ShiftDiffBadgeDescriptor,
+  type ShiftDiffDescriptorResult,
+  type ShiftDiffTimeRange,
+} from "@/lib/shift-diff-badges";
 import type {
+  ActiveShiftRequestSummary,
   GridCellId,
   AssignmentDefinition,
   DraftKind,
@@ -22,8 +28,8 @@ export function getCrossFocusBadgePalette(
   style?: Pick<AssignmentDefinition, "color" | "text"> | null,
 ) {
   return {
-    background: style?.color ?? "var(--color-bg)",
-    color: style?.text ?? "var(--color-text-muted)",
+    background: style?.color ?? "var(--dg-color-bg)",
+    color: style?.text ?? "var(--dg-color-text-muted)",
   };
 }
 
@@ -48,7 +54,7 @@ export function getDraftBorder(draftKind: DraftKind, fallback: string): string {
 
 export function getPublishDiffBoxShadow(kind: string, fallback: string): string {
   const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
-  return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
+  return `0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px ${color}`;
 }
 
 /**
@@ -129,6 +135,38 @@ export function getInsetDividerShadow(args: {
  */
 export function cellShowsDraftDiffBadge(args: { draftKind: DraftKind }): boolean {
   return !!args.draftKind && args.draftKind !== "deleted";
+}
+
+/**
+ * The badge the cell itself carries, rather than one riding on a pill.
+ * "Changed" is the summary of several pill-level edits, so it belongs to the
+ * cell by definition. An absence has no pills to hang a badge off — pill diffs
+ * are keyed off the after-state's assignment ids, which an absence has none of
+ * — so the cell carries its badge too; without that, replacing a published
+ * shift with an absence never said which shift it replaced. A plain "New" stays
+ * unbadged: the dashed border already reads as new.
+ */
+export function cellLevelDiffBadge(
+  summary: ShiftDiffDescriptorResult | null | undefined,
+): ShiftDiffBadgeDescriptor | null {
+  if (!summary?.cellBadge) return null;
+  const badge = summary.cellBadge;
+  if (badge.kind === "new" && badge.text === "New") return null;
+  return badge.text === "Changed" || summary.pillDiffs.length === 0 ? badge : null;
+}
+
+/**
+ * Tooltip for the request corner fold: what kind of request is on this shift
+ * and whether anyone still has to act on it.
+ */
+export function formatActiveRequestLabel(request: ActiveShiftRequestSummary): string {
+  const kind =
+    request.type === "swap"
+      ? "Swap request"
+      : request.type === "calloff"
+        ? "Call-off"
+        : "Pickup request";
+  return request.status === "pending_approval" ? `${kind} awaiting approval` : `${kind} open`;
 }
 
 export function formatRelativePublishTime(isoDate: string): string {

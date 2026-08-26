@@ -434,10 +434,10 @@ export default function StringListSettings({
     padding: "7px 10px",
     fontSize: "var(--dg-fs-label)",
     fontWeight: 500,
-    border: "1px solid var(--color-border)",
+    border: "1px solid var(--dg-color-border)",
     borderRadius: 6,
-    background: "var(--color-surface)",
-    color: "var(--color-text-primary)",
+    background: "var(--dg-color-surface)",
+    color: "var(--dg-color-text-primary)",
     outline: "none",
     transition: "border-color 150ms ease, box-shadow 150ms ease",
   };
@@ -488,7 +488,7 @@ export default function StringListSettings({
       style={{
         marginTop: 12,
         padding: sectionTitle ? "12px 16px" : undefined,
-        borderTop: sectionTitle ? "1px solid var(--color-border-light)" : undefined,
+        borderTop: sectionTitle ? "1px solid var(--dg-color-border-light)" : undefined,
       }}
     />
   ) : canEdit && displayList.length > 0 ? (
@@ -501,7 +501,7 @@ export default function StringListSettings({
       style={{
         marginTop: 12,
         padding: sectionTitle ? "12px 16px" : undefined,
-        borderTop: sectionTitle ? "1px solid var(--color-border-light)" : undefined,
+        borderTop: sectionTitle ? "1px solid var(--dg-color-border-light)" : undefined,
       }}
     />
   ) : null;
@@ -531,7 +531,7 @@ export default function StringListSettings({
               padding: "8px 16px",
               gap: 16,
               alignItems: "start",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             {(isEditing
@@ -569,7 +569,7 @@ export default function StringListSettings({
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                 }}
@@ -583,7 +583,7 @@ export default function StringListSettings({
                         fontWeight: 500,
                         letterSpacing: "normal",
                         textTransform: "none",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         lineHeight: 1.35,
                       }}
                     >
@@ -618,7 +618,9 @@ export default function StringListSettings({
                     gap: 16,
                     alignItems: isEditing ? "start" : undefined,
                     borderBottom:
-                      i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                      i < displayList.length - 1
+                        ? "1px solid var(--dg-color-border-light)"
+                        : "none",
                     cursor: isEditing ? "grab" : "default",
                     userSelect: isEditing ? "none" : undefined,
                   } as React.CSSProperties
@@ -661,7 +663,7 @@ export default function StringListSettings({
                       placeholder="Full name"
                       style={{
                         ...fieldStyle,
-                        ...(currentErrors.name ? { borderColor: "var(--color-danger)" } : {}),
+                        ...(currentErrors.name ? { borderColor: "var(--dg-color-danger)" } : {}),
                       }}
                     />
                     {currentErrors.name ? (
@@ -670,7 +672,7 @@ export default function StringListSettings({
                         style={{
                           marginTop: 4,
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-danger)",
+                          color: "var(--dg-color-danger)",
                         }}
                       >
                         {currentErrors.name}
@@ -682,13 +684,13 @@ export default function StringListSettings({
                     style={{
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
                     {item.name || (
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontStyle: "italic",
                           fontWeight: 400,
                         }}
@@ -717,7 +719,7 @@ export default function StringListSettings({
                         style={{
                           ...fieldStyle,
                           fontWeight: 600,
-                          ...(currentErrors.abbr ? { borderColor: "var(--color-danger)" } : {}),
+                          ...(currentErrors.abbr ? { borderColor: "var(--dg-color-danger)" } : {}),
                         }}
                       />
                       {currentErrors.abbr ? (
@@ -726,7 +728,7 @@ export default function StringListSettings({
                           style={{
                             marginTop: 4,
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-danger)",
+                            color: "var(--dg-color-danger)",
                           }}
                         >
                           {currentErrors.abbr}
@@ -738,7 +740,7 @@ export default function StringListSettings({
                       style={{
                         fontSize: "var(--dg-fs-label)",
                         fontWeight: 500,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {item.abbr}
@@ -753,7 +755,7 @@ export default function StringListSettings({
                         alignItems: "center",
                         gap: 10,
                         fontSize: "var(--dg-fs-label)",
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         cursor: "pointer",
                         userSelect: "none",
                       }}
@@ -788,16 +790,16 @@ export default function StringListSettings({
                           fontWeight: 600,
                           background:
                             item.isScheduleRole === false
-                              ? "var(--color-bg-secondary)"
-                              : "var(--color-brand-bg)",
+                              ? "var(--dg-color-bg-secondary)"
+                              : "var(--dg-color-brand-bg)",
                           border:
                             item.isScheduleRole === false
-                              ? "1px solid var(--color-border-light)"
-                              : "1px solid var(--color-brand-border)",
+                              ? "1px solid var(--dg-color-border-light)"
+                              : "1px solid var(--dg-color-brand-border)",
                           color:
                             item.isScheduleRole === false
-                              ? "var(--color-text-muted)"
-                              : "var(--color-brand)",
+                              ? "var(--dg-color-text-muted)"
+                              : "var(--dg-color-brand)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -837,7 +839,7 @@ export default function StringListSettings({
                           style={{
                             fontSize: "var(--dg-fs-label)",
                             fontWeight: 500,
-                            color: "var(--color-text-secondary)",
+                            color: "var(--dg-color-text-secondary)",
                           }}
                         >
                           {(item.departmentIds ?? [])
@@ -854,9 +856,9 @@ export default function StringListSettings({
                             borderRadius: 20,
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            background: "var(--color-brand-bg)",
-                            border: "1px solid var(--color-brand-border)",
-                            color: "var(--color-brand)",
+                            background: "var(--dg-color-brand-bg)",
+                            border: "1px solid var(--dg-color-brand-border)",
+                            color: "var(--dg-color-brand)",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -875,10 +877,10 @@ export default function StringListSettings({
                     }}
                     style={{
                       background: "none",
-                      border: "1px solid var(--color-danger-border, #FECACA)",
+                      border: "1px solid var(--dg-color-danger-border, #FECACA)",
                       borderRadius: 8,
                       cursor: "pointer",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       padding: "5px 10px",
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 600,
@@ -887,7 +889,7 @@ export default function StringListSettings({
                       transition: "background 150ms, color 150ms",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                      e.currentTarget.style.background = "var(--dg-color-danger-bg, #FEF2F2)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "none";
@@ -917,10 +919,10 @@ export default function StringListSettings({
           style={{
             marginTop: 12,
             padding: 12,
-            background: "var(--color-danger-bg)",
-            border: "1px solid var(--color-danger-border)",
+            background: "var(--dg-color-danger-bg)",
+            border: "1px solid var(--dg-color-danger-border)",
             borderRadius: "var(--dg-radius-md)",
-            color: "var(--color-danger-text)",
+            color: "var(--dg-color-danger-text)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 500,
             whiteSpace: "pre-wrap",
@@ -1050,9 +1052,9 @@ function DeptToggle({
         fontWeight: 600,
         whiteSpace: "nowrap",
         cursor: "pointer",
-        background: selected ? "var(--color-brand-bg)" : "var(--color-bg-secondary)",
-        border: `1px solid ${selected ? "var(--color-brand-border)" : "var(--color-border-light)"}`,
-        color: selected ? "var(--color-brand)" : "var(--color-text-secondary)",
+        background: selected ? "var(--dg-color-brand-bg)" : "var(--dg-color-bg-secondary)",
+        border: `1px solid ${selected ? "var(--dg-color-brand-border)" : "var(--dg-color-border-light)"}`,
+        color: selected ? "var(--dg-color-brand)" : "var(--dg-color-text-secondary)",
       }}
     >
       {label}

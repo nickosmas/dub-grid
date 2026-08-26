@@ -112,7 +112,7 @@ function ToggleSwitch({ on }: { on: boolean }) {
         width: 32,
         height: 18,
         borderRadius: 9,
-        background: on ? "var(--color-success)" : "var(--color-border)",
+        background: on ? "var(--dg-color-success)" : "var(--dg-color-border)",
         position: "relative",
         transition: "background 150ms ease",
         flexShrink: 0,
@@ -123,7 +123,7 @@ function ToggleSwitch({ on }: { on: boolean }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           position: "absolute",
           top: 2,
           left: on ? 16 : 2,
@@ -165,9 +165,11 @@ function SortMenuButton({
             fontWeight: 600,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
-            border: open ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
-            background: open ? "var(--color-brand-bg)" : undefined,
-            color: open ? "var(--color-brand)" : undefined,
+            border: open
+              ? "1px solid var(--dg-color-brand-border)"
+              : "1px solid var(--dg-color-border)",
+            background: open ? "var(--dg-color-brand-bg)" : undefined,
+            color: open ? "var(--dg-color-brand)" : undefined,
           }}
         >
           <ArrowUpDown size={13} />
@@ -601,7 +603,7 @@ export default function Toolbar({
             style={{
               fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
               textAlign: "center",
               flex: 1,
@@ -681,7 +683,7 @@ export default function Toolbar({
                   left: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "var(--color-text-faint)",
+                  color: "var(--dg-color-text-faint)",
                   pointerEvents: "none",
                 }}
               >
@@ -709,13 +711,13 @@ export default function Toolbar({
               data-tour="toolbar-tools-btn"
               style={{
                 border: toolsOpen
-                  ? "1px solid var(--color-brand-border)"
-                  : "1px solid var(--color-border)",
+                  ? "1px solid var(--dg-color-brand-border)"
+                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--color-brand)" : undefined,
+                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
+                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 flexShrink: 0,
                 position: "relative",
               }}
@@ -827,7 +829,7 @@ export default function Toolbar({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
               minWidth: 120,
               textAlign: "center",
@@ -919,7 +921,7 @@ export default function Toolbar({
                           style={{
                             width: 1,
                             height: 16,
-                            background: showDivider ? "var(--color-border)" : "transparent",
+                            background: showDivider ? "var(--dg-color-border)" : "transparent",
                             flexShrink: 0,
                             alignSelf: "center",
                           }}
@@ -957,7 +959,7 @@ export default function Toolbar({
                 left: 10,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "var(--color-text-faint)",
+                color: "var(--dg-color-text-faint)",
                 pointerEvents: "none",
               }}
             >
@@ -996,12 +998,12 @@ export default function Toolbar({
                 onClick={onCoverageToggle}
                 className="dg-btn dg-btn-ghost"
                 style={{
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: "var(--dg-btn-radius)",
                   height: "var(--dg-toolbar-h)",
                   padding: "0 12px",
                   position: "relative",
-                  color: coverageGapCount > 0 ? "var(--color-danger)" : undefined,
+                  color: coverageGapCount > 0 ? "var(--dg-color-danger)" : undefined,
                 }}
               >
                 <svg
@@ -1037,13 +1039,13 @@ export default function Toolbar({
               data-tour="toolbar-tools-btn"
               style={{
                 border: toolsOpen
-                  ? "1px solid var(--color-brand-border)"
-                  : "1px solid var(--color-border)",
+                  ? "1px solid var(--dg-color-brand-border)"
+                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--color-brand)" : undefined,
+                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
+                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 position: "relative",
               }}
             >

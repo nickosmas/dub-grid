@@ -1,4 +1,4 @@
-// middleware.ts
+// proxy.ts
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt } from "jose";
 import { createServerClient } from "@supabase/ssr";
@@ -11,10 +11,10 @@ import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
-import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/supabase-keys";
+import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 
 /**
- * Vercel Edge Middleware for RBAC Route Protection
+ * Vercel Edge Proxy for RBAC Route Protection
  *
  * This middleware implements route-level access control at the CDN edge:
  * - Uses @supabase/ssr createServerClient to read the session from cookies
@@ -60,6 +60,14 @@ const mwOrgAccessMemo = new Map<string, { value: MwOrgAccess; expiresAt: number 
 /** Test seam: clears the in-process org-access memo between cases. */
 export function resetMiddlewareOrgAccessMemo(): void {
   mwOrgAccessMemo.clear();
+}
+
+function redirectWithCookies(url: URL, source: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of source.cookies.getAll()) {
+    redirect.cookies.set(cookie);
+  }
+  return redirect;
 }
 
 async function readOrgAccess(
@@ -112,7 +120,7 @@ export function getRoleLevel(role: string): number {
   return ROLE_HIERARCHY[role] ?? 0;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const timer = new Timer();
   const host = req.headers.get("host") ?? "";
   const pathname = req.nextUrl.pathname;
@@ -178,21 +186,15 @@ export async function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
-  // Marketing pages should only render on the apex domain — redirect
-  // any subdomain (including nonsense slugs) back to the bare domain.
-  if (subdomain && subdomain !== "gridmaster") {
+  // Marketing content is canonical on the apex. Organization and Gridmaster
+  // application routes remain on their respective wildcard subdomains.
+  if (subdomain) {
     const isMarketingPage =
       pathname === "/" ||
       pathname === "/privacy" ||
       pathname === "/terms" ||
       pathname === "/request-demo";
     if (isMarketingPage) {
-      // Explicitly set both pathname and host from already-trusted values
-      // (pathname, parsedHost) rather than relying on req.url's own host —
-      // under self-hosted `next start`, req.url reports the server's bind
-      // address (e.g. "localhost:3000") instead of the real incoming Host,
-      // so mutating only .host on it is a no-op and this would otherwise
-      // redirect to itself forever.
       const url = new URL(req.url);
       url.pathname = pathname;
       url.host = `${parsedHost.rootDomain}${parsedHost.port}`;
@@ -304,7 +306,7 @@ export async function middleware(req: NextRequest) {
   // Fallback path: if custom JWT claims are missing, resolve role/org
   // from the caller's profile so route guards still work.
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
-  const isGridmaster = claims.platform_role === "gridmaster";
+  let isGridmaster = claims.platform_role === "gridmaster";
   const subdomainMismatch =
     !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
 
@@ -329,7 +331,7 @@ export async function middleware(req: NextRequest) {
         }),
       );
 
-      // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
+      // 2. Resolve the user's organization role on the requested subdomain.
       let resolvedOrgRole = "user";
       let resolvedOrgId = profile?.org_id;
       let resolvedOrgSlug: string | undefined = undefined;
@@ -341,9 +343,6 @@ export async function middleware(req: NextRequest) {
               .from("organization_memberships")
               .select("org_role, org_id, organizations!inner(slug)")
               .eq("user_id", userId)
-              // Removal is a soft archive, so without this an ex-member still
-              // matched: the subdomain-mismatch redirect below was skipped and
-              // their old org_role was restored from the archived row.
               .is("archived_at", null)
               .eq("organizations.slug", subdomain)
               .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
@@ -356,8 +355,6 @@ export async function middleware(req: NextRequest) {
           resolvedOrgId = membership.org_id;
           resolvedOrgSlug = membership.organizations?.slug;
         } else if (subdomainMismatch) {
-          // User is on a subdomain they don't belong to — redirect to login
-          // instead of silently proceeding with stale/missing org context.
           return NextResponse.redirect(new URL("/login", req.url));
         }
       }
@@ -374,6 +371,9 @@ export async function middleware(req: NextRequest) {
       // RLS enforces real data security; middleware guards are best-effort.
     }
   }
+
+  // The fallback above may have resolved the platform role from the profile.
+  isGridmaster = claims.platform_role === "gridmaster";
 
   // Calculate effective role - Requirement 11.1
   let effectiveRole = calculateEffectiveRole(claims);
@@ -463,9 +463,8 @@ export async function middleware(req: NextRequest) {
   // ── Sandbox mode override ──────────────────────────────────────────────
   // When a user has an active sandbox cookie, override the org context to
   // the sandbox org id WITHOUT touching the JWT or the current subdomain.
-  // The user stays signed in, on their real-org subdomain, but every
-  // org_id-scoped read/write is routed to the sandbox copy. Exiting just
-  // clears the cookie — no JWT refresh, no navigation.
+  // The user stays signed in on their real organization subdomain while every
+  // org_id-scoped read/write is routed to the sandbox copy.
   let isInSandbox = false;
   if (!isImpersonating && session?.user?.id) {
     const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
@@ -496,9 +495,8 @@ export async function middleware(req: NextRequest) {
               claims = {
                 ...claims,
                 org_id: data.id,
-                // Intentionally keep claims.org_slug so the user stays on
-                // their real-org subdomain and the subdomain redirect at
-                // line 410 is a no-op.
+                // Keep claims.org_slug so the user stays on their real
+                // organization subdomain.
               };
             }
             // No row → either the sandbox was deleted server-side or the
@@ -515,6 +513,30 @@ export async function middleware(req: NextRequest) {
           });
         }
       }
+    }
+  }
+
+  // Only platform gridmasters may use the reserved Gridmaster host.
+  if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // Gridmasters use their dedicated wildcard subdomain on every authenticated
+  // route. This also fixes a Gridmaster login that began from the apex host.
+  if (isGridmaster && !isImpersonating && subdomain !== "gridmaster") {
+    const url = new URL(req.url);
+    url.host = buildSubdomainHost("gridmaster", parsedHost);
+    return redirectWithCookies(url, res);
+  }
+
+  // Keep regular organization users on the host named by their active-org
+  // claim. Gridmasters move to their dedicated host below.
+  if (!isImpersonating && effectiveRole !== "gridmaster" && claims.org_slug) {
+    const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
+    if (host !== expectedHost) {
+      const url = new URL(req.url);
+      url.host = expectedHost;
+      return redirectWithCookies(url, res);
     }
   }
 
@@ -589,37 +611,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Gridmaster subdomain check - Requirement 11.1
-  if (subdomain === "gridmaster" && effectiveRole !== "gridmaster" && !isImpersonating) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // Keep org-scoped users on their org subdomain.
-  // Skip during impersonation — gridmaster stays on the current host.
-  if (!isImpersonating && effectiveRole !== "gridmaster" && claims.org_slug) {
-    const expectedHost = buildSubdomainHost(claims.org_slug, parsedHost);
-    if (host !== expectedHost) {
-      const url = new URL(req.url);
-      url.host = expectedHost;
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // Redirect /gridmaster to /dashboard on the gridmaster subdomain.
-  // The gridmaster portal renders at /dashboard when the user is a gridmaster.
-  if (
-    isGridmaster &&
-    !isImpersonating &&
-    pathname.startsWith("/gridmaster") &&
-    subdomain !== "gridmaster"
-  ) {
-    const gridmasterHost = buildSubdomainHost("gridmaster", parsedHost);
-    const url = new URL(req.url);
-    url.host = gridmasterHost;
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
-
   // Route guards - Requirements 11.2, 11.3
   // People is accessible to authenticated org members, with mutations gated deeper
   // by canManageEmployees. Settings is reserved for admins, super admins, and
@@ -633,12 +624,6 @@ export async function middleware(req: NextRequest) {
   // since /gridmaster access auto-ends impersonation above)
   if (pathname.startsWith("/gridmaster") && !isGridmaster) {
     return NextResponse.redirect(new URL("/schedule", req.url));
-  }
-
-  // On gridmaster subdomain, redirect /gridmaster to /dashboard
-  // (the gridmaster portal renders at /dashboard for gridmaster users)
-  if (pathname.startsWith("/gridmaster") && subdomain === "gridmaster") {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   // Inject headers - Requirement 11.5

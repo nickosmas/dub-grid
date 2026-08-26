@@ -42,19 +42,19 @@ const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; cla
   {
     pending: {
       label: "Pending",
-      className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
+      className: "bg-[var(--dg-color-warning-bg)] text-[var(--dg-color-warning-text)]",
     },
     approved: {
       label: "Approved",
-      className: "bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
+      className: "bg-[var(--dg-color-success-bg)] text-[var(--dg-color-success-text)]",
     },
     rejected: {
       label: "Rejected",
-      className: "bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
+      className: "bg-[var(--dg-color-danger-bg)] text-[var(--dg-color-danger-text)]",
     },
     cancelled: {
       label: "Cancelled",
-      className: "bg-[var(--color-bg)] text-[var(--color-text-muted)]",
+      className: "bg-[var(--dg-color-bg)] text-[var(--dg-color-text-muted)]",
     },
   };
 
@@ -121,10 +121,10 @@ function formatFieldValue(field: string, value: unknown, references: RequestRefe
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-faint)]">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
         {label}
       </div>
-      <div className="mt-1 break-words text-[13px] text-[var(--color-text-primary)]">
+      <div className="mt-1 break-words text-[13px] text-[var(--dg-color-text-primary)]">
         {value || "Not recorded"}
       </div>
     </div>
@@ -153,31 +153,31 @@ function ProfileUpdateDetails({
 
   if (changeKeys.length === 0) {
     return (
-      <div className="rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3 text-[13px] text-[var(--color-text-muted)]">
+      <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 text-[13px] text-[var(--dg-color-text-muted)]">
         No structured profile fields were included with this request.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)]">
-      <div className="grid grid-cols-[1fr_1fr_1fr] bg-[var(--color-bg)] text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-faint)]">
-        <div className="border-r border-[var(--color-border-light)] px-3 py-2">Field</div>
-        <div className="border-r border-[var(--color-border-light)] px-3 py-2">Current</div>
+    <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)]">
+      <div className="grid grid-cols-[1fr_1fr_1fr] bg-[var(--dg-color-bg)] text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
+        <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2">Field</div>
+        <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2">Current</div>
         <div className="px-3 py-2">Requested</div>
       </div>
       {changeKeys.map((field) => (
         <div
           key={field}
-          className="grid grid-cols-[1fr_1fr_1fr] border-t border-[var(--color-border-light)] text-[13px]"
+          className="grid grid-cols-[1fr_1fr_1fr] border-t border-[var(--dg-color-border-light)] text-[13px]"
         >
-          <div className="border-r border-[var(--color-border-light)] px-3 py-2 font-semibold text-[var(--color-text-primary)]">
+          <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2 font-semibold text-[var(--dg-color-text-primary)]">
             {FIELD_LABELS[field] ?? field}
           </div>
-          <div className="border-r border-[var(--color-border-light)] px-3 py-2 text-[var(--color-text-muted)]">
+          <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2 text-[var(--dg-color-text-muted)]">
             {formatFieldValue(field, request.currentValues[field], references)}
           </div>
-          <div className="px-3 py-2 font-semibold text-[var(--color-text-primary)]">
+          <div className="px-3 py-2 font-semibold text-[var(--dg-color-text-primary)]">
             {formatFieldValue(
               field,
               request.requestedChanges[field as keyof typeof request.requestedChanges],
@@ -192,11 +192,11 @@ function ProfileUpdateDetails({
 
 function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) {
   return (
-    <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-3">
-      <div className="text-[13px] font-semibold text-[var(--color-danger-text)]">
+    <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-danger-border)] bg-[var(--dg-color-danger-bg)] p-3">
+      <div className="text-[13px] font-semibold text-[var(--dg-color-danger-text)]">
         Account deletion request
       </div>
-      <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--color-danger-text)]">
+      <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--dg-color-danger-text)]">
         Approving will permanently delete this user&apos;s account and remove them from your
         organization. This can&apos;t be undone.
       </p>
@@ -217,7 +217,7 @@ function RequestQueueSkeleton() {
             <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
           </div>
           <div className="dg-card-body flex flex-col gap-3">
-            <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3 sm:grid-cols-3">
+            <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 sm:grid-cols-3">
               {Array.from({ length: 3 }).map((__, j) => (
                 <div key={j} className="flex flex-col gap-2">
                   <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
@@ -303,10 +303,10 @@ export function ProfileChangeRequestQueue({
   return (
     <div className="flex w-full flex-col gap-4">
       <div>
-        <h1 className="m-0 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
+        <h1 className="m-0 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
           People requests
         </h1>
-        <p className="mb-0 mt-1 text-[14px] text-[var(--color-text-muted)]">
+        <p className="mb-0 mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
           Review profile updates and account deletion requests from regular users.
         </p>
       </div>
@@ -338,7 +338,7 @@ export function ProfileChangeRequestQueue({
               </span>
             </div>
             <div className="dg-card-body flex flex-col gap-3">
-              <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3 sm:grid-cols-3">
+              <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 sm:grid-cols-3">
                 <DetailRow label="Requester email" value={request.requesterEmail} />
                 <DetailRow label="Submitted" value={formatDate(request.createdAt)} />
                 <DetailRow label="Last updated" value={formatDate(request.updatedAt)} />
@@ -351,24 +351,24 @@ export function ProfileChangeRequestQueue({
               )}
 
               {request.requestNote ? (
-                <div className="rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-faint)]">
+                <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
                     Request note
                   </div>
-                  <p className="m-0 mt-1 whitespace-pre-wrap text-[13px] leading-5 text-[var(--color-text-muted)]">
+                  <p className="m-0 mt-1 whitespace-pre-wrap text-[13px] leading-5 text-[var(--dg-color-text-muted)]">
                     {request.requestNote}
                   </p>
                 </div>
               ) : null}
 
               {request.resolverNote || request.resolvedAt || request.cancelledAt ? (
-                <div className="rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3">
+                <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailRow label="Resolved at" value={formatDate(request.resolvedAt)} />
                     <DetailRow label="Cancelled at" value={formatDate(request.cancelledAt)} />
                   </div>
                   {request.resolverNote ? (
-                    <p className="m-0 mt-3 whitespace-pre-wrap text-[13px] leading-5 text-[var(--color-text-muted)]">
+                    <p className="m-0 mt-3 whitespace-pre-wrap text-[13px] leading-5 text-[var(--dg-color-text-muted)]">
                       {request.resolverNote}
                     </p>
                   ) : null}

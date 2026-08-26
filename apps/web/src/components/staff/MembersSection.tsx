@@ -927,10 +927,10 @@ export function MembersSection({
       <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
         <div className="space-y-8">
           <div>
-            <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
+            <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
               Directory
             </h1>
-            <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+            <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
               View and manage your organization&apos;s staff roster.
             </p>
           </div>
@@ -939,9 +939,9 @@ export function MembersSection({
             <div
               className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[13px]"
               style={{
-                borderColor: "var(--color-border-light)",
+                borderColor: "var(--dg-color-border-light)",
                 background: "var(--color-muted)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               <span>Not everyone is shown yet. Use search or filters to find specific people.</span>
@@ -1014,7 +1014,7 @@ export function MembersSection({
                 {/* The dot counts the half you're looking at, so it never
                     reports filters the visible list isn't being narrowed by. */}
                 {(showManagement ? managementHasActiveFilters : hasActiveFilters) && (
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--color-brand)]" />
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--dg-color-brand)]" />
                 )}
               </Button>
 
@@ -1055,7 +1055,7 @@ export function MembersSection({
                             style={{
                               width: 1,
                               height: 16,
-                              background: showDivider ? "var(--color-border)" : "transparent",
+                              background: showDivider ? "var(--dg-color-border)" : "transparent",
                               flexShrink: 0,
                               alignSelf: "center",
                             }}
@@ -1086,8 +1086,8 @@ export function MembersSection({
                               lineHeight: 1,
                               background: active
                                 ? "rgba(255,255,255,0.25)"
-                                : "var(--color-border-light)",
-                              color: active ? "inherit" : "var(--color-text-muted)",
+                                : "var(--dg-color-border-light)",
+                              color: active ? "inherit" : "var(--dg-color-text-muted)",
                               marginLeft: 3,
                             }}
                           >
@@ -1122,8 +1122,8 @@ export function MembersSection({
                         background:
                           deptFilterId === null
                             ? "rgba(255,255,255,0.25)"
-                            : "var(--color-border-light)",
-                        color: deptFilterId === null ? "inherit" : "var(--color-text-muted)",
+                            : "var(--dg-color-border-light)",
+                        color: deptFilterId === null ? "inherit" : "var(--dg-color-text-muted)",
                         marginLeft: 3,
                       }}
                     >
@@ -1146,7 +1146,7 @@ export function MembersSection({
                             style={{
                               width: 1,
                               height: 16,
-                              background: showDivider ? "var(--color-border)" : "transparent",
+                              background: showDivider ? "var(--dg-color-border)" : "transparent",
                               flexShrink: 0,
                               alignSelf: "center",
                             }}
@@ -1170,8 +1170,8 @@ export function MembersSection({
                                 lineHeight: 1,
                                 background: active
                                   ? "rgba(255,255,255,0.25)"
-                                  : "var(--color-border-light)",
-                                color: active ? "inherit" : "var(--color-text-muted)",
+                                  : "var(--dg-color-border-light)",
+                                color: active ? "inherit" : "var(--dg-color-text-muted)",
                                 marginLeft: 3,
                               }}
                             >
@@ -1194,7 +1194,7 @@ export function MembersSection({
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--color-text-faint)]"
+                  className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--dg-color-text-faint)]"
                   style={{ left: 12 }}
                 >
                   <circle cx="11" cy="11" r="8" />
@@ -1455,11 +1455,11 @@ export function MembersSection({
                 <div
                   data-tour="staff-table"
                   data-testid="staff-table"
-                  className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]"
+                  className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
                 >
                   {isReordering ? (
                     <div className="dg-staff-directory-table">
-                      <div className="dg-staff-directory-header bg-[var(--color-bg)]">
+                      <div className="dg-staff-directory-header bg-[var(--dg-color-bg)]">
                         <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex select-none items-center gap-1">
                             ID{" "}
@@ -1533,9 +1533,9 @@ export function MembersSection({
                   ) : (
                     <Table>
                       <TableHeader>
-                        <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
+                        <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                            <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                               <div className="flex items-center gap-1.5">
                                 {canManageEmployees && (
                                   <input
@@ -1548,7 +1548,7 @@ export function MembersSection({
                                     }
                                     onChange={() => toggleSelectAll(paginatedList)}
                                     onClick={(event) => event.stopPropagation()}
-                                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-today-text)]"
+                                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--dg-color-today-text)]"
                                   />
                                 )}
                                 <span
@@ -1565,7 +1565,7 @@ export function MembersSection({
                             </TableHead>
                           )}
                           <TableHead
-                            className="cursor-pointer select-none border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
+                            className="cursor-pointer select-none border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]"
                             onClick={() => handleSort("name")}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -1574,36 +1574,36 @@ export function MembersSection({
                             </span>
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[110px] border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                            <TableHead className="w-[110px] border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                               Employment
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[110px] border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:border-r">
+                            <TableHead className="w-[110px] border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:border-r">
                               Status
                             </TableHead>
                           )}
-                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell md:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell md:border-r">
                             {focusAreaLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell lg:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell lg:border-r">
                             {certificationLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
                             Roles
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
                               Account
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
                               Access
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                            <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell">
                               Date Joined
                             </TableHead>
                           )}
@@ -1669,28 +1669,28 @@ export function MembersSection({
           {canSeeManagementUsers &&
             showManagement &&
             (filteredDeptUsers.length > 0 ? (
-              <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
+              <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]">
                 <Table>
                   <TableHeader>
-                    <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
-                      <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                    <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
+                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                         ID
                       </TableHead>
-                      <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                      <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                         Name
                       </TableHead>
                       {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                           {managementDepartmentLabel}
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                           Role
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                           Status
                         </TableHead>
                       )}
@@ -1720,22 +1720,22 @@ export function MembersSection({
                             : "Active";
                       const statusColors = isPending
                         ? {
-                            background: "var(--color-warning-bg)",
-                            color: "var(--color-warning-text)",
+                            background: "var(--dg-color-warning-bg)",
+                            color: "var(--dg-color-warning-text)",
                           }
                         : person.employeeStatus === "removed"
                           ? {
-                              background: "var(--color-danger-bg)",
-                              color: "var(--color-danger-text)",
+                              background: "var(--dg-color-danger-bg)",
+                              color: "var(--dg-color-danger-text)",
                             }
                           : person.employeeStatus === "inactive"
                             ? {
-                                background: "var(--color-warning-bg)",
-                                color: "var(--color-warning-text)",
+                                background: "var(--dg-color-warning-bg)",
+                                color: "var(--dg-color-warning-text)",
                               }
                             : {
-                                background: "var(--color-success-bg)",
-                                color: "var(--color-success-text)",
+                                background: "var(--dg-color-success-bg)",
+                                color: "var(--dg-color-success-text)",
                               };
                       const displayName =
                         person.firstName || person.lastName
@@ -1750,33 +1750,33 @@ export function MembersSection({
                           key={person.personId}
                           className={`cursor-pointer transition-colors ${
                             isExpanded
-                              ? "bg-[var(--color-control-active-bg)]"
-                              : "hover:bg-[var(--color-bg)]"
+                              ? "bg-[var(--dg-color-control-active-bg)]"
+                              : "hover:bg-[var(--dg-color-bg)]"
                           }`}
                           onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
                           style={{ opacity: isPending ? 0.7 : 1 }}
                         >
-                          <TableCell className="w-[100px] border-r border-[var(--color-border-light)] py-4 pl-6">
-                            <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--color-text-faint)]">
+                          <TableCell className="w-[100px] border-r border-[var(--dg-color-border-light)] py-4 pl-6">
+                            <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--dg-color-text-faint)]">
                               {person.employeeNumber !== null
                                 ? `#${person.employeeNumber}`
                                 : "\u2014"}
                             </span>
                           </TableCell>
 
-                          <TableCell className="border-r border-[var(--color-border-light)] py-4">
+                          <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <div
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
                                 style={{
                                   background: isPending
-                                    ? "var(--color-surface)"
+                                    ? "var(--dg-color-surface)"
                                     : avatarTone.backgroundColor,
                                   color: isPending
-                                    ? "var(--color-text-muted)"
+                                    ? "var(--dg-color-text-muted)"
                                     : avatarTone.textColor,
                                   border: isPending
-                                    ? "1px solid var(--color-border-light)"
+                                    ? "1px solid var(--dg-color-border-light)"
                                     : `1px solid ${avatarTone.borderColor}`,
                                 }}
                               >
@@ -1801,17 +1801,17 @@ export function MembersSection({
                                         currentUserId,
                                       )}
                                       onClick={(event) => event.stopPropagation()}
-                                      className="truncate text-[14px] font-medium text-[var(--color-text-primary)] hover:underline"
+                                      className="truncate text-[14px] font-medium text-[var(--dg-color-text-primary)] hover:underline"
                                     >
                                       {displayName}
                                     </Link>
                                   ) : (
-                                    <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
+                                    <span className="truncate text-[14px] font-medium text-[var(--dg-color-text-primary)]">
                                       {displayName}
                                     </span>
                                   )}
                                   {isYou && (
-                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">
+                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
                                       You
                                     </span>
                                   )}
@@ -1826,15 +1826,15 @@ export function MembersSection({
                                     <span
                                       className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                                       style={{
-                                        background: "var(--color-today-bg)",
-                                        color: "var(--color-today-text)",
+                                        background: "var(--dg-color-today-bg)",
+                                        color: "var(--dg-color-today-text)",
                                       }}
                                     >
                                       On Schedule
                                     </span>
                                   )}
                                 </div>
-                                <div className="mt-0.5 truncate text-[12px] text-[var(--color-text-muted)]">
+                                <div className="mt-0.5 truncate text-[12px] text-[var(--dg-color-text-muted)]">
                                   {person.email}
                                 </div>
                               </div>
@@ -1842,8 +1842,8 @@ export function MembersSection({
                           </TableCell>
 
                           {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--color-border-light)] py-4">
-                              <span className="text-[13px] text-[var(--color-text-muted)]">
+                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
+                              <span className="text-[13px] text-[var(--dg-color-text-muted)]">
                                 {personDepts.length > 0
                                   ? personDepts.map((department) => department.name).join(", ")
                                   : "\u2014"}
@@ -1852,7 +1852,7 @@ export function MembersSection({
                           )}
 
                           {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--color-border-light)] py-4">
+                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                               <InlineRoleSelect
                                 orgRole={person.orgRole}
                                 onChange={roleChangeHandlerFor(
@@ -1880,8 +1880,8 @@ export function MembersSection({
                               className="flex items-center justify-center"
                               style={{
                                 color: isExpanded
-                                  ? "var(--color-control-active-text)"
-                                  : "var(--color-text-faint)",
+                                  ? "var(--dg-color-control-active-text)"
+                                  : "var(--dg-color-text-faint)",
                               }}
                             >
                               <svg

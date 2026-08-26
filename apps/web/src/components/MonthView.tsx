@@ -72,8 +72,8 @@ function buildMonthCells(monthStart: Date): (Date | null)[] {
 }
 
 const NEUTRAL_FA_STYLE = {
-  bg: "var(--color-bg-secondary)",
-  text: "var(--color-text-muted)",
+  bg: "var(--dg-color-bg-secondary)",
+  text: "var(--dg-color-text-muted)",
 } as const;
 
 function shortName(name: string): string {
@@ -121,8 +121,8 @@ function DayPopover({
         initialFocus={false}
         finalFocus={false}
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-lg)",
           boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
@@ -136,14 +136,14 @@ function DayPopover({
         <div
           style={{
             padding: "10px 14px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
           }}
         >
           <span
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {date.toLocaleDateString("en-US", {
@@ -160,7 +160,7 @@ function DayPopover({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 textAlign: "center",
                 padding: "8px 0",
               }}
@@ -205,11 +205,11 @@ function DayPopover({
                                 borderRadius: 6,
                                 background:
                                   hasHighlightedSearch && isHighlighted
-                                    ? "var(--color-brand-bg)"
+                                    ? "var(--dg-color-brand-bg)"
                                     : "transparent",
                                 boxShadow:
                                   hasHighlightedSearch && isHighlighted
-                                    ? "inset 3px 0 0 0 var(--color-brand)"
+                                    ? "inset 3px 0 0 0 var(--dg-color-brand)"
                                     : undefined,
                                 opacity: hasHighlightedSearch && !isHighlighted ? 0.35 : 1,
                                 transition:
@@ -242,8 +242,8 @@ function DayPopover({
                                   fontSize: "var(--dg-fs-footnote)",
                                   color:
                                     hasHighlightedSearch && isHighlighted
-                                      ? "var(--color-brand)"
-                                      : "var(--color-text-secondary)",
+                                      ? "var(--dg-color-brand)"
+                                      : "var(--dg-color-text-secondary)",
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -500,7 +500,7 @@ export default function MonthView({
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
               letterSpacing: "0.07em",
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               padding: "4px 0",
             }}
           >
@@ -560,18 +560,18 @@ export default function MonthView({
               style={{
                 background: isSearchHighlightedDay
                   ? isToday
-                    ? "linear-gradient(180deg, var(--color-brand-bg) 0%, var(--color-today-bg) 100%)"
-                    : "var(--color-brand-bg)"
+                    ? "linear-gradient(180deg, var(--dg-color-brand-bg) 0%, var(--dg-color-today-bg) 100%)"
+                    : "var(--dg-color-brand-bg)"
                   : isToday
-                    ? "var(--color-today-bg)"
-                    : "var(--color-surface)",
+                    ? "var(--dg-color-today-bg)"
+                    : "var(--dg-color-surface)",
                 border: isOpen
-                  ? "2px solid var(--color-brand-border)"
+                  ? "2px solid var(--dg-color-brand-border)"
                   : isSearchHighlightedDay
-                    ? "2px solid var(--color-brand-border)"
+                    ? "2px solid var(--dg-color-brand-border)"
                     : isToday
-                      ? "2px solid var(--color-today-text)"
-                      : "1px solid var(--color-border)",
+                      ? "2px solid var(--dg-color-today-text)"
+                      : "1px solid var(--dg-color-border)",
                 borderRadius: 10,
                 padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
                 minHeight: 64,
@@ -597,13 +597,15 @@ export default function MonthView({
                     width: 24,
                     height: 24,
                     borderRadius: "50%",
-                    background: isToday ? "var(--color-today-text)" : "transparent",
+                    background: isToday ? "var(--dg-color-today-text)" : "transparent",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
-                    color: isToday ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
+                    color: isToday
+                      ? "var(--dg-color-text-inverse)"
+                      : "var(--dg-color-text-secondary)",
                   }}
                 >
                   {date.getDate()}

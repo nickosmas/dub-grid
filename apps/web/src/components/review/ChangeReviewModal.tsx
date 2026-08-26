@@ -42,7 +42,7 @@ export default function ChangeReviewModal({
           style={{
             margin: 0,
             fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             lineHeight: 1.5,
           }}
         >
@@ -54,9 +54,9 @@ export default function ChangeReviewModal({
             style={{
               padding: 12,
               borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--color-warning-border)",
-              background: "var(--color-warning-bg)",
-              color: "var(--color-warning-text)",
+              border: "1px solid var(--dg-color-warning-border)",
+              background: "var(--dg-color-warning-bg)",
+              color: "var(--dg-color-warning-text)",
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
             }}
@@ -67,7 +67,7 @@ export default function ChangeReviewModal({
 
         <div
           style={{
-            border: "1px solid var(--color-border-light)",
+            border: "1px solid var(--dg-color-border-light)",
             borderRadius: "var(--dg-radius-md)",
             overflow: "hidden",
           }}
@@ -80,15 +80,17 @@ export default function ChangeReviewModal({
                 gridTemplateColumns: "minmax(140px, 180px) 1fr 1fr",
                 gap: 12,
                 padding: "12px 14px",
-                borderTop: index === 0 ? "none" : "1px solid var(--color-border-light)",
-                background: change.sensitive ? "var(--color-bg-secondary)" : "var(--color-surface)",
+                borderTop: index === 0 ? "none" : "1px solid var(--dg-color-border-light)",
+                background: change.sensitive
+                  ? "var(--dg-color-bg-secondary)"
+                  : "var(--dg-color-surface)",
               }}
             >
               <div
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
                 }}
@@ -99,7 +101,7 @@ export default function ChangeReviewModal({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-faint)",
+                    color: "var(--dg-color-text-faint)",
                     marginBottom: 4,
                   }}
                 >
@@ -108,7 +110,7 @@ export default function ChangeReviewModal({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     lineHeight: 1.4,
                     wordBreak: "break-word",
                   }}
@@ -120,7 +122,7 @@ export default function ChangeReviewModal({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-faint)",
+                    color: "var(--dg-color-text-faint)",
                     marginBottom: 4,
                   }}
                 >
@@ -129,7 +131,7 @@ export default function ChangeReviewModal({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     fontWeight: 600,
                     lineHeight: 1.4,
                     wordBreak: "break-word",

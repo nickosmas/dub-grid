@@ -5,6 +5,7 @@ import type React from "react";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
+  ActiveShiftRequestSummary,
   CoverageRequirement,
   Department,
   DraftKind,
@@ -61,6 +62,7 @@ export interface ScheduleGridAccessors {
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
 }
 
 export interface ScheduleGridOptions {

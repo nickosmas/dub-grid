@@ -11,21 +11,21 @@ const BADGE_STYLES: Record<
   { bg: string; color: string; border: string; label: string }
 > = {
   high: {
-    bg: "var(--color-danger-bg)",
-    color: "var(--color-danger)",
-    border: "var(--color-danger-border)",
+    bg: "var(--dg-color-danger-bg)",
+    color: "var(--dg-color-danger)",
+    border: "var(--dg-color-danger-border)",
     label: "Urgent",
   },
   medium: {
-    bg: "var(--color-warning-bg)",
-    color: "var(--color-warning)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    color: "var(--dg-color-warning)",
+    border: "var(--dg-color-warning-border)",
     label: "Open",
   },
   low: {
-    bg: "var(--color-success-bg)",
-    color: "var(--color-success-text)",
-    border: "var(--color-success-border)",
+    bg: "var(--dg-color-success-bg)",
+    color: "var(--dg-color-success-text)",
+    border: "var(--dg-color-success-border)",
     label: "Open",
   },
 };
@@ -109,8 +109,8 @@ export default function OpenShiftsCard({
                 gap: 10,
                 padding: "14px 16px",
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
+                background: "var(--dg-color-bg)",
+                border: "1px solid var(--dg-color-border)",
               };
               const rowContent = (
                 <div style={rowStyle}>
@@ -119,7 +119,7 @@ export default function OpenShiftsCard({
                     <div
                       style={{
                         fontSize: 10,
-                        color: "var(--color-text-subtle)",
+                        color: "var(--dg-color-text-subtle)",
                         fontWeight: 500,
                       }}
                     >
@@ -129,7 +129,7 @@ export default function OpenShiftsCard({
                       style={{
                         fontSize: 16,
                         fontWeight: 700,
-                        color: "var(--color-text-primary)",
+                        color: "var(--dg-color-text-primary)",
                         lineHeight: 1,
                       }}
                     >
@@ -141,7 +141,7 @@ export default function OpenShiftsCard({
                     style={{
                       width: 1,
                       height: 36,
-                      background: "var(--color-border)",
+                      background: "var(--dg-color-border)",
                     }}
                   />
 
@@ -151,7 +151,7 @@ export default function OpenShiftsCard({
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
-                        color: "var(--color-text-primary)",
+                        color: "var(--dg-color-text-primary)",
                       }}
                     >
                       {shift.assignmentLabel}
@@ -160,7 +160,7 @@ export default function OpenShiftsCard({
                       <div
                         style={{
                           fontSize: 10,
-                          color: "var(--color-text-subtle)",
+                          color: "var(--dg-color-text-subtle)",
                           marginTop: 1,
                         }}
                       >
@@ -203,7 +203,7 @@ export default function OpenShiftsCard({
                           fontWeight: 600,
                           padding: "3px 8px",
                           borderRadius: 5,
-                          background: "var(--color-brand)",
+                          background: "var(--dg-color-brand)",
                           color: "#fff",
                           border: "none",
                           cursor: "pointer",
@@ -238,7 +238,7 @@ export default function OpenShiftsCard({
                   padding: "2px 2px 0",
                   fontSize: 11,
                   fontWeight: 600,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                 }}
               >
                 {remainingCount} more gap{remainingCount === 1 ? "" : "s"}

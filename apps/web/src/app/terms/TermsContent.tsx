@@ -8,13 +8,13 @@ const h2Style = {
   fontSize: "var(--dg-fs-heading)",
   fontWeight: 600,
   marginBottom: "12px",
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
 } as const;
 
 const pStyle = {
   fontSize: "var(--dg-fs-body)",
   lineHeight: 1.7,
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
 } as const;
 
 const sectionStyle = { marginBottom: "32px" } as const;
@@ -27,7 +27,7 @@ export default function TermsContent() {
       <p
         style={{
           fontSize: "var(--dg-fs-body-sm)",
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           marginBottom: "40px",
         }}
       >
@@ -161,14 +161,14 @@ export default function TermsContent() {
           the Service. Our handling of personal information is described in our{" "}
           <Link
             href="/privacy"
-            style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
           >
             Privacy Policy
           </Link>{" "}
           and{" "}
           <Link
             href="/cookie-policy"
-            style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
           >
             Cookie Policy
           </Link>
@@ -295,7 +295,7 @@ export default function TermsContent() {
           <br />
           <a
             href="mailto:support@dubgrid.com"
-            style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
           >
             support@dubgrid.com
           </a>

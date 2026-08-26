@@ -64,28 +64,3 @@ export function withThemeParam(url: string, preference: string | undefined): str
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}${THEME_PARAM}=${preference}`;
 }
-
-/**
- * Body of the blocking `<script>` injected into `<head>` (see
- * `app/layout.tsx`). It has to run *before* next-themes' own inline script —
- * which lives in `<body>` — so that next-themes reads an already-corrected
- * `localStorage` value and paints the right theme on the first frame. Doing
- * this after hydration instead would show a flash of the wrong theme, which
- * is the exact symptom this whole mechanism exists to remove.
- *
- * It only ever writes `localStorage`; the cookie is written after hydration by
- * `ThemeCookieSync`, which keeps the domain-suffix logic in one place rather
- * than duplicating it into a stringified script.
- *
- * The param is stripped with `replaceState` so it can't be bookmarked or
- * shared, and only that one key is removed — `OrgLogin.tsx` reads `verified`
- * and `name` off the same URL.
- */
-export function createThemeSeedScript(): string {
-  const key = JSON.stringify(THEME_STORAGE_KEY);
-  const cookie = JSON.stringify(THEME_COOKIE_NAME);
-  const param = JSON.stringify(THEME_PARAM);
-  const valid = JSON.stringify(VALID_PREFERENCES);
-
-  return `(function(){try{var K=${key},C=${cookie},P=${param},V=${valid};var q=new URLSearchParams(location.search),p=q.get(P);if(p&&V.indexOf(p)>-1){localStorage.setItem(K,p);q.delete(P);var s=q.toString();history.replaceState(null,"",location.pathname+(s?"?"+s:"")+location.hash);return}var m=document.cookie.split("; ").filter(function(c){return c.indexOf(C+"=")===0})[0];if(!m)return;var v=decodeURIComponent(m.slice(C.length+1));if(V.indexOf(v)>-1&&localStorage.getItem(K)!==v){localStorage.setItem(K,v)}}catch(e){}})()`;
-}

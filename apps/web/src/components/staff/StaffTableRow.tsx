@@ -132,10 +132,10 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--color-border-light)]"
+          tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--dg-color-border-light)]"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex py-4"
         >
-          <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
+          <div className="flex items-center gap-1" style={{ color: "var(--dg-color-text-faint)" }}>
             {isReordering && (
               <svg
                 width="12"
@@ -158,7 +158,7 @@ function StaffRowCells({
                 checked={isSelected}
                 onChange={() => onToggleSelect(emp.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
+                className="accent-[var(--dg-color-today-text)] cursor-pointer w-3.5 h-3.5"
               />
             )}
             <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
@@ -171,7 +171,7 @@ function StaffRowCells({
       {/* Name */}
       <StaffCell
         variant={variant}
-        tableClassName="py-4 border-r border-[var(--color-border-light)]"
+        tableClassName="py-4 border-r border-[var(--dg-color-border-light)]"
         gridClassName="dg-staff-directory-cell dg-staff-directory-cell--name flex py-4"
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -188,33 +188,33 @@ function StaffRowCells({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
+            <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--dg-color-text-primary)] truncate">
               {canNavigateToDetailsPage ? (
                 <Link
                   href={profileHref}
                   draggable={false}
                   onClick={(e) => e.stopPropagation()}
                   className="hover:underline truncate"
-                  style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
+                  style={{ color: isExpanded ? "var(--dg-color-control-active-text)" : "inherit" }}
                 >
                   {displayName}
                 </Link>
               ) : (
                 <span
                   className="truncate"
-                  style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
+                  style={{ color: isExpanded ? "var(--dg-color-control-active-text)" : "inherit" }}
                 >
                   {displayName}
                 </span>
               )}
               {isYou && (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">
+                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
                   You
                 </span>
               )}
             </div>
             {(emp.email || emp.phone) && (
-              <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">
+              <div className="text-[12px] text-[var(--dg-color-text-muted)] truncate mt-0.5">
                 {emp.email || emp.phone}
               </div>
             )}
@@ -226,12 +226,12 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="py-4 w-[110px] border-r border-[var(--color-border-light)]"
+          tableClassName="py-4 w-[110px] border-r border-[var(--dg-color-border-light)]"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--employment flex py-4"
         >
           <span
             aria-label={employmentLabel}
-            className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+            className="text-[12px] text-[var(--dg-color-text-muted)] whitespace-nowrap"
           >
             {employmentLabel}
           </span>
@@ -242,7 +242,7 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="py-4 w-[110px] border-[var(--color-border-light)] md:border-r"
+          tableClassName="py-4 w-[110px] border-[var(--dg-color-border-light)] md:border-r"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
         >
           <StatusPill tone={statusTone(emp.status)} aria-label={`Status: ${statusLabel}`}>
@@ -254,7 +254,7 @@ function StaffRowCells({
       {/* Focus Areas — neutral StatusPills, cap at 2 visible + "+N more" overflow chip. */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--color-border-light)] md:border-r"
+        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] md:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
       >
         <div className="flex gap-1">
@@ -285,7 +285,7 @@ function StaffRowCells({
       {/* Certification */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
       >
         {(() => {
@@ -293,7 +293,7 @@ function StaffRowCells({
           const certName = getCertName(emp.certificationId, certifications);
           return (
             <span
-              className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+              className="text-[12px] text-[var(--dg-color-text-muted)] whitespace-nowrap"
               title={certName || undefined}
             >
               {certAbbr || "None"}
@@ -305,10 +305,10 @@ function StaffRowCells({
       {/* Roles */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+        tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
-        <span className="text-[12px] text-[var(--color-text-muted)]">
+        <span className="text-[12px] text-[var(--dg-color-text-muted)]">
           {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "\u2014"}
         </span>
       </StaffCell>
@@ -317,7 +317,7 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
           gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
         >
           {(() => {
@@ -341,7 +341,7 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
           gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
         >
           <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
@@ -356,7 +356,7 @@ function StaffRowCells({
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
         >
           <span
-            className="text-[12px] tabular-nums text-[var(--color-text-muted)] whitespace-nowrap"
+            className="text-[12px] tabular-nums text-[var(--dg-color-text-muted)] whitespace-nowrap"
             title={emp.createdAt ?? undefined}
           >
             {joinedLabel}
@@ -373,7 +373,9 @@ function StaffRowCells({
         <div
           className="flex items-center justify-center"
           style={{
-            color: isExpanded ? "var(--color-control-active-text)" : "var(--color-text-faint)",
+            color: isExpanded
+              ? "var(--dg-color-control-active-text)"
+              : "var(--dg-color-text-faint)",
             visibility: isReordering ? "hidden" : "visible",
           }}
         >
@@ -400,14 +402,16 @@ export function StaffTableRow(props: StaffTableRowProps) {
 
   return (
     <TableRow
-      className={`${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering ? "cursor-pointer" : ""}`}
+      className={`${isExpanded ? "border-b-0 bg-[var(--dg-color-bg)]" : "hover:bg-[var(--dg-color-bg)]"} ${!isReordering ? "cursor-pointer" : ""}`}
       data-dragging={isDragging ? "true" : undefined}
       draggable={false}
       onClick={!isReordering ? () => onRowClick(emp.id) : undefined}
       style={{
-        borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
+        borderLeft: isExpanded
+          ? "3px solid var(--dg-color-control-primary)"
+          : "3px solid transparent",
         boxShadow: isExpanded
-          ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)"
+          ? "inset 0 1px 0 var(--dg-color-control-active-border), inset 0 -1px 0 var(--dg-color-control-active-border)"
           : undefined,
       }}
     >

@@ -14,34 +14,12 @@ export function PageShell({
    * pages instead of the bare links shown everywhere else. */
   signInDisclaimer?: boolean;
 }) {
-  const sentenceLinkStyle = { color: "inherit", textDecoration: "underline" };
-
   return (
     <div className="dg-auth-shell">
       {children}
 
-      <footer
-        style={{
-          marginTop: "36px",
-          width: "100%",
-          maxWidth: "860px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 8px",
-          fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-faint)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: "4px",
-            alignItems: "center",
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
+      <footer className="dg-auth-footer">
+        <div className="dg-auth-footer-content">
           {signInDisclaimer ? (
             <span>
               By continuing, I agree to DubGrid&apos;s{" "}
@@ -49,7 +27,7 @@ export function PageShell({
                 href="/terms"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={sentenceLinkStyle}
+                className="dg-auth-sentence-link"
               >
                 Terms of Service
               </Link>
@@ -58,7 +36,7 @@ export function PageShell({
                 href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={sentenceLinkStyle}
+                className="dg-auth-sentence-link"
               >
                 Privacy Policy
               </Link>
@@ -67,7 +45,7 @@ export function PageShell({
                 href="/cookie-policy"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={sentenceLinkStyle}
+                className="dg-auth-sentence-link"
               >
                 Cookie Policy
               </Link>
@@ -83,7 +61,7 @@ export function PageShell({
               >
                 Privacy Policy
               </Link>
-              <span style={{ margin: "0 4px" }}>·</span>
+              <span className="dg-auth-footer-separator">·</span>
               <Link
                 href="/terms"
                 target="_blank"
@@ -92,19 +70,11 @@ export function PageShell({
               >
                 Terms of Service
               </Link>
-              <span style={{ margin: "0 4px" }}>·</span>
+              <span className="dg-auth-footer-separator">·</span>
               <Button
                 type="button"
                 onClick={openConsentPreferences}
-                className="dg-auth-footer-link"
-                style={{
-                  color: "var(--color-text-faint)",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  font: "inherit",
-                }}
+                className="dg-auth-footer-link dg-auth-footer-button"
               >
                 Cookie preferences
               </Button>

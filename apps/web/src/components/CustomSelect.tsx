@@ -94,20 +94,20 @@ export default function CustomSelect<T extends string | number>({
           gap: 8,
           width: "100%",
           height: height ?? "var(--dg-toolbar-h)",
-          background: disabled ? "var(--color-bg)" : "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-btn-radius)",
           padding: "0 10px 0 12px",
           fontSize,
           fontWeight: 500,
-          color: disabled ? "var(--color-text-subtle)" : "var(--color-text-secondary)",
+          color: disabled ? "var(--dg-color-text-subtle)" : "var(--dg-color-text-secondary)",
           cursor: disabled ? "not-allowed" : "pointer",
           fontFamily: "inherit",
           whiteSpace: "nowrap",
           textAlign: "left",
           transition: "box-shadow 150ms ease",
           boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
-          borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
+          borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
           opacity: disabled ? 0.5 : 1,
         }}
       >
@@ -124,7 +124,7 @@ export default function CustomSelect<T extends string | number>({
           strokeLinecap="round"
           strokeLinejoin="round"
           style={{
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             flexShrink: 0,
             transition: "transform 150ms ease",
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
@@ -207,11 +207,11 @@ export default function CustomSelect<T extends string | number>({
                 onMouseEnter={() => setFocusedIndex(idx)}
                 style={{
                   fontWeight: isActive ? 700 : undefined,
-                  color: isActive ? "var(--color-text-primary)" : undefined,
+                  color: isActive ? "var(--dg-color-text-primary)" : undefined,
                   background: isFocused
-                    ? "var(--color-bg-secondary)"
+                    ? "var(--dg-color-bg-secondary)"
                     : isActive
-                      ? "var(--color-border-light)"
+                      ? "var(--dg-color-border-light)"
                       : undefined,
                 }}
               >

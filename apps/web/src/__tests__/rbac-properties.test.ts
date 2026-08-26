@@ -3085,7 +3085,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
 
 // ── Property 27: Middleware Route Protection ──────────────────────────────────
 
-import { calculateEffectiveRole, getRoleLevel } from "../../middleware";
+import { calculateEffectiveRole, getRoleLevel } from "../proxy";
 
 /**
  * Simulates the middleware route protection logic.

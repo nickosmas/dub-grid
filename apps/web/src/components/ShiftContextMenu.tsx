@@ -132,7 +132,7 @@ export default function ShiftContextMenu({
               style={{
                 padding: "8px 14px",
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-warning-text)",
+                color: "var(--dg-color-warning-text)",
                 fontStyle: "italic",
               }}
             >

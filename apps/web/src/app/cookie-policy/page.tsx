@@ -12,29 +12,29 @@ const sectionHeading = {
   fontSize: "var(--dg-fs-heading)",
   fontWeight: 600,
   marginBottom: "12px",
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
 } as const;
 
 const bodyText = {
   fontSize: "var(--dg-fs-body)",
   lineHeight: 1.7,
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
 } as const;
 
 const tableCell = {
   padding: "10px 14px",
   fontSize: "var(--dg-fs-body-sm)",
   lineHeight: 1.5,
-  color: "var(--color-text-secondary)",
-  borderBottom: "1px solid var(--color-border)",
+  color: "var(--dg-color-text-secondary)",
+  borderBottom: "1px solid var(--dg-color-border)",
   verticalAlign: "top",
 } as const;
 
 const tableHeader = {
   ...tableCell,
   fontWeight: 600,
-  color: "var(--color-text-primary)",
-  background: "var(--color-surface-hover)",
+  color: "var(--dg-color-text-primary)",
+  background: "var(--dg-color-surface-hover)",
 } as const;
 
 // Scope: written for the US market. Cookie categories and consent map to the
@@ -44,9 +44,9 @@ export default function CookiePolicyPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
         padding: "48px 24px 80px",
       }}
     >
@@ -56,7 +56,7 @@ export default function CookiePolicyPage() {
           style={{
             display: "inline-block",
             marginBottom: "32px",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             fontSize: "var(--dg-fs-body-sm)",
             textDecoration: "none",
           }}
@@ -76,7 +76,7 @@ export default function CookiePolicyPage() {
         <p
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             marginBottom: "40px",
           }}
         >
@@ -119,7 +119,7 @@ export default function CookiePolicyPage() {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               <thead>
@@ -205,7 +205,7 @@ export default function CookiePolicyPage() {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               <thead>
@@ -259,7 +259,7 @@ export default function CookiePolicyPage() {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               <thead>
@@ -326,7 +326,7 @@ export default function CookiePolicyPage() {
             described in our{" "}
             <Link
               href="/privacy"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               Privacy Policy
             </Link>
@@ -342,7 +342,7 @@ export default function CookiePolicyPage() {
             <Link
               href="/privacy"
               style={{
-                color: "var(--color-brand)",
+                color: "var(--dg-color-brand)",
                 textDecoration: "underline",
               }}
             >
@@ -351,7 +351,7 @@ export default function CookiePolicyPage() {
             . DubGrid is operated by DubGrid LLC. Questions about cookies? Email us at{" "}
             <a
               href="mailto:support@dubgrid.com"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               support@dubgrid.com
             </a>

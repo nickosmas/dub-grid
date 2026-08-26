@@ -63,7 +63,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           width: 80,
           height: 80,
           borderRadius: "50%",
-          background: "var(--color-success)",
+          background: "var(--dg-color-success)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -79,7 +79,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
         style={{
           fontSize: 28,
           fontWeight: 800,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           margin: "0 0 12px",
           letterSpacing: "-0.03em",
         }}
@@ -90,7 +90,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
       <p
         style={{
           fontSize: 16,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           lineHeight: 1.6,
           margin: "0 0 40px",
           maxWidth: 380,
@@ -112,8 +112,8 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           padding: "14px 32px",
           borderRadius: 12,
           border: "none",
-          background: "var(--color-brand)",
-          color: "var(--color-text-inverse)",
+          background: "var(--dg-color-brand)",
+          color: "var(--dg-color-text-inverse)",
           fontSize: 16,
           fontWeight: 700,
           cursor: loading ? "not-allowed" : "pointer",
@@ -124,7 +124,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
         <ButtonLoading
           loading={loading}
           loadingLabel="Finishing"
-          spinnerColor="var(--color-text-inverse)"
+          spinnerColor="var(--dg-color-text-inverse)"
           spinnerSize={20}
         >
           {ctaLabel}

@@ -90,12 +90,12 @@ export default function CoveragePanel({
         <div
           style={{
             padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
             display: "flex",
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {isMobile && (
@@ -121,7 +121,7 @@ export default function CoveragePanel({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-text-primary)"
+                stroke="var(--dg-color-text-primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -135,7 +135,7 @@ export default function CoveragePanel({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               Coverage Overview
@@ -143,7 +143,7 @@ export default function CoveragePanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 2,
               }}
             >
@@ -159,7 +159,7 @@ export default function CoveragePanel({
           <div
             style={{
               padding: "10px 20px",
-              borderBottom: "1px solid var(--color-border)",
+              borderBottom: "1px solid var(--dg-color-border)",
               display: "flex",
               gap: 8,
               flexShrink: 0,
@@ -205,10 +205,10 @@ export default function CoveragePanel({
                     marginBottom: 12,
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-sm)",
-                    background: "var(--color-bg)",
-                    border: "1px dashed var(--color-border)",
+                    background: "var(--dg-color-bg)",
+                    border: "1px dashed var(--dg-color-border)",
                     fontSize: 11,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                   }}
                 >
                   Showing published dates only.
@@ -219,7 +219,7 @@ export default function CoveragePanel({
                   style={{
                     padding: "40px 20px",
                     textAlign: "center",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   <div
@@ -227,7 +227,7 @@ export default function CoveragePanel({
                       width: 48,
                       height: 48,
                       borderRadius: "50%",
-                      background: "var(--color-success-bg)",
+                      background: "var(--dg-color-success-bg)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -239,7 +239,7 @@ export default function CoveragePanel({
                       height="24"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="var(--color-success-text)"
+                      stroke="var(--dg-color-success-text)"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -271,8 +271,8 @@ export default function CoveragePanel({
                           gap: 6,
                           padding: "4px 10px",
                           borderRadius: 8,
-                          background: "var(--color-bg-secondary)",
-                          color: "var(--color-text-muted)",
+                          background: "var(--dg-color-bg-secondary)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 700,
                           marginBottom: 8,
@@ -287,7 +287,7 @@ export default function CoveragePanel({
                             style={{
                               padding: "10px 12px",
                               borderRadius: "var(--dg-radius-lg)",
-                              border: "1px solid var(--color-border)",
+                              border: "1px solid var(--dg-color-border)",
                               background: "rgba(220, 38, 38, 0.03)",
                             }}
                           >
@@ -302,7 +302,7 @@ export default function CoveragePanel({
                                 style={{
                                   fontSize: "var(--dg-fs-caption)",
                                   fontWeight: 600,
-                                  color: "var(--color-text-secondary)",
+                                  color: "var(--dg-color-text-secondary)",
                                 }}
                               >
                                 {gap.shiftCategoryName}
@@ -310,7 +310,7 @@ export default function CoveragePanel({
                               <span
                                 style={{
                                   fontSize: "var(--dg-fs-footnote)",
-                                  color: "var(--color-text-muted)",
+                                  color: "var(--dg-color-text-muted)",
                                 }}
                               >
                                 {formatDate(gap.date)}
@@ -320,7 +320,7 @@ export default function CoveragePanel({
                               style={{
                                 fontSize: "var(--dg-fs-caption)",
                                 fontWeight: 700,
-                                color: "var(--color-danger-dark)",
+                                color: "var(--dg-color-danger-dark)",
                                 marginTop: 4,
                               }}
                             >
@@ -330,7 +330,7 @@ export default function CoveragePanel({
                               <div
                                 style={{
                                   fontSize: "var(--dg-fs-footnote)",
-                                  color: "var(--color-text-muted)",
+                                  color: "var(--dg-color-text-muted)",
                                   marginTop: 4,
                                 }}
                               >

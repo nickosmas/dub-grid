@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { withTimeout } from "@/lib/with-timeout";
 
 // ── TTL Constants ────────���─────────────────────���────────────────────────
 export const TTL = {
@@ -100,13 +101,27 @@ export const CacheKey = {
 const _debugMode = process.env.NODE_ENV === "development";
 
 /**
+ * How long any single Redis operation may hold a request.
+ *
+ * Upstash is a network hop, and the client has no timeout of its own — a slow
+ * or half-open connection would otherwise hold the request open indefinitely.
+ * That is not hypothetical: it is exactly how the subdomain form ends up
+ * spinning forever, because nothing rejects and so nothing recovers.
+ *
+ * A read that times out returns a miss, which every caller already handles: it
+ * falls through to the source of truth. The budget is generous enough that only
+ * a genuinely unhealthy Redis trips it.
+ */
+const REDIS_TIMEOUT_MS = 1_500;
+
+/**
  * Get a cached value by key. Returns null on miss or Redis unavailable.
  */
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const client = getRedis();
   if (!client) return null;
   try {
-    const raw = await client.get<T>(key);
+    const raw = await withTimeout(client.get<T>(key), REDIS_TIMEOUT_MS, null);
     return raw ?? null;
   } catch (err) {
     if (_debugMode) {
@@ -126,7 +141,7 @@ export async function cacheGetMany<T>(keys: string[]): Promise<(T | null)[]> {
   const client = getRedis();
   if (!client || keys.length === 0) return keys.map(() => null);
   try {
-    const raw = await client.mget<T[]>(...keys);
+    const raw = await withTimeout(client.mget<T[]>(...keys), REDIS_TIMEOUT_MS, null);
     return keys.map((_, i) => raw?.[i] ?? null);
   } catch (err) {
     if (_debugMode) {
@@ -143,7 +158,7 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
   const client = getRedis();
   if (!client) return;
   try {
-    await client.set(key, value, { ex: ttlSeconds });
+    await withTimeout(client.set(key, value, { ex: ttlSeconds }), REDIS_TIMEOUT_MS, null);
   } catch (err) {
     if (_debugMode) {
       console.warn(`[cache] SET failed for ${key}:`, err instanceof Error ? err.message : err);
@@ -158,7 +173,7 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   const client = getRedis();
   if (!client || keys.length === 0) return;
   try {
-    await client.del(...keys);
+    await withTimeout(client.del(...keys), REDIS_TIMEOUT_MS, null);
   } catch (err) {
     if (_debugMode) {
       console.warn(`[cache] DEL failed:`, err instanceof Error ? err.message : err);

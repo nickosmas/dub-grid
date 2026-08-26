@@ -552,7 +552,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           <div className="space-y-8 pb-10 dg-page-enter">
             <Link
               href="/people"
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-color-text-muted)] transition-colors hover:text-[var(--dg-color-text-primary)]"
             >
               <ChevronLeft className="size-4" strokeWidth={2.5} />
               People
@@ -638,7 +638,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
                     {perms.canManageEmployees && (
                       <div>
-                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-subtle)]">
+                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--dg-color-text-subtle)]">
                           Staffing actions
                         </div>
                         <EmployeeStatusActions
@@ -712,10 +712,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             <section className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-bold tracking-tight text-[var(--color-text-primary)]">
+                  <h2 className="text-lg font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                     Profile sections
                   </h2>
-                  <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
+                  <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
                     Move between overview, schedule, and activity without leaving People.
                   </p>
                 </div>

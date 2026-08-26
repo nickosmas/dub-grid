@@ -177,7 +177,7 @@ export function UsersTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
           {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
         <div style={{ flex: 1 }} />
@@ -270,7 +270,7 @@ export function UsersTab({
                     style={{
                       ...tdStyle,
                       textAlign: "center",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       padding: 32,
                     }}
                   >
@@ -299,7 +299,7 @@ export function UsersTab({
                       style={{
                         ...tdStyle,
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {u.orgRole === "admin" ? (

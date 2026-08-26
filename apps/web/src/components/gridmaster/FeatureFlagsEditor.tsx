@@ -115,20 +115,20 @@ export default function FeatureFlagsEditor({
                 type="checkbox"
                 checked={flags[REALTIME_FLAG.name] ?? false}
                 onChange={() => toggleFlag(REALTIME_FLAG.name)}
-                style={{ width: 16, height: 16, accentColor: "var(--color-today-text)" }}
+                style={{ width: 16, height: 16, accentColor: "var(--dg-color-today-text)" }}
               />
               <div>
                 <div
                   style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   {REALTIME_FLAG.label}
                 </div>
                 <div
-                  style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
+                  style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}
                 >
                   {REALTIME_FLAG.description}
                 </div>

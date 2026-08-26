@@ -15,7 +15,7 @@ export function ScheduleLoadingScreen() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         zIndex: 50,
       }}
     >

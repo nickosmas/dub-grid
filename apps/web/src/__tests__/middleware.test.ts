@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  calculateEffectiveRole,
-  getRoleLevel,
-  resetMiddlewareOrgAccessMemo,
-} from "../../middleware";
+import { calculateEffectiveRole, getRoleLevel, resetMiddlewareOrgAccessMemo } from "../proxy";
 
 // ── Mock next/server ─────────────────────────────────────────────────────────
 // NextResponse.next() and NextResponse.redirect() need to return objects
@@ -15,11 +11,27 @@ function makeResponseObject(init?: { headers?: Headers }) {
   return {
     headers,
     cookies: {
-      set(name: string, value: string, options?: Record<string, unknown>) {
-        cookieJar[name] = { value, options };
+      set(
+        name: string | { name: string; value: string; [key: string]: unknown },
+        value?: string,
+        options?: Record<string, unknown>,
+      ) {
+        if (typeof name !== "string") {
+          const { name: cookieName, value: cookieValue, ...cookieOptions } = name;
+          cookieJar[cookieName] = { value: cookieValue, options: cookieOptions };
+          return;
+        }
+        cookieJar[name] = { value: value ?? "", options };
       },
       get(name: string) {
         return cookieJar[name];
+      },
+      getAll() {
+        return Object.entries(cookieJar).map(([name, { value, options }]) => ({
+          name,
+          value,
+          ...options,
+        }));
       },
       _jar: cookieJar,
     },
@@ -203,10 +215,10 @@ describe("getRoleLevel", () => {
 // Part B: Middleware integration tests
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Dynamic import of middleware function — needs mocks set up first
+// Dynamic import of the Proxy entry point — needs mocks set up first.
 async function runMiddleware(req: ReturnType<typeof makeNextRequest>) {
-  const mod = await import("../../middleware");
-  return mod.middleware(req as Parameters<typeof mod.middleware>[0]) as unknown;
+  const mod = await import("../proxy");
+  return mod.proxy(req as Parameters<typeof mod.proxy>[0]) as unknown;
 }
 
 describe("middleware: public routes", () => {
@@ -249,7 +261,9 @@ describe("middleware: public routes", () => {
 
 describe("middleware: marketing page redirects", () => {
   it("redirects / on org subdomain to apex domain", async () => {
-    const req = makeNextRequest("http://acme.localhost:3000/", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("redirect");
     expect((res as { _redirectUrl: string })._redirectUrl).toContain("localhost:3000/");
@@ -269,8 +283,7 @@ describe("middleware: marketing page redirects", () => {
       host: "gridmaster.localhost:3000",
     });
     const res = await runMiddleware(req);
-    // / is a public route, so it passes through (not redirected to apex)
-    expect((res as { _type: string })._type).toBe("next");
+    expect((res as { _type: string })._type).toBe("redirect");
   });
 });
 
@@ -596,7 +609,7 @@ describe("middleware: route guards", () => {
     expect((res as { _redirectUrl: string })._redirectUrl).toContain("/schedule");
   });
 
-  it("allows gridmaster on /gridmaster (redirects to gridmaster subdomain /dashboard)", async () => {
+  it("redirects gridmaster from the apex to the Gridmaster subdomain", async () => {
     mockSessionWithClaims({
       platform_role: "gridmaster",
       org_role: "user",
@@ -604,9 +617,10 @@ describe("middleware: route guards", () => {
     });
     const req = makeNextRequest("http://localhost:3000/gridmaster");
     const res = await runMiddleware(req);
-    // Gridmaster on non-gridmaster subdomain hitting /gridmaster → redirect to gridmaster subdomain /dashboard
     expect((res as { _type: string })._type).toBe("redirect");
-    expect((res as { _redirectUrl: string })._redirectUrl).toContain("/dashboard");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://gridmaster.localhost:3000/gridmaster",
+    );
   });
 });
 
@@ -756,7 +770,7 @@ describe("middleware: impersonation", () => {
     expect(cookieJar["dubgrid-impersonation"]).toBeDefined();
   });
 
-  it("auto-ends impersonation on /gridmaster path (redirects to dashboard)", async () => {
+  it("auto-ends impersonation, then sends gridmaster to its subdomain", async () => {
     mockSessionWithClaims({
       platform_role: "gridmaster",
       org_role: "user",
@@ -776,10 +790,9 @@ describe("middleware: impersonation", () => {
     const rawCookie = `dubgrid-impersonation=${encodeURIComponent(JSON.stringify(impData))}`;
     const req = makeNextRequest("http://localhost:3000/gridmaster", { rawCookie });
     const res = await runMiddleware(req);
-    // Impersonation is auto-ended (cookie cleared on internal res), then
-    // gridmaster on non-gridmaster subdomain hitting /gridmaster redirects
-    // to gridmaster subdomain /dashboard
     expect((res as { _type: string })._type).toBe("redirect");
-    expect((res as { _redirectUrl: string })._redirectUrl).toContain("/dashboard");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://gridmaster.localhost:3000/gridmaster",
+    );
   });
 });

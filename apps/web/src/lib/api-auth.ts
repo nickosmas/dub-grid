@@ -298,9 +298,8 @@ export async function requireAuthenticatedUserWithClaims(
               // gating already prevents user-tier accounts from entering
               // a sandbox in the first place.)
               org_role: "super_admin",
-              // org_slug intentionally NOT changed — keeps user on the
-              // real-org subdomain. Some endpoints use slug for routing;
-              // exposing the sandbox slug would cause subdomain hops.
+              // org_slug is display metadata only. Host routing is not used
+              // to select organization or sandbox context.
               in_sandbox: true,
             },
           };

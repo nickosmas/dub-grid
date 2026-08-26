@@ -36,10 +36,10 @@ const defaultArrowRender = (
       height: "100%",
     }}
   >
-    <path d="M1.5 9.5L8 2.5L14.5 9.5V16H1.5Z" fill="var(--color-surface)" />
+    <path d="M1.5 9.5L8 2.5L14.5 9.5V16H1.5Z" fill="var(--dg-color-surface)" />
     <path
       d="M1.5 9.5L8 2.5L14.5 9.5"
-      stroke="var(--color-border)"
+      stroke="var(--dg-color-border)"
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="1.5"
@@ -156,7 +156,7 @@ function MenuItem({ className, render, ...props }: MenuPrimitive.Item.Props) {
       className={(state) =>
         cn(
           "dg-menu-item",
-          state.highlighted && "bg-[var(--color-bg-secondary)]",
+          state.highlighted && "bg-[var(--dg-color-bg-secondary)]",
           state.disabled && "pointer-events-none opacity-50",
           resolveStateValue(className, state),
         )

@@ -70,10 +70,10 @@ export function EmptyState({
       style={{
         padding: PADDING[size],
         textAlign: "center",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         borderRadius: RADIUS[size],
-        border: "1px dashed var(--color-border)",
-        color: "var(--color-text-muted)",
+        border: "1px dashed var(--dg-color-border)",
+        color: "var(--dg-color-text-muted)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -85,8 +85,8 @@ export function EmptyState({
       {icon && (
         <div
           style={{
-            color: "var(--color-text-faint)",
-            background: "var(--color-bg)",
+            color: "var(--dg-color-text-faint)",
+            background: "var(--dg-color-bg)",
             padding: ICON_PADDING[size],
             borderRadius: "50%",
             display: "flex",
@@ -103,7 +103,7 @@ export function EmptyState({
           style={{
             fontSize: titleFontSize,
             fontWeight: titleFontWeight,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {headingText}
@@ -113,7 +113,7 @@ export function EmptyState({
             style={{
               margin: 0,
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               maxWidth: 400,
             }}
           >

@@ -22,7 +22,7 @@ function Stat({ label, value }: { label: string; value: number }) {
         style={{
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 800,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
       >
@@ -32,7 +32,7 @@ function Stat({ label, value }: { label: string; value: number }) {
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >
@@ -67,7 +67,10 @@ function ComplianceSkeleton() {
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} style={sectionStyle}>
             <div
-              style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)" }}
+              style={{
+                padding: "12px 16px",
+                borderBottom: "1px solid var(--dg-color-border-light)",
+              }}
             >
               <div className="dg-skeleton" style={{ width: 140, height: 12, borderRadius: 4 }} />
             </div>
@@ -136,7 +139,7 @@ export default function GridmasterComplianceView({
             margin: 0,
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           Compliance Oversight
@@ -161,8 +164,8 @@ export default function GridmasterComplianceView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -197,10 +200,10 @@ export default function GridmasterComplianceView({
               <div
                 style={{
                   padding: "12px 16px",
-                  borderBottom: "1px solid var(--color-border-light)",
+                  borderBottom: "1px solid var(--dg-color-border-light)",
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 800,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Data Retention
@@ -246,7 +249,9 @@ export default function GridmasterComplianceView({
                           style={{
                             cursor: "pointer",
                             background:
-                              org.dataRetentionDays > 365 ? "var(--color-warning-bg)" : undefined,
+                              org.dataRetentionDays > 365
+                                ? "var(--dg-color-warning-bg)"
+                                : undefined,
                           }}
                         >
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
@@ -263,10 +268,10 @@ export default function GridmasterComplianceView({
               <div
                 style={{
                   padding: "12px 16px",
-                  borderBottom: "1px solid var(--color-border-light)",
+                  borderBottom: "1px solid var(--dg-color-border-light)",
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 800,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Recent Compliance Events

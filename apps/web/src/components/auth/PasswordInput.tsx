@@ -16,7 +16,6 @@ interface PasswordInputProps {
   disabled?: boolean;
   autoFocus?: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
-  style?: React.CSSProperties;
   /**
    * Overrides the default `dg-auth-input` styling with the supplied class
    * (e.g. "dg-input" for in-app form fields). `dg-standalone-input` is still
@@ -38,19 +37,20 @@ export function PasswordInput({
   disabled,
   autoFocus,
   inputRef,
-  style,
   className,
 }: PasswordInputProps) {
-  const mergedStyle = { ...style, paddingRight: 48 };
-
   return (
-    <div style={{ position: "relative" }}>
+    <div className="dg-password-input">
       <input
         id={id}
         ref={inputRef}
         type={showPassword ? "text" : "password"}
         placeholder={placeholder}
-        className={className ? `${className} dg-standalone-input` : "dg-auth-input"}
+        className={
+          className
+            ? `${className} dg-standalone-input dg-password-input__field`
+            : "dg-auth-input dg-password-input__field"
+        }
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required
@@ -59,24 +59,11 @@ export function PasswordInput({
         disabled={disabled}
         autoFocus={autoFocus}
         aria-describedby={ariaDescribedBy}
-        style={mergedStyle}
       />
       <Button
         type="button"
         onClick={onToggle}
-        style={{
-          position: "absolute",
-          right: 12,
-          top: "50%",
-          transform: "translateY(-50%)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 4,
-          color: "var(--color-text-subtle)",
-          display: "flex",
-          alignItems: "center",
-        }}
+        className="dg-password-input__toggle"
         aria-label={showPassword ? "Hide password" : "Show password"}
       >
         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

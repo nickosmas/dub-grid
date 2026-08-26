@@ -58,30 +58,30 @@ function statusTone(status: string | null): {
     case "active":
     case "trialing":
       return {
-        bg: "var(--color-success-bg)",
-        text: "var(--color-success)",
-        border: "var(--color-success-border)",
+        bg: "var(--dg-color-success-bg)",
+        text: "var(--dg-color-success)",
+        border: "var(--dg-color-success-border)",
       };
     case "past_due":
     case "incomplete":
       return {
-        bg: "var(--color-warning-bg)",
-        text: "var(--color-warning)",
-        border: "var(--color-warning-border)",
+        bg: "var(--dg-color-warning-bg)",
+        text: "var(--dg-color-warning)",
+        border: "var(--dg-color-warning-border)",
       };
     case "canceled":
     case "unpaid":
     case "incomplete_expired":
       return {
-        bg: "var(--color-danger-bg)",
-        text: "var(--color-danger)",
-        border: "var(--color-danger-border)",
+        bg: "var(--dg-color-danger-bg)",
+        text: "var(--dg-color-danger)",
+        border: "var(--dg-color-danger-border)",
       };
     default:
       return {
-        bg: "var(--color-bg-secondary)",
-        text: "var(--color-text-muted)",
-        border: "var(--color-border)",
+        bg: "var(--dg-color-bg-secondary)",
+        text: "var(--dg-color-text-muted)",
+        border: "var(--dg-color-border)",
       };
   }
 }
@@ -122,21 +122,21 @@ function BillingMetric({
 }) {
   const color =
     tone === "danger"
-      ? "var(--color-danger)"
+      ? "var(--dg-color-danger)"
       : tone === "warning"
-        ? "var(--color-warning)"
-        : "var(--color-text-primary)";
+        ? "var(--dg-color-warning)"
+        : "var(--dg-color-text-primary)";
   const iconAccent =
     tone === "danger"
-      ? { bg: "var(--color-danger-bg)", color: "var(--color-danger)" }
+      ? { bg: "var(--dg-color-danger-bg)", color: "var(--dg-color-danger)" }
       : tone === "warning"
-        ? { bg: "var(--color-warning-bg)", color: "var(--color-warning)" }
+        ? { bg: "var(--dg-color-warning-bg)", color: "var(--dg-color-warning)" }
         : { bg: "#EFF6FF", color: "#2563EB" };
 
   return (
     <div
       style={{
-        border: "1px solid var(--color-border-light)",
+        border: "1px solid var(--dg-color-border-light)",
         borderRadius: "var(--dg-radius-lg)",
         padding: "12px 14px",
         minWidth: 0,
@@ -155,7 +155,7 @@ function BillingMetric({
           style={{
             minWidth: 0,
             fontSize: "11px",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontWeight: 700,
           }}
         >
@@ -255,7 +255,7 @@ function BillingOperations({ operations }: { operations: BillingOperationSummary
                       <td
                         style={{
                           ...tdStyle,
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -301,7 +301,7 @@ function BillingOperationDetailsDialog({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div
             style={{
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-card-title)",
               fontWeight: 800,
             }}
@@ -310,7 +310,7 @@ function BillingOperationDetailsDialog({
           </div>
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
             }}
@@ -331,7 +331,7 @@ function BillingOperationDetailsDialog({
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 800,
               textTransform: "uppercase",
@@ -344,7 +344,7 @@ function BillingOperationDetailsDialog({
           ) : (
             <div
               style={{
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
               }}
@@ -380,7 +380,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
     <>
       <dt
         style={{
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 800,
         }}
@@ -389,7 +389,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
       </dt>
       <dd
         style={{
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           fontSize: "var(--dg-fs-label)",
           fontWeight: 650,
           margin: 0,
@@ -726,8 +726,8 @@ export default function BillingSettings({ organization }: { organization: { id: 
               style={{
                 padding: "10px 12px",
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-danger-bg)",
-                color: "var(--color-danger)",
+                background: "var(--dg-color-danger-bg)",
+                color: "var(--dg-color-danger)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
               }}
@@ -756,7 +756,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: 14,
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-border-light)",
+                    border: "1px solid var(--dg-color-border-light)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 8,
@@ -792,9 +792,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-warning-border)",
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning)",
+                    border: "1px solid var(--dg-color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    color: "var(--dg-color-warning)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
@@ -808,9 +808,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-danger-border)",
-                    background: "var(--color-danger-bg)",
-                    color: "var(--color-danger)",
+                    border: "1px solid var(--dg-color-danger-border)",
+                    background: "var(--dg-color-danger-bg)",
+                    color: "var(--dg-color-danger)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
@@ -824,9 +824,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-warning-border)",
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning)",
+                    border: "1px solid var(--dg-color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    color: "var(--dg-color-warning)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
@@ -840,9 +840,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-warning-border)",
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning)",
+                    border: "1px solid var(--dg-color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    color: "var(--dg-color-warning)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
@@ -856,9 +856,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-info-border)",
-                    background: "var(--color-info-bg)",
-                    color: "var(--color-info-text)",
+                    border: "1px solid var(--dg-color-info-border)",
+                    background: "var(--dg-color-info-bg)",
+                    color: "var(--dg-color-info-text)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}

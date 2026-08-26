@@ -67,7 +67,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             style={{
               fontSize: "var(--dg-fs-body)",
               fontWeight: 600,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               margin: 0,
             }}
           >
@@ -76,7 +76,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           <p
             style={{
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               margin: "6px 0 0",
               lineHeight: 1.5,
             }}
@@ -90,7 +90,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             display: "flex",
             justifyContent: "flex-start",
             paddingTop: 12,
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
           }}
         >
           <Button

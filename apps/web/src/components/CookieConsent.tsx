@@ -190,8 +190,8 @@ export default function CookieConsent() {
       aria-label="Cookie consent"
       className="fixed inset-x-0 bottom-0 z-[9999] flex flex-col gap-3 border-t p-4 pr-12 sm:flex-row sm:items-center sm:justify-center sm:gap-4 sm:p-5 sm:pr-14"
       style={{
-        background: "var(--color-surface)",
-        borderColor: "var(--color-border)",
+        background: "var(--dg-color-surface)",
+        borderColor: "var(--dg-color-border)",
         boxShadow: "0 -4px 24px rgba(0, 0, 0, 0.08)",
       }}
     >
@@ -208,14 +208,14 @@ export default function CookieConsent() {
             className="m-0 max-w-[540px] leading-relaxed"
             style={{
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             We use essential cookies to make DubGrid work. We&apos;d also like to set analytics
             cookies to help us improve.{" "}
             <a
               href="/cookie-policy"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               Cookie policy
             </a>
@@ -248,7 +248,7 @@ export default function CookieConsent() {
         <div className="flex w-full max-w-[640px] flex-col gap-4">
           <p
             className="m-0 font-semibold"
-            style={{ fontSize: "var(--dg-fs-body)", color: "var(--color-text-primary)" }}
+            style={{ fontSize: "var(--dg-fs-body)", color: "var(--dg-color-text-primary)" }}
           >
             Cookie preferences
           </p>
@@ -311,18 +311,18 @@ function ConsentCategory({
   return (
     <div
       className="flex items-start justify-between gap-4 rounded-[10px] border p-3"
-      style={{ borderColor: "var(--color-border)", background: "var(--color-surface-hover)" }}
+      style={{ borderColor: "var(--dg-color-border)", background: "var(--dg-color-surface-hover)" }}
     >
       <div className="min-w-0">
         <p
           className="m-0 font-semibold"
-          style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-primary)" }}
+          style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--dg-color-text-primary)" }}
         >
           {title}
         </p>
         <p
           className="m-0 mt-1 leading-relaxed"
-          style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)" }}
+          style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
         >
           {description}
         </p>

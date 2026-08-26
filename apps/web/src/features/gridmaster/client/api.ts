@@ -93,7 +93,6 @@ export interface StartImpersonationResult {
 
 export interface GridmasterOrganizationSetupInput {
   name: string;
-  slug: string;
   addressLine1: string;
   addressLine2: string;
   addressCity: string;

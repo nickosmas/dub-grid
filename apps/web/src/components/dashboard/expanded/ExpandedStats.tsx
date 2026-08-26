@@ -122,12 +122,12 @@ export default function ExpandedStats({
   ]);
 
   const columns = [
-    { key: "totalShifts", label: "Total shifts", color: "var(--color-success)" },
+    { key: "totalShifts", label: "Total shifts", color: "var(--dg-color-success)" },
     ...(hasRequirements
-      ? [{ key: "coveragePct", label: "Coverage", color: "var(--color-info)" }]
+      ? [{ key: "coveragePct", label: "Coverage", color: "var(--dg-color-info)" }]
       : []),
-    { key: "staffScheduled", label: "Staff", color: "var(--color-text-subtle)" },
-    ...(showOT ? [{ key: "otCount", label: "OT alerts", color: "var(--color-danger)" }] : []),
+    { key: "staffScheduled", label: "Staff", color: "var(--dg-color-text-subtle)" },
+    ...(showOT ? [{ key: "otCount", label: "OT alerts", color: "var(--dg-color-danger)" }] : []),
   ];
 
   const periodLabel = periodDays === 1 ? "Day" : periodDays === 7 ? "Week" : "Period";
@@ -139,11 +139,11 @@ export default function ExpandedStats({
         <div
           style={{
             fontSize: 12,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             padding: "14px 16px",
             borderRadius: "var(--dg-radius-md)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-bg)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           Last {NUM_PERIODS} {periodLabelPlural} &middot; most recent first
@@ -152,9 +152,9 @@ export default function ExpandedStats({
         <div
           style={{
             overflowX: "auto",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: 18,
-            background: "var(--color-bg)",
+            background: "var(--dg-color-bg)",
             padding: 12,
           }}
         >
@@ -196,7 +196,7 @@ export default function ExpandedStats({
                   <tr
                     key={row.label}
                     style={{
-                      background: isCurrent ? "var(--color-bg)" : "transparent",
+                      background: isCurrent ? "var(--dg-color-bg)" : "transparent",
                     }}
                   >
                     <td
@@ -207,7 +207,7 @@ export default function ExpandedStats({
                         <span
                           style={{
                             fontSize: 9,
-                            color: "var(--color-brand)",
+                            color: "var(--dg-color-brand)",
                             marginLeft: 6,
                             fontWeight: 600,
                           }}
@@ -242,11 +242,11 @@ export default function ExpandedStats({
                                 color:
                                   col.key === "otCount"
                                     ? delta > 0
-                                      ? "var(--color-danger)"
-                                      : "var(--color-success)"
+                                      ? "var(--dg-color-danger)"
+                                      : "var(--dg-color-success)"
                                     : delta > 0
-                                      ? "var(--color-success)"
-                                      : "var(--color-danger)",
+                                      ? "var(--dg-color-success)"
+                                      : "var(--dg-color-danger)",
                               }}
                             >
                               {delta > 0 ? "\u2191" : "\u2193"}
@@ -279,16 +279,16 @@ const thStyle = {
   padding: "8px 12px",
   fontSize: 11,
   fontWeight: 600 as const,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.04em",
   textAlign: "center" as const,
-  borderBottom: "2px solid var(--color-border)",
+  borderBottom: "2px solid var(--dg-color-border)",
 };
 
 const tdStyle = {
   padding: "10px 12px",
   textAlign: "center" as const,
-  borderBottom: "1px solid var(--color-border-light)",
-  color: "var(--color-text-primary)",
+  borderBottom: "1px solid var(--dg-color-border-light)",
+  color: "var(--dg-color-text-primary)",
 };

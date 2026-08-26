@@ -23,7 +23,7 @@ export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChange
         id={descId}
         style={{
           fontSize: "var(--dg-fs-body)",
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
           marginBottom: 24,
           lineHeight: 1.5,
         }}

@@ -58,21 +58,21 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
                   transition: "all 200ms ease",
                   ...(isCompleted
                     ? {
-                        background: "var(--color-brand)",
+                        background: "var(--dg-color-brand)",
                         color: "white",
-                        border: "2px solid var(--color-brand)",
+                        border: "2px solid var(--dg-color-brand)",
                       }
                     : isCurrent
                       ? {
                           background: "white",
-                          color: "var(--color-brand)",
-                          border: "2px solid var(--color-brand)",
+                          color: "var(--dg-color-brand)",
+                          border: "2px solid var(--dg-color-brand)",
                           boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)",
                         }
                       : {
-                          background: "var(--color-bg-secondary)",
-                          color: "var(--color-text-faint)",
-                          border: "2px solid var(--color-border)",
+                          background: "var(--dg-color-bg-secondary)",
+                          color: "var(--dg-color-text-faint)",
+                          border: "2px solid var(--dg-color-border)",
                         }),
                 }}
               >
@@ -83,10 +83,10 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
                   fontSize: 11,
                   fontWeight: isCurrent ? 700 : 500,
                   color: isCurrent
-                    ? "var(--color-text-primary)"
+                    ? "var(--dg-color-text-primary)"
                     : isCompleted
-                      ? "var(--color-brand)"
-                      : "var(--color-text-faint)",
+                      ? "var(--dg-color-brand)"
+                      : "var(--dg-color-text-faint)",
                   whiteSpace: "nowrap",
                   maxWidth: 80,
                   overflow: "hidden",
@@ -108,7 +108,7 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
                   marginLeft: 8,
                   marginRight: 8,
                   borderRadius: 1,
-                  background: isCompleted ? "var(--color-brand)" : "var(--color-border)",
+                  background: isCompleted ? "var(--dg-color-brand)" : "var(--dg-color-border)",
                   transition: "background 200ms ease",
                 }}
               />

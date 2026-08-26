@@ -43,6 +43,8 @@ describe("DomainSelector", () => {
         hostname: "localhost",
         protocol: "https:",
         port: "",
+        pathname: "/login",
+        search: "",
         get href() {
           return "";
         },
@@ -53,6 +55,30 @@ describe("DomainSelector", () => {
       writable: true,
       configurable: true,
     });
+  });
+
+  it("explains why, when a subdomain's /login sent the user back here", async () => {
+    // The subdomain page redirects rather than rendering a sign-in form for an
+    // organization that doesn't exist, so this is where the user finds out.
+    window.location.search = "?org_not_found=1";
+    const replaceState = vi.spyOn(window.history, "replaceState");
+
+    render(<DomainSelector />);
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "No organization found for that subdomain. Please check and try again.",
+        { id: "login-error" },
+      );
+    });
+    // Param stripped, so a refresh doesn't re-accuse a corrected subdomain.
+    expect(replaceState).toHaveBeenCalledWith({}, "", "/login");
+    replaceState.mockRestore();
+  });
+
+  it("says nothing on a normal visit", () => {
+    render(<DomainSelector />);
+    expect(mockToastError).not.toHaveBeenCalled();
   });
 
   it("blocks a reserved word (gridmaster) without calling validate-domain or redirecting", () => {
@@ -75,7 +101,7 @@ describe("DomainSelector", () => {
     }
   });
 
-  it("validates existence before redirecting, and forwards the resolved name", async () => {
+  it("validates existence before redirecting, without forwarding the org name", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ valid: true, name: "Acme Co" }), {
         status: 200,
@@ -87,9 +113,7 @@ describe("DomainSelector", () => {
     submitSlug("acme");
 
     await waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith(
-        "https://acme.localhost/login?verified=1&name=Acme%20Co",
-      );
+      expect(hrefSetter).toHaveBeenCalledWith("https://acme.localhost/login?verified=1");
     });
   });
 
@@ -107,7 +131,7 @@ describe("DomainSelector", () => {
 
     await waitFor(() => {
       expect(hrefSetter).toHaveBeenCalledWith(
-        "https://acme.localhost/login?verified=1&name=Acme%20Co&theme=light",
+        "https://acme.localhost/login?verified=1&theme=light",
       );
     });
   });

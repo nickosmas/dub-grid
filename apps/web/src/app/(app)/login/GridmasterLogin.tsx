@@ -22,6 +22,7 @@ import {
   useClientHost,
   useSessionInvalidToast,
 } from "./shared";
+import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
 
 export default function GridmasterLogin() {
   const router = useRouter();
@@ -46,7 +47,11 @@ export default function GridmasterLogin() {
       // destination server-side (see orchestratePostSignIn in
       // api/auth/login/route.ts) — no separate refreshSession/terms round
       // trips needed here.
-      const res = await fetch("/api/auth/login", {
+      // Deadline, not optional: a stalled connection leaves a bare `fetch`
+      // pending indefinitely, and every path that clears this form's loading
+      // state runs after the await — so a bad signal would leave the button
+      // spinning with no way back.
+      const res = await fetchWithTimeout("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -100,7 +105,9 @@ export default function GridmasterLogin() {
       router.replace(result.destination);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("fetch") || msg.includes("network")) {
+      if (isRequestTimeout(err)) {
+        toast.error("That took too long. Check your connection and try again.");
+      } else if (msg.includes("fetch") || msg.includes("network")) {
         toast.error("Check your connection and try again.");
       } else {
         toast.error("We couldn't sign you in. Try again.");
@@ -141,17 +148,7 @@ export default function GridmasterLogin() {
         <Card>
           <a href={landingUrl} className="dg-auth-logo-block">
             <DubGridLogo size={52} />
-            <span
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              Gridmaster Portal
-            </span>
+            <span className="dg-auth-portal-label">Gridmaster Portal</span>
           </a>
 
           <h1 className="dg-auth-heading">Platform Admin Sign In</h1>
@@ -169,15 +166,7 @@ export default function GridmasterLogin() {
           />
 
           {/* Navigation links */}
-          <div
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
+          <div className="dg-auth-login-navigation">
             <a
               href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
               className="dg-auth-link"

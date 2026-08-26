@@ -148,7 +148,7 @@ function ResetPasswordContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -175,30 +175,13 @@ function ResetPasswordContent() {
           />
         ) : (
           <>
-            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
-              Set New Password
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.5,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
+            <h1 className="dg-auth-heading dg-auth-page-heading">Set New Password</h1>
+            <p className="dg-auth-description">
               Choose a strong password: at least 10 characters, with a mix of uppercase letters,
               numbers, and symbols.
             </p>
 
-            <Form
-              onSubmit={handleSubmit}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
+            <Form onSubmit={handleSubmit} className="dg-auth-form">
               <div>
                 <label htmlFor="reset-new-password" className="dg-auth-field-label">
                   New Password
@@ -258,16 +241,12 @@ function ResetPasswordContent() {
               <button
                 type="submit"
                 disabled={loading || !canSubmit}
-                className="dg-btn dg-btn-primary dg-btn-lg"
-                style={{
-                  marginTop: "4px",
-                  width: "100%",
-                }}
+                className="dg-btn dg-btn-primary dg-btn-lg dg-auth-submit"
               >
                 <ButtonLoading
                   loading={loading}
                   loadingLabel="Resetting Password"
-                  spinnerColor="var(--color-text-inverse)"
+                  spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >
                   Reset Password

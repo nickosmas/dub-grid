@@ -18,19 +18,19 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
         borderRadius: "var(--dg-btn-radius)",
         border: "none",
         background: "transparent",
-        color: "var(--color-text-secondary)",
+        color: "var(--dg-color-text-secondary)",
         cursor: "pointer",
         flexShrink: 0,
         transition: "background 0.15s, color 0.15s, transform 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--color-brand-bg)";
-        e.currentTarget.style.color = "var(--color-brand)";
+        e.currentTarget.style.background = "var(--dg-color-brand-bg)";
+        e.currentTarget.style.color = "var(--dg-color-brand)";
         e.currentTarget.style.transform = "translateY(-1px)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "var(--color-text-secondary)";
+        e.currentTarget.style.color = "var(--dg-color-text-secondary)";
         e.currentTarget.style.transform = "translateY(0)";
       }}
     >

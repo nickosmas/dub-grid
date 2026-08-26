@@ -104,7 +104,7 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title flex items-center gap-2">
-            <History className="h-4 w-4 text-[var(--color-text-muted)]" />
+            <History className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
             History
             <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
               {timeline.length}
@@ -118,8 +118,8 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
       <div className={timeline.length === 0 ? "dg-card-body" : "p-0"}>
         {timeline.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <History className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
-            <p className="text-[13px] text-[var(--color-text-muted)]">No activity recorded</p>
+            <History className="mb-3 h-7 w-7 text-[var(--dg-color-text-faint)]" />
+            <p className="text-[13px] text-[var(--dg-color-text-muted)]">No activity recorded</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -137,10 +137,10 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
                   <TableRow key={event.id}>
                     <TableCell>
                       <div className="flex min-w-[120px] flex-col gap-0.5">
-                        <span className="font-medium text-[var(--color-text-primary)]">
+                        <span className="font-medium text-[var(--dg-color-text-primary)]">
                           {formatRelativeTime(event.date.toISOString())}
                         </span>
-                        <span className="text-[12px] text-[var(--color-text-muted)]">
+                        <span className="text-[12px] text-[var(--dg-color-text-muted)]">
                           {event.date.toLocaleDateString()}
                         </span>
                       </div>
@@ -151,27 +151,27 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
                     <TableCell>
                       <div className="flex min-w-[220px] items-center gap-2">
                         <EventIcon type={event.type} />
-                        <span className="font-medium text-[var(--color-text-primary)]">
+                        <span className="font-medium text-[var(--dg-color-text-primary)]">
                           {event.description}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex min-w-[240px] flex-wrap items-center gap-1.5 text-[13px] text-[var(--color-text-muted)]">
+                      <div className="flex min-w-[240px] flex-wrap items-center gap-1.5 text-[13px] text-[var(--dg-color-text-muted)]">
                         {event.fromRole && event.toRole ? (
                           <>
                             <RoleBadge role={event.fromRole} />
-                            <span className="text-[11px] text-[var(--color-text-muted)]">→</span>
+                            <span className="text-[11px] text-[var(--dg-color-text-muted)]">→</span>
                             <RoleBadge role={event.toRole} />
                           </>
                         ) : null}
                         {event.meta ? (
-                          <span className="text-[12px] text-[var(--color-text-muted)]">
+                          <span className="text-[12px] text-[var(--dg-color-text-muted)]">
                             {event.meta}
                           </span>
                         ) : null}
                         {!event.fromRole && !event.toRole && !event.meta ? (
-                          <span className="text-[12px] text-[var(--color-text-faint)]">—</span>
+                          <span className="text-[12px] text-[var(--dg-color-text-faint)]">—</span>
                         ) : null}
                       </div>
                     </TableCell>
@@ -190,20 +190,20 @@ function EventBadge({ event }: { event: TimelineEvent }) {
   const tone =
     event.type === "invitation_revoked" || event.type === "invitation_expired"
       ? {
-          bg: "var(--color-danger-bg)",
-          color: "var(--color-danger)",
-          border: "var(--color-danger-bg)",
+          bg: "var(--dg-color-danger-bg)",
+          color: "var(--dg-color-danger)",
+          border: "var(--dg-color-danger-bg)",
         }
       : event.type === "role_change"
         ? {
-            bg: "var(--color-warning-bg)",
-            color: "var(--color-warning)",
-            border: "var(--color-warning-bg)",
+            bg: "var(--dg-color-warning-bg)",
+            color: "var(--dg-color-warning)",
+            border: "var(--dg-color-warning-bg)",
           }
         : {
-            bg: "var(--color-success-bg)",
-            color: "var(--color-success)",
-            border: "var(--color-success-bg)",
+            bg: "var(--dg-color-success-bg)",
+            color: "var(--dg-color-success)",
+            border: "var(--dg-color-success-bg)",
           };
 
   return (
@@ -225,15 +225,15 @@ function EventIcon({ type }: { type: TimelineEvent["type"] }) {
   const className = "h-3.5 w-3.5 shrink-0";
   switch (type) {
     case "role_change":
-      return <UserPlus className={className} style={{ color: "var(--color-success)" }} />;
+      return <UserPlus className={className} style={{ color: "var(--dg-color-success)" }} />;
     case "invitation_sent":
-      return <Mail className={className} style={{ color: "var(--color-text-muted)" }} />;
+      return <Mail className={className} style={{ color: "var(--dg-color-text-muted)" }} />;
     case "invitation_accepted":
-      return <UserCheck className={className} style={{ color: "var(--color-success)" }} />;
+      return <UserCheck className={className} style={{ color: "var(--dg-color-success)" }} />;
     case "invitation_revoked":
-      return <UserX className={className} style={{ color: "var(--color-danger)" }} />;
+      return <UserX className={className} style={{ color: "var(--dg-color-danger)" }} />;
     case "invitation_expired":
-      return <Clock className={className} style={{ color: "var(--color-text-faint)" }} />;
+      return <Clock className={className} style={{ color: "var(--dg-color-text-faint)" }} />;
   }
 }
 

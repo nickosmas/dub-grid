@@ -285,7 +285,7 @@ export default function DashboardGreeting({
           flexWrap: "wrap",
           gap: "2px 14px",
           fontSize: "var(--dg-fs-body-sm, 14px)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           fontVariantNumeric: "tabular-nums",
         }}
       >
@@ -309,7 +309,7 @@ export default function DashboardGreeting({
           margin: 0,
           fontSize: "clamp(1.5rem, 2.2vw, 2rem)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           letterSpacing: "-0.03em",
         }}
       >

@@ -18,11 +18,11 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
         <div
           style={{
             fontSize: 13,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             padding: "12px 14px",
             borderRadius: "var(--dg-radius-md)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-bg)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           {breakdown.totalShifts} total shifts across {breakdown.byFocusArea.length} section
@@ -68,14 +68,14 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <span
-          style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", flex: 1 }}
+          style={{ fontSize: 13, fontWeight: 600, color: "var(--dg-color-text-primary)", flex: 1 }}
         >
           {fa.focusAreaName}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
           {fa.total}
         </span>
-        <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>({pct}%)</span>
+        <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>({pct}%)</span>
       </div>
 
       {/* Donut + legend */}
@@ -104,7 +104,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                 <span
                   style={{
                     fontSize: 12,
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     flex: 1,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -118,7 +118,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     flexShrink: 0,
                   }}
                 >
@@ -127,7 +127,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                 <span
                   style={{
                     fontSize: 10,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     flexShrink: 0,
                     minWidth: 30,
                     textAlign: "right",
@@ -149,6 +149,6 @@ const modalStyle = { maxWidth: 900, width: "90vw" };
 const cardStyle = {
   padding: 16,
   borderRadius: "var(--dg-radius-md)",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-border)",
+  background: "var(--dg-color-bg)",
+  border: "1px solid var(--dg-color-border)",
 };

@@ -181,7 +181,7 @@ export default function OrganizationLabels({
               className="dg-input"
               readOnly={readOnly}
               style={
-                fieldErrors.focusAreaLabel ? { borderColor: "var(--color-danger)" } : undefined
+                fieldErrors.focusAreaLabel ? { borderColor: "var(--dg-color-danger)" } : undefined
               }
             />
             {fieldErrors.focusAreaLabel ? (
@@ -189,7 +189,7 @@ export default function OrganizationLabels({
                 role="alert"
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   margin: "4px 0 0",
                 }}
               >
@@ -199,7 +199,7 @@ export default function OrganizationLabels({
             <p
               style={{
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 margin: "4px 0 0",
               }}
             >
@@ -216,7 +216,9 @@ export default function OrganizationLabels({
               className="dg-input"
               readOnly={readOnly}
               style={
-                fieldErrors.certificationLabel ? { borderColor: "var(--color-danger)" } : undefined
+                fieldErrors.certificationLabel
+                  ? { borderColor: "var(--dg-color-danger)" }
+                  : undefined
               }
             />
             {fieldErrors.certificationLabel ? (
@@ -224,7 +226,7 @@ export default function OrganizationLabels({
                 role="alert"
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   margin: "4px 0 0",
                 }}
               >
@@ -234,7 +236,7 @@ export default function OrganizationLabels({
             <p
               style={{
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 margin: "4px 0 0",
               }}
             >
@@ -250,14 +252,14 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
-              style={fieldErrors.roleLabel ? { borderColor: "var(--color-danger)" } : undefined}
+              style={fieldErrors.roleLabel ? { borderColor: "var(--dg-color-danger)" } : undefined}
             />
             {fieldErrors.roleLabel ? (
               <p
                 role="alert"
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   margin: "4px 0 0",
                 }}
               >
@@ -267,7 +269,7 @@ export default function OrganizationLabels({
             <p
               style={{
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 margin: "4px 0 0",
               }}
             >

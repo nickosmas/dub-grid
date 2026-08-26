@@ -3,7 +3,7 @@
 Scope: `apps/web`, package `@dubgrid/web`.
 
 Next.js 16 App Router. Routes under `apps/web/src/app`. Middleware at
-`apps/web/middleware.ts`. API Route Handlers under `apps/web/src/app/api`.
+`apps/web/src/middleware.ts`. API Route Handlers under `apps/web/src/app/api`.
 
 ## Verified Commands
 
@@ -20,9 +20,9 @@ Next.js 16 App Router. Routes under `apps/web/src/app`. Middleware at
 
 ```
 apps/web/
-  middleware.ts                     # Edge RBAC + org isolation (jwtVerify + decodeJwt fallback)
   src/
     app/                            # Next.js App Router
+    middleware.ts                   # Edge RBAC + org isolation (jwtVerify + decodeJwt fallback)
       api/                          # Route Handlers
         auth/                       # login, start-trial, etc.
         mobile/v1/                  # Mobile API (auth, bootstrap, me, notifications, org,
@@ -117,11 +117,15 @@ apps/web/
 
 ## Design System
 
-Two button/input class sets — not interchangeable:
+`dg-btn-*` is the button vocabulary everywhere: authenticated surfaces, public
+auth flows, and the landing page. The old `dg-auth-submit` pill is retired and
+must not be reintroduced.
 
-- `dg-btn-*` / `dg-input` / `dg-label` / `dg-form-error` — authenticated app surfaces.
-- `dg-auth-submit` / `dg-auth-input` / `dg-auth-link` / `dg-auth-heading` — public auth
-  flows only (pairs with `<AuthCard>` and `<PageShell>`).
+Input and label vocabularies are not interchangeable:
+
+- `dg-input` / `dg-label` / `dg-form-error` — authenticated app surfaces.
+- `dg-auth-input` / `dg-auth-link` / `dg-auth-heading` — public auth flows
+  (pairs with `<AuthCard>` and `<PageShell>`).
 
 Shared primitives — use before creating alternatives:
 `<PageContainer>`, `<Switch>`, `<EditorActionRow>`, `<SectionCard>`,
