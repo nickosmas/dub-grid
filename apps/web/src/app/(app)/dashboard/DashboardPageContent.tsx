@@ -69,7 +69,7 @@ function DashboardContent() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
+        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
       </div>
     );
   }
@@ -108,8 +108,7 @@ export default function DashboardPageContent() {
     return <ProgressBar loading />;
   }
 
-  // Gridmaster users see the gridmaster portal at /dashboard
-  // (the gridmaster subdomain makes the role obvious, no need for /gridmaster path)
+  // Gridmaster users also see their portal from the default post-login route.
   if (isGridmaster) {
     return <GridmasterPortal />;
   }

@@ -19,9 +19,9 @@ export default function TermsOfServicePage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
         padding: "48px 24px 80px",
       }}
     >
@@ -31,7 +31,7 @@ export default function TermsOfServicePage() {
           style={{
             display: "inline-block",
             marginBottom: "32px",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             fontSize: "var(--dg-fs-body-sm)",
             textDecoration: "none",
           }}

@@ -97,10 +97,10 @@ const PRIORITY_LABEL: Record<NotificationPriority, string> = {
 };
 
 const PRIORITY_COLOR: Record<NotificationPriority, string> = {
-  low: "var(--color-text-faint)",
-  normal: "var(--color-text-muted)",
-  high: "var(--color-warning)",
-  critical: "var(--color-danger)",
+  low: "var(--dg-color-text-faint)",
+  normal: "var(--dg-color-text-muted)",
+  high: "var(--dg-color-warning)",
+  critical: "var(--dg-color-danger)",
 };
 
 function NotificationIcon({ type }: { type: NotificationType }) {
@@ -509,7 +509,7 @@ export function InboxView() {
               margin: 0,
               fontSize: "var(--dg-fs-page-title)",
               fontWeight: 800,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {activeView.title}
@@ -517,7 +517,7 @@ export function InboxView() {
           <p
             style={{
               margin: "4px 0 0",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-label)",
             }}
           >
@@ -601,8 +601,8 @@ export function InboxView() {
                 listStyle: "none",
                 margin: 0,
                 padding: 0,
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
+                background: "var(--dg-color-surface)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-radius-lg)",
                 overflow: "hidden",
               }}
@@ -701,7 +701,7 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
           }}
         >
           {formatFullTimestamp(notification.createdAt)}
@@ -710,7 +710,7 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
         <p
           style={{
             margin: 0,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             fontSize: "var(--dg-fs-body)",
             lineHeight: 1.5,
           }}
@@ -721,20 +721,20 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
         {entries.length > 0 && (
           <div
             style={{
-              border: "1px solid var(--color-border-light)",
+              border: "1px solid var(--dg-color-border-light)",
               borderRadius: "var(--dg-radius-md)",
               padding: 12,
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              background: "var(--color-bg-secondary)",
+              background: "var(--dg-color-bg-secondary)",
             }}
           >
             <span
               style={{
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 textTransform: "uppercase",
                 letterSpacing: 0.4,
               }}
@@ -754,7 +754,7 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
                 <span
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   {entry.label}
@@ -762,7 +762,7 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
                 <span
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     wordBreak: "break-word",
                   }}
                 >
@@ -811,7 +811,7 @@ function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
         position: "sticky",
         // Park below the sticky app header instead of scrolling under it,
         // which would hide the top status links.
-        top: "calc(var(--app-shell-header-h, 0px) + 16px)",
+        top: "calc(var(--header-height) + 16px)",
         display: "flex",
         flexDirection: "column",
         gap: 2,
@@ -855,8 +855,8 @@ function FilterChip({
       data-active={active ? "true" : undefined}
       className={
         active
-          ? "bg-[var(--color-nav-active-bg)] text-[var(--color-text-primary)]"
-          : "hover:bg-[var(--color-bg-secondary)]"
+          ? "bg-[var(--dg-color-nav-active-bg)] text-[var(--dg-color-text-primary)]"
+          : "hover:bg-[var(--dg-color-bg-secondary)]"
       }
       style={{
         display: "flex",
@@ -868,7 +868,7 @@ function FilterChip({
         borderRadius: "var(--dg-radius-md)",
         cursor: "pointer",
         fontSize: "var(--dg-fs-label)",
-        color: active ? undefined : "var(--color-text-primary)",
+        color: active ? undefined : "var(--dg-color-text-primary)",
         background: active ? undefined : "transparent",
         fontWeight: active ? 600 : 500,
         fontFamily: "inherit",
@@ -883,7 +883,7 @@ function FilterChip({
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontVariantNumeric: "tabular-nums",
           }}
         >
@@ -917,7 +917,7 @@ function ReadFilterTabs({
         gap: 2,
         padding: 3,
         marginBottom: 12,
-        background: "var(--color-bg-secondary)",
+        background: "var(--dg-color-bg-secondary)",
         borderRadius: "var(--dg-radius-md)",
       }}
     >
@@ -941,8 +941,8 @@ function ReadFilterTabs({
               cursor: "pointer",
               fontSize: "var(--dg-fs-label)",
               fontWeight: active ? 600 : 500,
-              color: active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-              background: active ? "var(--color-surface)" : "transparent",
+              color: active ? "var(--dg-color-text-primary)" : "var(--dg-color-text-muted)",
+              background: active ? "var(--dg-color-surface)" : "transparent",
               boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
               fontFamily: "inherit",
               transition: "background 120ms ease, color 120ms ease",
@@ -956,8 +956,8 @@ function ReadFilterTabs({
                   fontWeight: 600,
                   padding: "1px 6px",
                   borderRadius: 999,
-                  background: active ? "var(--color-brand-bg)" : "var(--color-surface)",
-                  color: active ? "var(--color-brand)" : "var(--color-text-muted)",
+                  background: active ? "var(--dg-color-brand-bg)" : "var(--dg-color-surface)",
+                  color: active ? "var(--dg-color-brand)" : "var(--dg-color-text-muted)",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -1060,7 +1060,7 @@ function Toolbar({
           alignItems: "center",
           gap: 8,
           padding: "0 6px",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           fontSize: "var(--dg-fs-label)",
           cursor: hasNotifications ? "pointer" : "default",
         }}
@@ -1089,7 +1089,7 @@ function Toolbar({
             top: "50%",
             left: 10,
             transform: "translateY(-50%)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             pointerEvents: "none",
           }}
         />
@@ -1168,9 +1168,9 @@ function BulkActions({
         display: "inline-flex",
         gap: 6,
         padding: "4px 6px",
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-btn-radius)",
-        background: "var(--color-bg-secondary)",
+        background: "var(--dg-color-bg-secondary)",
       }}
     >
       <Button
@@ -1246,11 +1246,11 @@ function NotificationRow({
     gap: 12,
     padding: "12px 16px",
     background: selected
-      ? "var(--color-info-bg)"
+      ? "var(--dg-color-info-bg)"
       : isUnread
-        ? "var(--color-info-bg)"
-        : "var(--color-surface)",
-    borderBottom: isLast ? "none" : "1px solid var(--color-border-light)",
+        ? "var(--dg-color-info-bg)"
+        : "var(--dg-color-surface)",
+    borderBottom: isLast ? "none" : "1px solid var(--dg-color-border-light)",
     transition: "background 120ms ease",
   };
 
@@ -1269,8 +1269,8 @@ function NotificationRow({
           width: 32,
           height: 32,
           borderRadius: "50%",
-          background: isUnread ? "var(--color-info-bg)" : "var(--color-bg-secondary)",
-          color: isUnread ? "var(--color-info)" : "var(--color-text-muted)",
+          background: isUnread ? "var(--dg-color-info-bg)" : "var(--dg-color-bg-secondary)",
+          color: isUnread ? "var(--dg-color-info)" : "var(--dg-color-text-muted)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1316,7 +1316,7 @@ function NotificationRow({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: isUnread ? 700 : 600,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {notification.title}
@@ -1332,8 +1332,8 @@ function NotificationRow({
                 title={`Part of ${groupCount} related alerts`}
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
-                  background: "var(--color-bg-secondary)",
+                  color: "var(--dg-color-text-muted)",
+                  background: "var(--dg-color-bg-secondary)",
                   borderRadius: 999,
                   padding: "1px 8px",
                 }}
@@ -1349,7 +1349,7 @@ function NotificationRow({
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: "var(--color-info)",
+                background: "var(--dg-color-info)",
                 flexShrink: 0,
               }}
             />
@@ -1358,7 +1358,7 @@ function NotificationRow({
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.5,
           }}
         >
@@ -1367,7 +1367,7 @@ function NotificationRow({
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
           }}
         >
           {formatRelativeTime(notification.createdAt)}
@@ -1442,8 +1442,8 @@ function ListPlaceholder() {
   return (
     <div
       style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: "var(--dg-color-surface)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-lg)",
         padding: 0,
         overflow: "hidden",
@@ -1458,7 +1458,7 @@ function ListPlaceholder() {
             display: "flex",
             gap: 12,
             padding: "16px",
-            borderBottom: i < 3 ? "1px solid var(--color-border-light)" : "none",
+            borderBottom: i < 3 ? "1px solid var(--dg-color-border-light)" : "none",
           }}
         >
           <div
@@ -1466,7 +1466,7 @@ function ListPlaceholder() {
               width: 32,
               height: 32,
               borderRadius: "50%",
-              background: "var(--color-bg-secondary)",
+              background: "var(--dg-color-bg-secondary)",
             }}
           />
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1474,7 +1474,7 @@ function ListPlaceholder() {
               style={{
                 width: "40%",
                 height: 12,
-                background: "var(--color-bg-secondary)",
+                background: "var(--dg-color-bg-secondary)",
                 borderRadius: 4,
               }}
             />
@@ -1482,7 +1482,7 @@ function ListPlaceholder() {
               style={{
                 width: "70%",
                 height: 10,
-                background: "var(--color-bg-secondary)",
+                background: "var(--dg-color-bg-secondary)",
                 borderRadius: 4,
               }}
             />

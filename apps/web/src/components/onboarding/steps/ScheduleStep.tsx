@@ -101,11 +101,11 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                   padding: 16,
                   borderRadius: "var(--dg-radius-md)",
                   border: isActive
-                    ? "2px solid var(--color-brand)"
-                    : "1px solid var(--color-border)",
+                    ? "2px solid var(--dg-color-brand)"
+                    : "1px solid var(--dg-color-border)",
                   background: isActive
-                    ? "var(--color-brand-bg, rgba(59,130,246,0.06))"
-                    : "var(--color-surface)",
+                    ? "var(--dg-color-brand-bg, rgba(59,130,246,0.06))"
+                    : "var(--dg-color-surface)",
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "border-color 150ms ease, background 150ms ease",
@@ -118,8 +118,8 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                       height: 18,
                       borderRadius: "50%",
                       border: isActive
-                        ? "2px solid var(--color-brand)"
-                        : "2px solid var(--color-border-strong, #94a3b8)",
+                        ? "2px solid var(--dg-color-brand)"
+                        : "2px solid var(--dg-color-border-strong, #94a3b8)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -132,7 +132,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          background: "var(--color-brand)",
+                          background: "var(--dg-color-brand)",
                         }}
                       />
                     )}
@@ -141,7 +141,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                     style={{
                       fontWeight: 700,
                       fontSize: 15,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
                     {mode.title}
@@ -150,7 +150,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                 <p
                   style={{
                     fontSize: 13,
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     lineHeight: 1.5,
                     margin: 0,
                   }}
@@ -200,7 +200,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
         <p
           style={{
             fontSize: 13,
-            color: "var(--color-warning-text)",
+            color: "var(--dg-color-warning-text)",
             marginTop: 12,
             textAlign: "center",
           }}

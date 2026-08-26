@@ -45,6 +45,7 @@ import {
   PublishChange,
   CoverageRequirement,
   AbsenceType,
+  ActiveShiftRequestSummary,
   ShiftDisplayMode,
   GridOpenShift,
   ScheduleCellState,
@@ -82,6 +83,13 @@ import {
   shouldUseShiftColorForDiffState,
   GridDiffBadge,
   MentoredShiftBadge,
+  MENTORED_CORNER_CLEARANCE,
+  LOCK_CORNER_CLEARANCE,
+  REQUEST_FOLD_CLEARANCE,
+  RequestCornerFold,
+  NOTE_DOT_GAP,
+  NOTE_DOT_SIZE,
+  noteDotsWidth,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
@@ -96,7 +104,9 @@ import {
   areGridCellIdsEqual,
   getGridCellKey,
   getBulkSelectionRingStyle,
+  cellLevelDiffBadge,
   cellShowsDraftDiffBadge,
+  formatActiveRequestLabel,
   buildPublishTooltip,
   timeRangesFromCustomTimes,
   splitShiftLabelParts,
@@ -208,6 +218,7 @@ interface LegacyScheduleGridProps {
   absenceTypeMap?: Map<number, AbsenceType>;
   /** Returns the absence type ID for a given cell, or null/undefined if not an absence */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
   /** Resolves a user UUID to a display name for publish tooltips */
@@ -302,6 +313,7 @@ interface SectionBlockProps {
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: ShiftDisplayMode;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
@@ -365,6 +377,7 @@ const SectionBlock = memo(function SectionBlock({
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
+  activeRequestForKey,
   shiftDisplayMode = "code",
   resolvePublisherName,
   openShifts,
@@ -740,7 +753,7 @@ const SectionBlock = memo(function SectionBlock({
           style={{
             fontSize: "var(--dg-fs-heading)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             padding: "10px 0 8px",
           }}
         >
@@ -755,7 +768,7 @@ const SectionBlock = memo(function SectionBlock({
   const splitAtIndex = weekDates.length > 7 ? 7 : undefined;
   const isSplitDayDivider = (index: number) => splitAtIndex !== undefined && index === splitAtIndex;
   const getDayDividerColor = (index: number) =>
-    isSplitDayDivider(index) ? "var(--color-dark)" : "var(--color-border-light)";
+    isSplitDayDivider(index) ? "var(--dg-color-dark)" : "var(--dg-color-border-light)";
 
   const rowGrid: React.CSSProperties = {
     display: "grid",
@@ -770,10 +783,10 @@ const SectionBlock = memo(function SectionBlock({
         style={{
           fontSize: "var(--dg-fs-heading)",
           fontWeight: 800,
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
           marginBottom: 10,
           padding: "6px 10px 6px 8px",
-          background: "var(--color-bg-secondary)",
+          background: "var(--dg-color-bg-secondary)",
           borderRadius: 6,
           display: "flex",
           alignItems: "center",
@@ -785,7 +798,7 @@ const SectionBlock = memo(function SectionBlock({
             width: 3,
             height: 18,
             borderRadius: 2,
-            background: "var(--color-brand)",
+            background: "var(--dg-color-brand)",
             flexShrink: 0,
           }}
         />
@@ -795,9 +808,9 @@ const SectionBlock = memo(function SectionBlock({
       <div
         style={{
           position: "relative",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-md)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
           boxShadow: BOX_SHADOW_CARD,
         }}
@@ -817,9 +830,9 @@ const SectionBlock = memo(function SectionBlock({
               gap: 6,
               padding: "8px 10px",
               borderRadius: 999,
-              border: "1px solid var(--color-brand)",
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
+              border: "1px solid var(--dg-color-brand)",
+              background: "var(--dg-color-brand)",
+              color: "var(--dg-color-text-inverse)",
               boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 700,
@@ -857,9 +870,9 @@ const SectionBlock = memo(function SectionBlock({
               gap: 6,
               padding: "8px 10px",
               borderRadius: 999,
-              border: "1px solid var(--color-brand)",
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
+              border: "1px solid var(--dg-color-brand)",
+              background: "var(--dg-color-brand)",
+              color: "var(--dg-color-text-inverse)",
               boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 700,
@@ -912,23 +925,23 @@ const SectionBlock = memo(function SectionBlock({
                   left: 0,
                   // Frozen name column: above all scrolling day cells (max 8).
                   zIndex: 10,
-                  background: "var(--color-bg)",
+                  background: "var(--dg-color-bg)",
                   padding: "10px var(--dg-space-md)",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 600,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   letterSpacing: "0.04em",
                   // The bottom divider is a background-image, not a box-shadow
                   // line, because Chromium clips box-shadow/border decorations
                   // on position:sticky elements at sub-100% browser zoom (see
                   // the same fix on the Open Shifts label cell below).
                   backgroundImage:
-                    "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
+                    "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
                   backgroundPosition: "0 100%",
                   backgroundRepeat: "no-repeat",
                   backgroundSize: "100% 1px",
                   boxShadow: joinBoxShadows(
-                    "1px 0 0 0 var(--color-border-light)",
+                    "1px 0 0 0 var(--dg-color-border-light)",
                     "2px 0 4px rgba(0,0,0,0.02)",
                   ),
                 }}
@@ -959,7 +972,7 @@ const SectionBlock = memo(function SectionBlock({
                       // edge, while this draws flush at it, so mixing the two
                       // techniques put them a pixel apart vertically.
                       backgroundImage:
-                        "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
+                        "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
                       backgroundPosition: "0 100%",
                       backgroundRepeat: "no-repeat",
                       backgroundSize: "100% 1px",
@@ -970,7 +983,9 @@ const SectionBlock = memo(function SectionBlock({
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
-                        color: isToday ? "var(--color-today-text)" : "var(--color-text-subtle)",
+                        color: isToday
+                          ? "var(--dg-color-today-text)"
+                          : "var(--dg-color-text-subtle)",
                         letterSpacing: "0.04em",
                       }}
                     >
@@ -980,7 +995,9 @@ const SectionBlock = memo(function SectionBlock({
                       style={{
                         fontSize: "var(--dg-fs-title)",
                         fontWeight: 700,
-                        color: isToday ? "var(--color-today-text)" : "var(--color-text-secondary)",
+                        color: isToday
+                          ? "var(--dg-color-today-text)"
+                          : "var(--dg-color-text-secondary)",
                         lineHeight: "var(--dg-lh-tight)",
                         marginTop: 1,
                       }}
@@ -998,7 +1015,7 @@ const SectionBlock = memo(function SectionBlock({
                 role="row"
                 style={{
                   ...rowGrid,
-                  background: "var(--color-warning-bg, #FFF8E1)",
+                  background: "var(--dg-color-warning-bg, #FFF8E1)",
                   alignItems: "stretch",
                 }}
               >
@@ -1008,14 +1025,14 @@ const SectionBlock = memo(function SectionBlock({
                     position: "sticky",
                     left: 0,
                     zIndex: 10,
-                    background: "var(--color-warning-bg, #FFF8E1)",
+                    background: "var(--dg-color-warning-bg, #FFF8E1)",
                     display: "flex",
                     alignItems: "center",
                     alignSelf: "stretch",
                     padding: "6px 10px",
                     fontWeight: 700,
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-warning-text, #92400E)",
+                    color: "var(--dg-color-warning-text, #92400E)",
                     gap: 6,
                     whiteSpace: "nowrap",
                     // A real border-bottom on this sticky cell gets clipped by
@@ -1023,11 +1040,11 @@ const SectionBlock = memo(function SectionBlock({
                     // match the day cells' background-image divider technique
                     // instead, which renders correctly at every zoom level.
                     backgroundImage:
-                      "repeating-linear-gradient(to right, var(--color-warning-border, #F59E0B) 0 6px, transparent 6px 10px)",
+                      "repeating-linear-gradient(to right, var(--dg-color-warning-border, #F59E0B) 0 6px, transparent 6px 10px)",
                     backgroundPosition: "0 100%",
                     backgroundRepeat: "no-repeat",
                     backgroundSize: "100% 2px",
-                    boxShadow: "1px 0 0 0 var(--color-border)",
+                    boxShadow: "1px 0 0 0 var(--dg-color-border)",
                   }}
                 >
                   <svg
@@ -1049,7 +1066,7 @@ const SectionBlock = memo(function SectionBlock({
                       minWidth: 18,
                       height: 18,
                       borderRadius: 9,
-                      background: "var(--color-warning)",
+                      background: "var(--dg-color-warning)",
                       color: "#fff",
                       fontSize: "var(--dg-fs-badge)",
                       fontWeight: 700,
@@ -1136,9 +1153,9 @@ const SectionBlock = memo(function SectionBlock({
                                 padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
                                 minWidth: 0,
                                 borderRadius: 6,
-                                border: `1.5px dashed ${scPill?.border ?? "var(--color-warning-border, #F59E0B)"}`,
-                                background: scPill?.color ?? "var(--color-surface)",
-                                color: scPill?.text ?? "var(--color-warning-text, #92400E)",
+                                border: `1.5px dashed ${scPill?.border ?? "var(--dg-color-warning-border, #F59E0B)"}`,
+                                background: scPill?.color ?? "var(--dg-color-surface)",
+                                color: scPill?.text ?? "var(--dg-color-warning-text, #92400E)",
                                 fontSize: "var(--dg-fs-caption)",
                                 fontWeight: 600,
                                 cursor: "pointer",
@@ -1192,8 +1209,8 @@ const SectionBlock = memo(function SectionBlock({
                                   width: 16,
                                   height: 16,
                                   borderRadius: "50%",
-                                  background: scPill?.text ?? "var(--color-warning)",
-                                  color: scPill?.color ?? "var(--color-text-inverse)",
+                                  background: scPill?.text ?? "var(--dg-color-warning)",
+                                  color: scPill?.color ?? "var(--dg-color-text-inverse)",
                                   fontSize: 10,
                                   fontWeight: 700,
                                   display: "inline-flex",
@@ -1222,12 +1239,14 @@ const SectionBlock = memo(function SectionBlock({
                 ? (highlightEmpIds?.has(emp.id) ?? false)
                 : true;
               const isCurrentUser = !!(emp.userId && currentUser && emp.userId === currentUser.id);
-              const baseRowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
+              const baseRowBg = isCurrentUser
+                ? "var(--dg-color-today-bg)"
+                : "var(--dg-color-surface)";
               const rowBg =
                 hasHighlightedSearch && isHighlighted
                   ? isCurrentUser
-                    ? "linear-gradient(90deg, var(--color-brand-bg) 0%, var(--color-today-bg) 100%)"
-                    : "var(--color-brand-bg)"
+                    ? "linear-gradient(90deg, var(--dg-color-brand-bg) 0%, var(--dg-color-today-bg) 100%)"
+                    : "var(--dg-color-brand-bg)"
                   : baseRowBg;
               const certAbbr = getCertAbbr(emp.certificationId, certifications);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
@@ -1260,12 +1279,12 @@ const SectionBlock = memo(function SectionBlock({
                       justifyContent: "space-between",
                       gap: 8,
                       minWidth: 0,
-                      borderTop: ri > 0 ? "1px solid var(--color-border-light)" : undefined,
+                      borderTop: ri > 0 ? "1px solid var(--dg-color-border-light)" : undefined,
                       boxShadow: joinBoxShadows(
                         hasHighlightedSearch && isHighlighted
-                          ? "inset 4px 0 0 0 var(--color-brand)"
+                          ? "inset 4px 0 0 0 var(--dg-color-brand)"
                           : undefined,
-                        "1px 0 0 0 var(--color-border-light)",
+                        "1px 0 0 0 var(--dg-color-border-light)",
                         "2px 0 4px rgba(0,0,0,0.02)",
                       ),
                     }}
@@ -1287,8 +1306,8 @@ const SectionBlock = memo(function SectionBlock({
                             fontWeight: 600,
                             color:
                               hasHighlightedSearch && isHighlighted
-                                ? "var(--color-brand)"
-                                : "var(--color-text-secondary)",
+                                ? "var(--dg-color-brand)"
+                                : "var(--dg-color-text-secondary)",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -1302,7 +1321,7 @@ const SectionBlock = memo(function SectionBlock({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-badge)",
-                            color: "var(--color-text-subtle)",
+                            color: "var(--dg-color-text-subtle)",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -1366,6 +1385,14 @@ const SectionBlock = memo(function SectionBlock({
                         currentAbsenceTypeId != null
                           ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
                           : null;
+                      const activeRequest = activeRequestForKey?.(emp.id, date) ?? null;
+                      const activeRequestLabel = activeRequest
+                        ? formatActiveRequestLabel(activeRequest)
+                        : null;
+                      // The lock avatar outranks everything else in the top-right
+                      // corner: it is the only mark that explains why a cell will
+                      // not open. Everything else there starts past it.
+                      const cornerLockClearance = isLocked ? LOCK_CORNER_CLEARANCE : 0;
 
                       const showDiffCellTint = !!draftKind || showsPublishDiff;
                       // The row above paints its own bottom stroke inside its
@@ -1439,7 +1466,7 @@ const SectionBlock = memo(function SectionBlock({
                           style={{
                             height: "var(--dg-grid-cell-height)",
                             background: isBulkSelected
-                              ? "var(--color-brand-bg)"
+                              ? "var(--dg-color-brand-bg)"
                               : showDiffCellTint
                                 ? rowBg
                                 : undefined,
@@ -1560,16 +1587,25 @@ const SectionBlock = memo(function SectionBlock({
                                   pillColor:
                                     cellAbsenceType?.color ??
                                     firstStyle?.color ??
-                                    "var(--color-bg)",
+                                    "var(--dg-color-bg)",
                                   pillText:
                                     cellAbsenceType?.text ??
                                     firstStyle?.text ??
-                                    "var(--color-text-muted)",
+                                    "var(--dg-color-text-muted)",
                                 }}
                                 disabled={!hasDraggableEntry}
                               >
                                 {(() => {
-                                  const labels = shiftLabel.split("/");
+                                  // "/" joins the segments of a worked cell,
+                                  // so it is what splits that cell into pills.
+                                  // An absence is a single pill whose label is
+                                  // whatever the org named it — splitting one
+                                  // called "PTO/Flex" tore it into two pills
+                                  // that then resolved against the assignment
+                                  // list and rendered someone else's label.
+                                  const labels = cellAbsenceType
+                                    ? [shiftLabel]
+                                    : shiftLabel.split("/");
                                   const isPubDiff =
                                     !draftKind && showsPublishDiff ? publishDiff : null;
                                   const publishFrom =
@@ -1668,30 +1704,28 @@ const SectionBlock = memo(function SectionBlock({
                                       })
                                     : null;
 
-                                  let publishBadge: GridDiffBadgeConfig | null = null;
-                                  if (
-                                    isPubDiff &&
-                                    publishDiffSummary?.cellBadge &&
-                                    publishDiffSummary.cellBadge.text === "Changed"
-                                  ) {
-                                    publishBadge = {
-                                      source: "publish",
-                                      kind: publishDiffSummary.cellBadge.kind,
-                                      text: publishDiffSummary.cellBadge.text,
-                                      tooltip: buildPublishTooltip({
-                                        publishDiff: publishDiff!,
-                                        resolvePublisherName,
-                                        detail: publishDiffSummary.cellBadge.detail,
-                                      }),
-                                    };
-                                  }
-                                  // Absence cells produce no pill diffs (pills
+                                  const publishCellBadge = isPubDiff
+                                    ? cellLevelDiffBadge(publishDiffSummary)
+                                    : null;
+                                  const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
+                                    ? {
+                                        source: "publish",
+                                        kind: publishCellBadge.kind,
+                                        text: publishCellBadge.text,
+                                        tooltip: buildPublishTooltip({
+                                          publishDiff: publishDiff!,
+                                          resolvePublisherName,
+                                          detail: publishCellBadge.detail,
+                                        }),
+                                      }
+                                    : null;
+                                  // An absence produces no pill diffs — pills
                                   // are keyed off after-side assignment ids,
-                                  // which absences don't have), so the ring
-                                  // kind has to come from the cell-level diff
-                                  // directly. We never promote that change to a
-                                  // text badge — the banner legend explains the
-                                  // ring colors instead.
+                                  // which an absence has none of — so its ring
+                                  // has to come from the cell-level diff. The
+                                  // badge above already carries the text for
+                                  // that case; this only fills in a ring the
+                                  // badge itself doesn't imply (a plain "New").
                                   const publishRingKind: ShiftDiffBorderKind =
                                     publishBadge?.kind === "new" ||
                                     publishBadge?.kind === "modified"
@@ -1704,19 +1738,17 @@ const SectionBlock = memo(function SectionBlock({
                                         ? publishDiffSummary.cellBadge.kind
                                         : null;
 
-                                  let draftBadge: GridDiffBadgeConfig | null = null;
-                                  if (
-                                    showsDraftBadge &&
-                                    draftDiff?.cellBadge &&
-                                    draftDiff.cellBadge.text === "Changed"
-                                  ) {
-                                    draftBadge = {
-                                      source: "draft",
-                                      kind: draftDiff.cellBadge.kind,
-                                      text: draftDiff.cellBadge.text,
-                                      tooltip: draftDiff.cellBadge.detail,
-                                    };
-                                  }
+                                  const draftCellBadge = showsDraftBadge
+                                    ? cellLevelDiffBadge(draftDiff)
+                                    : null;
+                                  const draftBadge: GridDiffBadgeConfig | null = draftCellBadge
+                                    ? {
+                                        source: "draft",
+                                        kind: draftCellBadge.kind,
+                                        text: draftCellBadge.text,
+                                        tooltip: draftCellBadge.detail,
+                                      }
+                                    : null;
 
                                   const buildPillBadge = (args: {
                                     source: "publish" | "draft";
@@ -1898,7 +1930,7 @@ const SectionBlock = memo(function SectionBlock({
                                             left: insetFromVisibleCellLeft(singleSideInset),
                                             background: singleUsesShiftColor
                                               ? effectiveColor
-                                              : "var(--color-surface)",
+                                              : "var(--dg-color-surface)",
                                             opacity: draftKind === "deleted" ? 0.5 : 1,
                                             border: effectiveBorder,
                                             borderRadius: SINGLE_SHIFT_PILL_RADIUS,
@@ -1929,12 +1961,20 @@ const SectionBlock = memo(function SectionBlock({
                                               draftKind === "deleted" ? "line-through" : "none",
                                           }}
                                         >
+                                          {activeRequest && activeRequestLabel && (
+                                            <RequestCornerFold
+                                              status={activeRequest.status}
+                                              label={activeRequestLabel}
+                                            />
+                                          )}
                                           {singlePillBadge && (
                                             <GridDiffBadge
                                               badge={{
                                                 ...singlePillBadge,
                                                 topOffset: -8,
-                                                leftOffset: 4,
+                                                leftOffset: activeRequest
+                                                  ? REQUEST_FOLD_CLEARANCE
+                                                  : 4,
                                               }}
                                             />
                                           )}
@@ -1942,7 +1982,13 @@ const SectionBlock = memo(function SectionBlock({
                                             <span
                                               style={{
                                                 position: "absolute",
-                                                top: 0,
+                                                // Yields its top corner to a
+                                                // left-anchored badge, which
+                                                // hangs 8px into the pill. The
+                                                // initials stay centred in what
+                                                // is left, so the overlap reads
+                                                // as layering, not clipping.
+                                                top: singlePillBadge ? 8 : 0,
                                                 bottom: 0,
                                                 left: 0,
                                                 display: "flex",
@@ -1952,7 +1998,9 @@ const SectionBlock = memo(function SectionBlock({
                                                 lineHeight: 1,
                                                 background: singleCrossFocusPalette.background,
                                                 color: singleCrossFocusPalette.color,
-                                                borderRadius: "2px 0 0 2px",
+                                                borderRadius: singlePillBadge
+                                                  ? "0 0 0 2px"
+                                                  : "2px 0 0 2px",
                                                 padding: "0 3px",
                                                 letterSpacing: "0.02em",
                                                 pointerEvents: "none",
@@ -1961,7 +2009,11 @@ const SectionBlock = memo(function SectionBlock({
                                               {getFocusAreaInitials(singleCrossFocusPill.name)}
                                             </span>
                                           )}
-                                          {singleIsMentored && <MentoredShiftBadge />}
+                                          {singleIsMentored && (
+                                            <MentoredShiftBadge
+                                              rightInset={cornerLockClearance || undefined}
+                                            />
+                                          )}
                                           <div
                                             style={{
                                               display: "flex",
@@ -2131,7 +2183,14 @@ const SectionBlock = memo(function SectionBlock({
                                               badge={{
                                                 ...(draftBadge ?? publishBadge!),
                                                 topOffset: -8,
-                                                rightOffset: 4,
+                                                // Past the lock avatar first,
+                                                // then past the "M" that has
+                                                // itself been pushed past it.
+                                                rightOffset:
+                                                  cornerLockClearance +
+                                                  (singleIsMentored
+                                                    ? MENTORED_CORNER_CLEARANCE
+                                                    : 4),
                                               }}
                                             />
                                           )}
@@ -2157,6 +2216,27 @@ const SectionBlock = memo(function SectionBlock({
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
+                                  // Four things anchor to this cell's top-right
+                                  // corner and each has to start past the one
+                                  // before it: the lock avatar, the last pill's
+                                  // mentored "M", the note dots, then the cell's
+                                  // diff badge. The offsets used to be constants
+                                  // written for one dot, no "M" and no lock, so
+                                  // a second indicator or a mentored last pill
+                                  // piled them into the same 16px square.
+                                  const lastPillIsMentored =
+                                    cellSegments[labels.length - 1]?.isMentored ?? false;
+                                  const multiMentoredRightOffset = lastPillIsMentored
+                                    ? cornerLockClearance + MENTORED_CORNER_CLEARANCE
+                                    : cornerLockClearance;
+                                  const multiNotesRightOffset = Math.max(
+                                    multiMentoredRightOffset,
+                                    2,
+                                  );
+                                  const multiBadgeRightOffset =
+                                    noteTypes.length > 0
+                                      ? multiNotesRightOffset + noteDotsWidth(noteTypes.length) + 4
+                                      : Math.max(3, multiMentoredRightOffset);
                                   return (
                                     <>
                                       {isBulkSelected && (
@@ -2189,6 +2269,12 @@ const SectionBlock = memo(function SectionBlock({
                                           opacity: draftKind === "deleted" ? 0.5 : 1,
                                         }}
                                       >
+                                        {activeRequest && activeRequestLabel && (
+                                          <RequestCornerFold
+                                            status={activeRequest.status}
+                                            label={activeRequestLabel}
+                                          />
+                                        )}
                                         <div
                                           style={{
                                             display: "flex",
@@ -2321,7 +2407,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   flex: 1,
                                                   background: multiUsesShiftColor
                                                     ? effectiveColorLi
-                                                    : "var(--color-surface)",
+                                                    : "var(--dg-color-surface)",
                                                   border: pillBorder,
                                                   borderRadius: MULTI_SHIFT_PILL_RADIUS,
                                                   color: multiForegroundColor,
@@ -2374,7 +2460,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   <span
                                                     style={{
                                                       position: "absolute",
-                                                      top: 0,
+                                                      top: pillBadge ? 8 : 0,
                                                       bottom: 0,
                                                       left: 0,
                                                       display: "flex",
@@ -2384,7 +2470,9 @@ const SectionBlock = memo(function SectionBlock({
                                                       lineHeight: 1,
                                                       background: multiCrossFocusPalette.background,
                                                       color: multiCrossFocusPalette.color,
-                                                      borderRadius: "2px 0 0 2px",
+                                                      borderRadius: pillBadge
+                                                        ? "0 0 0 2px"
+                                                        : "2px 0 0 2px",
                                                       padding: "0 2px",
                                                       letterSpacing: "0.02em",
                                                       pointerEvents: "none",
@@ -2393,7 +2481,19 @@ const SectionBlock = memo(function SectionBlock({
                                                     {getFocusAreaInitials(multiCrossFocusPill.name)}
                                                   </span>
                                                 )}
-                                                {isMentoredPill && <MentoredShiftBadge compact />}
+                                                {isMentoredPill && (
+                                                  <MentoredShiftBadge
+                                                    compact
+                                                    rightInset={
+                                                      // Only the last pill shares
+                                                      // the cell's corner with
+                                                      // the lock avatar.
+                                                      li === labels.length - 1
+                                                        ? cornerLockClearance || undefined
+                                                        : undefined
+                                                    }
+                                                  />
+                                                )}
                                                 <div
                                                   style={{
                                                     display: "flex",
@@ -2527,9 +2627,9 @@ const SectionBlock = memo(function SectionBlock({
                                             style={{
                                               position: "absolute",
                                               top: 2,
-                                              right: 2,
+                                              right: multiNotesRightOffset,
                                               display: "flex",
-                                              gap: 2,
+                                              gap: NOTE_DOT_GAP,
                                               zIndex: 1,
                                             }}
                                           >
@@ -2559,8 +2659,8 @@ const SectionBlock = memo(function SectionBlock({
                                           <GridDiffBadge
                                             badge={{
                                               ...(draftBadge ?? publishBadge!),
-                                              topOffset: noteTypes.length > 0 ? 8 : -8,
-                                              rightOffset: noteTypes.length > 0 ? 14 : 3,
+                                              topOffset: -8,
+                                              rightOffset: multiBadgeRightOffset,
                                             }}
                                           />
                                         )}
@@ -2622,6 +2722,39 @@ const SectionBlock = memo(function SectionBlock({
                                         detail: `Deleted ${deletedLabel}.`,
                                       })
                                     : undefined;
+                                // A reviewer checking a delete before publishing
+                                // needs the same two facts the live pill carries:
+                                // whether it was mentored, and whether it was
+                                // someone else's focus area. This branch used to
+                                // drop both, leaving only the struck-through
+                                // label. One pill stands for a joined label, so
+                                // "any segment" is the right rule for mentored.
+                                const deletedSegments = isDraftDelete
+                                  ? publishedSegments
+                                  : (publishDiff?.fromState?.segments ?? []);
+                                const deletedWasMentored = deletedSegments.some(
+                                  (segment) => segment.isMentored ?? false,
+                                );
+                                const deletedAssignmentDefinitionId = isDraftDelete
+                                  ? publishedCodeIds[0]
+                                  : publishDeletedFromIds[0];
+                                const deletedAssignment =
+                                  deletedAssignmentDefinitionId != null
+                                    ? assignmentById.get(deletedAssignmentDefinitionId)
+                                    : undefined;
+                                const deletedCrossFocusArea =
+                                  publishDeletedAbsenceTypeId == null &&
+                                  deletedAssignment?.focusAreaId != null &&
+                                  sectionFocusArea != null &&
+                                  deletedAssignment.focusAreaId !== sectionFocusArea.id
+                                    ? focusAreas.find(
+                                        (fa) => fa.id === deletedAssignment.focusAreaId,
+                                      )
+                                    : undefined;
+                                const deletedCrossFocusPalette = getCrossFocusBadgePalette({
+                                  color: "var(--dg-color-danger-bg)",
+                                  text: "var(--dg-color-danger-dark)",
+                                });
                                 const deletedPill = (
                                   <div
                                     data-shift-pill="deleted"
@@ -2632,22 +2765,22 @@ const SectionBlock = memo(function SectionBlock({
                                       right: "4px",
                                       bottom: "4px",
                                       left: insetFromVisibleCellLeft(4),
-                                      background: "var(--color-danger-bg)",
+                                      background: "var(--dg-color-danger-bg)",
                                       border: isDraftDelete
-                                        ? "2px dashed var(--color-danger-dark)"
-                                        : "1px solid var(--color-danger-border)",
+                                        ? "2px dashed var(--dg-color-danger-dark)"
+                                        : "1px solid var(--dg-color-danger-border)",
                                       borderRadius: 8,
                                       ...(isDraftDelete
                                         ? {}
                                         : {
                                             boxShadow:
-                                              "0 0 0 1px var(--color-surface), 0 0 0 2.5px var(--color-danger-dark)",
+                                              "0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px var(--dg-color-danger-dark)",
                                           }),
                                       display: "flex",
                                       flexDirection: "column",
                                       alignItems: "center",
                                       justifyContent: "center",
-                                      color: "var(--color-danger-dark)",
+                                      color: "var(--dg-color-danger-dark)",
                                       overflow: "visible",
                                     }}
                                   >
@@ -2661,6 +2794,34 @@ const SectionBlock = memo(function SectionBlock({
                                         leftOffset: 4,
                                       }}
                                     />
+                                    {deletedCrossFocusArea && (
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          top: 8,
+                                          bottom: 0,
+                                          left: 0,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          fontSize: "var(--dg-fs-footnote)",
+                                          fontWeight: 800,
+                                          lineHeight: 1,
+                                          background: deletedCrossFocusPalette.background,
+                                          color: deletedCrossFocusPalette.color,
+                                          borderRadius: "0 0 0 2px",
+                                          padding: "0 3px",
+                                          letterSpacing: "0.02em",
+                                          pointerEvents: "none",
+                                        }}
+                                      >
+                                        {getFocusAreaInitials(deletedCrossFocusArea.name)}
+                                      </span>
+                                    )}
+                                    {deletedWasMentored && (
+                                      <MentoredShiftBadge
+                                        rightInset={cornerLockClearance || undefined}
+                                      />
+                                    )}
                                     <span
                                       style={{
                                         fontSize: "var(--dg-fs-title)",
@@ -2675,6 +2836,41 @@ const SectionBlock = memo(function SectionBlock({
                                 return (
                                   <>
                                     {deletedPill}
+                                    {/* Deleting the shift does not delete the
+                                        cell's notes — they outlive the draft and
+                                        come back the moment it publishes. This
+                                        branch used to drop them, so a note went
+                                        invisible for exactly as long as the
+                                        delete sat unpublished. */}
+                                    {noteTypes.length > 0 && (
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          top: 5,
+                                          right: 5,
+                                          display: "flex",
+                                          gap: NOTE_DOT_GAP,
+                                          zIndex: 7,
+                                        }}
+                                      >
+                                        {indicatorTypes
+                                          .filter((ind) => noteTypes.includes(ind.id))
+                                          .map((ind) => (
+                                            <MaybeHint key={ind.name} content={ind.name} side="top">
+                                              <div
+                                                style={{
+                                                  width: NOTE_DOT_SIZE,
+                                                  height: NOTE_DOT_SIZE,
+                                                  borderRadius: "50%",
+                                                  background: ind.color,
+                                                  border: "1.5px solid rgba(255,255,255,0.9)",
+                                                  flexShrink: 0,
+                                                }}
+                                              />
+                                            </MaybeHint>
+                                          ))}
+                                      </div>
+                                    )}
                                     {shouldShowAuthorName && auditName && (
                                       <AuthorBadge
                                         name={auditName}
@@ -2693,7 +2889,7 @@ const SectionBlock = memo(function SectionBlock({
                                     style={{
                                       fontSize: "var(--dg-fs-micro)",
                                       fontWeight: 600,
-                                      color: "var(--color-text-faint)",
+                                      color: "var(--dg-color-text-faint)",
                                       letterSpacing: "0.06em",
                                       userSelect: "none",
                                     }}
@@ -2744,8 +2940,8 @@ const SectionBlock = memo(function SectionBlock({
                                     width: 20,
                                     height: 20,
                                     borderRadius: "50%",
-                                    background: "var(--color-brand)",
-                                    color: "var(--color-text-inverse)",
+                                    background: "var(--dg-color-brand)",
+                                    color: "var(--dg-color-text-inverse)",
                                     fontSize: 9,
                                     fontWeight: 700,
                                     display: "flex",
@@ -2775,7 +2971,7 @@ const SectionBlock = memo(function SectionBlock({
                                     right: 2,
                                     fontSize: 10,
                                     lineHeight: 1,
-                                    color: "var(--color-text-muted)",
+                                    color: "var(--dg-color-text-muted)",
                                     zIndex: 2,
                                     pointerEvents: "auto",
                                   }}
@@ -2804,8 +3000,8 @@ const SectionBlock = memo(function SectionBlock({
                     data-tally-row={`category-${row.categoryId}`}
                     style={{
                       ...rowGrid,
-                      borderTop: rowIndex === 0 ? "1px solid var(--color-border)" : undefined,
-                      background: "var(--color-surface)",
+                      borderTop: rowIndex === 0 ? "1px solid var(--dg-color-border)" : undefined,
+                      background: "var(--dg-color-surface)",
                     }}
                   >
                     <div
@@ -2814,17 +3010,19 @@ const SectionBlock = memo(function SectionBlock({
                         position: "sticky",
                         left: 0,
                         zIndex: 10,
-                        background: "var(--color-surface)",
+                        background: "var(--dg-color-surface)",
                         padding: "6px 14px",
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         letterSpacing: "0.04em",
                         display: "flex",
                         alignItems: "center",
-                        borderBottom: isLastRow ? undefined : "1px solid var(--color-border-light)",
+                        borderBottom: isLastRow
+                          ? undefined
+                          : "1px solid var(--dg-color-border-light)",
                         boxShadow: joinBoxShadows(
-                          "1px 0 0 0 var(--color-border-light)",
+                          "1px 0 0 0 var(--dg-color-border-light)",
                           "2px 0 4px rgba(0,0,0,0.02)",
                         ),
                       }}
@@ -2873,14 +3071,14 @@ const SectionBlock = memo(function SectionBlock({
                             lineHeight: 1.4,
                             color: hasRequirement
                               ? isMet
-                                ? "var(--color-success-text)"
-                                : "var(--color-danger-dark)"
-                              : "var(--color-text-muted)",
+                                ? "var(--dg-color-success-text)"
+                                : "var(--dg-color-danger-dark)"
+                              : "var(--dg-color-text-muted)",
                             background: hasRequirement
                               ? isMet
                                 ? "rgba(22, 163, 74, 0.12)"
                                 : "rgba(220, 38, 38, 0.12)"
-                              : "var(--color-surface)",
+                              : "var(--dg-color-surface)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2967,6 +3165,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
+  activeRequestForKey,
   shiftDisplayMode = "code",
   resolvePublisherName,
   openShifts,
@@ -3291,6 +3490,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     coverageRequirements={coverageRequirements}
                     absenceTypeMap={absenceTypeMap}
                     absenceTypeIdForKey={absenceTypeIdForKey}
+                    activeRequestForKey={activeRequestForKey}
                     shiftDisplayMode={shiftDisplayMode}
                     resolvePublisherName={resolvePublisherName}
                     openShifts={openShifts?.filter(
@@ -3510,6 +3710,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         coverageRequirements={model.coverageRequirements}
         absenceTypeMap={model.absenceTypeMap}
         absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
+        activeRequestForKey={model.accessors.activeRequestForKey}
         shiftDisplayMode={model.options.shiftDisplayMode}
         resolvePublisherName={model.resolvePublisherName}
         openShifts={model.openShifts}

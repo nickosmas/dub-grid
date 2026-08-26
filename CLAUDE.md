@@ -638,7 +638,7 @@ router.push("/dashboard");
 
 ## Middleware
 
-Use `apps/web/middleware.ts` for cross-cutting concerns that must run on every request:
+Use `apps/web/src/middleware.ts` for cross-cutting concerns that must run on every request:
 auth guards, redirects, locale detection, A/B flags.
 
 Keep middleware fast and dependency-light — it runs on the Edge runtime.

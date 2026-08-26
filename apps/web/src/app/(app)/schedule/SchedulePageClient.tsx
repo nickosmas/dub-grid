@@ -185,6 +185,7 @@ import {
   ShiftMap,
   AssignmentDefinition,
   AbsenceType,
+  ActiveShiftRequestSummary,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
@@ -2634,15 +2635,37 @@ function SchedulerContent() {
     [shifts],
   );
 
-  const hasActiveRequestForShift = useCallback(
-    (empId: string, date: Date): boolean =>
-      shiftRequests.requests.some(
+  /**
+   * The live request sitting on a cell, if any — what the grid's corner fold
+   * tints itself from and what `hasActiveRequestForShift` answers over.
+   *
+   * Matches the *requester's* cell only. A swap therefore marks the person who
+   * asked, not the person being asked: covering the other side needs a second
+   * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
+   */
+  const activeRequestForKey = useCallback(
+    (empId: string, date: Date): ActiveShiftRequestSummary | null => {
+      const dateKey = formatDateKey(date);
+      const match = shiftRequests.requests.find(
         (r) =>
           r.requesterEmpId === empId &&
-          r.requesterShiftDate === formatDateKey(date) &&
+          r.requesterShiftDate === dateKey &&
           (r.status === "open" || r.status === "pending_approval"),
-      ),
+      );
+      if (!match) return null;
+      // The find above already admitted only these two, so this narrows rather
+      // than decides.
+      return {
+        type: match.type,
+        status: match.status === "pending_approval" ? "pending_approval" : "open",
+      };
+    },
     [shiftRequests.requests],
+  );
+
+  const hasActiveRequestForShift = useCallback(
+    (empId: string, date: Date): boolean => activeRequestForKey(empId, date) !== null,
+    [activeRequestForKey],
   );
 
   const publishDiffKindForKey = useCallback(
@@ -3282,9 +3305,9 @@ function SchedulerContent() {
         orgId: "",
         label: type,
         name: type,
-        color: "var(--color-bg)",
-        border: "var(--color-border)",
-        text: "var(--color-text-muted)",
+        color: "var(--dg-color-bg)",
+        border: "var(--dg-color-border)",
+        text: "var(--dg-color-text-muted)",
         sortOrder: 999,
       } satisfies AssignmentDefinition;
     },
@@ -4087,35 +4110,38 @@ function SchedulerContent() {
 
       const sourceEntry = shifts[sourceKey];
       const targetEntry = shifts[targetKey];
-      const targetPublishedAssignmentDefinitionIds =
-        targetEntry?.publishedAssignmentDefinitionIds ?? [];
-      const targetPublishedAbsenceTypeId = targetEntry?.publishedAbsenceTypeId ?? null;
-      const targetPublishedLabel = targetEntry?.publishedLabel ?? "";
-      const targetHasPublished =
-        targetPublishedAssignmentDefinitionIds.length > 0 || targetPublishedAbsenceTypeId != null;
-      const targetDraftKind: DraftKind = targetHasPublished ? "modified" : "new";
-      const movedEntry = buildScheduleCellEntryFromInput({
-        input: {
-          ...payload,
-          customStartTime:
-            payload.kind === "worked"
-              ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
-              : null,
-          customEndTime:
-            payload.kind === "worked"
-              ? (sourceEntry?.customEndTime ?? payload.customEndTime ?? null)
-              : null,
-        },
-        published: getPublishedSnapshot(shifts[targetKey]),
-        segmentCompatibility,
-        absenceTypeMap,
-        draftKind: targetDraftKind,
-        version: shifts[targetKey]?.version != null ? shifts[targetKey]!.version + 1 : undefined,
-        createdBy: shifts[targetKey]?.createdBy ?? null,
-        updatedBy: currentUserRef.current?.id ?? null,
-        createdAt: shifts[targetKey]?.createdAt ?? null,
-        updatedAt: shifts[targetKey]?.updatedAt ?? null,
-      });
+      const buildMovedEntry = (draftKind: DraftKind) =>
+        buildScheduleCellEntryFromInput({
+          input: {
+            ...payload,
+            customStartTime:
+              payload.kind === "worked"
+                ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
+                : null,
+            customEndTime:
+              payload.kind === "worked"
+                ? (sourceEntry?.customEndTime ?? payload.customEndTime ?? null)
+                : null,
+          },
+          published: getPublishedSnapshot(targetEntry),
+          segmentCompatibility,
+          absenceTypeMap,
+          draftKind,
+          version: targetEntry?.version != null ? targetEntry.version + 1 : undefined,
+          createdBy: targetEntry?.createdBy ?? null,
+          updatedBy: currentUserRef.current?.id ?? null,
+          createdAt: targetEntry?.createdAt ?? null,
+          updatedAt: targetEntry?.updatedAt ?? null,
+        });
+
+      // Read the kind back off the built entry instead of assuming a drop onto
+      // a published cell is always a modification: dropping a shift onto the
+      // cell that already published that exact shift changes nothing, and
+      // assuming otherwise dashed a draft border around it.
+      const provisionalEntry = buildMovedEntry(null);
+      const movedEntry = provisionalEntry
+        ? buildMovedEntry(computeScheduleEntryDraftKind(provisionalEntry))
+        : null;
       if (!movedEntry) {
         toast.error("We couldn't move that assignment.");
         return;
@@ -5018,6 +5044,7 @@ function SchedulerContent() {
           publishDiffForKey: publishDiffKindForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
+          activeRequestForKey,
         },
       }),
     [
@@ -5067,6 +5094,7 @@ function SchedulerContent() {
       canRenderAuthorNames,
       createdByNameForKey,
       absenceTypeIdForKey,
+      activeRequestForKey,
     ],
   );
 
@@ -5417,7 +5445,7 @@ function SchedulerContent() {
           gap: 24,
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
           background:
-            "linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-surface) 100%)",
+            "linear-gradient(180deg, var(--dg-color-bg-secondary) 0%, var(--dg-color-surface) 100%)",
           padding: 24,
           textAlign: "center",
         }}
@@ -5427,7 +5455,7 @@ function SchedulerContent() {
             width: 64,
             height: 64,
             borderRadius: "50%",
-            background: "var(--color-danger-bg)",
+            background: "var(--dg-color-danger-bg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -5439,7 +5467,7 @@ function SchedulerContent() {
             height="32"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-danger)"
+            stroke="var(--dg-color-danger)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -5455,7 +5483,7 @@ function SchedulerContent() {
             style={{
               fontSize: "var(--dg-fs-section-title)",
               fontWeight: 800,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               marginBottom: 12,
               letterSpacing: "-0.02em",
             }}
@@ -5465,7 +5493,7 @@ function SchedulerContent() {
           <p
             style={{
               fontSize: "var(--dg-fs-title)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               lineHeight: 1.6,
               marginBottom: 32,
             }}
@@ -5480,8 +5508,8 @@ function SchedulerContent() {
               onClick={() => window.location.reload()}
               style={{
                 padding: "12px 24px",
-                background: "var(--color-brand)",
-                color: "var(--color-surface)",
+                background: "var(--dg-color-brand)",
+                color: "var(--dg-color-surface)",
                 border: "none",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
@@ -5498,8 +5526,8 @@ function SchedulerContent() {
               }}
               style={{
                 padding: "12px 24px",
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-text-secondary)",
+                background: "var(--dg-color-bg-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 border: "none",
                 borderRadius: "8px",
                 fontSize: "var(--dg-fs-body)",
@@ -5518,7 +5546,7 @@ function SchedulerContent() {
             marginTop: 40,
             opacity: 0.1,
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
           }}
         >
           System status: {loadError}
@@ -5531,9 +5559,9 @@ function SchedulerContent() {
     <div
       style={{
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         minHeight: "100vh",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
       }}
     >
       {isLoading && !canPaintFromSnapshot && employees.length > 0 && <ScheduleLoadingScreen />}
@@ -5544,30 +5572,30 @@ function SchedulerContent() {
             className="no-print"
             style={{
               position: "sticky",
-              top: "var(--app-shell-header-h, 56px)",
+              top: "var(--header-height)",
               display: "flow-root",
               zIndex: 99,
-              background: "var(--color-bg)",
+              background: "var(--dg-color-bg)",
             }}
           >
             {isBulkDeleteMode && (
               <div
                 className="dg-draft-banner no-print"
                 style={{
-                  background: "var(--color-danger-bg)",
-                  borderColor: "var(--color-danger-border)",
-                  color: "var(--color-danger-text)",
+                  background: "var(--dg-color-danger-bg)",
+                  borderColor: "var(--dg-color-danger-border)",
+                  color: "var(--dg-color-danger-text)",
                 }}
               >
                 <div
                   className="dg-draft-banner-dot"
-                  style={{ background: "var(--color-danger)" }}
+                  style={{ background: "var(--dg-color-danger)" }}
                 />
                 <span style={{ fontWeight: 700 }}>Bulk delete</span>
                 <span
                   style={{
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-danger-text)",
+                    color: "var(--dg-color-danger-text)",
                     opacity: 0.82,
                     marginLeft: 4,
                   }}
@@ -5595,8 +5623,8 @@ function SchedulerContent() {
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       padding: "5px 12px",
-                      color: "var(--color-danger-text)",
-                      borderColor: "var(--color-danger-border)",
+                      color: "var(--dg-color-danger-text)",
+                      borderColor: "var(--dg-color-danger-border)",
                     }}
                   >
                     Clear selection
@@ -5616,7 +5644,7 @@ function SchedulerContent() {
                     onClick={handleCancelBulkDeleteMode}
                     style={{
                       fontSize: "var(--dg-fs-caption)",
-                      color: "var(--color-danger-text)",
+                      color: "var(--dg-color-danger-text)",
                     }}
                   >
                     Cancel
@@ -5642,15 +5670,15 @@ function SchedulerContent() {
                   className="dg-draft-banner no-print"
                   data-tour="draft-banner-other-weeks"
                   style={{
-                    background: "var(--color-info-bg)",
-                    borderColor: "var(--color-info-border)",
-                    color: "var(--color-info-text)",
+                    background: "var(--dg-color-info-bg)",
+                    borderColor: "var(--dg-color-info-border)",
+                    color: "var(--dg-color-info-text)",
                     flexWrap: "wrap",
                   }}
                 >
                   <div
                     className="dg-draft-banner-dot"
-                    style={{ background: "var(--color-info-text)" }}
+                    style={{ background: "var(--dg-color-info-text)" }}
                   />
                   <span style={{ fontWeight: 600 }}>Also unpublished nearby:</span>
                   <span style={{ opacity: 0.85 }}>
@@ -5731,15 +5759,15 @@ function SchedulerContent() {
                   <div
                     className="dg-draft-banner no-print"
                     style={{
-                      background: "var(--color-info-bg)",
-                      borderColor: "var(--color-info-border)",
-                      color: "var(--color-info-text)",
+                      background: "var(--dg-color-info-bg)",
+                      borderColor: "var(--dg-color-info-border)",
+                      color: "var(--dg-color-info-text)",
                       flexWrap: "wrap",
                     }}
                   >
                     <div
                       className="dg-draft-banner-dot"
-                      style={{ background: "var(--color-info-text)" }}
+                      style={{ background: "var(--dg-color-info-text)" }}
                     />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span style={{ opacity: 0.85 }}>
@@ -5806,14 +5834,14 @@ function SchedulerContent() {
                   <div
                     className="dg-draft-banner no-print"
                     style={{
-                      background: "var(--color-info-bg)",
-                      borderColor: "var(--color-info-border)",
-                      color: "var(--color-info-text)",
+                      background: "var(--dg-color-info-bg)",
+                      borderColor: "var(--dg-color-info-border)",
+                      color: "var(--dg-color-info-text)",
                     }}
                   >
                     <div
                       className="dg-draft-banner-dot"
-                      style={{ background: "var(--color-primary)" }}
+                      style={{ background: "var(--dg-color-primary)" }}
                     />
                     <span style={{ fontWeight: 600 }}>
                       Published{" "}
@@ -5849,8 +5877,8 @@ function SchedulerContent() {
                             style={{
                               fontSize: "var(--dg-fs-caption)",
                               padding: "5px 12px",
-                              background: "var(--color-info-bg)",
-                              color: "var(--color-accent-text)",
+                              background: "var(--dg-color-info-bg)",
+                              color: "var(--dg-color-accent-text)",
                             }}
                           >
                             Hide Changes
@@ -5878,8 +5906,8 @@ function SchedulerContent() {
                               style={{
                                 fontSize: "var(--dg-fs-caption)",
                                 padding: "5px 12px",
-                                background: showPublishDiff ? "var(--color-info-bg)" : undefined,
-                                color: showPublishDiff ? "var(--color-accent-text)" : undefined,
+                                background: showPublishDiff ? "var(--dg-color-info-bg)" : undefined,
+                                color: showPublishDiff ? "var(--dg-color-accent-text)" : undefined,
                               }}
                             >
                               {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
@@ -5942,7 +5970,7 @@ function SchedulerContent() {
                 // Horizontally on the canonical page gutter, shared with the
                 // header logo and every other page (see globals.css).
                 padding: "12px var(--dg-page-gutter) 0",
-                borderBottom: "1px solid var(--color-border)",
+                borderBottom: "1px solid var(--dg-color-border)",
               }}
             >
               <Toolbar
@@ -6167,7 +6195,7 @@ function SchedulerContent() {
                   <div
                     style={{
                       fontSize: "var(--dg-fs-body-sm)",
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       lineHeight: 1.5,
                     }}
                   >
@@ -6184,7 +6212,7 @@ function SchedulerContent() {
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 600,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       Shift and job
@@ -6416,7 +6444,7 @@ function SchedulerContent() {
                     <div>Called off by {openShiftDetails.calledOffBy}</div>
                   )}
                   <div>{openShiftDetails.needed ?? 1} needed</div>
-                  <div style={{ color: "var(--color-text-muted)" }}>
+                  <div style={{ color: "var(--dg-color-text-muted)" }}>
                     {openShiftDetailsReasons.length > 0
                       ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
                       : "You aren't personally eligible to claim this shift."}
@@ -6716,6 +6744,8 @@ function SchedulerContent() {
               orgRoles={orgRoles}
               shiftForKey={shiftForKey}
               assignmentIdsForKey={assignmentIdsForKey}
+              absenceTypeIdForKey={absenceTypeIdForKey}
+              absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}
               onClose={() => setActivePrintConfig(null)}
@@ -6740,7 +6770,7 @@ function SchedulerContent() {
                       margin: 0,
                       fontSize: "var(--dg-fs-body-sm)",
                       lineHeight: 1.5,
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                     }}
                   >
                     {showOrganizationDiscardScope

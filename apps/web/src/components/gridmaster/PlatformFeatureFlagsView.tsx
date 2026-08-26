@@ -70,11 +70,6 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
     description:
       "A background job that automatically closes old, unanswered shift requests. Turning this off means unanswered requests stay open instead of expiring automatically.",
   },
-  cron_reconcile_org_domains: {
-    label: "Organization Domain Sync",
-    description:
-      "A background job that keeps organization subdomains in sync. Safe to turn off temporarily, there's no immediate user-facing effect.",
-  },
   cron_sandbox_cleanup: {
     label: "Sandbox Cleanup",
     description:
@@ -195,7 +190,9 @@ export default function PlatformFeatureFlagsView() {
               padding: "14px 20px 0",
             }}
           >
-            <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+            <span
+              style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}
+            >
               Quick add:
             </span>
             {suggestedKeys.map((key) => (
@@ -212,7 +209,7 @@ export default function PlatformFeatureFlagsView() {
         )}
         <div style={sectionBodyStyle}>
           {flagsQuery.isLoading ? (
-            <div style={{ color: "var(--color-text-muted)" }}>Loading feature controls…</div>
+            <div style={{ color: "var(--dg-color-text-muted)" }}>Loading feature controls…</div>
           ) : flags.length === 0 ? (
             <EmptyState
               size="compact"
@@ -231,7 +228,7 @@ export default function PlatformFeatureFlagsView() {
                       alignItems: "center",
                       gap: 16,
                       padding: "14px 0",
-                      borderTop: index === 0 ? undefined : "1px solid var(--color-border-light)",
+                      borderTop: index === 0 ? undefined : "1px solid var(--dg-color-border-light)",
                     }}
                   >
                     <Switch
@@ -248,7 +245,7 @@ export default function PlatformFeatureFlagsView() {
                           gap: 8,
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                         }}
                       >
                         {info.label}
@@ -257,7 +254,7 @@ export default function PlatformFeatureFlagsView() {
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 400,
                             fontFamily: "var(--font-mono, monospace)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           {flag.key}
@@ -266,7 +263,7 @@ export default function PlatformFeatureFlagsView() {
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {info.description}
@@ -277,8 +274,8 @@ export default function PlatformFeatureFlagsView() {
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 600,
                         color: flag.enabled
-                          ? "var(--color-success-text)"
-                          : "var(--color-danger-text)",
+                          ? "var(--dg-color-success-text)"
+                          : "var(--dg-color-danger-text)",
                       }}
                     >
                       {flag.enabled ? "On" : "Off"}
@@ -326,7 +323,7 @@ export default function PlatformFeatureFlagsView() {
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Key
@@ -341,7 +338,7 @@ export default function PlatformFeatureFlagsView() {
               <span
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: keyError ? "var(--color-danger-text)" : "var(--color-text-muted)",
+                  color: keyError ? "var(--dg-color-danger-text)" : "var(--dg-color-text-muted)",
                 }}
               >
                 {keyError ??
@@ -353,7 +350,7 @@ export default function PlatformFeatureFlagsView() {
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Description
@@ -373,7 +370,9 @@ export default function PlatformFeatureFlagsView() {
                 onChange={(event) => setNewEnabled(event.target.checked)}
                 style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-primary)" }}>
+              <span
+                style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-primary)" }}
+              >
                 Start enabled
               </span>
             </label>

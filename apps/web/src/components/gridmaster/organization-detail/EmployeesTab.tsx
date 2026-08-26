@@ -23,25 +23,25 @@ export function EmployeesTab({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Status tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--dg-color-border)" }}>
         {[
           {
             key: "active" as const,
             label: "Active",
             count: active.length,
-            color: "var(--color-today-text)",
+            color: "var(--dg-color-today-text)",
           },
           {
             key: "inactive" as const,
             label: "Inactive",
             count: inactive.length,
-            color: "var(--color-warning)",
+            color: "var(--dg-color-warning)",
           },
           {
             key: "removed" as const,
             label: "Removed",
             count: removed.length,
-            color: "var(--color-danger)",
+            color: "var(--dg-color-danger)",
           },
         ].map((tab) => {
           const isActive = showStatus === tab.key;
@@ -53,7 +53,7 @@ export function EmployeesTab({
                 padding: "8px 20px",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: isActive ? 700 : 500,
-                color: isActive ? tab.color : "var(--color-text-muted)",
+                color: isActive ? tab.color : "var(--dg-color-text-muted)",
                 background: "transparent",
                 border: "none",
                 borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
@@ -71,8 +71,8 @@ export function EmployeesTab({
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  background: isActive ? `${tab.color}15` : "var(--color-border-light)",
-                  color: isActive ? tab.color : "var(--color-text-faint)",
+                  background: isActive ? `${tab.color}15` : "var(--dg-color-border-light)",
+                  color: isActive ? tab.color : "var(--dg-color-text-faint)",
                   borderRadius: 10,
                   padding: "1px 7px",
                   minWidth: 20,
@@ -106,7 +106,7 @@ export function EmployeesTab({
                     style={{
                       ...tdStyle,
                       textAlign: "center",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       padding: 32,
                     }}
                   >
@@ -125,7 +125,7 @@ export function EmployeesTab({
                       style={{
                         ...tdStyle,
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {emp.phone || "—"}
@@ -134,7 +134,7 @@ export function EmployeesTab({
                       style={{
                         ...tdStyle,
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {emp.email || "—"}

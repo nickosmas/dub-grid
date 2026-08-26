@@ -7,14 +7,14 @@
 export function OrganizationBadge({
   slug,
   baseDomain,
-  style,
+  className = "",
 }: {
   slug: string;
   baseDomain: string;
-  style?: React.CSSProperties;
+  className?: string;
 }) {
   return (
-    <div style={{ textAlign: "center", marginBottom: "28px", ...style }}>
+    <div className={`dg-auth-badge-wrap${className ? ` ${className}` : ""}`}>
       <span className="dg-auth-badge">
         {slug}.{baseDomain}
       </span>

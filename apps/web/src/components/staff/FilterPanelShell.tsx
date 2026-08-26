@@ -40,15 +40,15 @@ export function FilterPanelShell({
     <div className="flex max-h-[inherit] flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
 
-      <div className="flex items-center justify-between border-t border-[var(--color-border-light)] px-4 py-3">
+      <div className="flex items-center justify-between border-t border-[var(--dg-color-border-light)] px-4 py-3">
         <Button
           type="button"
           onClick={onClearAll}
           disabled={!hasActiveFilters}
           className={`text-xs font-semibold transition-colors ${
             hasActiveFilters
-              ? "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-              : "cursor-not-allowed text-[var(--color-text-faint)]"
+              ? "text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-primary)]"
+              : "cursor-not-allowed text-[var(--dg-color-text-faint)]"
           }`}
         >
           Clear all
@@ -56,7 +56,7 @@ export function FilterPanelShell({
         <Button
           type="button"
           onClick={onClose}
-          className="rounded-[var(--dg-radius-sm)] bg-[var(--color-brand)] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          className="rounded-[var(--dg-radius-sm)] bg-[var(--dg-color-brand)] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
         >
           Done
         </Button>
@@ -81,7 +81,7 @@ export function FilterPanelShell({
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
           <div className="flex justify-center pb-1 pt-3">
-            <div className="h-1 w-8 rounded-full bg-[var(--color-border)]" />
+            <div className="h-1 w-8 rounded-full bg-[var(--dg-color-border)]" />
           </div>
           {content}
         </SheetContent>
@@ -105,7 +105,7 @@ export function FilterPanelShell({
           className="isolate z-50"
         >
           <PopoverPrimitive.Popup
-            className={`flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-menu)] outline-hidden ${widthClassName}`}
+            className={`flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] shadow-[var(--shadow-menu)] outline-hidden ${widthClassName}`}
           >
             {content}
           </PopoverPrimitive.Popup>
@@ -117,8 +117,8 @@ export function FilterPanelShell({
 
 export function FilterSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-b border-[var(--color-border-light)] py-4 first:pt-1 last:border-b-0">
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-subtle)]">
+    <section className="border-b border-[var(--dg-color-border-light)] py-4 first:pt-1 last:border-b-0">
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
         {title}
       </div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
@@ -129,7 +129,9 @@ export function FilterSection({ title, children }: { title: string; children: Re
 export function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mb-3 w-full last:mb-0">
-      <div className="mb-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">{label}</div>
+      <div className="mb-1.5 text-[11px] font-semibold text-[var(--dg-color-text-muted)]">
+        {label}
+      </div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );
@@ -151,8 +153,8 @@ export function FilterChip({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
         active
-          ? "border-[var(--color-brand-border)] bg-[var(--color-brand-bg)] text-[var(--color-brand)]"
-          : "border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)]"
+          ? "border-[var(--dg-color-brand-border)] bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]"
+          : "border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-border-light)]"
       }`}
     >
       {children}

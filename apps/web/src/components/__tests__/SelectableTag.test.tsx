@@ -12,8 +12,8 @@ describe("SelectableTag", () => {
 
     expect(button).toHaveAttribute("aria-pressed", "true");
     expect(button).toHaveStyle({
-      background: "var(--color-brand)",
-      color: "var(--color-text-inverse)",
+      background: "var(--dg-color-brand)",
+      color: "var(--dg-color-text-inverse)",
       borderRadius: "999px",
     });
   });
@@ -31,8 +31,8 @@ describe("SelectableTag", () => {
     const button = screen.getByRole("button", { name: "South" });
     expect(button).toHaveAttribute("aria-pressed", "false");
     expect(button).toHaveStyle({
-      background: "var(--color-surface)",
-      color: "var(--color-text-secondary)",
+      background: "var(--dg-color-surface)",
+      color: "var(--dg-color-text-secondary)",
       borderRadius: "999px",
     });
 
@@ -41,8 +41,8 @@ describe("SelectableTag", () => {
 
     rerender(<SelectableTag selected>South</SelectableTag>);
     expect(button).toHaveStyle({
-      background: "var(--color-brand)",
-      color: "var(--color-text-inverse)",
+      background: "var(--dg-color-brand)",
+      color: "var(--dg-color-text-inverse)",
     });
   });
 });

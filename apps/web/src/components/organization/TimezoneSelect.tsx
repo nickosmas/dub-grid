@@ -128,7 +128,7 @@ export default function TimezoneSelect({
                 style={{
                   padding: "10px 12px",
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                 }}
               >
                 No matching time zones
@@ -156,16 +156,16 @@ export default function TimezoneSelect({
                       alignItems: "flex-start",
                       gap: 2,
                       background: isFocused
-                        ? "var(--color-bg-secondary)"
+                        ? "var(--dg-color-bg-secondary)"
                         : isSelected
-                          ? "var(--color-border-light)"
+                          ? "var(--dg-color-border-light)"
                           : undefined,
                     }}
                   >
                     <span
                       style={{
                         fontWeight: isSelected ? 700 : 600,
-                        color: "var(--color-text-primary)",
+                        color: "var(--dg-color-text-primary)",
                       }}
                     >
                       {option.label}
@@ -173,7 +173,7 @@ export default function TimezoneSelect({
                     <span
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {option.value}
@@ -213,20 +213,22 @@ export default function TimezoneSelect({
             gap: 8,
             width: "100%",
             height: "var(--dg-toolbar-h)",
-            background: disabled ? "var(--color-bg)" : "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-btn-radius)",
             padding: "0 10px 0 12px",
             fontSize: 13,
             fontWeight: 500,
-            color: selectedOption ? "var(--color-text-secondary)" : "var(--color-text-subtle)",
+            color: selectedOption
+              ? "var(--dg-color-text-secondary)"
+              : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             whiteSpace: "nowrap",
             textAlign: "left",
             transition: "box-shadow 150ms ease",
             boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
-            borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
+            borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
             opacity: disabled ? 0.5 : 1,
           }}
         >
@@ -243,7 +245,7 @@ export default function TimezoneSelect({
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
               flexShrink: 0,
               transition: "transform 150ms ease",
               transform: open ? "rotate(180deg)" : "rotate(0deg)",

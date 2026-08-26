@@ -209,8 +209,8 @@ export function DisplayModeSample({
       style={{
         width: "100%",
         borderRadius: "var(--dg-radius-lg)",
-        border: "1px solid var(--color-border)",
-        background: "var(--color-surface)",
+        border: "1px solid var(--dg-color-border)",
+        background: "var(--dg-color-surface)",
         overflow: "hidden",
       }}
     >
@@ -226,14 +226,14 @@ export function DisplayModeSample({
           style={{
             position: "relative",
             zIndex: 2,
-            background: "var(--color-bg)",
+            background: "var(--dg-color-bg)",
             padding: "10px var(--dg-space-md)",
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 600,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             letterSpacing: "0.04em",
             boxShadow:
-              "1px 0 0 0 var(--color-border-light), 0 1px 0 0 var(--color-dark), 2px 0 4px rgba(0,0,0,0.02)",
+              "1px 0 0 0 var(--dg-color-border-light), 0 1px 0 0 var(--dg-color-dark), 2px 0 4px rgba(0,0,0,0.02)",
           }}
         >
           Staff
@@ -247,7 +247,7 @@ export function DisplayModeSample({
               position: "relative",
               textAlign: "center",
               padding: "8px 0",
-              boxShadow: "0 1px 0 0 var(--color-dark)",
+              boxShadow: "0 1px 0 0 var(--dg-color-dark)",
             }}
           >
             <div className="dg-grid-slot__chrome" aria-hidden="true" />
@@ -255,7 +255,7 @@ export function DisplayModeSample({
               style={{
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 letterSpacing: "0.04em",
               }}
             >
@@ -265,7 +265,7 @@ export function DisplayModeSample({
               style={{
                 fontSize: "var(--dg-fs-title)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 lineHeight: "var(--dg-lh-tight)",
                 marginTop: 1,
               }}
@@ -277,19 +277,19 @@ export function DisplayModeSample({
 
         <div
           style={{
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
             padding: "7px var(--dg-space-md)",
             display: "flex",
             alignItems: "center",
             minWidth: 0,
-            boxShadow: "1px 0 0 0 var(--color-border-light), 2px 0 4px rgba(0,0,0,0.02)",
+            boxShadow: "1px 0 0 0 var(--dg-color-border-light), 2px 0 4px rgba(0,0,0,0.02)",
           }}
         >
           <span
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               lineHeight: "var(--dg-lh-tight)",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -308,7 +308,7 @@ export function DisplayModeSample({
             data-interactive="false"
             style={{
               height: "var(--dg-grid-cell-height)",
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
             }}
           >
             <div className="dg-grid-cell__chrome" aria-hidden="true" />
@@ -413,15 +413,15 @@ export default function DisplayMode({
       <div
         style={{
           borderRadius: "var(--dg-radius-lg)",
-          border: "1px solid var(--color-border)",
-          background: "var(--color-bg)",
+          border: "1px solid var(--dg-color-border)",
+          background: "var(--dg-color-bg)",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             padding: "16px 18px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -431,7 +431,7 @@ export default function DisplayMode({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Choose a display mode
@@ -439,7 +439,7 @@ export default function DisplayMode({
           <div
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               lineHeight: 1.5,
             }}
           >
@@ -464,9 +464,9 @@ export default function DisplayMode({
                     padding: 16,
                     borderRadius: "var(--dg-radius-md)",
                     border: isActive
-                      ? "2px solid var(--color-brand-border)"
-                      : "1px solid var(--color-border)",
-                    background: isActive ? "var(--color-brand-bg)" : "var(--color-surface)",
+                      ? "2px solid var(--dg-color-brand-border)"
+                      : "1px solid var(--dg-color-border)",
+                    background: isActive ? "var(--dg-color-brand-bg)" : "var(--dg-color-surface)",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "border-color 150ms ease, background 150ms ease",
@@ -480,8 +480,8 @@ export default function DisplayMode({
                         height: 18,
                         borderRadius: "50%",
                         border: isActive
-                          ? "2px solid var(--color-brand)"
-                          : "2px solid var(--color-border-strong, #94a3b8)",
+                          ? "2px solid var(--dg-color-brand)"
+                          : "2px solid var(--dg-color-border-strong, #94a3b8)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -494,13 +494,17 @@ export default function DisplayMode({
                             width: 10,
                             height: 10,
                             borderRadius: "50%",
-                            background: "var(--color-brand)",
+                            background: "var(--dg-color-brand)",
                           }}
                         />
                       )}
                     </div>
                     <span
-                      style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 15,
+                        color: "var(--dg-color-text-primary)",
+                      }}
                     >
                       {mode.title}
                     </span>
@@ -510,7 +514,7 @@ export default function DisplayMode({
                   <p
                     style={{
                       fontSize: 13,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       lineHeight: 1.5,
                       margin: 0,
                     }}
@@ -529,11 +533,11 @@ export default function DisplayMode({
         <div
           style={{
             padding: "14px 18px",
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
             display: "flex",
             justifyContent: "flex-end",
             gap: 8,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {isModified ? (

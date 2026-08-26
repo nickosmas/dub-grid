@@ -209,7 +209,7 @@ export default function OrganizationGeneral({
                 style={{
                   margin: "6px 0 0",
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                 }}
               >
                 {nameError}

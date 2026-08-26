@@ -149,20 +149,20 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
   const colors =
     notice.tone === "danger"
       ? {
-          bg: "var(--color-danger-bg)",
-          border: "var(--color-danger-border)",
-          text: "var(--color-danger)",
+          bg: "var(--dg-color-danger-bg)",
+          border: "var(--dg-color-danger-border)",
+          text: "var(--dg-color-danger)",
         }
       : notice.tone === "warning"
         ? {
-            bg: "var(--color-warning-bg)",
-            border: "var(--color-warning-border)",
-            text: "var(--color-warning)",
+            bg: "var(--dg-color-warning-bg)",
+            border: "var(--dg-color-warning-border)",
+            text: "var(--dg-color-warning)",
           }
         : {
-            bg: "var(--color-info-bg)",
-            border: "var(--color-info-border)",
-            text: "var(--color-info-text)",
+            bg: "var(--dg-color-info-bg)",
+            border: "var(--dg-color-info-border)",
+            text: "var(--dg-color-info-text)",
           };
 
   return (
@@ -209,7 +209,7 @@ function HamburgerIcon({ open }: { open: boolean }) {
       height="20"
       viewBox="0 0 20 20"
       fill="none"
-      stroke="var(--color-text-primary)"
+      stroke="var(--dg-color-text-primary)"
       strokeWidth="1.8"
       strokeLinecap="round"
       style={{ transition: "transform 150ms ease" }}
@@ -410,13 +410,13 @@ export default function Header({ orgName }: HeaderProps) {
         {logoutConfirmDialog}
         <div
           style={{
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
             padding: "0 var(--dg-page-gutter)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             height: 56,
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
           }}
         >
           {/* Logo + Org Name */}
@@ -426,7 +426,7 @@ export default function Header({ orgName }: HeaderProps) {
               <>
                 <span
                   style={{
-                    color: "var(--color-border)",
+                    color: "var(--dg-color-border)",
                     fontSize: "var(--dg-fs-body)",
                     fontWeight: 300,
                     userSelect: "none",
@@ -438,7 +438,7 @@ export default function Header({ orgName }: HeaderProps) {
                 <MaybeHint content={orgName} side="bottom">
                   <span
                     style={{
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
@@ -513,7 +513,7 @@ export default function Header({ orgName }: HeaderProps) {
       {logoutConfirmDialog}
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           // The logo sits on the canonical page gutter on every route, with no
           // per-route exceptions — every page's left content edge uses the same
           // token, so the logo never shifts as you navigate.
@@ -523,18 +523,18 @@ export default function Header({ orgName }: HeaderProps) {
           alignItems: "center",
           justifyContent: "space-between",
           height: 56,
-          borderBottom: "1px solid var(--color-border)",
+          borderBottom: "1px solid var(--dg-color-border)",
         }}
       >
         {/* Logo + Org Anchor */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
           <DubGridLogo size={30} />
-          <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
+          <DubGridWordmark fontSize={18} color="var(--dg-color-text-primary)" />
           {orgName && (
             <>
               <span
                 style={{
-                  color: "var(--color-border)",
+                  color: "var(--dg-color-border)",
                   fontSize: "var(--dg-fs-title)",
                   fontWeight: 300,
                   userSelect: "none",
@@ -545,7 +545,7 @@ export default function Header({ orgName }: HeaderProps) {
               <MaybeHint content={orgName} side="bottom">
                 <span
                   style={{
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 500,
                     whiteSpace: "nowrap",
@@ -594,8 +594,8 @@ export default function Header({ orgName }: HeaderProps) {
                 alignItems: "center",
                 gap: 4,
                 background: "transparent",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-link)",
+                border: "1px solid var(--dg-color-border)",
+                color: "var(--dg-color-link)",
                 borderRadius: "var(--dg-btn-radius)",
                 padding: "5px 14px",
                 fontSize: "var(--dg-fs-label)",
@@ -606,12 +606,12 @@ export default function Header({ orgName }: HeaderProps) {
                 transition: "background 150ms ease, border-color 150ms ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--color-bg-secondary)";
-                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--dg-color-border)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.borderColor = "var(--dg-color-border)";
               }}
             >
               <svg
@@ -655,8 +655,8 @@ export default function Header({ orgName }: HeaderProps) {
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
-              border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
+              background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
+              border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
               borderRadius: "var(--dg-btn-radius)",
               padding: "4px 8px 4px 4px",
               minHeight: 44,
@@ -666,8 +666,8 @@ export default function Header({ orgName }: HeaderProps) {
             }}
             onMouseEnter={(e) => {
               if (!menuOpen) {
-                e.currentTarget.style.background = "var(--color-bg-secondary)";
-                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--dg-color-border)";
               }
             }}
             onMouseLeave={(e) => {
@@ -682,13 +682,13 @@ export default function Header({ orgName }: HeaderProps) {
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: "var(--color-brand)",
+                background: "var(--dg-color-brand)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--color-text-inverse)",
+                color: "var(--dg-color-text-inverse)",
                 flexShrink: 0,
               }}
             >
@@ -699,7 +699,7 @@ export default function Header({ orgName }: HeaderProps) {
                 style={{
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                   lineHeight: 1.2,
                   maxWidth: 120,
                   overflow: "hidden",
@@ -712,7 +712,7 @@ export default function Header({ orgName }: HeaderProps) {
               <div
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   lineHeight: 1.2,
                 }}
               >
@@ -724,7 +724,7 @@ export default function Header({ orgName }: HeaderProps) {
               height="12"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="var(--color-text-muted)"
+              stroke="var(--dg-color-text-muted)"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -832,7 +832,7 @@ export default function Header({ orgName }: HeaderProps) {
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 600,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     textTransform: "uppercase",
                     letterSpacing: "0.04em",
                     marginBottom: 6,

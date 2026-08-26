@@ -121,7 +121,7 @@ export function SettingsShell<TId extends string = string>({
         style={{
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
-          height: "calc(100dvh - var(--app-shell-header-h, 56px))",
+          height: "calc(100dvh - var(--header-height))",
           width: "100%",
           overflow: "hidden",
           position: "relative",
@@ -131,16 +131,16 @@ export function SettingsShell<TId extends string = string>({
           <Sidebar
             data-tour="settings-sidebar"
             collapsible="icon"
-            className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+            className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
             style={{
-              top: "var(--app-shell-header-h, 56px)",
-              height: "calc(100dvh - var(--app-shell-header-h, 56px))",
+              top: "var(--header-height)",
+              height: "calc(100dvh - var(--header-height))",
             }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
               {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
-                  <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0">
+                  <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
                     {group.label}
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
@@ -153,13 +153,13 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
+                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
                                 <item.Icon />
@@ -176,7 +176,7 @@ export function SettingsShell<TId extends string = string>({
             </SidebarContent>
             <SidebarFooter>
               {footerGroups.length > 0 && (
-                <div className="-mx-2 border-t border-[var(--color-border)]" />
+                <div className="-mx-2 border-t border-[var(--dg-color-border)]" />
               )}
               {footerGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
@@ -190,13 +190,13 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
+                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
                                 <item.Icon />
@@ -215,7 +215,7 @@ export function SettingsShell<TId extends string = string>({
                   <SidebarMenuButton
                     onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                     tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--color-text-faint)] hover:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
+                    className="h-9 text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
                       <svg
@@ -263,7 +263,7 @@ export function SettingsShell<TId extends string = string>({
                 style={{
                   fontSize: "var(--dg-fs-page-title)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                   margin: 0,
                 }}
               >
@@ -273,7 +273,7 @@ export function SettingsShell<TId extends string = string>({
                 <p
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     margin: "5px 0 0",
                     lineHeight: 1.5,
                   }}
@@ -294,7 +294,7 @@ export function SettingsShell<TId extends string = string>({
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "60px 20px",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontSize: "var(--dg-fs-label)",
                 textAlign: "center",
                 gap: 12,
@@ -304,7 +304,7 @@ export function SettingsShell<TId extends string = string>({
                 style={{
                   fontSize: "var(--dg-fs-heading)",
                   fontWeight: 700,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                 }}
               >
                 No access

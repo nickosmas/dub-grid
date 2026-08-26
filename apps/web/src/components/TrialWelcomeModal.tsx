@@ -75,21 +75,21 @@ export default function TrialWelcomeModal() {
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <p
           style={{
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             fontSize: "var(--dg-fs-body)",
             lineHeight: 1.6,
             margin: 0,
           }}
         >
           Your 14-day free trial is now active, and every feature is unlocked. The trial ends on{" "}
-          <strong style={{ color: "var(--color-text-primary)" }}>
+          <strong style={{ color: "var(--dg-color-text-primary)" }}>
             {formatTrialEndDate(data.trialEndsAt)}
           </strong>
           .
         </p>
         <p
           style={{
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             fontSize: "var(--dg-fs-body)",
             lineHeight: 1.6,
             margin: 0,

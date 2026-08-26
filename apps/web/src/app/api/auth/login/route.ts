@@ -51,25 +51,13 @@ type OrchestrationOutcome =
     }
   | { ok: false; status: number; code: string; error: string };
 
-/** Returned to the client when the caller has no access to the subdomain's org. */
+/** Returned when the user cannot access the organization named by the host. */
 const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
 
 /**
- * Re-scopes a just-minted session to the organization the caller is signing
- * in to, when that isn't the one their profile defaults to.
- *
- * The second token mint is unavoidable: `switch_org` writes
- * `user_sessions.active_org_id` keyed on a `session_id` that does not exist
- * until the first token is minted, and the access-token hook only picks the
- * new org up on the next mint. What this removes is the client having to
- * drive it — that was `get_my_organizations`, `switch_org`, the refresh, the
- * trial start, the sandbox teardown and the terms check as six serial HTTP
- * round trips before a full page load, measured at 4.4s against a
- * seven-organization account.
- *
- * `switch_org` is the authorization boundary here, not the slug lookup: the
- * RPC itself verifies the caller's membership and that the org is active, so
- * resolving the slug through the service client grants nothing on its own.
+ * Re-scope a newly-created session to the organization encoded in the request
+ * host. `switch_org` is the authorization boundary: it verifies that the
+ * signed-in person has a live membership before the refreshed token is issued.
  */
 async function switchSessionToHostOrganization(
   session: SessionTokens,
@@ -97,8 +85,6 @@ async function switchSessionToHostOrganization(
   const client = createTokenScopedClient(session.access_token);
   const { error: switchError } = await client.rpc("switch_org", { target_org_id: org.id });
   if (switchError) {
-    // switch_org rejects a caller with no live membership, or an inactive
-    // org. Both mean the same thing to the person signing in.
     return {
       ok: false,
       status: 403,
@@ -130,21 +116,13 @@ async function switchSessionToHostOrganization(
 
 /**
  * Everything that has to happen between a correct password and a usable
- * dashboard: re-scoping the session to the organization being signed in to,
- * trial activation, sandbox teardown, and the terms check.
+ * dashboard: host-selected organization context, trial activation, sandbox
+ * teardown, and the terms check.
  *
- * All of it is server-side. Org-switching used to be driven from the browser
- * as six serial round trips before a full page load — measured at 4.4s on a
- * seven-organization account, against 1.4s for this. That split was
- * deliberate once (see memory: project_login_double_mint_constraint) and was
- * re-opened with explicit sign-off; the constraint it was protecting still
- * holds and is documented on switchSessionToHostOrganization, namely that the
- * second token mint is structural and cannot be removed, only relocated.
- *
+ * All of it is server-side.
  * Only runs for the non-MFA path: MFA-required responses return before this
- * is called, so no trial-activation side effect can fire on a password
- * check alone before the second factor is verified. That path still switches
- * organizations from the browser, because it cannot re-enter this route.
+ * is called, so no trial-activation side effect can fire on a password check
+ * alone before the second factor is verified.
  */
 async function orchestratePostSignIn(
   initialSession: SessionTokens,
@@ -195,8 +173,7 @@ async function orchestratePostSignIn(
 
     // First super_admin login starts this org's trial. Idempotent and
     // self-gated server-side, so safe to fire whenever a super_admin signs
-    // in. Non-fatal: never blocks sign-in on failure. Reads the post-switch
-    // claims, so a switch starts the trial for the org actually signed in to.
+    // in. Non-fatal: never blocks sign-in on failure.
     const signedInOrgId =
       typeof effectiveClaims.org_id === "string" ? effectiveClaims.org_id : null;
     if (signedInOrgId && effectiveClaims.org_role === "super_admin") {
@@ -249,11 +226,8 @@ async function orchestratePostSignIn(
 /**
  * POST /api/auth/login
  * Server-side login wrapper with brute-force protection. Also orchestrates
- * trial activation and the terms-check server-side for the non-MFA,
- * non-org-switch path (see orchestratePostSignIn) so the browser gets final
- * tokens and a destination in one round trip instead of driving that
- * sequence itself. Org-switching stays client-orchestrated (see
- * orchestratePostSignIn's doc comment).
+ * trial activation and the terms-check server-side for the non-MFA path so
+ * the browser gets final tokens and a destination in one round trip.
  * Rate-limits by SHA-256 hash of email (never stores raw email in Redis).
  */
 export async function POST(req: NextRequest) {
@@ -409,9 +383,6 @@ export async function POST(req: NextRequest) {
     destination,
     didSwitchOrg,
   });
-  // The session now points at a different organization than any sandbox the
-  // cookie names. Leaving it set would route every later request into a clone
-  // of the org the user just left, at super_admin.
   if (didSwitchOrg) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }

@@ -32,9 +32,9 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-  super_admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
-  admin: { bg: "var(--color-brand-bg)", text: "var(--color-brand)" },
-  user: { bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
+  super_admin: { bg: "var(--dg-color-brand-bg)", text: "var(--dg-color-brand)" },
+  admin: { bg: "var(--dg-color-brand-bg)", text: "var(--dg-color-brand)" },
+  user: { bg: "var(--dg-color-border-light)", text: "var(--dg-color-text-muted)" },
 };
 
 interface ManagementStaffDraft {
@@ -366,35 +366,35 @@ export function ManagementStaffPanel({
   const statusConfig = isPending
     ? isExpired
       ? {
-          bg: "var(--color-danger-bg)",
-          text: "var(--color-danger-text)",
-          dot: "var(--color-danger)",
+          bg: "var(--dg-color-danger-bg)",
+          text: "var(--dg-color-danger-text)",
+          dot: "var(--dg-color-danger)",
           label: "Expired",
         }
       : {
-          bg: "var(--color-warning-bg)",
-          text: "var(--color-warning-text)",
-          dot: "var(--color-warning)",
+          bg: "var(--dg-color-warning-bg)",
+          text: "var(--dg-color-warning-text)",
+          dot: "var(--dg-color-warning)",
           label: "Pending",
         }
     : person.employeeStatus === "removed"
       ? {
-          bg: "var(--color-danger-bg)",
-          text: "var(--color-danger-text)",
-          dot: "var(--color-danger)",
+          bg: "var(--dg-color-danger-bg)",
+          text: "var(--dg-color-danger-text)",
+          dot: "var(--dg-color-danger)",
           label: "Removed",
         }
       : person.employeeStatus === "inactive"
         ? {
-            bg: "var(--color-warning-bg)",
-            text: "var(--color-warning-text)",
-            dot: "var(--color-warning)",
+            bg: "var(--dg-color-warning-bg)",
+            text: "var(--dg-color-warning-text)",
+            dot: "var(--dg-color-warning)",
             label: "Inactive",
           }
         : {
-            bg: "var(--color-success-bg)",
-            text: "var(--color-success-text)",
-            dot: "var(--color-success)",
+            bg: "var(--dg-color-success-bg)",
+            text: "var(--dg-color-success-text)",
+            dot: "var(--dg-color-success)",
             label: "Active",
           };
 
@@ -402,7 +402,7 @@ export function ManagementStaffPanel({
     display: "block",
     fontSize: "var(--dg-fs-label)",
     fontWeight: 600,
-    color: "var(--color-text-secondary)",
+    color: "var(--dg-color-text-secondary)",
     marginBottom: 6,
   };
 
@@ -411,11 +411,11 @@ export function ManagementStaffPanel({
     padding: "10px 12px",
     borderWidth: 1,
     borderStyle: "solid",
-    borderColor: "var(--color-border)",
+    borderColor: "var(--dg-color-border)",
     borderRadius: "var(--dg-btn-radius)",
     fontSize: "var(--dg-fs-body-sm)",
-    color: "var(--color-text-primary)",
-    background: "var(--color-surface)",
+    color: "var(--dg-color-text-primary)",
+    background: "var(--dg-color-surface)",
     outline: "none",
   };
 
@@ -463,8 +463,8 @@ export function ManagementStaffPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: isPending ? "var(--color-surface)" : avatarTone.backgroundColor,
-                color: isPending ? "var(--color-text-muted)" : avatarTone.textColor,
+                background: isPending ? "var(--dg-color-surface)" : avatarTone.backgroundColor,
+                color: isPending ? "var(--dg-color-text-muted)" : avatarTone.textColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -472,7 +472,7 @@ export function ManagementStaffPanel({
                 fontWeight: 800,
                 flexShrink: 0,
                 border: isPending
-                  ? "1px solid var(--color-border-light)"
+                  ? "1px solid var(--dg-color-border-light)"
                   : `2px solid ${avatarTone.borderColor}`,
               }}
             >
@@ -484,7 +484,7 @@ export function ManagementStaffPanel({
                   style={{
                     fontWeight: 700,
                     fontSize: "var(--dg-fs-body)",
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -504,8 +504,8 @@ export function ManagementStaffPanel({
                         borderRadius: 20,
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 600,
-                        background: "var(--color-today-bg)",
-                        color: "var(--color-today-text)",
+                        background: "var(--dg-color-today-bg)",
+                        color: "var(--dg-color-today-text)",
                       }}
                     >
                       On Schedule
@@ -540,7 +540,7 @@ export function ManagementStaffPanel({
               <div
                 style={{
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginTop: 2,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -570,7 +570,7 @@ export function ManagementStaffPanel({
                     marginTop: 4,
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 600,
-                    color: "var(--color-link)",
+                    color: "var(--dg-color-link)",
                     textDecoration: "none",
                   }}
                 >
@@ -621,8 +621,8 @@ export function ManagementStaffPanel({
                     readOnly
                     style={{
                       ...inputStyle,
-                      background: "var(--color-bg-secondary)",
-                      color: "var(--color-text-muted)",
+                      background: "var(--dg-color-bg-secondary)",
+                      color: "var(--dg-color-text-muted)",
                       cursor: "default",
                     }}
                   />
@@ -634,8 +634,8 @@ export function ManagementStaffPanel({
                     readOnly
                     style={{
                       ...inputStyle,
-                      background: "var(--color-bg-secondary)",
-                      color: "var(--color-text-muted)",
+                      background: "var(--dg-color-bg-secondary)",
+                      color: "var(--dg-color-text-muted)",
                       cursor: "default",
                     }}
                   />
@@ -649,8 +649,8 @@ export function ManagementStaffPanel({
                     readOnly
                     style={{
                       ...inputStyle,
-                      background: "var(--color-bg-secondary)",
-                      color: "var(--color-text-muted)",
+                      background: "var(--dg-color-bg-secondary)",
+                      color: "var(--dg-color-text-muted)",
                       cursor: "default",
                     }}
                   />
@@ -666,9 +666,9 @@ export function ManagementStaffPanel({
                         selected={deptIds.includes(department.id)}
                         onClick={() => toggleDepartment(department.id)}
                         padding="5px 12px"
-                        unselectedBackground="var(--color-bg-secondary)"
+                        unselectedBackground="var(--dg-color-bg-secondary)"
                         unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--color-text-faint)"
+                        unselectedTextColor="var(--dg-color-text-faint)"
                       >
                         {department.name}
                       </SelectableTag>
@@ -679,7 +679,7 @@ export function ManagementStaffPanel({
                       style={{
                         marginTop: 6,
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       Saving now removes their management access. They'll stay on the schedule.
@@ -698,7 +698,7 @@ export function ManagementStaffPanel({
                         setDeptIds([]);
                       }}
                       className="dg-btn dg-btn-ghost"
-                      style={{ color: "var(--color-danger)" }}
+                      style={{ color: "var(--dg-color-danger)" }}
                     >
                       Remove from Management
                     </Button>
@@ -732,7 +732,7 @@ export function ManagementStaffPanel({
               <div
                 style={{
                   fontSize: "var(--dg-fs-caption)",
-                  color: "var(--color-text-faint)",
+                  color: "var(--dg-color-text-faint)",
                   fontStyle: "italic",
                 }}
               >
@@ -753,7 +753,7 @@ export function ManagementStaffPanel({
               >
                 <div>
                   <label style={labelStyle}>
-                    First name <span style={{ color: "var(--color-danger)" }}>*</span>
+                    First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <input
                     value={firstName}
@@ -761,7 +761,7 @@ export function ManagementStaffPanel({
                     onBlur={() => markTouched("firstName")}
                     style={
                       fieldErrors.firstName
-                        ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                        ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                         : inputStyle
                     }
                   />
@@ -769,7 +769,7 @@ export function ManagementStaffPanel({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -780,7 +780,7 @@ export function ManagementStaffPanel({
                 </div>
                 <div>
                   <label style={labelStyle}>
-                    Last name <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <input
                     value={lastName}
@@ -788,7 +788,7 @@ export function ManagementStaffPanel({
                     onBlur={() => markTouched("lastName")}
                     style={
                       fieldErrors.lastName
-                        ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                        ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                         : inputStyle
                     }
                   />
@@ -796,7 +796,7 @@ export function ManagementStaffPanel({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -810,7 +810,7 @@ export function ManagementStaffPanel({
               <div>
                 <label style={labelStyle}>
                   Email{" "}
-                  <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                  <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                     (optional)
                   </span>
                 </label>
@@ -822,14 +822,14 @@ export function ManagementStaffPanel({
                   placeholder="name@example.com"
                   style={
                     fieldErrors.email
-                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                       : inputStyle
                   }
                 />
                 {fieldErrors.email && (
                   <div
                     style={{
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       fontSize: "var(--dg-fs-footnote)",
                       marginTop: 4,
                     }}
@@ -854,14 +854,14 @@ export function ManagementStaffPanel({
                   placeholder="Optional"
                   style={
                     fieldErrors.phone
-                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                       : inputStyle
                   }
                 />
                 {fieldErrors.phone && (
                   <div
                     style={{
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       fontSize: "var(--dg-fs-footnote)",
                       marginTop: 4,
                     }}
@@ -882,9 +882,9 @@ export function ManagementStaffPanel({
                         selected={deptIds.includes(department.id)}
                         onClick={() => toggleDepartment(department.id)}
                         padding="5px 12px"
-                        unselectedBackground="var(--color-bg-secondary)"
+                        unselectedBackground="var(--dg-color-bg-secondary)"
                         unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--color-text-faint)"
+                        unselectedTextColor="var(--dg-color-text-faint)"
                       >
                         {department.name}
                       </SelectableTag>
@@ -894,7 +894,7 @@ export function ManagementStaffPanel({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -951,7 +951,7 @@ export function ManagementStaffPanel({
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 700,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     letterSpacing: "0.07em",
                     textTransform: "uppercase" as const,
                     marginBottom: 8,
@@ -967,10 +967,10 @@ export function ManagementStaffPanel({
                       alignItems: "center",
                       gap: 10,
                       padding: "10px 14px",
-                      background: "var(--color-bg-secondary)",
+                      background: "var(--dg-color-bg-secondary)",
                       borderRadius: "var(--dg-radius-sm)",
                       textDecoration: "none",
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       fontSize: "var(--dg-fs-body-sm)",
                     }}
                   >
@@ -984,7 +984,7 @@ export function ManagementStaffPanel({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       style={{
-                        color: "var(--color-text-faint)",
+                        color: "var(--dg-color-text-faint)",
                         flexShrink: 0,
                       }}
                     >
@@ -1001,10 +1001,10 @@ export function ManagementStaffPanel({
                         alignItems: "center",
                         gap: 10,
                         padding: "10px 14px",
-                        background: "var(--color-bg-secondary)",
+                        background: "var(--dg-color-bg-secondary)",
                         borderRadius: "var(--dg-radius-sm)",
                         textDecoration: "none",
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         fontSize: "var(--dg-fs-body-sm)",
                       }}
                     >
@@ -1018,7 +1018,7 @@ export function ManagementStaffPanel({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         style={{
-                          color: "var(--color-text-faint)",
+                          color: "var(--dg-color-text-faint)",
                           flexShrink: 0,
                         }}
                       >
@@ -1039,7 +1039,7 @@ export function ManagementStaffPanel({
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
                       fontWeight: 700,
-                      color: "var(--color-text-subtle)",
+                      color: "var(--dg-color-text-subtle)",
                       letterSpacing: "0.07em",
                       textTransform: "uppercase" as const,
                       marginBottom: 10,
@@ -1060,7 +1060,7 @@ export function ManagementStaffPanel({
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             textTransform: "uppercase" as const,
                             letterSpacing: "0.04em",
                             marginBottom: 4,
@@ -1076,8 +1076,9 @@ export function ManagementStaffPanel({
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 600,
                             background:
-                              ROLE_COLORS[person.orgRole]?.bg ?? "var(--color-border-light)",
-                            color: ROLE_COLORS[person.orgRole]?.text ?? "var(--color-text-muted)",
+                              ROLE_COLORS[person.orgRole]?.bg ?? "var(--dg-color-border-light)",
+                            color:
+                              ROLE_COLORS[person.orgRole]?.text ?? "var(--dg-color-text-muted)",
                           }}
                         >
                           {ROLE_LABELS[person.orgRole] ?? person.orgRole}
@@ -1091,7 +1092,7 @@ export function ManagementStaffPanel({
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             textTransform: "uppercase" as const,
                             letterSpacing: "0.04em",
                             marginBottom: 4,
@@ -1106,10 +1107,10 @@ export function ManagementStaffPanel({
                               style={{
                                 padding: "4px 10px",
                                 borderRadius: 999,
-                                background: "var(--color-bg-secondary)",
+                                background: "var(--dg-color-bg-secondary)",
                                 fontSize: "var(--dg-fs-caption)",
                                 fontWeight: 500,
-                                color: "var(--color-text-secondary)",
+                                color: "var(--dg-color-text-secondary)",
                               }}
                             >
                               {d.name}
@@ -1125,7 +1126,7 @@ export function ManagementStaffPanel({
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             textTransform: "uppercase" as const,
                             letterSpacing: "0.04em",
                             marginBottom: 4,
@@ -1139,7 +1140,7 @@ export function ManagementStaffPanel({
                             alignItems: "center",
                             gap: 6,
                             fontSize: "var(--dg-fs-body-sm)",
-                            color: "var(--color-text-secondary)",
+                            color: "var(--dg-color-text-secondary)",
                           }}
                         >
                           <svg
@@ -1152,7 +1153,7 @@ export function ManagementStaffPanel({
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             style={{
-                              color: "var(--color-text-faint)",
+                              color: "var(--dg-color-text-faint)",
                               flexShrink: 0,
                             }}
                           >
@@ -1186,7 +1187,7 @@ export function ManagementStaffPanel({
           {(canManageManagementAccess || canManageScheduleEmployees) && (
             <div
               style={{
-                borderTop: "1px solid var(--color-border-light)",
+                borderTop: "1px solid var(--dg-color-border-light)",
                 paddingTop: 16,
                 marginTop: 8,
                 display: "flex",
@@ -1252,7 +1253,7 @@ export function ManagementStaffPanel({
                   <Button
                     onClick={() => setShowRevokeConfirm(true)}
                     className="dg-btn dg-btn-ghost"
-                    style={{ width: "100%", color: "var(--color-danger)" }}
+                    style={{ width: "100%", color: "var(--dg-color-danger)" }}
                   >
                     Revoke Invitation
                   </Button>
@@ -1262,17 +1263,17 @@ export function ManagementStaffPanel({
                       display: "flex",
                       flexDirection: "column",
                       gap: 10,
-                      background: "var(--color-danger-bg)",
+                      background: "var(--dg-color-danger-bg)",
                       padding: "14px 16px",
                       borderRadius: "var(--dg-radius-lg)",
-                      border: "1px solid var(--color-danger-border)",
+                      border: "1px solid var(--dg-color-danger-border)",
                     }}
                   >
                     <span
                       style={{
                         fontSize: "var(--dg-fs-label)",
                         fontWeight: 600,
-                        color: "var(--color-danger-text)",
+                        color: "var(--dg-color-danger-text)",
                         lineHeight: 1.4,
                       }}
                     >
@@ -1284,9 +1285,9 @@ export function ManagementStaffPanel({
                         disabled={revoking}
                         className="dg-btn dg-btn-primary"
                         style={{
-                          background: "var(--color-danger)",
+                          background: "var(--dg-color-danger)",
                           border: "none",
-                          color: "var(--color-text-inverse)",
+                          color: "var(--dg-color-text-inverse)",
                         }}
                       >
                         <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={14}>

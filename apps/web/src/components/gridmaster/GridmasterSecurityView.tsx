@@ -20,7 +20,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
         style={{
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 800,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
       >
@@ -30,7 +30,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >
@@ -39,7 +39,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
       <div
         style={{
           fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           marginTop: 2,
         }}
       >
@@ -60,19 +60,19 @@ const SESSION_STATUS_STYLES: Record<
   { bg: string; text: string; border: string }
 > = {
   active: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success)",
-    border: "var(--color-success-border)",
+    bg: "var(--dg-color-success-bg)",
+    text: "var(--dg-color-success)",
+    border: "var(--dg-color-success-border)",
   },
   recent: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    text: "var(--dg-color-warning)",
+    border: "var(--dg-color-warning-border)",
   },
   stale: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-muted)",
-    border: "var(--color-border)",
+    bg: "var(--dg-color-bg-secondary)",
+    text: "var(--dg-color-text-muted)",
+    border: "var(--dg-color-border)",
   },
 };
 
@@ -181,14 +181,14 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
         gridTemplateColumns: "140px minmax(0, 1fr)",
         gap: 12,
         padding: "10px 0",
-        borderBottom: "1px solid var(--color-border-light)",
+        borderBottom: "1px solid var(--dg-color-border-light)",
       }}
     >
       <div
         style={{
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 700,
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           textTransform: "uppercase",
           letterSpacing: "0.04em",
         }}
@@ -200,7 +200,7 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
           minWidth: 0,
           overflowWrap: "anywhere",
           fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         {value || "—"}
@@ -228,7 +228,7 @@ function SessionDetailPanel({
         <div
           style={{
             padding: "18px 20px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             alignItems: "flex-start",
             gap: 12,
@@ -239,7 +239,7 @@ function SessionDetailPanel({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 800,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               {session.deviceLabel ?? "Unknown device"}
@@ -248,7 +248,7 @@ function SessionDetailPanel({
               style={{
                 marginTop: 3,
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
@@ -338,7 +338,7 @@ function SessionsTable({
             <tr>
               <td
                 colSpan={7}
-                style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}
+                style={{ ...tdStyle, textAlign: "center", color: "var(--dg-color-text-muted)" }}
               >
                 Loading
               </td>
@@ -352,14 +352,14 @@ function SessionsTable({
                     colSpan={7}
                     style={{
                       padding: "8px 12px",
-                      background: "var(--color-bg-secondary)",
+                      background: "var(--dg-color-bg-secondary)",
                       fontSize: "var(--dg-fs-footnote)",
                       fontWeight: 800,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
-                      borderTop: "1px solid var(--color-border-light)",
-                      borderBottom: "1px solid var(--color-border-light)",
+                      borderTop: "1px solid var(--dg-color-border-light)",
+                      borderBottom: "1px solid var(--dg-color-border-light)",
                     }}
                   >
                     {group.dateLabel}
@@ -382,13 +382,13 @@ function SessionsTable({
                   >
                     <td style={tdStyle}>{statusBadge(session.status)}</td>
                     <td style={{ ...tdStyle, minWidth: 220 }}>
-                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
+                      <div style={{ fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
                         {session.userName ?? "Unknown user"}
                       </div>
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {session.userEmail ?? "Unknown email"}
@@ -399,21 +399,21 @@ function SessionsTable({
                         style={{
                           color:
                             session.org || session.userPlatformRole === "gridmaster"
-                              ? "var(--color-text-primary)"
-                              : "var(--color-text-muted)",
+                              ? "var(--dg-color-text-primary)"
+                              : "var(--dg-color-text-muted)",
                         }}
                       >
                         {sessionOrgLabel(session)}
                       </div>
                     </td>
                     <td style={{ ...tdStyle, minWidth: 190 }}>
-                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
+                      <div style={{ fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
                         {session.deviceLabel ?? "Unknown device"}
                       </div>
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {session.platform ?? "unknown"}
@@ -495,7 +495,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
         <div
           style={{
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -507,7 +507,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 800,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               User sessions
@@ -516,7 +516,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               style={{
                 marginTop: 2,
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               All tracked web and mobile session records, newest first.
@@ -526,7 +526,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             aria-live="polite"
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               whiteSpace: "nowrap",
               fontFamily: "var(--font-dm-mono), monospace",
             }}
@@ -541,7 +541,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           <div
             style={{
               padding: "12px 16px",
-              color: "var(--color-danger)",
+              color: "var(--dg-color-danger)",
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
             }}
@@ -560,7 +560,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             alignItems: "center",
             flexWrap: "wrap",
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
           }}
         >
           <CustomSelect
@@ -642,7 +642,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             justifyContent: "center",
             alignItems: "center",
             padding: "12px 16px",
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
           }}
         >
           <Button
@@ -656,7 +656,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontFamily: "var(--font-dm-mono), monospace",
             }}
           >
@@ -676,7 +676,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
         <div
           style={{
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -688,7 +688,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 800,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Gridmaster sessions
@@ -697,7 +697,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               style={{
                 marginTop: 2,
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Platform account sessions, kept separate from organization users.
@@ -707,7 +707,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             aria-live="polite"
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               whiteSpace: "nowrap",
             }}
           >
@@ -750,7 +750,7 @@ export default function GridmasterSecurityView({
           margin: "0 0 16px",
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         Security Oversight
@@ -760,8 +760,8 @@ export default function GridmasterSecurityView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -804,10 +804,10 @@ export default function GridmasterSecurityView({
             <div
               style={{
                 padding: "12px 16px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 800,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Impersonation Governance
@@ -857,7 +857,9 @@ export default function GridmasterSecurityView({
                             style={{
                               ...tdStyle,
                               fontWeight: 700,
-                              color: active ? "var(--color-warning)" : "var(--color-text-muted)",
+                              color: active
+                                ? "var(--dg-color-warning)"
+                                : "var(--dg-color-text-muted)",
                             }}
                           >
                             {active ? "Active" : entry.endedAt ? "Ended" : "Expired"}

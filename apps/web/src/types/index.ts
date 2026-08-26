@@ -1217,6 +1217,23 @@ export interface ShiftRequest {
   updatedAt: string;
 }
 
+/**
+ * The two statuses that mean a request is still live. The resolved ones can
+ * never reach the grid, so naming them here keeps the fold's color table total
+ * instead of carrying four unreachable entries and a fallback.
+ */
+export type ActiveShiftRequestStatus = Extract<ShiftRequestStatus, "open" | "pending_approval">;
+
+/**
+ * The little the schedule grid needs to know about a request sitting on a cell:
+ * enough to tint its corner fold and name it in a tooltip, without handing the
+ * grid the whole request.
+ */
+export interface ActiveShiftRequestSummary {
+  type: ShiftRequestType;
+  status: ActiveShiftRequestStatus;
+}
+
 // ── Grid Open Shifts ────────────────────────────────────────────────────────
 
 export interface GridOpenShift {

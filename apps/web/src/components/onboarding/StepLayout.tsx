@@ -49,7 +49,7 @@ export default function StepLayout({
           style={{
             fontSize: 24,
             fontWeight: 800,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             margin: "0 0 8px",
             letterSpacing: "-0.02em",
           }}
@@ -60,7 +60,7 @@ export default function StepLayout({
           <p
             style={{
               fontSize: 15,
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               margin: 0,
               lineHeight: 1.6,
             }}
@@ -92,9 +92,9 @@ export default function StepLayout({
               gap: 6,
               padding: "10px 20px",
               borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              color: "var(--color-text-secondary)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
+              color: "var(--dg-color-text-secondary)",
               fontSize: 14,
               fontWeight: 600,
               cursor: "pointer",
@@ -117,8 +117,8 @@ export default function StepLayout({
               padding: "10px 24px",
               borderRadius: 10,
               border: "none",
-              background: nextDisabled ? "var(--color-bg-secondary)" : "var(--color-brand)",
-              color: nextDisabled ? "var(--color-text-faint)" : "var(--color-text-inverse)",
+              background: nextDisabled ? "var(--dg-color-bg-secondary)" : "var(--dg-color-brand)",
+              color: nextDisabled ? "var(--dg-color-text-faint)" : "var(--dg-color-text-inverse)",
               fontSize: 14,
               fontWeight: 700,
               cursor: nextDisabled ? "not-allowed" : "pointer",
@@ -129,7 +129,7 @@ export default function StepLayout({
             <ButtonLoading
               loading={nextLoading}
               loadingLabel={nextPendingLabel}
-              spinnerColor="var(--color-text-inverse)"
+              spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={18}
             >
               {nextLabel}

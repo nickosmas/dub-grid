@@ -108,7 +108,7 @@ export function ScheduleTab({
           <div className="dg-card-header">
             <div>
               <div className="dg-card-title flex items-center gap-2">
-                <CalendarClock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                <CalendarClock className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
                 Recurring schedule
                 <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
                   {recurringShifts.length}
@@ -120,8 +120,8 @@ export function ScheduleTab({
           <div className="dg-card-body">
             {recurringShifts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CalendarClock className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
-                <p className="text-[13px] text-[var(--color-text-muted)]">
+                <CalendarClock className="mb-3 h-7 w-7 text-[var(--dg-color-text-faint)]" />
+                <p className="text-[13px] text-[var(--dg-color-text-muted)]">
                   No recurring shifts configured
                 </p>
               </div>
@@ -135,18 +135,18 @@ export function ScheduleTab({
                         key={day}
                         className={`flex flex-col items-center justify-center rounded-lg border py-2.5 ${
                           recurringShift
-                            ? "border-[var(--color-border-light)] bg-[var(--color-bg)]"
+                            ? "border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg)]"
                             : "border-transparent bg-transparent"
                         }`}
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
                           {day}
                         </span>
                         <span
                           className={`mt-1 max-w-full truncate px-0.5 text-[11px] font-semibold ${
                             recurringShift
-                              ? "text-[var(--color-text-primary)]"
-                              : "text-[var(--color-text-faint)]"
+                              ? "text-[var(--dg-color-text-primary)]"
+                              : "text-[var(--dg-color-text-faint)]"
                           }`}
                         >
                           {recurringShift ? recurringShift.shiftLabel : "—"}
@@ -156,7 +156,7 @@ export function ScheduleTab({
                   })}
                 </div>
                 {recurringShifts.some((shift) => shift.effectiveUntil) && (
-                  <p className="mt-3 text-center text-[10px] text-[var(--color-text-muted)]">
+                  <p className="mt-3 text-center text-[10px] text-[var(--dg-color-text-muted)]">
                     {recurringShifts
                       .filter((shift) => shift.effectiveUntil)
                       .map(
@@ -175,7 +175,7 @@ export function ScheduleTab({
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title flex items-center gap-2">
-              <History className="h-4 w-4 text-[var(--color-text-muted)]" />
+              <History className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
               Shift history
               <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
                 {shiftEntries.length}
@@ -189,8 +189,8 @@ export function ScheduleTab({
         <div className="p-0">
           {shiftEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <History className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
-              <p className="text-[13px] text-[var(--color-text-muted)]">No shifts found</p>
+              <History className="mb-3 h-7 w-7 text-[var(--dg-color-text-faint)]" />
+              <p className="text-[13px] text-[var(--dg-color-text-muted)]">No shifts found</p>
             </div>
           ) : (
             <>
@@ -211,8 +211,8 @@ export function ScheduleTab({
                     {groupedEntries.map((group) => (
                       <Fragment key={`month-${group.month}`}>
                         <TableRow>
-                          <TableCell colSpan={7} className="bg-[var(--color-bg)] px-4 py-1.5">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                          <TableCell colSpan={7} className="bg-[var(--dg-color-bg)] px-4 py-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
                               {group.month}
                             </span>
                           </TableCell>
@@ -259,10 +259,10 @@ export function ScheduleTab({
                           return (
                             <TableRow key={entry.dateKey}>
                               <TableCell>
-                                <span className="mr-1.5 font-semibold text-[var(--color-text-primary)]">
+                                <span className="mr-1.5 font-semibold text-[var(--dg-color-text-primary)]">
                                   {dayName}
                                 </span>
-                                <span className="text-[var(--color-text-muted)]">
+                                <span className="text-[var(--dg-color-text-muted)]">
                                   {entry.dateKey}
                                 </span>
                               </TableCell>
@@ -332,8 +332,8 @@ export function ScheduleTab({
                                               className="text-[10px] font-semibold"
                                               style={{
                                                 color: isCodeDraft
-                                                  ? "var(--color-warning)"
-                                                  : "var(--color-success)",
+                                                  ? "var(--dg-color-warning)"
+                                                  : "var(--dg-color-success)",
                                               }}
                                             >
                                               {isCodeDraft ? "Draft" : "Live"}
@@ -353,14 +353,14 @@ export function ScheduleTab({
                                   )}
                                   {entry.fromRecurring && (
                                     <Hint content={hint("From recurring schedule")} side="top">
-                                      <span className="text-[11px] text-[var(--color-text-muted)]">
+                                      <span className="text-[11px] text-[var(--dg-color-text-muted)]">
                                         ↻
                                       </span>
                                     </Hint>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-[13px] text-[var(--color-text-muted)]">
+                              <TableCell className="text-[13px] text-[var(--dg-color-text-muted)]">
                                 {isAbsence ? (
                                   "—"
                                 ) : isSplit ? (
@@ -373,7 +373,7 @@ export function ScheduleTab({
                                   (codes[0]?.focusArea?.name ?? "—")
                                 )}
                               </TableCell>
-                              <TableCell className="text-[13px] text-[var(--color-text-muted)]">
+                              <TableCell className="text-[13px] text-[var(--dg-color-text-muted)]">
                                 {isAbsence ? (
                                   "—"
                                 ) : isSplit ? (
@@ -401,7 +401,7 @@ export function ScheduleTab({
                                   })()
                                 )}
                               </TableCell>
-                              <TableCell className="text-[13px] font-semibold text-[var(--color-text-primary)]">
+                              <TableCell className="text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                                 {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
                               </TableCell>
                               <TableCell>
@@ -416,8 +416,8 @@ export function ScheduleTab({
                                         className="text-[12px] font-semibold"
                                         style={{
                                           color: isCodeDraft
-                                            ? "var(--color-warning)"
-                                            : "var(--color-success)",
+                                            ? "var(--dg-color-warning)"
+                                            : "var(--dg-color-success)",
                                         }}
                                       >
                                         {isCodeDraft ? "Draft" : "Published"}
@@ -429,15 +429,15 @@ export function ScheduleTab({
                                     className="text-[12px] font-semibold"
                                     style={{
                                       color: entry.isDraft
-                                        ? "var(--color-warning)"
-                                        : "var(--color-success)",
+                                        ? "var(--dg-color-warning)"
+                                        : "var(--dg-color-success)",
                                     }}
                                   >
                                     {entry.isDraft ? "Draft" : "Published"}
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-[12px] text-[var(--color-text-muted)]">
+                              <TableCell className="text-[12px] text-[var(--dg-color-text-muted)]">
                                 {(() => {
                                   const editorId = entry.updatedBy || entry.createdBy;
                                   if (!editorId) return "—";
@@ -466,8 +466,8 @@ export function ScheduleTab({
               </div>
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-[var(--color-border-light)] px-4 py-3">
-                  <span className="text-[12px] text-[var(--color-text-muted)]">
+                <div className="flex items-center justify-between border-t border-[var(--dg-color-border-light)] px-4 py-3">
+                  <span className="text-[12px] text-[var(--dg-color-text-muted)]">
                     Page {page + 1} of {totalPages}
                   </span>
                   <div className="flex gap-2">
@@ -502,7 +502,7 @@ export function ScheduleTab({
           <div className="dg-card-header">
             <div>
               <div className="dg-card-title flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[var(--color-text-muted)]" />
+                <Clock className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
                 Shift requests
                 <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
                   {shiftRequests.length}
@@ -540,16 +540,16 @@ export function ScheduleTab({
                           style={{
                             color:
                               request.status === "approved"
-                                ? "var(--color-success)"
+                                ? "var(--dg-color-success)"
                                 : request.status === "rejected"
-                                  ? "var(--color-danger)"
-                                  : "var(--color-warning)",
+                                  ? "var(--dg-color-danger)"
+                                  : "var(--dg-color-warning)",
                           }}
                         >
                           {formatShiftRequestStatusLabel(request.status)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-[13px] text-[var(--color-text-muted)]">
+                      <TableCell className="text-[13px] text-[var(--dg-color-text-muted)]">
                         {new Date(request.createdAt).toLocaleDateString()}
                       </TableCell>
                     </TableRow>

@@ -11,21 +11,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[var(--color-brand)] text-[var(--color-text-inverse)] hover:bg-[var(--color-brand-light)]",
+          "bg-[var(--dg-color-brand)] text-[var(--dg-color-text-inverse)] hover:bg-[var(--dg-color-brand-light)]",
         brand:
-          "bg-[var(--color-brand)] text-[var(--color-text-inverse)] hover:bg-[var(--color-brand-light)]",
+          "bg-[var(--dg-color-brand)] text-[var(--dg-color-text-inverse)] hover:bg-[var(--dg-color-brand-light)]",
         outline:
-          "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] aria-expanded:bg-[var(--color-bg-secondary)] aria-expanded:text-[var(--color-text-secondary)]",
+          "border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-bg-secondary)] aria-expanded:bg-[var(--dg-color-bg-secondary)] aria-expanded:text-[var(--dg-color-text-secondary)]",
         secondary:
-          "border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] aria-expanded:bg-[var(--color-bg-secondary)] aria-expanded:text-[var(--color-text-secondary)]",
+          "border-[var(--dg-color-border)] bg-transparent text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-bg-secondary)] aria-expanded:bg-[var(--dg-color-bg-secondary)] aria-expanded:text-[var(--dg-color-text-secondary)]",
         ghost:
-          "text-[var(--color-text-muted)] hover:bg-[var(--color-border-light)] hover:text-[var(--color-text-secondary)] aria-expanded:bg-[var(--color-border-light)] aria-expanded:text-[var(--color-text-secondary)]",
+          "text-[var(--dg-color-text-muted)] hover:bg-[var(--dg-color-border-light)] hover:text-[var(--dg-color-text-secondary)] aria-expanded:bg-[var(--dg-color-border-light)] aria-expanded:text-[var(--dg-color-text-secondary)]",
         destructive:
-          "border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] text-[var(--color-danger)] hover:bg-[var(--color-danger-border)] focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
+          "border-[var(--dg-color-danger-border)] bg-[var(--dg-color-danger-bg)] text-[var(--dg-color-danger)] hover:bg-[var(--dg-color-danger-border)] focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         warningFilled:
-          "border-[var(--color-warning)] bg-[var(--color-warning)] text-[var(--color-text-inverse)] hover:brightness-95 active:brightness-90",
+          "border-[var(--dg-color-warning)] bg-[var(--dg-color-warning)] text-[var(--dg-color-text-inverse)] hover:brightness-95 active:brightness-90",
         dangerFilled:
-          "border-[var(--color-danger)] bg-[var(--color-danger)] text-[var(--color-text-inverse)] hover:brightness-95 active:brightness-90",
+          "border-[var(--dg-color-danger)] bg-[var(--dg-color-danger)] text-[var(--dg-color-text-inverse)] hover:brightness-95 active:brightness-90",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

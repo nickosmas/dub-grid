@@ -6,16 +6,16 @@ import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_COLORS = {
-  green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
-  amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
-  red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
-  none: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)" },
+  green: { bg: "var(--dg-color-success-border)", text: "var(--dg-color-success-text)" },
+  amber: { bg: "var(--dg-color-warning-border)", text: "var(--dg-color-warning-text)" },
+  red: { bg: "var(--dg-color-danger-border)", text: "var(--dg-color-danger-text)" },
+  none: { bg: "var(--dg-color-bg-secondary)", text: "var(--dg-color-text-subtle)" },
 };
 
 const PCT_COLORS = {
-  green: "var(--color-success)",
-  amber: "var(--color-warning)",
-  red: "var(--color-danger)",
+  green: "var(--dg-color-success)",
+  amber: "var(--dg-color-warning)",
+  red: "var(--dg-color-danger)",
 };
 
 interface CoverageBySectionCardProps {
@@ -120,8 +120,8 @@ export default function CoverageBySectionCard({
                   gap: 7,
                   padding: "14px 16px",
                   borderRadius: "var(--dg-radius-md)",
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--dg-color-bg)",
+                  border: "1px solid var(--dg-color-border)",
                 }}
               >
                 <div
@@ -132,12 +132,16 @@ export default function CoverageBySectionCard({
                   }}
                 >
                   <span
-                    style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "var(--dg-color-text-secondary)",
+                    }}
                   >
                     {sec.focusAreaName}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
+                    <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>
                       {sec.filledTotal} / {sec.requiredTotal} filled
                     </span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: PCT_COLORS[pctColor] }}>
@@ -148,7 +152,7 @@ export default function CoverageBySectionCard({
                 <div
                   style={{
                     height: 6,
-                    background: "var(--color-border)",
+                    background: "var(--dg-color-border)",
                     borderRadius: 3,
                     overflow: "hidden",
                   }}
@@ -175,7 +179,7 @@ export default function CoverageBySectionCard({
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginBottom: 10,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
@@ -198,7 +202,7 @@ export default function CoverageBySectionCard({
                   key={d.dateKey}
                   style={{
                     fontSize: 10,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     textAlign: "center",
                     fontWeight: 500,
                     padding: "2px 0",
@@ -214,7 +218,7 @@ export default function CoverageBySectionCard({
                   <div
                     style={{
                       fontSize: 11,
-                      color: "var(--color-text-subtle)",
+                      color: "var(--dg-color-text-subtle)",
                       textAlign: "right",
                       paddingRight: 8,
                       lineHeight: "28px",

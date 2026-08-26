@@ -41,7 +41,7 @@ export default function WizardShell({
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        background: "var(--color-onboarding-shell-bg)",
+        background: "var(--dg-color-onboarding-shell-bg)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         overflow: "auto",
       }}
@@ -61,7 +61,7 @@ export default function WizardShell({
             style={{
               fontSize: 15,
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               letterSpacing: "-0.02em",
             }}
           >
@@ -79,7 +79,7 @@ export default function WizardShell({
               border: "none",
               fontSize: 13,
               fontWeight: 500,
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
               cursor: skipLoading ? "not-allowed" : "pointer",
               textDecoration: "underline",
               textUnderlineOffset: 3,

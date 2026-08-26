@@ -13,17 +13,17 @@ export function DirectorySummaryCards({
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <Card
         size="sm"
-        className="border-[var(--color-brand-border)]"
+        className="border-[var(--dg-color-brand-border)]"
         aria-label="On schedule staff count"
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
               On schedule
             </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{onScheduleCount}</p>
           </div>
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-brand-bg)]">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-brand-bg)]">
             <svg
               width="20"
               height="20"
@@ -33,7 +33,7 @@ export function DirectorySummaryCards({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-[var(--color-brand)]"
+              className="text-[var(--dg-color-brand)]"
             >
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
@@ -46,17 +46,17 @@ export function DirectorySummaryCards({
 
       <Card
         size="sm"
-        className="border-[var(--color-border-light)]"
+        className="border-[var(--dg-color-border-light)]"
         aria-label="Full-time staff count"
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
               Full-time
             </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{fullTimeCount}</p>
           </div>
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-bg-secondary)]">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-bg-secondary)]">
             <svg
               width="20"
               height="20"
@@ -66,7 +66,7 @@ export function DirectorySummaryCards({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-[var(--color-text-subtle)]"
+              className="text-[var(--dg-color-text-subtle)]"
             >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4" />
@@ -84,17 +84,17 @@ export function DirectorySummaryCards({
 
       <Card
         size="sm"
-        className="border-[var(--color-border-light)]"
+        className="border-[var(--dg-color-border-light)]"
         aria-label="Part-time staff count"
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
               Part-time
             </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{partTimeCount}</p>
           </div>
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-warning-bg,#FEF3C7)]">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-warning-bg,#FEF3C7)]">
             <svg
               width="20"
               height="20"
@@ -104,7 +104,7 @@ export function DirectorySummaryCards({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-[var(--color-warning-text,#92400E)]"
+              className="text-[var(--dg-color-warning-text,#92400E)]"
             >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4" />

@@ -315,7 +315,7 @@ describe("ReportsPageContent", () => {
       .find(Boolean);
     expect(blakeRow).toBeTruthy();
     expect(blakeRow!).toHaveStyle({
-      background: "var(--color-bg-secondary)",
+      background: "var(--dg-color-bg-secondary)",
     });
     expect(screen.getAllByText("Scheduled hours").length).toBeGreaterThan(1);
     expect(fetchOperationsReport).toHaveBeenCalledWith({

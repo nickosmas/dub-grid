@@ -2415,6 +2415,7 @@ async function main() {
        RETURNING id`,
       [
         tenant.name,
+        // The slug is a stable identifier and the wildcard web subdomain.
         tenant.slug,
         addressFields.address,
         addressFields.addressLine1,

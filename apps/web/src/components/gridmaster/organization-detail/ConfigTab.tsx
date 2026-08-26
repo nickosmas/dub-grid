@@ -57,7 +57,7 @@ export function ConfigTab({
               style={{
                 fontWeight: 400,
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginLeft: 8,
               }}
             >
@@ -67,7 +67,7 @@ export function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeFocusAreas.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -81,8 +81,8 @@ export function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                   }}
                 >
                   {fa.name}
@@ -102,7 +102,7 @@ export function ConfigTab({
               style={{
                 fontWeight: 400,
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginLeft: 8,
               }}
             >
@@ -117,7 +117,7 @@ export function ConfigTab({
           }}
         >
           {activeShiftCategories.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -131,12 +131,12 @@ export function ConfigTab({
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: "var(--color-text-subtle)",
+                        color: "var(--dg-color-text-subtle)",
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                         textAlign: "left",
                         whiteSpace: "nowrap",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {h}
@@ -153,7 +153,7 @@ export function ConfigTab({
                       <td
                         style={{
                           padding: "8px 14px",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         <span
@@ -167,9 +167,9 @@ export function ConfigTab({
                             borderRadius: 8,
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 700,
-                            background: "var(--color-bg-secondary)",
-                            color: "var(--color-text-primary)",
-                            border: "1.5px solid var(--color-border-light)",
+                            background: "var(--dg-color-bg-secondary)",
+                            color: "var(--dg-color-text-primary)",
+                            border: "1.5px solid var(--dg-color-border-light)",
                           }}
                         >
                           {shift.name}
@@ -180,8 +180,8 @@ export function ConfigTab({
                           padding: "8px 14px",
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-primary)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {shift.abbr?.trim() || "—"}
@@ -191,8 +191,8 @@ export function ConfigTab({
                           padding: "8px 14px",
                           fontSize: "var(--dg-fs-caption)",
                           fontFamily: "var(--font-dm-mono), monospace",
-                          color: "var(--color-text-muted)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-muted)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -203,10 +203,10 @@ export function ConfigTab({
                           padding: "8px 14px",
                           fontSize: "var(--dg-fs-caption)",
                           color: faName
-                            ? "var(--color-text-secondary)"
-                            : "var(--color-text-subtle)",
+                            ? "var(--dg-color-text-secondary)"
+                            : "var(--dg-color-text-subtle)",
                           fontWeight: faName ? 600 : 400,
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {faName ?? "Global"}
@@ -229,7 +229,7 @@ export function ConfigTab({
               style={{
                 fontWeight: 400,
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginLeft: 8,
               }}
             >
@@ -244,7 +244,7 @@ export function ConfigTab({
           }}
         >
           {activeJobs.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -258,12 +258,12 @@ export function ConfigTab({
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: "var(--color-text-subtle)",
+                        color: "var(--dg-color-text-subtle)",
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                         textAlign: "left",
                         whiteSpace: "nowrap",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {h}
@@ -279,8 +279,8 @@ export function ConfigTab({
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-label)",
                         fontWeight: 600,
-                        color: "var(--color-text-primary)",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        color: "var(--dg-color-text-primary)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {job.name}
@@ -290,8 +290,8 @@ export function ConfigTab({
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-caption)",
                         fontFamily: "var(--font-dm-mono), monospace",
-                        color: "var(--color-text-muted)",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        color: "var(--dg-color-text-muted)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {job.abbr}
@@ -300,8 +300,8 @@ export function ConfigTab({
                       style={{
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-secondary)",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        color: "var(--dg-color-text-secondary)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {job.assignmentMode === "shiftless"
@@ -314,8 +314,8 @@ export function ConfigTab({
                       style={{
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-secondary)",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        color: "var(--dg-color-text-secondary)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {job.showOnGrid ? "Shown on grid" : "Hidden on grid"}
@@ -337,7 +337,7 @@ export function ConfigTab({
               style={{
                 fontWeight: 400,
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginLeft: 8,
               }}
             >
@@ -352,7 +352,7 @@ export function ConfigTab({
           }}
         >
           {activeAbsenceTypes.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -366,12 +366,12 @@ export function ConfigTab({
                         padding: "8px 14px",
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: "var(--color-text-subtle)",
+                        color: "var(--dg-color-text-subtle)",
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                         textAlign: "left",
                         whiteSpace: "nowrap",
-                        borderBottom: "1px solid var(--color-border-light)",
+                        borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       {h}
@@ -393,7 +393,7 @@ export function ConfigTab({
                       <td
                         style={{
                           padding: "8px 14px",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         <span
@@ -420,8 +420,8 @@ export function ConfigTab({
                           padding: "8px 14px",
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-primary)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {at.name}
@@ -429,7 +429,7 @@ export function ConfigTab({
                       <td
                         style={{
                           padding: "8px 14px",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         <span
@@ -460,7 +460,7 @@ export function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeCerts.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -474,8 +474,8 @@ export function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                   }}
                 >
                   {c.abbr ? `${c.abbr} — ${c.name}` : c.name}
@@ -493,7 +493,7 @@ export function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeRoles.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -507,8 +507,8 @@ export function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                   }}
                 >
                   {r.abbr ? `${r.abbr} — ${r.name}` : r.name}
@@ -524,7 +524,7 @@ export function ConfigTab({
         <div style={sectionHeaderStyle}>Indicator Types ({activeIndicators.length})</div>
         <div style={sectionBodyStyle}>
           {activeIndicators.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-muted)" }}>
               None configured
             </span>
           ) : (
@@ -540,8 +540,8 @@ export function ConfigTab({
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-secondary)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                   }}
                 >
                   <span

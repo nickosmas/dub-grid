@@ -17,21 +17,20 @@ export function AppearancePanel() {
 
   return (
     <SectionCard>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="flex flex-col gap-3">
         <div>
-          <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">Theme</div>
-          <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+          <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">Theme</div>
+          <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
             Follow your device's appearance, or choose light or dark. This only affects how DubGrid
             looks on this device.
           </p>
         </div>
-        <div className="dg-segment" style={{ display: "flex", maxWidth: 320 }}>
+        <div className="dg-segment flex max-w-80">
           {THEME_OPTIONS.map((option) => (
             <Button
               key={option.value}
               type="button"
-              className={`dg-segment-btn${theme === option.value ? " active" : ""}`}
-              style={{ flex: 1 }}
+              className={`dg-segment-btn flex-1${theme === option.value ? " active" : ""}`}
               onClick={() => setTheme(option.value)}
             >
               {option.label}

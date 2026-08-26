@@ -11,21 +11,21 @@ const BADGE_STYLES: Record<
   { bg: string; color: string; border: string; label: string }
 > = {
   high: {
-    bg: "var(--color-danger-bg)",
-    color: "var(--color-danger)",
-    border: "var(--color-danger-border)",
+    bg: "var(--dg-color-danger-bg)",
+    color: "var(--dg-color-danger)",
+    border: "var(--dg-color-danger-border)",
     label: "Urgent",
   },
   medium: {
-    bg: "var(--color-warning-bg)",
-    color: "var(--color-warning)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    color: "var(--dg-color-warning)",
+    border: "var(--dg-color-warning-border)",
     label: "Open",
   },
   low: {
-    bg: "var(--color-success-bg)",
-    color: "var(--color-success-text)",
-    border: "var(--color-success-border)",
+    bg: "var(--dg-color-success-bg)",
+    color: "var(--dg-color-success-text)",
+    border: "var(--dg-color-success-border)",
     label: "Open",
   },
 };
@@ -77,10 +77,10 @@ export default function ExpandedOpenShifts({
                 style={{
                   padding: "10px 12px",
                   borderRadius: "var(--dg-radius-sm)",
-                  background: "var(--color-bg)",
-                  border: "1px dashed var(--color-border)",
+                  background: "var(--dg-color-bg)",
+                  border: "1px dashed var(--dg-color-border)",
                   fontSize: 11,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                 }}
               >
                 Showing published dates only.
@@ -95,8 +95,8 @@ export default function ExpandedOpenShifts({
                 alignItems: "center",
                 padding: 16,
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
+                background: "var(--dg-color-bg)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               <span style={filterLabelStyle}>Filter:</span>
@@ -124,7 +124,7 @@ export default function ExpandedOpenShifts({
               <span
                 style={{
                   fontSize: 11,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   marginLeft: "auto",
                 }}
               >
@@ -176,7 +176,7 @@ export default function ExpandedOpenShifts({
                           <div
                             style={{
                               fontSize: 10,
-                              color: "var(--color-text-subtle)",
+                              color: "var(--dg-color-text-subtle)",
                               fontWeight: 500,
                             }}
                           >
@@ -186,7 +186,7 @@ export default function ExpandedOpenShifts({
                             style={{
                               fontSize: 18,
                               fontWeight: 700,
-                              color: "var(--color-text-primary)",
+                              color: "var(--dg-color-text-primary)",
                               lineHeight: 1,
                             }}
                           >
@@ -197,7 +197,7 @@ export default function ExpandedOpenShifts({
                           style={{
                             width: 1,
                             height: 40,
-                            background: "var(--color-border)",
+                            background: "var(--dg-color-border)",
                           }}
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -205,7 +205,7 @@ export default function ExpandedOpenShifts({
                             style={{
                               fontSize: 13,
                               fontWeight: 600,
-                              color: "var(--color-text-primary)",
+                              color: "var(--dg-color-text-primary)",
                             }}
                           >
                             {shift.assignmentLabel}
@@ -214,7 +214,7 @@ export default function ExpandedOpenShifts({
                             <div
                               style={{
                                 fontSize: 11,
-                                color: "var(--color-text-subtle)",
+                                color: "var(--dg-color-text-subtle)",
                                 marginTop: 2,
                               }}
                             >
@@ -254,7 +254,7 @@ const modalStyle = { maxWidth: 700, width: "90vw" };
 const filterLabelStyle = {
   fontSize: 11,
   fontWeight: 600 as const,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.04em",
 };
@@ -265,6 +265,6 @@ const itemStyle = {
   gap: 12,
   padding: "14px 16px",
   borderRadius: "var(--dg-radius-md)",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-border)",
+  background: "var(--dg-color-bg)",
+  border: "1px solid var(--dg-color-border)",
 };

@@ -21,7 +21,7 @@ const DEFAULT_LABEL_STYLE: CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
   marginBottom: 6,
 };
 

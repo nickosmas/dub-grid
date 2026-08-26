@@ -30,17 +30,17 @@ const labelStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
   marginBottom: "6px",
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "11px 13px",
-  border: "1.5px solid var(--color-border)",
+  border: "1.5px solid var(--dg-color-border)",
   borderRadius: "8px",
   fontSize: "var(--dg-fs-body)",
-  background: "var(--color-bg)",
-  color: "var(--color-text-primary)",
+  background: "var(--dg-color-bg)",
+  color: "var(--dg-color-text-primary)",
   outline: "none",
   boxSizing: "border-box",
   fontFamily: "inherit",
@@ -147,7 +147,7 @@ export default function RequestDemoPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -160,7 +160,7 @@ export default function RequestDemoPage() {
         /* ── Success state ──────────────────────────────────────────────── */
         <div
           style={{
-            background: "var(--color-bg)",
+            background: "var(--dg-color-bg)",
             borderRadius: "20px",
             padding: "48px 40px",
             maxWidth: "480px",
@@ -171,13 +171,17 @@ export default function RequestDemoPage() {
         >
           <CheckCircle2
             size={48}
-            style={{ color: "var(--color-success)", marginBottom: "16px", margin: "0 auto 16px" }}
+            style={{
+              color: "var(--dg-color-success)",
+              marginBottom: "16px",
+              margin: "0 auto 16px",
+            }}
           />
           <h1
             style={{
               fontSize: "22px",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               margin: "0 0 12px",
               letterSpacing: "-0.02em",
             }}
@@ -187,7 +191,7 @@ export default function RequestDemoPage() {
           <p
             style={{
               fontSize: "var(--dg-fs-body)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               lineHeight: 1.6,
               margin: "0 0 32px",
             }}
@@ -201,7 +205,7 @@ export default function RequestDemoPage() {
               alignItems: "center",
               gap: "8px",
               padding: "13px 32px",
-              background: "var(--color-brand)",
+              background: "var(--dg-color-brand)",
               color: "#fff",
               border: "none",
               borderRadius: "999px",
@@ -218,7 +222,7 @@ export default function RequestDemoPage() {
         /* ── Form ───────────────────────────────────────────────────────── */
         <div
           style={{
-            background: "var(--color-bg)",
+            background: "var(--dg-color-bg)",
             borderRadius: "20px",
             padding: "40px 36px",
             maxWidth: "540px",
@@ -241,7 +245,7 @@ export default function RequestDemoPage() {
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 textDecoration: "none",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 500,
@@ -260,7 +264,7 @@ export default function RequestDemoPage() {
             style={{
               fontSize: "22px",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               margin: "0 0 6px",
               letterSpacing: "-0.02em",
             }}
@@ -270,7 +274,7 @@ export default function RequestDemoPage() {
           <p
             style={{
               fontSize: "var(--dg-fs-body)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               margin: "0 0 28px",
               lineHeight: 1.5,
             }}
@@ -283,7 +287,7 @@ export default function RequestDemoPage() {
               {/* Contact Name */}
               <div>
                 <label style={labelStyle}>
-                  Contact Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Contact Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -300,7 +304,7 @@ export default function RequestDemoPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
                   <label style={labelStyle}>
-                    Email <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Email <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <input
                     type="email"
@@ -333,7 +337,7 @@ export default function RequestDemoPage() {
               {/* Organization Name */}
               <div>
                 <label style={labelStyle}>
-                  Organization Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Organization Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -350,7 +354,7 @@ export default function RequestDemoPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
                   <label style={labelStyle}>
-                    Employee Count <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Employee Count <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <CustomSelect
                     value={orgSize || ""}
@@ -404,7 +408,7 @@ export default function RequestDemoPage() {
               <ButtonLoading
                 loading={loading}
                 loadingLabel="Submitting Request"
-                spinnerColor="var(--color-text-inverse)"
+                spinnerColor="var(--dg-color-text-inverse)"
                 spinnerSize={20}
               >
                 Submit Request
@@ -422,14 +426,14 @@ export default function RequestDemoPage() {
           gap: "4px",
           alignItems: "center",
           fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-faint)",
+          color: "var(--dg-color-text-faint)",
         }}
       >
         <Link
           href="/privacy"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
+          style={{ color: "var(--dg-color-text-faint)", textDecoration: "none" }}
         >
           Privacy Policy
         </Link>
@@ -438,7 +442,7 @@ export default function RequestDemoPage() {
           href="/terms"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
+          style={{ color: "var(--dg-color-text-faint)", textDecoration: "none" }}
         >
           Terms of Service
         </Link>
@@ -447,7 +451,7 @@ export default function RequestDemoPage() {
           type="button"
           onClick={openConsentPreferences}
           style={{
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             textDecoration: "none",
             background: "none",
             border: "none",
@@ -466,5 +470,5 @@ export default function RequestDemoPage() {
 const errorStyle: React.CSSProperties = {
   margin: "6px 0 0",
   fontSize: "var(--dg-fs-footnote)",
-  color: "var(--color-danger)",
+  color: "var(--dg-color-danger)",
 };

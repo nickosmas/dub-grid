@@ -44,7 +44,7 @@ export default function InactivityGuard() {
           margin: "0 0 20px",
           fontSize: "var(--dg-fs-body-sm)",
           lineHeight: 1.5,
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
         }}
         aria-live="polite"
       >

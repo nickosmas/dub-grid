@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
@@ -70,11 +69,7 @@ function AppHeader() {
   if (hideForSetupLock || hideForBillingLock) return null;
 
   return (
-    <div
-      style={{
-        background: "var(--color-bg)",
-      }}
-    >
+    <div className="dg-app-shell-header-surface">
       <Header orgName={org?.name} />
     </div>
   );
@@ -83,7 +78,6 @@ function AppHeader() {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isGridmaster, isLoading, orgId } = usePermissions();
-  const headerRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to the bootstrap query so we can detect sandbox-mode org
   // switches without forcing an extra fetch — the query is already
@@ -106,20 +100,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? (bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending")
     : "public";
 
-  // Publish the actual sticky-header height as a CSS custom property so that
-  // sidebar layouts (StaffView, SettingsPage, etc.) can subtract the correct
-  // value instead of a hardcoded 56px.
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(([entry]) => {
-      const h = entry.contentRect.height;
-      document.documentElement.style.setProperty("--app-shell-header-h", `${h}px`);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   // Show the org header on app routes, but not when gridmaster is at /dashboard
   // (the gridmaster portal renders its own header).
   // Skip while permissions are loading to prevent mounting AppHeader (and its
@@ -130,15 +110,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <div
-        ref={headerRef}
-        className="no-print"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 9999,
-        }}
-      >
+      <div className="dg-app-shell-header no-print">
         {isAppRoute(pathname) && (
           <>
             <ImpersonationBanner />
@@ -149,7 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         )}
         {showHeader && <AppHeader />}
       </div>
-      <div key={effectiveOrgKey} style={{ display: "contents" }}>
+      <div key={effectiveOrgKey} className="contents">
         {children}
       </div>
       {!isGridmaster && <TrialWelcomeModal />}

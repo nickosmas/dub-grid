@@ -33,7 +33,7 @@ export default function SetupPendingScreen() {
         justifyContent: "center",
         padding: 24,
         background:
-          "linear-gradient(to bottom, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
+          "linear-gradient(to bottom, var(--dg-color-bg) 0%, var(--dg-color-brand-bg, #eff6ff) 100%)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       }}
     >
@@ -53,7 +53,7 @@ export default function SetupPendingScreen() {
           style={{
             fontSize: 24,
             fontWeight: 800,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             margin: "0 0 12px",
             letterSpacing: "-0.02em",
           }}
@@ -64,7 +64,7 @@ export default function SetupPendingScreen() {
         <p
           style={{
             fontSize: 15,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.6,
             margin: "0 0 32px",
             maxWidth: 360,
@@ -84,7 +84,7 @@ export default function SetupPendingScreen() {
               padding: "10px 24px",
               borderRadius: 10,
               border: "none",
-              background: "var(--color-brand)",
+              background: "var(--dg-color-brand)",
               color: "white",
               fontSize: 14,
               fontWeight: 600,
@@ -100,9 +100,9 @@ export default function SetupPendingScreen() {
             style={{
               padding: "10px 24px",
               borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              color: "var(--color-text-primary)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
+              color: "var(--dg-color-text-primary)",
               fontSize: 14,
               fontWeight: 600,
               cursor: "pointer",

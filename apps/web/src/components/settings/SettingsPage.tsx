@@ -212,11 +212,11 @@ export default function SettingsPage({
           alignItems: "center",
           gap: 8,
           padding: "8px 14px",
-          background: "var(--color-info-bg)",
+          background: "var(--dg-color-info-bg)",
           borderRadius: "var(--dg-radius-sm)",
-          border: "1px solid var(--color-info-border)",
+          border: "1px solid var(--dg-color-info-border)",
           fontSize: "var(--dg-fs-caption)",
-          color: "var(--color-info-text)",
+          color: "var(--dg-color-info-text)",
         }}
       >
         <svg

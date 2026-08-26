@@ -25,12 +25,12 @@ function CountTile({
       size="sm"
       className={
         selected
-          ? "border-[var(--color-brand-border)] bg-[var(--color-brand-bg)]"
-          : "border-[var(--color-border-light)]"
+          ? "border-[var(--dg-color-brand-border)] bg-[var(--dg-color-brand-bg)]"
+          : "border-[var(--dg-color-border-light)]"
       }
     >
       <CardContent>
-        <p className="text-[11px] font-semibold uppercase tracking-wide truncate text-[var(--color-text-subtle)]">
+        <p className="text-[11px] font-semibold uppercase tracking-wide truncate text-[var(--dg-color-text-subtle)]">
           {label}
         </p>
         <p className="text-2xl font-bold tracking-tight mt-0.5 tabular-nums">{count}</p>

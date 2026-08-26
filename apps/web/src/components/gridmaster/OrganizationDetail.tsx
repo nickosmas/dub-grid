@@ -259,7 +259,7 @@ export default function OrganizationDetail({
             margin: 0,
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {organization.name}
@@ -269,8 +269,8 @@ export default function OrganizationDetail({
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontFamily: "var(--font-dm-mono), monospace",
-              color: "var(--color-text-muted)",
-              background: "var(--color-bg-secondary)",
+              color: "var(--dg-color-text-muted)",
+              background: "var(--dg-color-bg-secondary)",
               padding: "2px 8px",
               borderRadius: 4,
             }}
@@ -285,8 +285,8 @@ export default function OrganizationDetail({
               fontWeight: 600,
               padding: "2px 8px",
               borderRadius: 4,
-              background: "var(--color-danger-bg)",
-              color: "var(--color-danger)",
+              background: "var(--dg-color-danger-bg)",
+              color: "var(--dg-color-danger)",
               textTransform: "uppercase",
             }}
           >
@@ -300,8 +300,8 @@ export default function OrganizationDetail({
               fontWeight: 600,
               padding: "2px 8px",
               borderRadius: 4,
-              background: "var(--color-warning-bg)",
-              color: "var(--color-warning)",
+              background: "var(--dg-color-warning-bg)",
+              color: "var(--dg-color-warning)",
               textTransform: "uppercase",
             }}
           >
@@ -313,7 +313,7 @@ export default function OrganizationDetail({
         <div
           style={{
             fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             marginBottom: 20,
           }}
         >
@@ -358,8 +358,8 @@ export default function OrganizationDetail({
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
                   color: orgHealthQuery.data.setup.isComplete
-                    ? "var(--color-success)"
-                    : "var(--color-warning)",
+                    ? "var(--dg-color-success)"
+                    : "var(--dg-color-warning)",
                 }}
               >
                 {orgHealthQuery.data.setup.isComplete
@@ -435,7 +435,7 @@ export default function OrganizationDetail({
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: "2px solid var(--color-border-light)",
+          borderBottom: "2px solid var(--dg-color-border-light)",
           marginBottom: 20,
         }}
       >
@@ -450,10 +450,11 @@ export default function OrganizationDetail({
               padding: "10px 18px",
               fontSize: "var(--dg-fs-label)",
               fontWeight: tab === t.id ? 700 : 500,
-              color: tab === t.id ? "var(--color-brand)" : "var(--color-text-muted)",
+              color: tab === t.id ? "var(--dg-color-brand)" : "var(--dg-color-text-muted)",
               background: "transparent",
               border: "none",
-              borderBottom: tab === t.id ? "2px solid var(--color-brand)" : "2px solid transparent",
+              borderBottom:
+                tab === t.id ? "2px solid var(--dg-color-brand)" : "2px solid transparent",
               marginBottom: -2,
               cursor: "pointer",
               fontFamily: "inherit",
@@ -469,8 +470,8 @@ export default function OrganizationDetail({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -486,7 +487,7 @@ export default function OrganizationDetail({
           style={{
             padding: 32,
             textAlign: "center",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontSize: "var(--dg-fs-label)",
           }}
         >

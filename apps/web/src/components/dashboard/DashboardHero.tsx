@@ -25,28 +25,28 @@ function getMetricAccent(label: string): AccentTone {
 
   if (key.includes("coverage")) {
     return {
-      iconBg: "var(--color-brand-bg)",
-      iconColor: "var(--color-brand)",
+      iconBg: "var(--dg-color-brand-bg)",
+      iconColor: "var(--dg-color-brand)",
     };
   }
 
   if (key.includes("gap")) {
     return {
-      iconBg: "var(--color-danger-bg)",
-      iconColor: "var(--color-danger-text)",
+      iconBg: "var(--dg-color-danger-bg)",
+      iconColor: "var(--dg-color-danger-text)",
     };
   }
 
   if (key.includes("approval")) {
     return {
-      iconBg: "var(--color-warning-bg)",
-      iconColor: "var(--color-warning-text)",
+      iconBg: "var(--dg-color-warning-bg)",
+      iconColor: "var(--dg-color-warning-text)",
     };
   }
 
   return {
-    iconBg: "var(--color-info-bg)",
-    iconColor: "var(--color-info)",
+    iconBg: "var(--dg-color-info-bg)",
+    iconColor: "var(--dg-color-info)",
   };
 }
 
@@ -140,8 +140,8 @@ export default function DashboardHero({
         display: "grid",
         gap: 12,
         padding: "14px 16px",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: "var(--dg-color-surface)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-xl)",
       }}
     >
@@ -160,7 +160,7 @@ export default function DashboardHero({
               margin: 0,
               fontSize: "var(--dg-fs-page-title)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               letterSpacing: "-0.03em",
             }}
           >
@@ -169,7 +169,7 @@ export default function DashboardHero({
           <p
             style={{
               margin: "6px 0 0",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-body-sm, 14px)",
               maxWidth: 780,
               lineHeight: 1.45,
@@ -210,8 +210,8 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
   const card = (
     <div
       style={{
-        background: "var(--color-bg)",
-        border: "1px solid var(--color-border)",
+        background: "var(--dg-color-bg)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-lg)",
         padding: "12px 14px",
       }}
@@ -229,7 +229,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
           style={{
             minWidth: 0,
             fontSize: "11px",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
           }}
         >
           {metric.label}
@@ -253,7 +253,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
         style={{
           fontSize: "clamp(1.45rem, 1.8vw, 1.85rem)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           letterSpacing: "-0.04em",
         }}
       >
@@ -264,7 +264,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
           style={{
             marginTop: 4,
             fontSize: "11px",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.4,
           }}
         >

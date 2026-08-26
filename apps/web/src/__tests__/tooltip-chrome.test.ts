@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
-import { createWebCssVariables } from "@dubgrid/design-tokens";
 
 function resolveRepoRoot(): string {
   const cwd = process.cwd();
@@ -19,7 +18,6 @@ function resolveWebSource(path: string): string {
 
 const tooltipPrimitive = readFileSync(resolveWebSource("components/ui/tooltip.tsx"), "utf-8");
 const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
-const webCssVariables = createWebCssVariables();
 const chartTooltipStyles = readFileSync(
   resolveWebSource("components/dashboard/chartTooltipStyles.ts"),
   "utf-8",
@@ -30,14 +28,14 @@ describe("tooltip chrome", () => {
     expect(tooltipPrimitive).toContain("@base-ui/react/tooltip");
     expect(tooltipPrimitive).toContain("delay={delay}");
     expect(tooltipPrimitive).toContain("sideOffset = 4");
-    expect(tooltipPrimitive).toContain("bg-[var(--color-surface)]");
-    expect(tooltipPrimitive).toContain("text-[var(--color-text-primary)]");
+    expect(tooltipPrimitive).toContain("bg-[var(--dg-color-surface)]");
+    expect(tooltipPrimitive).toContain("text-[var(--dg-color-text-primary)]");
     expect(tooltipPrimitive).toContain("shadow-[var(--tooltip-shadow)]");
     expect(tooltipPrimitive).toContain("z-[11000]");
-    expect(webCssVariables["--tooltip-shadow"]).toBe(
-      "0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1)",
+    expect(globalsCss).toContain(
+      "--tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);",
     );
-    expect(tooltipPrimitive).not.toContain("border-[var(--color-border-light)]");
+    expect(tooltipPrimitive).not.toContain("border-[var(--dg-color-border-light)]");
   });
 
   it("uses the shadcn base tooltip arrow so the pointer tip is rendered", () => {
@@ -46,13 +44,13 @@ describe("tooltip chrome", () => {
     expect(globalsCss).not.toContain(".dg-tooltip::after");
     expect(tooltipPrimitive).toContain("TooltipPrimitive.Arrow");
     expect(tooltipPrimitive).toContain("rotate-45");
-    expect(tooltipPrimitive).toContain("fill-[var(--color-surface)]");
+    expect(tooltipPrimitive).toContain("fill-[var(--dg-color-surface)]");
   });
 
   it("reuses the elevated white hover treatment for chart tooltips", () => {
-    expect(chartTooltipStyles).toContain('backgroundColor: "var(--color-surface)"');
+    expect(chartTooltipStyles).toContain('backgroundColor: "var(--dg-color-surface)"');
     expect(chartTooltipStyles).toContain('boxShadow: "var(--tooltip-shadow)"');
     expect(chartTooltipStyles).toContain("zIndex: 11000");
-    expect(chartTooltipStyles).not.toContain('border: "1px solid var(--color-border-light)"');
+    expect(chartTooltipStyles).not.toContain('border: "1px solid var(--dg-color-border-light)"');
   });
 });

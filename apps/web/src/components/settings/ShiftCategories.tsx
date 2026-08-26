@@ -441,13 +441,13 @@ function ShiftCategoriesSettings({
                   style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   {cat.name || (
                     <span
                       style={{
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         fontStyle: "italic",
                         fontWeight: 400,
                       }}
@@ -458,7 +458,10 @@ function ShiftCategoriesSettings({
                 </span>
                 {(cat.startTime || cat.endTime) && (
                   <span
-                    style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
                   >
                     {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
                     {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
@@ -466,7 +469,7 @@ function ShiftCategoriesSettings({
                         style={{
                           marginLeft: 8,
                           fontWeight: 700,
-                          color: "var(--color-text-secondary)",
+                          color: "var(--dg-color-text-secondary)",
                         }}
                       >
                         ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
@@ -479,7 +482,7 @@ function ShiftCategoriesSettings({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-faint)",
+                    color: "var(--dg-color-text-faint)",
                     marginTop: 2,
                   }}
                 >
@@ -507,11 +510,11 @@ function ShiftCategoriesSettings({
       <div
         key={cat.id}
         style={{
-          background: "var(--color-bg-secondary)",
+          background: "var(--dg-color-bg-secondary)",
           borderRadius: "var(--dg-radius-lg)",
           padding: "14px 16px",
           margin: "8px 0",
-          border: "1px solid var(--color-border-light)",
+          border: "1px solid var(--dg-color-border-light)",
         }}
       >
         <div
@@ -531,7 +534,7 @@ function ShiftCategoriesSettings({
               maxLength={50}
               style={{
                 ...inputStyle,
-                ...(nameError || duplicateName ? { borderColor: "var(--color-danger)" } : {}),
+                ...(nameError || duplicateName ? { borderColor: "var(--dg-color-danger)" } : {}),
               }}
               autoFocus
               disabled={!canManageScheduleDefinitions}
@@ -542,7 +545,7 @@ function ShiftCategoriesSettings({
                 style={{
                   margin: "4px 0 0",
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                 }}
               >
                 {nameError ?? "Another shift in this focus area already uses that name."}
@@ -559,7 +562,7 @@ function ShiftCategoriesSettings({
               style={{
                 ...inputStyle,
                 textTransform: "uppercase",
-                ...(abbrError || duplicateCode ? { borderColor: "var(--color-danger)" } : {}),
+                ...(abbrError || duplicateCode ? { borderColor: "var(--dg-color-danger)" } : {}),
               }}
               disabled={!canManageScheduleDefinitions}
             />
@@ -569,7 +572,7 @@ function ShiftCategoriesSettings({
                 style={{
                   margin: "4px 0 0",
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                 }}
               >
                 {abbrError ?? "Another shift in this focus area already uses that code."}
@@ -658,9 +661,9 @@ function ShiftCategoriesSettings({
               alignItems: "center",
               gap: 4,
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border-light)",
+              color: "var(--dg-color-text-muted)",
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border-light)",
               borderRadius: 6,
               padding: "4px 10px",
               marginBottom: 12,
@@ -674,7 +677,7 @@ function ShiftCategoriesSettings({
                 return (
                   <>
                     Gross: {gross} · Break: {effectiveBreak}m · Net:{" "}
-                    <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                    <span style={{ fontWeight: 700, color: "var(--dg-color-text-secondary)" }}>
                       {net}
                     </span>
                   </>
@@ -683,7 +686,7 @@ function ShiftCategoriesSettings({
               return (
                 <>
                   Duration:{" "}
-                  <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                  <span style={{ fontWeight: 700, color: "var(--dg-color-text-secondary)" }}>
                     {gross}
                   </span>
                 </>
@@ -746,7 +749,9 @@ function ShiftCategoriesSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
+      <p
+        style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)", margin: 0 }}
+      >
         Define the primary shift blocks for each focus area (for example Day, Evening, and Night).
       </p>
 
@@ -764,22 +769,22 @@ function ShiftCategoriesSettings({
           <div
             key={focusArea.id}
             style={{
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               overflow: "hidden",
             }}
           >
             <div
               style={{
                 padding: "12px 16px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 fontWeight: 700,
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               {focusArea.name}
@@ -790,7 +795,7 @@ function ShiftCategoriesSettings({
                   <React.Fragment key={cat.id}>
                     {renderCategoryRow(cat)}
                     {i < areaCats.length - 1 && (
-                      <div style={{ height: 1, background: "var(--color-border-light)" }} />
+                      <div style={{ height: 1, background: "var(--dg-color-border-light)" }} />
                     )}
                   </React.Fragment>
                 ))}

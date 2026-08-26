@@ -103,7 +103,7 @@ export default async function GoodbyePage({
             fontSize: "clamp(2rem, 4vw, 2.75rem)",
             fontWeight: 800,
             letterSpacing: "-0.03em",
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             lineHeight: 1.15,
           }}
         >
@@ -114,7 +114,7 @@ export default async function GoodbyePage({
           style={{
             textAlign: "center",
             fontSize: "clamp(1rem, 1.5vw, 1.125rem)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             marginBottom: "40px",
             fontWeight: 500,
             lineHeight: 1.5,

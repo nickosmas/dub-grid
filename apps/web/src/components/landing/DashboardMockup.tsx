@@ -46,10 +46,10 @@ const HERO_METRICS: Metric[] = [
    Token-driven (not the raw pastel hex the real component used to hardcode)
    so these follow the page theme instead of blowing out in dark mode. ── */
 const METRIC_ACCENTS: Record<Metric["icon"], { iconBg: string; iconColor: string }> = {
-  coverage: { iconBg: "var(--color-brand-bg)", iconColor: "var(--color-brand)" },
-  gap: { iconBg: "var(--color-danger-bg)", iconColor: "var(--color-danger-text)" },
-  approval: { iconBg: "var(--color-warning-bg)", iconColor: "var(--color-warning-text)" },
-  bars: { iconBg: "var(--color-info-bg)", iconColor: "var(--color-info)" },
+  coverage: { iconBg: "var(--dg-color-brand-bg)", iconColor: "var(--dg-color-brand)" },
+  gap: { iconBg: "var(--dg-color-danger-bg)", iconColor: "var(--dg-color-danger-text)" },
+  approval: { iconBg: "var(--dg-color-warning-bg)", iconColor: "var(--dg-color-warning-text)" },
+  bars: { iconBg: "var(--dg-color-info-bg)", iconColor: "var(--dg-color-info)" },
 };
 
 function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {
@@ -133,9 +133,9 @@ const COVERAGE = [
 ];
 
 function coverageColor(pct: number) {
-  if (pct >= 90) return "var(--color-success)";
-  if (pct >= 70) return "var(--color-warning)";
-  return "var(--color-danger)";
+  if (pct >= 90) return "var(--dg-color-success)";
+  if (pct >= 70) return "var(--dg-color-warning)";
+  return "var(--dg-color-danger)";
 }
 
 const ACTIVITY = [
@@ -160,17 +160,17 @@ const ACTIVITY = [
 ];
 
 const ACTIVITY_TONE = {
-  success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
-  neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
+  success: { bg: "var(--dg-color-success-bg)", stroke: "var(--dg-color-success-text)" },
+  neutral: { bg: "var(--dg-color-bg-secondary)", stroke: "var(--dg-color-text-secondary)" },
 };
 
 export default function DashboardMockup() {
   return (
     <div
       style={{
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         borderRadius: 14,
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         padding: "20px 24px 24px",
         maxWidth: 960,
         margin: "0 auto",
@@ -197,12 +197,12 @@ export default function DashboardMockup() {
                 width: 38,
                 height: 38,
                 borderRadius: 6,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
+                border: "1px solid var(--dg-color-border)",
+                background: "var(--dg-color-surface)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               <Icon size={14} strokeWidth={2.5} />
@@ -219,7 +219,7 @@ export default function DashboardMockup() {
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 whiteSpace: "nowrap" as const,
               }}
             >
@@ -233,11 +233,11 @@ export default function DashboardMockup() {
               alignItems: "center",
               padding: "0 14px",
               borderRadius: 6,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             This week
@@ -248,10 +248,10 @@ export default function DashboardMockup() {
         <div
           style={{
             display: "flex",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: 6,
             overflow: "hidden",
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {["Day", "Week", "2 Weeks"].map((tab, i) => (
@@ -261,9 +261,9 @@ export default function DashboardMockup() {
                 padding: "8px 14px",
                 fontSize: 12,
                 fontWeight: 600,
-                color: i === 1 ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                background: i === 1 ? "var(--color-bg-secondary)" : "transparent",
-                borderLeft: i > 0 ? "1px solid var(--color-border)" : undefined,
+                color: i === 1 ? "var(--dg-color-text-primary)" : "var(--dg-color-text-muted)",
+                background: i === 1 ? "var(--dg-color-bg-secondary)" : "transparent",
+                borderLeft: i > 0 ? "1px solid var(--dg-color-border)" : undefined,
               }}
             >
               {tab}
@@ -275,8 +275,8 @@ export default function DashboardMockup() {
       {/* ── DashboardHero — title + action + metric cards ── */}
       <div
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: 12,
           padding: "16px 18px",
           display: "grid",
@@ -298,7 +298,7 @@ export default function DashboardMockup() {
                 margin: 0,
                 fontSize: 28,
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 letterSpacing: "-0.03em",
                 lineHeight: 1.2,
               }}
@@ -308,7 +308,7 @@ export default function DashboardMockup() {
             <p
               style={{
                 margin: "6px 0 0",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 fontSize: 14,
                 maxWidth: 520,
                 lineHeight: 1.45,
@@ -326,8 +326,8 @@ export default function DashboardMockup() {
               height: 38,
               padding: "0 16px",
               borderRadius: 6,
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
+              background: "var(--dg-color-brand)",
+              color: "var(--dg-color-text-inverse)",
               fontSize: 13,
               fontWeight: 600,
               whiteSpace: "nowrap" as const,
@@ -351,8 +351,8 @@ export default function DashboardMockup() {
               <div
                 key={metric.label}
                 style={{
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--dg-color-bg)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: 10,
                   padding: "12px 14px",
                 }}
@@ -369,7 +369,7 @@ export default function DashboardMockup() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       minWidth: 0,
                     }}
                   >
@@ -394,7 +394,7 @@ export default function DashboardMockup() {
                   style={{
                     fontSize: 28,
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.04em",
                     lineHeight: 1.05,
                   }}
@@ -405,7 +405,7 @@ export default function DashboardMockup() {
                   style={{
                     marginTop: 4,
                     fontSize: 11,
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     lineHeight: 1.4,
                   }}
                 >
@@ -422,8 +422,8 @@ export default function DashboardMockup() {
         {/* Coverage by focus area card — matches CoverageBySectionCard */}
         <div
           style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: 8,
             overflow: "hidden",
           }}
@@ -431,14 +431,14 @@ export default function DashboardMockup() {
           <div
             style={{
               padding: "14px 18px",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             <div
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Coverage by focus area
@@ -446,7 +446,7 @@ export default function DashboardMockup() {
             <div
               style={{
                 fontSize: 11,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 1,
               }}
             >
@@ -470,8 +470,8 @@ export default function DashboardMockup() {
                   gap: 7,
                   padding: "14px 16px",
                   borderRadius: 8,
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--dg-color-bg)",
+                  border: "1px solid var(--dg-color-border)",
                 }}
               >
                 <div
@@ -486,13 +486,13 @@ export default function DashboardMockup() {
                     style={{
                       fontSize: 12,
                       fontWeight: 500,
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                     }}
                   >
                     {row.name}
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
+                    <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>
                       {row.filled} / {row.req} filled
                     </span>
                     <span
@@ -510,7 +510,7 @@ export default function DashboardMockup() {
                   style={{
                     height: 6,
                     borderRadius: 3,
-                    background: "var(--color-border)",
+                    background: "var(--dg-color-border)",
                     overflow: "hidden",
                   }}
                 >
@@ -530,8 +530,8 @@ export default function DashboardMockup() {
         {/* Recent activity — matches ActivityFeed */}
         <div
           style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: 8,
             overflow: "hidden",
           }}
@@ -539,14 +539,14 @@ export default function DashboardMockup() {
           <div
             style={{
               padding: "14px 18px",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             <div
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Recent activity
@@ -554,7 +554,7 @@ export default function DashboardMockup() {
             <div
               style={{
                 fontSize: 11,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 1,
               }}
             >
@@ -572,7 +572,9 @@ export default function DashboardMockup() {
                     gap: 12,
                     padding: "12px 0",
                     borderBottom:
-                      i < ACTIVITY.length - 1 ? "1px solid var(--color-border-light)" : undefined,
+                      i < ACTIVITY.length - 1
+                        ? "1px solid var(--dg-color-border-light)"
+                        : undefined,
                   }}
                 >
                   <div
@@ -593,7 +595,7 @@ export default function DashboardMockup() {
                     <div
                       style={{
                         fontSize: 12,
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         lineHeight: 1.35,
                       }}
                     >
@@ -602,7 +604,7 @@ export default function DashboardMockup() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: "var(--color-text-subtle)",
+                        color: "var(--dg-color-text-subtle)",
                         marginTop: 3,
                         textTransform: "uppercase" as const,
                         letterSpacing: "0.05em",

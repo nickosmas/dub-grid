@@ -21,9 +21,9 @@ function ReviewCountChip({ children }: { children: React.ReactNode }) {
       style={{
         padding: "3px 8px",
         borderRadius: 999,
-        border: "1px solid var(--color-border)",
-        background: "var(--color-surface)",
-        color: "var(--color-text-secondary)",
+        border: "1px solid var(--dg-color-border)",
+        background: "var(--dg-color-surface)",
+        color: "var(--dg-color-text-secondary)",
         fontWeight: 600,
       }}
     >
@@ -116,10 +116,10 @@ export default function BulkDeleteReviewContent({
           gap: 6,
           maxHeight: 280,
           overflowY: "auto",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-md)",
           padding: 8,
-          background: "var(--color-bg)",
+          background: "var(--dg-color-bg)",
         }}
       >
         {people.map((person) => (
@@ -137,7 +137,7 @@ export default function BulkDeleteReviewContent({
             <strong>{person.empName}</strong>
             <span
               style={{
-                color: "var(--color-danger-text)",
+                color: "var(--dg-color-danger-text)",
                 fontWeight: 600,
                 whiteSpace: "nowrap",
               }}

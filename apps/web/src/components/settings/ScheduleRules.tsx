@@ -153,7 +153,7 @@ export default function ScheduleRules({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Enforce shift conflict prevention
@@ -161,7 +161,7 @@ export default function ScheduleRules({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 2,
               }}
             >
@@ -184,7 +184,7 @@ export default function ScheduleRules({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Biweekly pay period start date
@@ -192,7 +192,7 @@ export default function ScheduleRules({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 2,
               }}
             >
@@ -218,7 +218,7 @@ export default function ScheduleRules({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Mentored coverage credit
@@ -226,7 +226,7 @@ export default function ScheduleRules({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 2,
               }}
             >
@@ -253,7 +253,7 @@ export default function ScheduleRules({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Show coverage shortages to staff
@@ -261,7 +261,7 @@ export default function ScheduleRules({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 2,
               }}
             >
@@ -286,7 +286,7 @@ export default function ScheduleRules({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Show call-off vacancies to staff
@@ -294,7 +294,7 @@ export default function ScheduleRules({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 2,
               }}
             >

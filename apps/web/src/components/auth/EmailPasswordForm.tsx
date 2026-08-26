@@ -35,7 +35,7 @@ export function EmailPasswordForm({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <Form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <Form onSubmit={onSubmit} className="dg-auth-form">
       <div>
         <label htmlFor="auth-email" className="dg-auth-field-label">
           Email
@@ -69,12 +69,8 @@ export function EmailPasswordForm({
       </div>
 
       {forgotPasswordHref && (
-        <div style={{ textAlign: "right", marginTop: "2px" }}>
-          <a
-            href={forgotPasswordHref}
-            className="dg-auth-link"
-            style={{ color: "var(--color-text-subtle)" }}
-          >
+        <div className="dg-auth-forgot">
+          <a href={forgotPasswordHref} className="dg-auth-link dg-auth-link--subtle">
             Forgot password?
           </a>
         </div>
@@ -83,13 +79,12 @@ export function EmailPasswordForm({
       <button
         type="submit"
         disabled={loading}
-        className="dg-btn dg-btn-primary dg-btn-lg"
-        style={{ marginTop: "4px", width: "100%" }}
+        className="dg-btn dg-btn-primary dg-btn-lg dg-auth-submit"
       >
         <ButtonLoading
           loading={loading}
           loadingLabel={submitPendingLabel}
-          spinnerColor="var(--color-text-inverse)"
+          spinnerColor="var(--dg-color-text-inverse)"
           spinnerSize={20}
         >
           {submitLabel}

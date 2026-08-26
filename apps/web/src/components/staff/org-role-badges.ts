@@ -9,8 +9,8 @@ export function getOrgRoleBadgeStyle(
   _role: DirectoryPerson["orgRole"] | null | undefined,
 ): CSSProperties {
   return {
-    background: "var(--color-bg-secondary)",
-    border: "1px solid var(--color-border-light)",
-    color: "var(--color-text-muted)",
+    background: "var(--dg-color-bg-secondary)",
+    border: "1px solid var(--dg-color-border-light)",
+    color: "var(--dg-color-text-muted)",
   };
 }

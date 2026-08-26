@@ -156,9 +156,9 @@ function CalendarField({
   return (
     <div
       className={cn(
-        "rounded-[var(--dg-radius-lg)] border bg-[var(--color-surface)]",
+        "rounded-[var(--dg-radius-lg)] border bg-[var(--dg-color-surface)]",
         compact ? "p-2" : "p-2.5",
-        error ? "border-[var(--color-danger)]" : "border-[var(--color-border)]",
+        error ? "border-[var(--dg-color-danger)]" : "border-[var(--dg-color-border)]",
       )}
     >
       <Button
@@ -170,7 +170,7 @@ function CalendarField({
       >
         <span className="min-w-0">
           {showSelectionLabel && (
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-subtle)]">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--dg-color-text-subtle)]">
               {selectionLabel}
             </span>
           )}
@@ -178,14 +178,14 @@ function CalendarField({
             className={cn(
               "block truncate font-medium",
               compact ? "text-[12px]" : "text-[13px]",
-              value ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-faint)]",
+              value ? "text-[var(--dg-color-text-secondary)]" : "text-[var(--dg-color-text-faint)]",
             )}
           >
             {value ? formatFieldDate(value) : placeholder}
           </span>
         </span>
-        <span className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-          <span className="text-[11px] font-medium text-[var(--color-text-faint)]">
+        <span className="flex items-center gap-2 text-[var(--dg-color-text-secondary)]">
+          <span className="text-[11px] font-medium text-[var(--dg-color-text-faint)]">
             {expanded ? "Close" : "Edit"}
           </span>
           <ChevronDown
@@ -204,14 +204,14 @@ function CalendarField({
       >
         <div className="overflow-hidden">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="min-w-[8.75rem] text-[12px] font-semibold text-[var(--color-text-primary)]">
+            <div className="min-w-[8.75rem] text-[12px] font-semibold text-[var(--dg-color-text-primary)]">
               {MONTH_FORMATTER.format(visibleMonth)}
             </div>
             <div className="flex items-center gap-1">
               <Button
                 type="button"
                 onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))}
-                className="flex size-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
+                className="flex size-7 items-center justify-center rounded-md text-[var(--dg-color-text-secondary)] transition-colors hover:bg-[var(--dg-color-bg-secondary)] hover:text-[var(--dg-color-text-primary)]"
                 aria-label={`Show ${MONTH_FORMATTER.format(shiftMonth(visibleMonth, -1))}`}
                 tabIndex={expanded ? 0 : -1}
               >
@@ -220,7 +220,7 @@ function CalendarField({
               <Button
                 type="button"
                 onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))}
-                className="flex size-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
+                className="flex size-7 items-center justify-center rounded-md text-[var(--dg-color-text-secondary)] transition-colors hover:bg-[var(--dg-color-bg-secondary)] hover:text-[var(--dg-color-text-primary)]"
                 aria-label={`Show ${MONTH_FORMATTER.format(shiftMonth(visibleMonth, 1))}`}
                 tabIndex={expanded ? 0 : -1}
               >
@@ -234,7 +234,7 @@ function CalendarField({
               <div
                 key={weekday}
                 className={cn(
-                  "flex items-center justify-center font-medium text-[var(--color-text-subtle)]",
+                  "flex items-center justify-center font-medium text-[var(--dg-color-text-subtle)]",
                   compact ? "h-6 text-[10px]" : "h-7 text-[10px]",
                 )}
               >
@@ -264,14 +264,14 @@ function CalendarField({
                     "relative flex items-center justify-center rounded-lg transition-colors",
                     compact ? "h-7 text-[11px]" : "h-8 text-[12px]",
                     isSelected
-                      ? "bg-[var(--color-brand)] font-semibold text-[var(--color-text-inverse)]"
+                      ? "bg-[var(--dg-color-brand)] font-semibold text-[var(--dg-color-text-inverse)]"
                       : isDisabled
-                        ? "cursor-not-allowed text-[var(--color-text-faint)] opacity-35"
-                        : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]",
+                        ? "cursor-not-allowed text-[var(--dg-color-text-faint)] opacity-35"
+                        : "text-[var(--dg-color-text-primary)] hover:bg-[var(--dg-color-bg-secondary)]",
                     !isSelected &&
                       !isDisabled &&
                       !isCurrentMonth &&
-                      "text-[var(--color-text-faint)]",
+                      "text-[var(--dg-color-text-faint)]",
                   )}
                 >
                   <span>{day.getDate()}</span>
@@ -279,7 +279,9 @@ function CalendarField({
                     <span
                       className={cn(
                         "absolute bottom-1 h-1 w-1 rounded-full",
-                        isSelected ? "bg-[var(--color-text-inverse)]" : "bg-[var(--color-brand)]",
+                        isSelected
+                          ? "bg-[var(--dg-color-text-inverse)]"
+                          : "bg-[var(--dg-color-brand)]",
                       )}
                     />
                   )}
@@ -396,9 +398,10 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       secondaryLabel: null,
     };
   }, [absenceType, shiftCategory, assignment, shiftJob, shiftLabel]);
-  const previewBackground = absenceType?.color ?? assignment?.color ?? "var(--color-bg-secondary)";
-  const previewText = absenceType?.text ?? assignment?.text ?? "var(--color-text-secondary)";
-  const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--color-border)";
+  const previewBackground =
+    absenceType?.color ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
+  const previewText = absenceType?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
+  const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--dg-color-border)";
 
   function toggleDay(day: number) {
     setDaysOfWeek((prev) =>
@@ -543,7 +546,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                     style={{
                       width: 1,
                       height: 16,
-                      background: showDivider ? "var(--color-border)" : "transparent",
+                      background: showDivider ? "var(--dg-color-border)" : "transparent",
                       flexShrink: 0,
                       alignSelf: "center",
                     }}
@@ -586,9 +589,9 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                     width: 48,
                     height: 48,
                     borderRadius: "50%",
-                    border: `1.5px solid ${active ? "var(--color-brand)" : "var(--color-border)"}`,
-                    background: active ? "var(--color-brand)" : "var(--color-surface)",
-                    color: active ? "var(--color-text-inverse)" : "var(--color-text-muted)",
+                    border: `1.5px solid ${active ? "var(--dg-color-brand)" : "var(--dg-color-border)"}`,
+                    background: active ? "var(--dg-color-brand)" : "var(--dg-color-surface)",
+                    color: active ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-muted)",
                     fontWeight: 700,
                     fontSize: "var(--dg-fs-body)",
                     cursor: "pointer",
@@ -606,7 +609,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             <div
               style={{
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-danger)",
+                color: "var(--dg-color-danger)",
                 marginTop: 4,
               }}
             >
@@ -655,12 +658,12 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                       ? "On date"
                       : "After N occurrences"
                 }
-                style={{ accentColor: "var(--color-brand)" }}
+                style={{ accentColor: "var(--dg-color-brand)" }}
               />
               <span
                 style={{
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                   fontWeight: 500,
                 }}
               >
@@ -705,7 +708,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           <div
             style={{
               fontSize: "var(--dg-fs-footnote)",
-              color: "var(--color-danger)",
+              color: "var(--dg-color-danger)",
               marginTop: 4,
             }}
           >
@@ -716,7 +719,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           <div
             style={{
               fontSize: "var(--dg-fs-footnote)",
-              color: "var(--color-danger)",
+              color: "var(--dg-color-danger)",
               marginTop: 4,
             }}
           >
@@ -733,31 +736,31 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             padding: "10px 12px",
             borderRadius: 8,
             background:
-              preview.overwrites > 0 ? "var(--color-warning-bg)" : "var(--color-success-bg)",
-            border: `1px solid ${preview.overwrites > 0 ? "var(--color-warning)" : "var(--color-info-border)"}`,
+              preview.overwrites > 0 ? "var(--dg-color-warning-bg)" : "var(--dg-color-success-bg)",
+            border: `1px solid ${preview.overwrites > 0 ? "var(--dg-color-warning)" : "var(--dg-color-info-border)"}`,
             fontSize: "var(--dg-fs-caption)",
             lineHeight: 1.5,
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
           }}
         >
           <div style={{ fontWeight: 600 }}>
             {preview.total} {isAbsence ? "off day" : "shift"}
             {preview.total === 1 ? "" : "s"} will be created
             {endType === "never" && (
-              <span style={{ fontWeight: 400, color: "var(--color-text-subtle)" }}>
+              <span style={{ fontWeight: 400, color: "var(--dg-color-text-subtle)" }}>
                 {" "}
                 (6-month max)
               </span>
             )}
           </div>
           {isCapped && (
-            <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
+            <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
               Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date
               range or &ldquo;After N occurrences&rdquo; for more control.
             </div>
           )}
           {preview.overwrites > 0 && (
-            <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
+            <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
               {preview.overwrites} existing {isAbsence ? "entry" : "shift"}
               {preview.overwrites === 1 ? "" : "s"} will be overwritten.
             </div>
@@ -787,7 +790,7 @@ const badgeRowStyle: React.CSSProperties = {
 const badgeLabelStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-body)",
   fontWeight: 700,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
   lineHeight: 1.1,
@@ -824,7 +827,7 @@ const endOptionsStyle: React.CSSProperties = {
 const sectionLabelStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-footnote)",
   fontWeight: 700,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
   lineHeight: 1.1,

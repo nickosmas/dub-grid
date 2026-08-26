@@ -62,8 +62,8 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         fontWeight: 600,
         padding: "2px 8px",
         borderRadius: 4,
-        background: "var(--color-danger-bg)",
-        color: "var(--color-danger)",
+        background: "var(--dg-color-danger-bg)",
+        color: "var(--dg-color-danger)",
         textTransform: "uppercase",
         marginLeft: 4,
       }}
@@ -251,7 +251,7 @@ export default function AllUsersView({
                 display: "flex",
                 gap: 16,
                 padding: "12px 14px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
               }}
             >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "25%" }} />
@@ -275,7 +275,7 @@ export default function AllUsersView({
           margin: "0 0 16px",
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         All Users
@@ -285,8 +285,8 @@ export default function AllUsersView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -307,7 +307,7 @@ export default function AllUsersView({
             style={{
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               textTransform: "uppercase",
               whiteSpace: "nowrap",
             }}
@@ -359,7 +359,7 @@ export default function AllUsersView({
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--color-today-text)",
+                color: "var(--dg-color-today-text)",
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
                 cursor: "pointer",
@@ -378,7 +378,7 @@ export default function AllUsersView({
             aria-live="polite"
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               whiteSpace: "nowrap",
             }}
           >
@@ -399,7 +399,7 @@ export default function AllUsersView({
                 left: 10,
                 top: "50%",
                 transform: "translateY(-50%)",
-                color: "var(--color-text-faint)",
+                color: "var(--dg-color-text-faint)",
               }}
             >
               <circle cx="11" cy="11" r="8" />
@@ -414,8 +414,8 @@ export default function AllUsersView({
                 paddingLeft: 32,
                 paddingRight: search ? 30 : 12,
                 fontSize: "var(--dg-fs-caption)",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border-light)",
+                background: "var(--dg-color-surface)",
+                border: "1px solid var(--dg-color-border-light)",
               }}
             />
             {search && (
@@ -480,7 +480,7 @@ export default function AllUsersView({
                             style={{
                               background: "none",
                               border: "none",
-                              color: "var(--color-info)",
+                              color: "var(--dg-color-info)",
                               cursor: "pointer",
                               fontSize: "var(--dg-fs-label)",
                               fontWeight: 500,
@@ -492,7 +492,7 @@ export default function AllUsersView({
                             {u.orgName}
                           </Button>
                         ) : (
-                          <span style={{ color: "var(--color-text-muted)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-muted)" }}>—</span>
                         )}
                       </td>
                       <td
@@ -526,7 +526,7 @@ export default function AllUsersView({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -544,7 +544,7 @@ export default function AllUsersView({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -641,8 +641,8 @@ export default function AllUsersView({
           const emailName = u.email?.split("@")[0] ?? "";
           const initials = emailName.slice(0, 2).toUpperCase();
           const badgeColor = isGM
-            ? "var(--color-brand)"
-            : (ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--color-bg-secondary)");
+            ? "var(--dg-color-brand)"
+            : (ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--dg-color-bg-secondary)");
           return (
             <>
               <div
@@ -680,7 +680,7 @@ export default function AllUsersView({
                       margin: "0 0 6px",
                       fontSize: "var(--dg-fs-body-sm)",
                       fontWeight: 700,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                       textAlign: "center",
                       wordBreak: "break-all",
                     }}
@@ -712,14 +712,14 @@ export default function AllUsersView({
                       gap: "14px 24px",
                       fontSize: "var(--dg-fs-label)",
                       padding: 16,
-                      background: "var(--color-bg)",
+                      background: "var(--dg-color-bg)",
                       borderRadius: "var(--dg-radius-md)",
                     }}
                   >
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -730,7 +730,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           marginTop: 2,
                           fontWeight: 500,
                         }}
@@ -741,7 +741,7 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -752,7 +752,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           marginTop: 2,
                           fontWeight: 500,
                         }}
@@ -768,7 +768,7 @@ export default function AllUsersView({
                       <div>
                         <span
                           style={{
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
                             textTransform: "uppercase",
@@ -786,7 +786,7 @@ export default function AllUsersView({
                             style={{
                               background: "none",
                               border: "none",
-                              color: "var(--color-info)",
+                              color: "var(--dg-color-info)",
                               cursor: "pointer",
                               fontSize: "var(--dg-fs-label)",
                               fontWeight: 500,
@@ -803,7 +803,7 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -814,7 +814,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           marginTop: 2,
                           fontSize: "var(--dg-fs-footnote)",
                           fontFamily: "var(--font-dm-mono), monospace",
@@ -826,7 +826,7 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -837,7 +837,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           marginTop: 2,
                           fontWeight: 500,
                         }}
@@ -848,7 +848,7 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -859,7 +859,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           marginTop: 2,
                           fontWeight: 500,
                         }}
@@ -870,7 +870,7 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
                           textTransform: "uppercase",
@@ -881,7 +881,7 @@ export default function AllUsersView({
                       </span>
                       <div
                         style={{
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           marginTop: 2,
                           fontWeight: 500,
                         }}
@@ -899,7 +899,7 @@ export default function AllUsersView({
                           margin: "0 0 8px",
                           fontSize: "var(--dg-fs-caption)",
                           fontWeight: 700,
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                         }}
                       >
                         Organization Memberships
@@ -942,7 +942,7 @@ export default function AllUsersView({
                         <div
                           style={{
                             padding: 16,
-                            color: "var(--color-danger)",
+                            color: "var(--dg-color-danger)",
                             fontSize: "var(--dg-fs-label)",
                           }}
                         >
@@ -972,7 +972,7 @@ export default function AllUsersView({
                                     style={{
                                       background: "none",
                                       border: "none",
-                                      color: "var(--color-info)",
+                                      color: "var(--dg-color-info)",
                                       cursor: "pointer",
                                       fontSize: "var(--dg-fs-label)",
                                       fontWeight: 600,
@@ -991,7 +991,7 @@ export default function AllUsersView({
                                   style={{
                                     ...tdStyle,
                                     fontSize: "var(--dg-fs-caption)",
-                                    color: "var(--color-text-muted)",
+                                    color: "var(--dg-color-text-muted)",
                                   }}
                                 >
                                   {new Date(m.joined_at).toLocaleDateString("en-US", {
@@ -1016,7 +1016,7 @@ export default function AllUsersView({
                         gap: 8,
                         flexWrap: "wrap",
                         paddingTop: 16,
-                        borderTop: "1px solid var(--color-border-light)",
+                        borderTop: "1px solid var(--dg-color-border-light)",
                       }}
                     >
                       <Button
@@ -1035,8 +1035,8 @@ export default function AllUsersView({
                           style={{
                             fontSize: "var(--dg-fs-label)",
                             color: isDeactivated
-                              ? "var(--color-success, green)"
-                              : "var(--color-warning, orange)",
+                              ? "var(--dg-color-success, green)"
+                              : "var(--dg-color-warning, orange)",
                           }}
                           onClick={() => setDeactivateConfirm(u)}
                           disabled={actionLoading === u.id}
@@ -1046,7 +1046,7 @@ export default function AllUsersView({
                       )}
                       <Button
                         className="dg-btn dg-btn-secondary"
-                        style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}
+                        style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-danger)" }}
                         onClick={() => setForceLogoutConfirm(u)}
                         disabled={actionLoading === u.id}
                       >

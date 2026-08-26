@@ -113,8 +113,8 @@ export function StaffReadOnlyDetailPanel({
         <div
           className="staff-detail-header"
           style={{
-            background: `linear-gradient(180deg, ${avatarTone.backgroundColor} 0%, var(--color-surface) 100%)`,
-            borderBottom: "1px solid var(--color-border)",
+            background: `linear-gradient(180deg, ${avatarTone.backgroundColor} 0%, var(--dg-color-surface) 100%)`,
+            borderBottom: "1px solid var(--dg-color-border)",
           }}
         >
           <CloseButton
@@ -159,7 +159,7 @@ export function StaffReadOnlyDetailPanel({
                   style={{
                     fontWeight: 700,
                     fontSize: 18,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -178,9 +178,9 @@ export function StaffReadOnlyDetailPanel({
                     fontWeight: 600,
                     padding: "3px 9px",
                     borderRadius: 20,
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-muted)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-muted)",
+                    border: "1px solid var(--dg-color-border)",
                     flexShrink: 0,
                   }}
                 >
@@ -248,7 +248,7 @@ export function StaffReadOnlyDetailPanel({
                   <a
                     href={`mailto:${employee.email}`}
                     style={{
-                      color: "var(--color-link)",
+                      color: "var(--dg-color-link)",
                       textDecoration: "none",
                       fontWeight: 500,
                     }}
@@ -256,7 +256,7 @@ export function StaffReadOnlyDetailPanel({
                     {employee.email}
                   </a>
                 ) : (
-                  <span style={{ color: "var(--color-text-faint)" }}>—</span>
+                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
                 )
               }
             />
@@ -268,7 +268,7 @@ export function StaffReadOnlyDetailPanel({
                   <a
                     href={`tel:${employee.phone}`}
                     style={{
-                      color: "var(--color-link)",
+                      color: "var(--dg-color-link)",
                       textDecoration: "none",
                       fontWeight: 500,
                     }}
@@ -276,7 +276,7 @@ export function StaffReadOnlyDetailPanel({
                     {employee.phone}
                   </a>
                 ) : (
-                  <span style={{ color: "var(--color-text-faint)" }}>—</span>
+                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
                 )
               }
               isLast
@@ -302,7 +302,7 @@ export function StaffReadOnlyDetailPanel({
                 alignItems: "center",
                 gap: 6,
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-faint)",
+                color: "var(--dg-color-text-faint)",
               }}
             >
               <Calendar size={12} strokeWidth={2} />
@@ -331,7 +331,7 @@ function ReadOnlySection({ title, children }: { title: string; children: ReactNo
           margin: "0 0 10px 2px",
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 700,
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           letterSpacing: "0.07em",
           textTransform: "uppercase",
         }}
@@ -340,8 +340,8 @@ function ReadOnlySection({ title, children }: { title: string; children: ReactNo
       </h3>
       <div
         style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: "var(--dg-color-surface)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-lg)",
           overflow: "hidden",
         }}
@@ -370,7 +370,7 @@ function ReadOnlyRow({
         alignItems: "center",
         gap: 14,
         padding: "12px 14px",
-        borderBottom: isLast ? "none" : "1px solid var(--color-border)",
+        borderBottom: isLast ? "none" : "1px solid var(--dg-color-border)",
       }}
     >
       <span
@@ -381,8 +381,8 @@ function ReadOnlyRow({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-bg-secondary)",
-          color: "var(--color-text-muted)",
+          background: "var(--dg-color-bg-secondary)",
+          color: "var(--dg-color-text-muted)",
           flexShrink: 0,
         }}
       >
@@ -391,7 +391,7 @@ function ReadOnlyRow({
       <span
         style={{
           fontSize: "var(--dg-fs-caption)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           fontWeight: 500,
           flexShrink: 0,
           width: 110,
@@ -402,7 +402,7 @@ function ReadOnlyRow({
       <span
         style={{
           fontSize: "var(--dg-fs-body)",
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           fontWeight: 500,
           flex: 1,
           minWidth: 0,

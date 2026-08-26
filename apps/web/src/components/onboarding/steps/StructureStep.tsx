@@ -177,7 +177,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
         <p
           style={{
             fontSize: 13,
-            color: "var(--color-warning-text)",
+            color: "var(--dg-color-warning-text)",
             marginTop: 12,
             textAlign: "center",
           }}

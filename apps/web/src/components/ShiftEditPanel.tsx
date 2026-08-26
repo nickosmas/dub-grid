@@ -238,9 +238,9 @@ function parseMultiTimes(time: string | null | undefined, count: number): (strin
 function getPanelDiffBadgeBackground(kind: ShiftDiffBadgeDescriptor["kind"]): string {
   switch (kind) {
     case "new":
-      return "var(--color-success-text)";
+      return "var(--dg-color-success-text)";
     default:
-      return "var(--color-warning)";
+      return "var(--dg-color-warning)";
   }
 }
 
@@ -250,10 +250,10 @@ const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
 function getPanelDiffBorder(args: { diffKind: ShiftDiffBorderKind; fallback: string }): string {
   const { diffKind, fallback } = args;
   if (diffKind === "new") {
-    return `2px dashed var(--color-success-text)`;
+    return `2px dashed var(--dg-color-success-text)`;
   }
   if (diffKind === "modified") {
-    return `2px dashed var(--color-warning)`;
+    return `2px dashed var(--dg-color-warning)`;
   }
   return fallback;
 }
@@ -1016,9 +1016,9 @@ export default function ShiftEditPanel({
     }
     return (
       assignments.find((st) => st.label === label) ?? {
-        color: "var(--color-bg)",
-        border: "var(--color-border)",
-        text: "var(--color-text-muted)",
+        color: "var(--dg-color-bg)",
+        border: "var(--dg-color-border)",
+        text: "var(--dg-color-text-muted)",
       }
     );
   }
@@ -1027,7 +1027,7 @@ export default function ShiftEditPanel({
     marginBottom: 8,
     fontSize: "var(--dg-fs-badge)",
     fontWeight: 700,
-    color: "var(--color-text-subtle)",
+    color: "var(--dg-color-text-subtle)",
     textTransform: "uppercase",
     letterSpacing: "0.06em",
   };
@@ -1530,8 +1530,8 @@ export default function ShiftEditPanel({
       textAlign: "left",
       whiteSpace: "normal",
       cursor: "pointer",
-      background: "var(--color-surface)",
-      border: "1px solid var(--color-border)",
+      background: "var(--dg-color-surface)",
+      border: "1px solid var(--dg-color-border)",
       position: "relative",
     };
 
@@ -1539,12 +1539,12 @@ export default function ShiftEditPanel({
       fontSize: "var(--dg-fs-label)",
       fontWeight: 700,
       lineHeight: 1.2,
-      color: "var(--color-text-primary)",
+      color: "var(--dg-color-text-primary)",
     };
 
     const choiceBodyStyle: React.CSSProperties = {
       fontSize: "var(--dg-fs-body-sm)",
-      color: "var(--color-text-secondary)",
+      color: "var(--dg-color-text-secondary)",
       lineHeight: 1.5,
     };
 
@@ -1562,7 +1562,7 @@ export default function ShiftEditPanel({
         <div
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             lineHeight: 1.5,
           }}
         >
@@ -1579,10 +1579,12 @@ export default function ShiftEditPanel({
             disabled={!onMakeAvailable}
             style={{
               ...choiceButtonBaseStyle,
-              borderColor: showPickupTargetOptions ? "var(--color-brand)" : "var(--color-border)",
+              borderColor: showPickupTargetOptions
+                ? "var(--dg-color-brand)"
+                : "var(--dg-color-border)",
               background: showPickupTargetOptions
-                ? "var(--color-bg-secondary)"
-                : "var(--color-surface)",
+                ? "var(--dg-color-bg-secondary)"
+                : "var(--dg-color-surface)",
               opacity: onMakeAvailable ? 1 : 0.6,
               cursor: onMakeAvailable ? "pointer" : "not-allowed",
             }}
@@ -1597,8 +1599,8 @@ export default function ShiftEditPanel({
                   width: 20,
                   height: 20,
                   borderRadius: 999,
-                  background: "var(--color-brand)",
-                  color: "var(--color-text-inverse)",
+                  background: "var(--dg-color-brand)",
+                  color: "var(--dg-color-text-inverse)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1637,10 +1639,10 @@ export default function ShiftEditPanel({
             disabled={!onCallOff || activeAbsenceTypes.length === 0}
             style={{
               ...choiceButtonBaseStyle,
-              borderColor: "var(--color-danger-border)",
+              borderColor: "var(--dg-color-danger-border)",
               background: showCoverageCalloffOptions
-                ? "var(--color-danger-bg)"
-                : "var(--color-surface)",
+                ? "var(--dg-color-danger-bg)"
+                : "var(--dg-color-surface)",
               cursor: onCallOff && activeAbsenceTypes.length > 0 ? "pointer" : "not-allowed",
               opacity: onCallOff && activeAbsenceTypes.length > 0 ? 1 : 0.6,
             }}
@@ -1655,8 +1657,8 @@ export default function ShiftEditPanel({
                   width: 20,
                   height: 20,
                   borderRadius: 999,
-                  background: "var(--color-danger-text)",
-                  color: "var(--color-text-inverse)",
+                  background: "var(--dg-color-danger-text)",
+                  color: "var(--dg-color-text-inverse)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1670,7 +1672,7 @@ export default function ShiftEditPanel({
               <div
                 style={{
                   ...choiceTitleStyle,
-                  color: "var(--color-danger-text)",
+                  color: "var(--dg-color-danger-text)",
                   paddingRight: 28,
                 }}
               >
@@ -1689,10 +1691,10 @@ export default function ShiftEditPanel({
             style={{
               padding: "12px 14px",
               borderRadius: 12,
-              border: "1px solid var(--color-warning-border)",
-              background: "var(--color-warning-bg)",
+              border: "1px solid var(--dg-color-warning-border)",
+              background: "var(--dg-color-warning-bg)",
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-warning-text)",
+              color: "var(--dg-color-warning-text)",
               lineHeight: 1.5,
             }}
           >
@@ -1733,7 +1735,7 @@ export default function ShiftEditPanel({
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Request specific person
@@ -1753,7 +1755,7 @@ export default function ShiftEditPanel({
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: 12,
                   overflow: "hidden",
                   flex: 1,
@@ -1766,7 +1768,7 @@ export default function ShiftEditPanel({
                     style={{
                       padding: "18px 14px",
                       textAlign: "center",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       fontSize: "var(--dg-fs-body-sm)",
                     }}
                   >
@@ -1810,10 +1812,10 @@ export default function ShiftEditPanel({
                           border: "none",
                           borderBottom:
                             index < targetedPickupTargets.length - 1
-                              ? "1px solid var(--color-border)"
+                              ? "1px solid var(--dg-color-border)"
                               : "none",
-                          background: "var(--color-surface)",
-                          color: "var(--color-text-primary)",
+                          background: "var(--dg-color-surface)",
+                          color: "var(--dg-color-text-primary)",
                           fontFamily: "inherit",
                           fontSize: "var(--dg-fs-body-sm)",
                           cursor: "pointer",
@@ -1826,7 +1828,7 @@ export default function ShiftEditPanel({
                         </span>
                         <span
                           style={{
-                            color: "var(--color-text-secondary)",
+                            color: "var(--dg-color-text-secondary)",
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 600,
                             textAlign: "right",
@@ -1851,15 +1853,15 @@ export default function ShiftEditPanel({
               gap: 10,
               padding: "14px 16px",
               borderRadius: 12,
-              border: "1px solid var(--color-danger-border)",
-              background: "var(--color-surface)",
+              border: "1px solid var(--dg-color-danger-border)",
+              background: "var(--dg-color-surface)",
             }}
           >
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-danger-text)",
+                color: "var(--dg-color-danger-text)",
               }}
             >
               Select absence reason
@@ -1881,9 +1883,9 @@ export default function ShiftEditPanel({
                     fontSize: "var(--dg-fs-body-sm)",
                     padding: "12px 14px",
                     borderRadius: 12,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                    color: "var(--color-text-primary)",
+                    border: "1px solid var(--dg-color-border)",
+                    background: "var(--dg-color-surface)",
+                    color: "var(--dg-color-text-primary)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -1898,7 +1900,7 @@ export default function ShiftEditPanel({
                   <span>{at.name}</span>
                   <span
                     style={{
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 700,
                       flexShrink: 0,
@@ -1916,7 +1918,7 @@ export default function ShiftEditPanel({
               style={{
                 width: "100%",
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 fontFamily: "inherit",
                 border: "none",
                 background: "transparent",
@@ -1937,7 +1939,7 @@ export default function ShiftEditPanel({
               paddingTop: 12,
               paddingBottom: 2,
               background:
-                "linear-gradient(to bottom, rgba(255,255,255,0), var(--color-surface) 28px)",
+                "linear-gradient(to bottom, rgba(255,255,255,0), var(--dg-color-surface) 28px)",
               zIndex: 1,
             }}
           >
@@ -1976,8 +1978,8 @@ export default function ShiftEditPanel({
           style={{
             padding: "12px 14px",
             borderRadius: 12,
-            border: "1px solid var(--color-border)",
-            background: "var(--color-bg-secondary)",
+            border: "1px solid var(--dg-color-border)",
+            background: "var(--dg-color-bg-secondary)",
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -1987,7 +1989,7 @@ export default function ShiftEditPanel({
             style={{
               fontSize: "var(--dg-fs-badge)",
               fontWeight: 700,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               textTransform: "uppercase",
               letterSpacing: "0.06em",
             }}
@@ -1998,7 +2000,7 @@ export default function ShiftEditPanel({
             <div
               style={{
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -2008,7 +2010,7 @@ export default function ShiftEditPanel({
               <span
                 style={{
                   fontWeight: 500,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                   marginLeft: 8,
                 }}
               >
@@ -2020,7 +2022,7 @@ export default function ShiftEditPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
                 marginTop: 4,
               }}
             >
@@ -2037,8 +2039,8 @@ export default function ShiftEditPanel({
               gap: 12,
               padding: "14px 16px",
               borderRadius: 12,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
             }}
           >
             <div>
@@ -2046,7 +2048,7 @@ export default function ShiftEditPanel({
                 style={{
                   fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                   marginBottom: 4,
@@ -2058,7 +2060,7 @@ export default function ShiftEditPanel({
                 <div
                   style={{
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -2068,7 +2070,7 @@ export default function ShiftEditPanel({
                   <span
                     style={{
                       fontWeight: 500,
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       marginLeft: 8,
                     }}
                   >
@@ -2080,7 +2082,7 @@ export default function ShiftEditPanel({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     marginTop: 4,
                   }}
                 >
@@ -2091,12 +2093,12 @@ export default function ShiftEditPanel({
               ) : null}
             </div>
 
-            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 12 }}>
+            <div style={{ borderTop: "1px solid var(--dg-color-border)", paddingTop: 12 }}>
               <div
                 style={{
                   fontSize: "var(--dg-fs-badge)",
                   fontWeight: 700,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                   marginBottom: 4,
@@ -2108,7 +2110,7 @@ export default function ShiftEditPanel({
                 <div
                   style={{
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -2118,7 +2120,7 @@ export default function ShiftEditPanel({
                   <span
                     style={{
                       fontWeight: 500,
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       marginLeft: 8,
                     }}
                   >
@@ -2129,7 +2131,7 @@ export default function ShiftEditPanel({
               <div
                 style={{
                   fontSize: "var(--dg-fs-caption)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginTop: 4,
                 }}
               >
@@ -2139,7 +2141,7 @@ export default function ShiftEditPanel({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     marginTop: 4,
                   }}
                 >
@@ -2186,7 +2188,7 @@ export default function ShiftEditPanel({
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Eligible teammates
@@ -2221,7 +2223,7 @@ export default function ShiftEditPanel({
                   aria-label={`Current swap week ${swapWeekRangeLabel}`}
                   style={{
                     textAlign: "center",
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     fontSize: "var(--dg-fs-body-sm)",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
@@ -2273,9 +2275,11 @@ export default function ShiftEditPanel({
                     style={{
                       minHeight: 68,
                       borderRadius: 10,
-                      border: `1px solid ${active ? "var(--color-brand)" : "var(--color-border)"}`,
-                      background: active ? "var(--color-bg-secondary)" : "var(--color-surface)",
-                      color: active ? "var(--color-brand)" : "var(--color-text-primary)",
+                      border: `1px solid ${active ? "var(--dg-color-brand)" : "var(--dg-color-border)"}`,
+                      background: active
+                        ? "var(--dg-color-bg-secondary)"
+                        : "var(--dg-color-surface)",
+                      color: active ? "var(--dg-color-brand)" : "var(--dg-color-text-primary)",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -2291,7 +2295,7 @@ export default function ShiftEditPanel({
                       style={{
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: active ? "var(--color-brand)" : "var(--color-text-subtle)",
+                        color: active ? "var(--dg-color-brand)" : "var(--dg-color-text-subtle)",
                         textTransform: "uppercase",
                       }}
                     >
@@ -2313,7 +2317,7 @@ export default function ShiftEditPanel({
                         gap: 3,
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       <User aria-hidden="true" focusable="false" size={11} strokeWidth={2.4} />
@@ -2328,10 +2332,10 @@ export default function ShiftEditPanel({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: 12,
                 overflow: "hidden",
-                background: "var(--color-surface)",
+                background: "var(--dg-color-surface)",
                 flex: 1,
                 minHeight: 0,
                 overflowY: "auto",
@@ -2342,7 +2346,7 @@ export default function ShiftEditPanel({
                   style={{
                     padding: "22px 16px",
                     textAlign: "center",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     fontSize: "var(--dg-fs-body-sm)",
                     lineHeight: 1.5,
                   }}
@@ -2352,7 +2356,7 @@ export default function ShiftEditPanel({
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       marginTop: 4,
-                      color: "var(--color-text-faint)",
+                      color: "var(--dg-color-text-faint)",
                     }}
                   >
                     Try another day.
@@ -2408,10 +2412,10 @@ export default function ShiftEditPanel({
                           border: "none",
                           borderBottom:
                             index < eligibleSwapEmployees.length - 1
-                              ? "1px solid var(--color-border)"
+                              ? "1px solid var(--dg-color-border)"
                               : "none",
-                          background: "var(--color-surface)",
-                          color: "var(--color-text-primary)",
+                          background: "var(--dg-color-surface)",
+                          color: "var(--dg-color-text-primary)",
                           fontFamily: "inherit",
                           fontSize: "var(--dg-fs-body-sm)",
                           cursor: "pointer",
@@ -2423,7 +2427,7 @@ export default function ShiftEditPanel({
                         </span>
                         <span
                           style={{
-                            color: "var(--color-text-secondary)",
+                            color: "var(--dg-color-text-secondary)",
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 600,
                           }}
@@ -2435,7 +2439,7 @@ export default function ShiftEditPanel({
                         {timeLabel || focusAreaLabel ? (
                           <span
                             style={{
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               fontSize: "var(--dg-fs-caption)",
                             }}
                           >
@@ -2477,20 +2481,20 @@ export default function ShiftEditPanel({
       padding: "10px 12px",
       borderRadius: 10,
       border: `1px solid ${
-        tone === "danger" && isActive ? "var(--color-danger-border)" : "var(--color-border)"
+        tone === "danger" && isActive ? "var(--dg-color-danger-border)" : "var(--dg-color-border)"
       }`,
       background:
         tone === "danger" && isActive
-          ? "var(--color-danger-bg)"
+          ? "var(--dg-color-danger-bg)"
           : isActive
-            ? "var(--color-bg-secondary)"
-            : "var(--color-surface)",
+            ? "var(--dg-color-bg-secondary)"
+            : "var(--dg-color-surface)",
       color:
         tone === "danger" && isActive
-          ? "var(--color-danger-text)"
+          ? "var(--dg-color-danger-text)"
           : isActive
-            ? "var(--color-text-primary)"
-            : "var(--color-text-secondary)",
+            ? "var(--dg-color-text-primary)"
+            : "var(--dg-color-text-secondary)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -2541,15 +2545,15 @@ export default function ShiftEditPanel({
               gap: 8,
               padding: "12px 14px",
               borderRadius: 12,
-              border: "1px solid var(--color-brand)",
-              background: "var(--color-bg-secondary)",
+              border: "1px solid var(--dg-color-brand)",
+              background: "var(--dg-color-bg-secondary)",
             }}
           >
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Choose shift
@@ -2571,14 +2575,14 @@ export default function ShiftEditPanel({
                       borderRadius: 10,
                       border: `1px solid ${
                         selectedRequesterSegmentIndex === option.segmentIndex
-                          ? "var(--color-brand)"
-                          : "var(--color-border)"
+                          ? "var(--dg-color-brand)"
+                          : "var(--dg-color-border)"
                       }`,
                       background:
                         selectedRequesterSegmentIndex === option.segmentIndex
-                          ? "var(--color-surface)"
+                          ? "var(--dg-color-surface)"
                           : "transparent",
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -2610,8 +2614,8 @@ export default function ShiftEditPanel({
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          background: "var(--color-brand)",
-                          color: "var(--color-surface)",
+                          background: "var(--dg-color-brand)",
+                          color: "var(--dg-color-surface)",
                         }}
                       >
                         <Check aria-hidden="true" size={15} strokeWidth={3} />
@@ -2677,7 +2681,7 @@ export default function ShiftEditPanel({
           fontWeight: 800,
           letterSpacing: "0.05em",
           background: getPanelDiffBadgeBackground(badge.kind),
-          color: "var(--color-text-inverse)",
+          color: "var(--dg-color-text-inverse)",
           borderRadius: 3,
           padding: "3px 8px",
           lineHeight: 1,
@@ -2991,7 +2995,7 @@ export default function ShiftEditPanel({
                 data-shift-edit-card-body={i}
                 style={{
                   padding: "10px 12px",
-                  background: "var(--color-surface)",
+                  background: "var(--dg-color-surface)",
                   borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
                 }}
               >
@@ -3003,7 +3007,7 @@ export default function ShiftEditPanel({
                       alignItems: "center",
                       gap: 6,
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-subtle)",
+                      color: "var(--dg-color-text-subtle)",
                     }}
                   >
                     <svg
@@ -3040,7 +3044,7 @@ export default function ShiftEditPanel({
                     style={{
                       marginTop: defaultStart || defaultEnd ? 6 : 0,
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                       fontWeight: 500,
                     }}
                   >
@@ -3054,7 +3058,7 @@ export default function ShiftEditPanel({
                       paddingTop: defaultStart || defaultEnd || focusAreaLabel ? 10 : 0,
                       borderTop:
                         defaultStart || defaultEnd || focusAreaLabel
-                          ? "1px solid var(--color-border-light)"
+                          ? "1px solid var(--dg-color-border-light)"
                           : "none",
                       display: "flex",
                       alignItems: "center",
@@ -3066,7 +3070,7 @@ export default function ShiftEditPanel({
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 700,
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                       }}
                     >
                       Mentored
@@ -3136,13 +3140,13 @@ export default function ShiftEditPanel({
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 10px",
-                border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
+                border: `1.5px solid ${isActive ? color : "var(--dg-color-border)"}`,
                 borderRadius: 20,
-                background: isActive ? `${color}18` : "var(--color-surface)",
+                background: isActive ? `${color}18` : "var(--dg-color-surface)",
                 cursor: "pointer",
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: isActive ? 600 : 400,
-                color: isActive ? color : "var(--color-text-subtle)",
+                color: isActive ? color : "var(--dg-color-text-subtle)",
                 fontFamily: "inherit",
                 transition: "border-color 150ms ease, background 150ms ease",
               }}
@@ -3152,7 +3156,7 @@ export default function ShiftEditPanel({
                   width: 7,
                   height: 7,
                   borderRadius: "50%",
-                  background: isActive ? color : "var(--color-border)",
+                  background: isActive ? color : "var(--dg-color-border)",
                   flexShrink: 0,
                 }}
               />
@@ -3183,9 +3187,9 @@ export default function ShiftEditPanel({
                   alignItems: "center",
                   gap: 10,
                   padding: "10px 12px",
-                  border: `1.5px solid ${isActive ? color : "var(--color-border)"}`,
+                  border: `1.5px solid ${isActive ? color : "var(--dg-color-border)"}`,
                   borderRadius: 8,
-                  background: isActive ? `${color}18` : "var(--color-surface)",
+                  background: isActive ? `${color}18` : "var(--dg-color-surface)",
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "border-color 150ms ease, background 150ms ease",
@@ -3208,7 +3212,7 @@ export default function ShiftEditPanel({
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 700,
-                      color: isActive ? color : "var(--color-text-secondary)",
+                      color: isActive ? color : "var(--dg-color-text-secondary)",
                     }}
                   >
                     {name}
@@ -3216,7 +3220,7 @@ export default function ShiftEditPanel({
                   <div
                     style={{
                       fontSize: "var(--dg-fs-badge)",
-                      color: "var(--color-text-subtle)",
+                      color: "var(--dg-color-text-subtle)",
                       marginTop: 1,
                     }}
                   >
@@ -3270,7 +3274,7 @@ export default function ShiftEditPanel({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "16px 20px",
-              borderBottom: "1px solid var(--color-border)",
+              borderBottom: "1px solid var(--dg-color-border)",
             }}
           >
             <div>
@@ -3278,7 +3282,7 @@ export default function ShiftEditPanel({
                 style={{
                   fontSize: "var(--dg-fs-title)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 Shift requests
@@ -3286,7 +3290,7 @@ export default function ShiftEditPanel({
               <div
                 style={{
                   fontSize: "var(--dg-fs-caption)",
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                   marginTop: 2,
                 }}
               >
@@ -3322,8 +3326,8 @@ export default function ShiftEditPanel({
               style={{
                 flexShrink: 0,
                 padding: "12px 20px 20px",
-                borderTop: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
+                borderTop: "1px solid var(--dg-color-border)",
+                background: "var(--dg-color-surface)",
               }}
             >
               <Button
@@ -3364,12 +3368,12 @@ export default function ShiftEditPanel({
         <div
           style={{
             padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
             display: "flex",
             alignItems: "center",
             gap: 12,
             flexShrink: 0,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
           }}
         >
           {isMobile && (
@@ -3395,7 +3399,7 @@ export default function ShiftEditPanel({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-text-primary)"
+                stroke="var(--dg-color-text-primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -3409,7 +3413,7 @@ export default function ShiftEditPanel({
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               {modal.empName}
@@ -3417,7 +3421,7 @@ export default function ShiftEditPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 marginTop: 2,
               }}
             >
@@ -3427,7 +3431,7 @@ export default function ShiftEditPanel({
                   {" · "}
                   <span
                     style={{
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       fontWeight: 500,
                     }}
                   >
@@ -3484,9 +3488,9 @@ export default function ShiftEditPanel({
                       justifyContent: "space-between",
                       gap: 12,
                       padding: "10px 12px",
-                      border: "1px solid var(--color-border)",
+                      border: "1px solid var(--dg-color-border)",
                       borderRadius: 8,
-                      background: "var(--color-surface)",
+                      background: "var(--dg-color-surface)",
                     }}
                   >
                     <div>
@@ -3494,7 +3498,7 @@ export default function ShiftEditPanel({
                         style={{
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 700,
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                         }}
                       >
                         Mentored
@@ -3502,7 +3506,7 @@ export default function ShiftEditPanel({
                       <div
                         style={{
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           marginTop: 2,
                         }}
                       >
@@ -3550,11 +3554,11 @@ export default function ShiftEditPanel({
               {!hasActiveShift && !allowShiftEdits && (
                 <div
                   style={{
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: "var(--dg-radius-md)",
                     padding: "12px",
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     marginBottom: 16,
                   }}
                 >
@@ -3568,8 +3572,8 @@ export default function ShiftEditPanel({
                   style={{
                     marginBottom: 16,
                     padding: "10px 12px",
-                    background: "var(--color-warning-bg)",
-                    border: "1px solid var(--color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    border: "1px solid var(--dg-color-warning-border)",
                     borderRadius: 8,
                   }}
                 >
@@ -3577,7 +3581,7 @@ export default function ShiftEditPanel({
                     style={{
                       ...sectionLabel,
                       marginBottom: 6,
-                      color: "var(--color-warning-text)",
+                      color: "var(--dg-color-warning-text)",
                     }}
                   >
                     {isAbsence ? "Repeating — edit scope" : "Repeating shift — edit scope"}
@@ -3659,9 +3663,9 @@ export default function ShiftEditPanel({
                   style={{
                     marginTop: 20,
                     paddingTop: 12,
-                    borderTop: "1px solid var(--color-border)",
+                    borderTop: "1px solid var(--dg-color-border)",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 4,
@@ -3671,7 +3675,7 @@ export default function ShiftEditPanel({
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ fontWeight: 600 }}>Created by</span>
                       <span>{auditInfo.createdByName}</span>
-                      <span style={{ color: "var(--color-text-muted)" }}>
+                      <span style={{ color: "var(--dg-color-text-muted)" }}>
                         {formatRelativeTime(auditInfo.createdAt)}
                       </span>
                     </div>
@@ -3680,7 +3684,7 @@ export default function ShiftEditPanel({
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <span style={{ fontWeight: 600 }}>Updated by</span>
                       <span>{auditInfo.updatedByName}</span>
-                      <span style={{ color: "var(--color-text-muted)" }}>
+                      <span style={{ color: "var(--dg-color-text-muted)" }}>
                         {formatRelativeTime(auditInfo.updatedAt)}
                       </span>
                     </div>
@@ -3741,7 +3745,7 @@ export default function ShiftEditPanel({
                         width: "100%",
                         fontSize: "var(--dg-fs-caption)",
                         padding: "9px 12px",
-                        border: "1px dashed var(--color-border)",
+                        border: "1px dashed var(--dg-color-border)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -3772,7 +3776,7 @@ export default function ShiftEditPanel({
                   style={{
                     marginTop: 16,
                     paddingTop: 16,
-                    borderTop: "1px solid var(--color-border)",
+                    borderTop: "1px solid var(--dg-color-border)",
                     display: "flex",
                     flexDirection: "column",
                     gap: 8,
@@ -3784,7 +3788,7 @@ export default function ShiftEditPanel({
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      color: "var(--color-text-subtle)",
+                      color: "var(--dg-color-text-subtle)",
                       marginBottom: 2,
                     }}
                   >
@@ -3798,10 +3802,10 @@ export default function ShiftEditPanel({
                   style={{
                     marginTop: 16,
                     padding: "10px 12px",
-                    background: "var(--color-warning-bg)",
+                    background: "var(--dg-color-warning-bg)",
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-warning-text)",
+                    color: "var(--dg-color-warning-text)",
                     textAlign: "center",
                   }}
                 >
@@ -3813,11 +3817,11 @@ export default function ShiftEditPanel({
                   style={{
                     marginTop: 16,
                     padding: "10px 12px",
-                    background: "var(--color-danger-bg)",
-                    border: "1px solid var(--color-danger-border)",
+                    background: "var(--dg-color-danger-bg)",
+                    border: "1px solid var(--dg-color-danger-border)",
                     borderRadius: 8,
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-danger-dark)",
+                    color: "var(--dg-color-danger-dark)",
                   }}
                 >
                   This shift changed in another tab or by another editor. Close and reopen it before
@@ -3830,9 +3834,9 @@ export default function ShiftEditPanel({
                     marginTop: 16,
                     padding: "10px 12px",
                     background: enforceConflicts
-                      ? "var(--color-danger-bg)"
-                      : "var(--color-warning-bg)",
-                    border: `1px solid ${enforceConflicts ? "var(--color-danger-border)" : "var(--color-warning-border)"}`,
+                      ? "var(--dg-color-danger-bg)"
+                      : "var(--dg-color-warning-bg)",
+                    border: `1px solid ${enforceConflicts ? "var(--dg-color-danger-border)" : "var(--dg-color-warning-border)"}`,
                     borderRadius: 8,
                   }}
                 >
@@ -3841,8 +3845,8 @@ export default function ShiftEditPanel({
                       fontSize: "var(--dg-fs-badge)",
                       fontWeight: 700,
                       color: enforceConflicts
-                        ? "var(--color-danger-dark)"
-                        : "var(--color-warning-text)",
+                        ? "var(--dg-color-danger-dark)"
+                        : "var(--dg-color-warning-text)",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
                       marginBottom: 4,
@@ -3856,8 +3860,8 @@ export default function ShiftEditPanel({
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         color: enforceConflicts
-                          ? "var(--color-danger-dark)"
-                          : "var(--color-warning-text)",
+                          ? "var(--dg-color-danger-dark)"
+                          : "var(--dg-color-warning-text)",
                         marginTop: i > 0 ? 4 : 0,
                       }}
                     >
@@ -3868,7 +3872,7 @@ export default function ShiftEditPanel({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         marginTop: 6,
                         fontStyle: "italic",
                       }}
@@ -3894,7 +3898,7 @@ export default function ShiftEditPanel({
                     display: "flex",
                     alignItems: "center",
                     gap: 5,
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                   }}
                 >
                   <svg
@@ -3919,7 +3923,7 @@ export default function ShiftEditPanel({
                   style={{
                     padding: "24px 16px",
                     textAlign: "center",
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     fontSize: "var(--dg-fs-label)",
                   }}
                 >
@@ -3986,8 +3990,8 @@ export default function ShiftEditPanel({
             style={{
               flexShrink: 0,
               padding: "12px 20px 20px",
-              borderTop: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              borderTop: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
             }}
           >
             <Button
@@ -4009,10 +4013,10 @@ export default function ShiftEditPanel({
             style={{
               flexShrink: 0,
               padding: "12px 20px",
-              borderTop: "1px solid var(--color-border)",
+              borderTop: "1px solid var(--dg-color-border)",
               display: "flex",
               gap: 8,
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
             }}
           >
             <Button
@@ -4023,7 +4027,7 @@ export default function ShiftEditPanel({
                 flex: 1,
                 fontSize: "var(--dg-fs-caption)",
                 padding: "9px 12px",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               Back
@@ -4051,18 +4055,18 @@ export default function ShiftEditPanel({
             style={{
               flexShrink: 0,
               padding: "12px 20px",
-              borderTop: "1px solid var(--color-border)",
+              borderTop: "1px solid var(--dg-color-border)",
               display: "flex",
               flexDirection: "column",
               gap: 6,
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
             }}
           >
             {(shiftSummary || timeSummary || noteSummary) && (
               <div
                 style={{
                   fontSize: "var(--dg-fs-badge)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   lineHeight: 1.4,
                 }}
               >
@@ -4079,7 +4083,7 @@ export default function ShiftEditPanel({
                   flex: 1,
                   fontSize: "var(--dg-fs-caption)",
                   padding: "9px 12px",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                 }}
               >
                 Undo

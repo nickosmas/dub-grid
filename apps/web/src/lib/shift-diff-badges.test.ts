@@ -105,3 +105,101 @@ describe("buildShiftDiffDescriptors — shift cells (sanity)", () => {
     expect(result.pillDiffs[0]?.badge?.text).toBe("Was Sick");
   });
 });
+
+describe("buildShiftDiffDescriptors — mentored flag", () => {
+  it("names a pill that became mentored", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], isMentoredFlags: [false] },
+      after: { assignmentIds: [1], isMentoredFlags: [true] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]?.borderKind).toBe("modified");
+    expect(result.pillDiffs[0]?.badge).toEqual({
+      kind: "modified",
+      text: "+ Mentored",
+      detail: "Marked mentored.",
+    });
+    expect(result.cellBadge?.detail).toBe("Marked mentored.");
+  });
+
+  it("names a pill that stopped being mentored", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], isMentoredFlags: [true] },
+      after: { assignmentIds: [1], isMentoredFlags: [false] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]?.badge?.text).toBe("\u2212 Mentored");
+    expect(result.pillDiffs[0]?.badge?.detail).toBe("Removed mentored.");
+  });
+
+  it("keeps both edits in the tooltip when the time changed too", () => {
+    const result = buildShiftDiffDescriptors({
+      before: {
+        assignmentIds: [1],
+        isMentoredFlags: [false],
+        timeRanges: [{ start: "07:00", end: "15:00" }],
+      },
+      after: {
+        assignmentIds: [1],
+        isMentoredFlags: [true],
+        timeRanges: [{ start: "08:00", end: "16:00" }],
+      },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]?.badge?.text).toBe("Time");
+    expect(result.pillDiffs[0]?.badge?.detail).toBe(
+      "Changed custom time 07:00-15:00 to 08:00-16:00. Marked mentored.",
+    );
+  });
+
+  it("says nothing about a pill whose mentored flag did not move", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], isMentoredFlags: [true] },
+      after: { assignmentIds: [1], isMentoredFlags: [true] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]).toEqual({ borderKind: null, badge: null });
+    expect(result.cellBadge).toBeNull();
+  });
+});
+
+describe("buildShiftDiffDescriptors — custom time", () => {
+  it("signs a removed custom time so it cannot be read as a changed one", () => {
+    const removed = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], timeRanges: [{ start: "07:00", end: "15:00" }] },
+      after: { assignmentIds: [1], timeRanges: [{ start: null, end: null }] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+    const changed = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], timeRanges: [{ start: "07:00", end: "15:00" }] },
+      after: { assignmentIds: [1], timeRanges: [{ start: "08:00", end: "16:00" }] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(removed.pillDiffs[0]?.badge?.text).toBe("\u2212 Time");
+    expect(removed.pillDiffs[0]?.badge?.detail).toBe("Removed custom time.");
+    expect(changed.pillDiffs[0]?.badge?.text).toBe("Time");
+    expect(removed.pillDiffs[0]?.badge?.text).not.toBe(changed.pillDiffs[0]?.badge?.text);
+  });
+
+  it("signs an added custom time the same way", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1], timeRanges: [{ start: null, end: null }] },
+      after: { assignmentIds: [1], timeRanges: [{ start: "08:00", end: "16:00" }] },
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]?.badge?.text).toBe("+ Time");
+  });
+});

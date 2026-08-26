@@ -126,10 +126,10 @@ export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
               maxWidth: 260,
               padding: "10px 12px",
               borderRadius: "var(--dg-radius-md)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
               boxShadow: "var(--tooltip-shadow)",
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-caption)",
               lineHeight: 1.45,
             }}

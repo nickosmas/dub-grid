@@ -87,11 +87,11 @@ function SessionRow({
         alignItems: "center",
         gap: 12,
         padding: "11px 16px",
-        borderBottom: isLast ? "none" : "1px solid var(--color-border-light)",
+        borderBottom: isLast ? "none" : "1px solid var(--dg-color-border-light)",
         opacity: muted ? 0.65 : 1,
       }}
     >
-      <div style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
+      <div style={{ color: "var(--dg-color-text-muted)", flexShrink: 0 }}>
         {device.icon === "mobile" ? <Smartphone size={17} /> : <Monitor size={17} />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -102,7 +102,7 @@ function SessionRow({
             gap: 8,
             fontSize: "var(--dg-fs-caption)",
             fontWeight: muted ? 500 : 600,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {device.label}
@@ -111,8 +111,8 @@ function SessionRow({
               style={{
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--color-text-inverse)",
-                background: "var(--color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                background: "var(--dg-color-brand)",
                 padding: "1px 7px",
                 borderRadius: 999,
                 lineHeight: 1.5,
@@ -125,7 +125,7 @@ function SessionRow({
         <div
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             marginTop: 2,
           }}
         >
@@ -134,7 +134,7 @@ function SessionRow({
         <div
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             marginTop: 2,
           }}
         >
@@ -146,7 +146,7 @@ function SessionRow({
           onClick={() => onRevoke(session)}
           disabled={revoking}
           className="dg-btn dg-btn-ghost dg-btn-xs"
-          style={{ color: "var(--color-danger)", flexShrink: 0 }}
+          style={{ color: "var(--dg-color-danger)", flexShrink: 0 }}
         >
           <ButtonLoading loading={revoking} loadingLabel="Signing out" spinnerSize={14}>
             Sign out
@@ -165,15 +165,15 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count:
         alignItems: "center",
         justifyContent: "space-between",
         padding: "8px 16px",
-        background: "var(--color-bg-secondary)",
-        borderBottom: "1px solid var(--color-border-light)",
+        background: "var(--dg-color-bg-secondary)",
+        borderBottom: "1px solid var(--dg-color-border-light)",
       }}
     >
       <span
         style={{
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 700,
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           textTransform: "uppercase",
           letterSpacing: "0.05em",
         }}
@@ -184,7 +184,7 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count:
         style={{
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 600,
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
       >
@@ -266,11 +266,11 @@ export function SessionList() {
   const emptyStateBoxStyle = {
     padding: "24px 16px",
     textAlign: "center" as const,
-    color: "var(--color-text-muted)",
+    color: "var(--dg-color-text-muted)",
     fontSize: "var(--dg-fs-label)",
     borderRadius: "var(--dg-radius-md)",
-    border: "1px solid var(--color-border-light)",
-    background: "var(--color-surface)",
+    border: "1px solid var(--dg-color-border-light)",
+    background: "var(--dg-color-surface)",
   };
 
   if (loading) {
@@ -288,8 +288,8 @@ export function SessionList() {
           style={{
             overflow: "hidden",
             borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border-light)",
-            background: "var(--color-surface)",
+            border: "1px solid var(--dg-color-border-light)",
+            background: "var(--dg-color-surface)",
           }}
         >
           <SectionHeading count={active.length}>Active sessions</SectionHeading>
@@ -311,8 +311,8 @@ export function SessionList() {
           style={{
             overflow: "hidden",
             borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border-light)",
-            background: "var(--color-surface)",
+            border: "1px solid var(--dg-color-border-light)",
+            background: "var(--dg-color-surface)",
           }}
         >
           <SectionHeading count={stale.length}>Stale sessions</SectionHeading>

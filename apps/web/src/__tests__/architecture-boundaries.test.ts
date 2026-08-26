@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -81,6 +81,32 @@ function isIgnoredUiLayerSourceFile(relativePath: string): boolean {
     relativePath.includes("/server/")
   );
 }
+
+describe("framework file placement", () => {
+  // Next.js only invokes Proxy from the directory holding the app dir —
+  // `apps/web/src/`, since this app lives at `src/app`. A copy one level up at
+  // `apps/web/proxy.ts` still type-checks and still passes every unit test in
+  // `middleware.test.ts`, because those import the module directly. It just
+  // never runs on a request. That is how every guard in it — the
+  // unauthenticated redirect, subdomain enforcement, org suspension/archival,
+  // billing lock, impersonation rewriting, the per-request CSP — sat inert
+  // through the whole monorepo layout without one failing check.
+  it("lives beside the app directory, where Next.js will actually invoke it", () => {
+    expect(existsSync(path.join(repoRoot, "apps/web/src/proxy.ts"))).toBe(true);
+    expect(existsSync(path.join(repoRoot, "apps/web/proxy.ts"))).toBe(false);
+  });
+
+  // Vercel reads vercel.json from the project's Root Directory, which is
+  // `apps/web` (recorded in .vercel/project.json). A copy at the repo root is
+  // never opened — and a `crons` block sitting in the unread copy would mean
+  // scheduled jobs that simply never fire, with nothing anywhere reporting a
+  // failure. Same failure shape as the middleware above: wrong directory, no
+  // error, feature silently absent.
+  it("keeps vercel.json only in the directory Vercel actually reads", () => {
+    expect(existsSync(path.join(repoRoot, "apps/web/vercel.json"))).toBe(true);
+    expect(existsSync(path.join(repoRoot, "vercel.json"))).toBe(false);
+  });
+});
 
 describe("architecture boundaries", () => {
   it("keeps shared packages platform-neutral and app-independent", () => {

@@ -233,7 +233,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const sectionLabel: React.CSSProperties = {
       fontSize: "var(--dg-fs-footnote)",
       fontWeight: 700,
-      color: "var(--color-text-subtle)",
+      color: "var(--dg-color-text-subtle)",
       letterSpacing: "0.04em",
       display: "block",
       marginBottom: 8,
@@ -243,7 +243,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const fieldLabel: React.CSSProperties = {
       fontSize: "var(--dg-fs-caption)",
       fontWeight: 500,
-      color: "var(--color-text-muted)",
+      color: "var(--dg-color-text-muted)",
       display: "block",
       marginBottom: 4,
     };
@@ -273,7 +273,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               >
                 <div>
                   <label style={fieldLabel}>
-                    First name <span style={{ color: "var(--color-danger)" }}>*</span>
+                    First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <input
                     className="dg-input"
@@ -283,14 +283,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     placeholder="e.g. Maria"
                     readOnly={readOnly}
                     style={
-                      fieldErrors.firstName ? { borderColor: "var(--color-danger)" } : undefined
+                      fieldErrors.firstName ? { borderColor: "var(--dg-color-danger)" } : undefined
                     }
                   />
                   {fieldErrors.firstName && (
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -301,7 +301,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 </div>
                 <div>
                   <label style={fieldLabel}>
-                    Last name <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <input
                     className="dg-input"
@@ -311,14 +311,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     placeholder="e.g. Garcia"
                     readOnly={readOnly}
                     style={
-                      fieldErrors.lastName ? { borderColor: "var(--color-danger)" } : undefined
+                      fieldErrors.lastName ? { borderColor: "var(--dg-color-danger)" } : undefined
                     }
                   />
                   {fieldErrors.lastName && (
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -372,13 +372,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     }}
                     placeholder="(415) 555-0100"
                     readOnly={readOnly}
-                    style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
+                    style={
+                      fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined
+                    }
                   />
                   {fieldErrors.phone && (
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -397,13 +399,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     onBlur={() => markTouched("email")}
                     placeholder="name@example.com"
                     readOnly={readOnly}
-                    style={fieldErrors.email ? { borderColor: "var(--color-danger)" } : undefined}
+                    style={
+                      fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
+                    }
                   />
                   {employee.userId && form.email !== employee.email && (
                     <p
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-warning)",
+                        color: "var(--dg-color-warning)",
                         margin: "4px 0 0",
                         lineHeight: 1.3,
                       }}
@@ -415,7 +419,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                       role="alert"
@@ -445,7 +449,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   <div
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       marginTop: 4,
                     }}
                     role="alert"
@@ -460,7 +464,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           {/* ── Assignments section ── */}
           <div
             style={{
-              borderTop: "1px solid var(--color-border-light)",
+              borderTop: "1px solid var(--dg-color-border-light)",
               paddingTop: 20,
               paddingBottom: 20,
             }}
@@ -491,7 +495,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
               <div>
                 <label style={fieldLabel}>
-                  {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
+                  {focusAreaLabel} <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {focusAreas.map((focusArea) => {
@@ -506,9 +510,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         }}
                         disabled={readOnly}
                         padding="5px 12px"
-                        unselectedBackground="var(--color-bg-secondary)"
+                        unselectedBackground="var(--dg-color-bg-secondary)"
                         unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--color-text-faint)"
+                        unselectedTextColor="var(--dg-color-text-faint)"
                       >
                         {focusArea.name}
                       </SelectableTag>
@@ -519,7 +523,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   <div
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                       marginTop: 4,
                     }}
                     role="alert"
@@ -545,9 +549,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           onClick={() => toggleRole(role.id)}
                           disabled={readOnly}
                           padding="5px 12px"
-                          unselectedBackground="var(--color-bg-secondary)"
+                          unselectedBackground="var(--dg-color-bg-secondary)"
                           unselectedBorderColor="transparent"
-                          unselectedTextColor="var(--color-text-faint)"
+                          unselectedTextColor="var(--dg-color-text-faint)"
                         >
                           {role.abbr}
                         </SelectableTag>
@@ -564,7 +568,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         {canEdit && !employee.userId && employee.email && (pendingInvitation || onInvite) && (
           <div
             style={{
-              borderTop: "1px solid var(--color-border-light)",
+              borderTop: "1px solid var(--dg-color-border-light)",
               paddingTop: 16,
               paddingBottom: 4,
             }}
@@ -576,8 +580,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 10,
-                  background: "var(--color-warning-bg)",
-                  border: "1px solid var(--color-warning-border)",
+                  background: "var(--dg-color-warning-bg)",
+                  border: "1px solid var(--dg-color-warning-border)",
                   borderRadius: "var(--dg-radius-lg)",
                   padding: "10px 14px",
                 }}
@@ -595,7 +599,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="var(--color-warning-text)"
+                    stroke="var(--dg-color-warning-text)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -609,7 +613,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
-                        color: "var(--color-warning-text)",
+                        color: "var(--dg-color-warning-text)",
                       }}
                     >
                       Invitation pending
@@ -617,7 +621,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-warning-text)",
+                        color: "var(--dg-color-warning-text)",
                         marginTop: 1,
                       }}
                     >
@@ -643,7 +647,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       }}
                       className="dg-btn dg-btn-ghost dg-btn-xs"
                       style={{
-                        color: "var(--color-link)",
+                        color: "var(--dg-color-link)",
                       }}
                     >
                       <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
@@ -664,7 +668,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       }}
                       className="dg-btn dg-btn-ghost dg-btn-xs"
                       style={{
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                       }}
                     >
                       <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
@@ -679,12 +683,12 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 onClick={() => onInvite(employee)}
                 className="dg-btn dg-btn-ghost"
                 style={{
-                  color: "var(--color-link)",
+                  color: "var(--dg-color-link)",
                   fontSize: "var(--dg-fs-caption)",
                   padding: "6px 10px",
                   width: "100%",
                   justifyContent: "center",
-                  border: "1px dashed var(--color-brand-border)",
+                  border: "1px dashed var(--dg-color-brand-border)",
                   borderRadius: "var(--dg-btn-radius)",
                 }}
               >
@@ -711,7 +715,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         <div
           style={{
             paddingTop: 16,
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
             display: "flex",
             flexDirection: "column",
             gap: 12,

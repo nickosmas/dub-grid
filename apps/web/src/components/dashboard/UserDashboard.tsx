@@ -687,8 +687,8 @@ function buildAbsenceSegment(
     : null;
   return {
     assignment: null,
-    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
-    borderColor: resolved?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--dg-color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--dg-color-border)",
     chipLabel: label,
     dateKey,
     endTime: null,
@@ -705,7 +705,7 @@ function buildAbsenceSegment(
     shiftName: null,
     sortTime: "99:99:99",
     startTime: null,
-    textColor: resolved?.text ?? "var(--color-text-secondary)",
+    textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
     title: label,
     typeLabel: "Absence",
   };
@@ -799,8 +799,8 @@ function buildWorkedSegment(input: {
 
   return {
     assignment,
-    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
-    borderColor: resolved?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--dg-color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--dg-color-border)",
     chipLabel: isGeneral ? chipLabel : chipLabel || title,
     dateKey: input.dateKey,
     endTime,
@@ -817,7 +817,7 @@ function buildWorkedSegment(input: {
     shiftName,
     sortTime: startTime ?? "99:99:99",
     startTime,
-    textColor: resolved?.text ?? "var(--color-text-primary)",
+    textColor: resolved?.text ?? "var(--dg-color-text-primary)",
     title,
     typeLabel: isGeneral ? "General shift" : null,
   };
@@ -1809,7 +1809,7 @@ function HeroPillRow({
       {showTypeLabel ? (
         <div
           style={{
-            color: inverse ? "#fff" : "var(--color-text-primary)",
+            color: inverse ? "#fff" : "var(--dg-color-text-primary)",
             fontSize: inverse ? 20 : 15,
             fontWeight: 750,
             lineHeight: 1.1,
@@ -1866,10 +1866,10 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
   return (
     <span
       style={{
-        background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-bg-secondary)",
-        border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--color-border)",
+        background: inverse ? "rgba(255,255,255,0.16)" : "var(--dg-color-bg-secondary)",
+        border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--dg-color-border)",
         borderRadius: 7,
-        color: inverse ? "#fff" : "var(--color-text-secondary)",
+        color: inverse ? "#fff" : "var(--dg-color-text-secondary)",
         display: "inline-flex",
         fontSize: 12,
         fontWeight: 750,
@@ -1893,12 +1893,12 @@ function SplitShiftBadge({ inverse = false, label }: { inverse?: boolean; label:
     <span
       style={{
         alignItems: "center",
-        background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-brand-bg)",
+        background: inverse ? "rgba(255,255,255,0.16)" : "var(--dg-color-brand-bg)",
         border: inverse
           ? "1px solid rgba(255,255,255,0.28)"
-          : "1px solid var(--color-brand-border)",
+          : "1px solid var(--dg-color-brand-border)",
         borderRadius: 999,
-        color: inverse ? "#fff" : "var(--color-brand)",
+        color: inverse ? "#fff" : "var(--dg-color-brand)",
         display: "inline-flex",
         flexShrink: 0,
         fontSize: 13,
@@ -2032,7 +2032,7 @@ function ShiftmatesRow({
     ? isDarkTheme
       ? DASHBOARD_HERO_COLLABORATOR_BG_DARK
       : DASHBOARD_HERO_COLLABORATOR_BG_LIGHT
-    : "var(--color-bg-secondary)";
+    : "var(--dg-color-bg-secondary)";
 
   return (
     <div
@@ -2042,9 +2042,9 @@ function ShiftmatesRow({
         background: collaboratorBackground,
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
-          : "1px solid var(--color-border-light)",
+          : "1px solid var(--dg-color-border-light)",
         borderRadius: 16,
-        color: inverse ? "rgba(255,255,255,0.84)" : "var(--color-text-secondary)",
+        color: inverse ? "rgba(255,255,255,0.84)" : "var(--dg-color-text-secondary)",
         display: "flex",
         gap: 10,
         justifyContent: "space-between",
@@ -2426,9 +2426,9 @@ function MyWeekSection({
               key={group.dateKey}
               data-testid={isToday ? "user-dashboard-my-week-today" : undefined}
               style={{
-                background: isToday ? "var(--color-brand-bg)" : "transparent",
+                background: isToday ? "var(--dg-color-brand-bg)" : "transparent",
                 borderBottom:
-                  index < groups.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                  index < groups.length - 1 ? "1px solid var(--dg-color-border-light)" : "none",
                 display: "grid",
                 gap: 14,
                 gridTemplateColumns: "72px minmax(0, 1fr)",
@@ -2484,8 +2484,8 @@ function SummaryMetricPanel({
       data-testid="user-dashboard-summary-panel"
       style={{
         alignItems: "flex-start",
-        background: "var(--color-bg)",
-        border: "1px solid var(--color-border-light)",
+        background: "var(--dg-color-bg)",
+        border: "1px solid var(--dg-color-border-light)",
         borderRadius: "var(--dg-radius-md)",
         display: "flex",
         gap: 12,
@@ -2495,10 +2495,10 @@ function SummaryMetricPanel({
       <div
         style={{
           alignItems: "center",
-          background: "var(--color-brand-bg)",
-          border: "1px solid var(--color-brand-border)",
+          background: "var(--dg-color-brand-bg)",
+          border: "1px solid var(--dg-color-brand-border)",
           borderRadius: 12,
-          color: "var(--color-brand)",
+          color: "var(--dg-color-brand)",
           display: "flex",
           flexShrink: 0,
           fontSize: 22,
@@ -2514,7 +2514,7 @@ function SummaryMetricPanel({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             fontSize: 13,
             fontWeight: 700,
           }}
@@ -2523,7 +2523,7 @@ function SummaryMetricPanel({
         </div>
         <div
           style={{
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontSize: 12,
             lineHeight: 1.4,
             marginTop: 3,
@@ -2553,8 +2553,8 @@ function ActionCardShell({
     <article
       role="listitem"
       style={{
-        background: "var(--color-bg)",
-        border: "1px solid var(--color-border)",
+        background: "var(--dg-color-bg)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-lg)",
         boxShadow: "var(--shadow-sm)",
         boxSizing: "border-box",
@@ -2578,7 +2578,7 @@ function ActionCardShell({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: 11,
               fontWeight: 750,
               letterSpacing: 0,
@@ -2591,7 +2591,7 @@ function ActionCardShell({
           </div>
           <div
             style={{
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               fontSize: 15,
               fontWeight: 760,
               lineHeight: 1.25,
@@ -2602,7 +2602,7 @@ function ActionCardShell({
           </div>
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: 12,
               lineHeight: 1.4,
               marginTop: 5,
@@ -2765,7 +2765,7 @@ function WeekShiftRow({
           >
             <div
               style={{
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 fontSize: 15,
                 fontWeight: 750,
                 minWidth: 0,
@@ -2786,7 +2786,7 @@ function WeekShiftRow({
             <div
               style={{
                 alignItems: "center",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 display: "flex",
                 flexShrink: 0,
                 fontSize: 12,
@@ -2802,7 +2802,7 @@ function WeekShiftRow({
         {item.segment.focusAreaName ? (
           <div
             style={{
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontSize: 12,
               marginTop: 4,
             }}
@@ -2923,8 +2923,10 @@ function DateTile({
       style={{
         alignSelf: compact ? undefined : "center",
         alignItems: "center",
-        background: compact ? "var(--color-bg)" : "var(--color-bg-secondary)",
-        border: compact ? "1px solid var(--color-border)" : "1px solid var(--color-border-light)",
+        background: compact ? "var(--dg-color-bg)" : "var(--dg-color-bg-secondary)",
+        border: compact
+          ? "1px solid var(--dg-color-border)"
+          : "1px solid var(--dg-color-border-light)",
         borderRadius: compact ? 10 : 16,
         display: "flex",
         flexDirection: "column",
@@ -2936,7 +2938,7 @@ function DateTile({
     >
       <span
         style={{
-          color: compact ? "var(--color-text-muted)" : "var(--color-text-subtle)",
+          color: compact ? "var(--dg-color-text-muted)" : "var(--dg-color-text-subtle)",
           fontSize: compact ? 10 : 11,
           fontWeight: 750,
           textTransform: "uppercase",
@@ -2946,7 +2948,7 @@ function DateTile({
       </span>
       <span
         style={{
-          color: compact ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+          color: compact ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
           fontSize: compact ? 17 : 20,
           fontWeight: 800,
           lineHeight: compact ? 1 : "24px",
@@ -2959,7 +2961,7 @@ function DateTile({
           aria-hidden
           data-testid="user-dashboard-date-tile-today-dot"
           style={{
-            background: "var(--color-danger)",
+            background: "var(--dg-color-danger)",
             borderRadius: 999,
             height: 5,
             marginTop: 1,
@@ -2976,7 +2978,7 @@ function DashedDivider() {
     <div
       aria-hidden
       style={{
-        borderTop: "1px dashed var(--color-border)",
+        borderTop: "1px dashed var(--dg-color-border)",
         height: 1,
         margin: "0 0 12px",
       }}

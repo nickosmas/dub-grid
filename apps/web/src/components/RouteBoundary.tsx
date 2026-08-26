@@ -21,13 +21,13 @@ const shellStyle = {
 const titleStyle = {
   fontSize: "var(--dg-fs-page-title)",
   fontWeight: 700,
-  color: "var(--color-text-primary)",
+  color: "var(--dg-color-text-primary)",
   margin: 0,
 };
 
 const bodyStyle = {
   fontSize: "var(--dg-fs-body)",
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   margin: 0,
   maxWidth: 480,
 };

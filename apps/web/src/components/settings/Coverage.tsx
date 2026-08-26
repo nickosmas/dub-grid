@@ -109,21 +109,21 @@ function serializeDrafts(drafts: Record<string, CoverageDraft>): string {
 
 function CoveragePreview({ draft }: { draft: CoverageDraft }) {
   const numberStyle: React.CSSProperties = {
-    color: "var(--color-text-primary)",
+    color: "var(--dg-color-text-primary)",
     fontWeight: 700,
     fontSize: "var(--dg-fs-body-sm)",
     fontVariantNumeric: "tabular-nums",
     lineHeight: 1,
   };
   const labelStyle: React.CSSProperties = {
-    color: "var(--color-text-muted)",
+    color: "var(--dg-color-text-muted)",
     fontSize: "var(--dg-fs-caption)",
     textTransform: "uppercase",
     letterSpacing: "0.04em",
     fontWeight: 600,
   };
   const emptyStyle: React.CSSProperties = {
-    color: "var(--color-text-faint)",
+    color: "var(--dg-color-text-faint)",
     fontStyle: "italic",
     fontSize: "var(--dg-fs-caption)",
   };
@@ -356,7 +356,9 @@ function CoverageOptionRow({
   return (
     <div
       className="dg-list-row"
-      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+      style={{
+        borderBottom: expanded || isLast ? "none" : "1px solid var(--dg-color-border-light)",
+      }}
     >
       <Button
         type="button"
@@ -383,7 +385,7 @@ function CoverageOptionRow({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {getCoverageRowTitle(option)}
@@ -395,7 +397,7 @@ function CoverageOptionRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -408,9 +410,9 @@ function CoverageOptionRow({
         <div
           id={panelId}
           style={{
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
             borderRadius: "var(--dg-radius-lg)",
-            border: "1px solid var(--color-border-light)",
+            border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
             padding: "14px 16px",
             display: "flex",
@@ -426,7 +428,7 @@ function CoverageOptionRow({
                 alignItems: "center",
                 gap: 8,
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               <input
@@ -461,7 +463,7 @@ function CoverageOptionRow({
                 style={{
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 700,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
                 }}
@@ -483,7 +485,7 @@ function CoverageOptionRow({
                   width: 72,
                   padding: "6px 8px",
                   borderRadius: 8,
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                   textAlign: "center",
                 }}
                 disabled={!canEdit}
@@ -502,7 +504,7 @@ function CoverageOptionRow({
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 700,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
                     }}
@@ -526,7 +528,7 @@ function CoverageOptionRow({
                       width: "100%",
                       padding: "6px 8px",
                       borderRadius: 8,
-                      border: "1px solid var(--color-border)",
+                      border: "1px solid var(--dg-color-border)",
                       textAlign: "center",
                     }}
                     disabled={!canEdit}
@@ -635,19 +637,19 @@ function FocusAreaCoverageCard({
   return (
     <div
       style={{
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         borderRadius: "var(--dg-radius-md)",
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         overflow: "hidden",
       }}
     >
       <div
         style={{
           padding: "12px 16px",
-          borderBottom: "1px solid var(--color-border-light)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
           fontWeight: 700,
           fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
         }}
       >
         {focusArea.name}
@@ -667,7 +669,7 @@ function FocusAreaCoverageCard({
               <div
                 key={`${focusArea.id}-${section.key}`}
                 style={{
-                  border: "1px solid var(--color-border-light)",
+                  border: "1px solid var(--dg-color-border-light)",
                   borderRadius: "var(--dg-radius-lg)",
                   overflow: "hidden",
                 }}
@@ -675,14 +677,14 @@ function FocusAreaCoverageCard({
                 <div
                   style={{
                     padding: "10px 12px",
-                    borderBottom: "1px solid var(--color-border-light)",
+                    borderBottom: "1px solid var(--dg-color-border-light)",
                   }}
                 >
                   <div
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 700,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
                     }}
@@ -711,7 +713,9 @@ function FocusAreaCoverageCard({
             ))}
           </div>
 
-          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}>
+          <div
+            style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
+          >
             <EditorActionRow
               secondaryAction={
                 isDirty ? (

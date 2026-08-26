@@ -40,7 +40,7 @@ export default function SettingsMockup() {
           style={{
             fontSize: 28,
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             margin: 0,
             lineHeight: 1.2,
             letterSpacing: "-0.02em",
@@ -51,7 +51,7 @@ export default function SettingsMockup() {
         <p
           style={{
             fontSize: 13,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             margin: "5px 0 0",
             lineHeight: 1.5,
           }}
@@ -64,9 +64,9 @@ export default function SettingsMockup() {
       {/* SectionCard (headerless) */}
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: 10,
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
           padding: 20,
         }}
@@ -86,7 +86,7 @@ export default function SettingsMockup() {
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     letterSpacing: "0.04em",
                     textTransform: "uppercase" as const,
                     marginBottom: 6,
@@ -104,10 +104,10 @@ export default function SettingsMockup() {
                     fontSize: 13,
                     fontWeight: 500,
                     padding: "0 12px",
-                    border: `1px solid ${field.dirty ? "var(--color-border-focus)" : "var(--color-border)"}`,
+                    border: `1px solid ${field.dirty ? "var(--dg-color-border-focus)" : "var(--dg-color-border)"}`,
                     borderRadius: 6,
-                    color: "var(--color-text-secondary)",
-                    background: "var(--color-surface)",
+                    color: "var(--dg-color-text-secondary)",
+                    background: "var(--dg-color-surface)",
                     boxShadow: field.dirty ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
                   }}
                 >
@@ -117,7 +117,7 @@ export default function SettingsMockup() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     marginTop: 4,
                   }}
                 >
@@ -145,9 +145,9 @@ export default function SettingsMockup() {
                   fontSize: 13,
                   fontWeight: 600,
                   padding: "0 16px",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: 6,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                   background: "transparent",
                 }}
               >
@@ -163,8 +163,8 @@ export default function SettingsMockup() {
                 fontWeight: 600,
                 padding: "0 16px",
                 borderRadius: 6,
-                color: "var(--color-text-inverse)",
-                background: "var(--color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                background: "var(--dg-color-brand)",
               }}
             >
               Save

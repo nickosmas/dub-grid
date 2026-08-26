@@ -41,7 +41,7 @@ and a fix.
 
 ### H-2 — `/billing-required` gets the nonce CSP but is statically prerendered — ✅ Fixed
 
-- **Where:** `apps/web/middleware.ts` (public-route classification); `apps/web/src/app/billing-required/page.tsx`.
+- **Where:** `apps/web/src/middleware.ts` (public-route classification); `apps/web/src/app/billing-required/page.tsx`.
 - **Root cause:** `/billing-required` was statically prerendered but received the `dynamicCspHeaderValue` (nonce + `strict-dynamic`) in production, breaking script hydration for users in the billing-locked state.
 - **Fix confirmed:** `apps/web/src/app/billing-required/page.tsx` now exports `export const dynamic = "force-dynamic"` (lines 2-4), making it server-rendered per request so it can carry the nonce.
 - **Process fix still needed:** Add a build-time check that asserts every route receiving the nonce CSP is absent from `prerender-manifest.json`, so this class of issue cannot recur silently.

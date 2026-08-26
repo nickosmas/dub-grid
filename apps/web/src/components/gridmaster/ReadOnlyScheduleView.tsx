@@ -34,16 +34,16 @@ function getAssignmentStyle(
 ) {
   if (!assignment.color) {
     return {
-      background: "var(--color-bg-secondary)",
-      borderColor: assignment.border ?? "var(--color-border)",
-      color: assignment.text ?? "var(--color-text-primary)",
+      background: "var(--dg-color-bg-secondary)",
+      borderColor: assignment.border ?? "var(--dg-color-border)",
+      color: assignment.text ?? "var(--dg-color-text-primary)",
     };
   }
   const resolved = resolveShiftPillColors(
     {
       color: assignment.color,
-      text: assignment.text ?? "var(--color-text-primary)",
-      border: assignment.border ?? "var(--color-border)",
+      text: assignment.text ?? "var(--dg-color-text-primary)",
+      border: assignment.border ?? "var(--dg-color-border)",
     },
     isDarkTheme,
   );
@@ -138,7 +138,7 @@ export default function ReadOnlyScheduleView({
             Next →
           </Button>
         </div>
-        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
           {formatDate(startDate)} - {formatDate(endDate)} ({shifts.length} shifts)
         </span>
       </div>
@@ -147,8 +147,8 @@ export default function ReadOnlyScheduleView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -164,7 +164,7 @@ export default function ReadOnlyScheduleView({
           style={{
             padding: 32,
             textAlign: "center",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             fontSize: "var(--dg-fs-label)",
           }}
         >
@@ -180,9 +180,9 @@ export default function ReadOnlyScheduleView({
                 padding: "8px 14px",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
-                borderBottom: "1px solid var(--color-border-light)",
-                background: "var(--color-bg-secondary)",
+                color: "var(--dg-color-text-primary)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-bg-secondary)",
               }}
             >
               {formatDate(date)}
@@ -237,21 +237,21 @@ export default function ReadOnlyScheduleView({
                               borderRadius: 4,
                               fontSize: "var(--dg-fs-caption)",
                               fontWeight: 700,
-                              background: "var(--color-warning-bg)",
-                              color: "var(--color-warning)",
+                              background: "var(--dg-color-warning-bg)",
+                              color: "var(--dg-color-warning)",
                             }}
                           >
                             {r.absenceLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--color-text-faint)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
                         )}
                       </td>
                       <td
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {r.focusAreaName ??
@@ -266,8 +266,8 @@ export default function ReadOnlyScheduleView({
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 600,
-                                color: "var(--color-warning)",
-                                background: "var(--color-warning-bg)",
+                                color: "var(--dg-color-warning)",
+                                background: "var(--dg-color-warning-bg)",
                                 padding: "1px 6px",
                                 borderRadius: 4,
                               }}
@@ -279,8 +279,8 @@ export default function ReadOnlyScheduleView({
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 600,
-                                color: "var(--color-success)",
-                                background: "var(--color-success-bg)",
+                                color: "var(--dg-color-success)",
+                                background: "var(--dg-color-success-bg)",
                                 padding: "1px 6px",
                                 borderRadius: 4,
                               }}
@@ -295,8 +295,8 @@ export default function ReadOnlyScheduleView({
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 600,
-                                color: "var(--color-today-text)",
-                                background: "var(--color-today-bg)",
+                                color: "var(--dg-color-today-text)",
+                                background: "var(--dg-color-today-bg)",
                                 padding: "1px 6px",
                                 borderRadius: 4,
                               }}
@@ -312,8 +312,8 @@ export default function ReadOnlyScheduleView({
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 600,
-                                color: "var(--color-danger)",
-                                background: "var(--color-danger-bg)",
+                                color: "var(--dg-color-danger)",
+                                background: "var(--dg-color-danger-bg)",
                                 padding: "1px 6px",
                                 borderRadius: 4,
                               }}

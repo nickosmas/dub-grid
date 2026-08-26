@@ -6,10 +6,10 @@ import Modal from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
-  danger: { bg: "var(--color-danger-bg)", stroke: "var(--color-danger)" },
-  warning: { bg: "var(--color-warning-bg)", stroke: "var(--color-warning)" },
-  neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
+  success: { bg: "var(--dg-color-success-bg)", stroke: "var(--dg-color-success-text)" },
+  danger: { bg: "var(--dg-color-danger-bg)", stroke: "var(--dg-color-danger)" },
+  warning: { bg: "var(--dg-color-warning-bg)", stroke: "var(--dg-color-warning)" },
+  neutral: { bg: "var(--dg-color-bg-secondary)", stroke: "var(--dg-color-text-secondary)" },
 };
 
 function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
@@ -121,8 +121,8 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
             flexWrap: "wrap",
             padding: 16,
             borderRadius: "var(--dg-radius-md)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-bg)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           {TYPE_FILTERS.map((f) => {
@@ -137,9 +137,9 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                   padding: "5px 12px",
                   borderRadius: 6,
                   border: "1px solid",
-                  borderColor: active ? "var(--color-brand)" : "var(--color-border)",
-                  background: active ? "var(--color-brand)" : "transparent",
-                  color: active ? "#fff" : "var(--color-text-secondary)",
+                  borderColor: active ? "var(--dg-color-brand)" : "var(--dg-color-border)",
+                  background: active ? "var(--dg-color-brand)" : "transparent",
+                  color: active ? "#fff" : "var(--dg-color-text-secondary)",
                   cursor: "pointer",
                   transition: "all 0.15s",
                 }}
@@ -151,7 +151,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
           <span
             style={{
               fontSize: 11,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               marginLeft: "auto",
               alignSelf: "center",
             }}
@@ -179,7 +179,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                     gap: 12,
                     padding: "12px 0",
                     borderBottom:
-                      i < filtered.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                      i < filtered.length - 1 ? "1px solid var(--dg-color-border-light)" : "none",
                   }}
                 >
                   <ActivityIcon variant={item.iconVariant} />
@@ -187,13 +187,15 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                     <div
                       style={{
                         fontSize: 13,
-                        color: "var(--color-text-secondary)",
+                        color: "var(--dg-color-text-secondary)",
                         lineHeight: 1.35,
                       }}
                     >
                       {item.description}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 3 }}>
+                    <div
+                      style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 3 }}
+                    >
                       {item.relativeTime}
                     </div>
                   </div>

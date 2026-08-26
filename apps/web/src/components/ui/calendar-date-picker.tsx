@@ -113,26 +113,26 @@ export default function CalendarDatePicker({
             gap: 10,
             width: "100%",
             minHeight: "var(--dg-toolbar-h)",
-            background: disabled ? "var(--color-bg)" : "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: disabled ? "var(--dg-color-bg)" : "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-btn-radius)",
             padding: "10px 12px",
             fontSize: 13,
             fontWeight: 500,
-            color: selectedDate ? "var(--color-text-secondary)" : "var(--color-text-subtle)",
+            color: selectedDate ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             textAlign: "left",
             transition: "box-shadow 150ms ease",
             boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
-            borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
+            borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
             opacity: disabled ? 0.5 : 1,
           }}
         >
           <CalendarDays
             size={15}
             style={{
-              color: selectedDate ? "var(--color-text-muted)" : "var(--color-text-faint)",
+              color: selectedDate ? "var(--dg-color-text-muted)" : "var(--dg-color-text-faint)",
               flexShrink: 0,
             }}
           />
@@ -149,7 +149,7 @@ export default function CalendarDatePicker({
           <ChevronDown
             size={14}
             style={{
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
               flexShrink: 0,
               transition: "transform 150ms ease",
               transform: open ? "rotate(180deg)" : "rotate(0deg)",
@@ -195,7 +195,7 @@ export default function CalendarDatePicker({
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {MONTH_FORMATTER.format(visibleMonth)}
@@ -243,7 +243,7 @@ export default function CalendarDatePicker({
                     height: 28,
                     fontSize: 10,
                     fontWeight: 600,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                     textTransform: "uppercase",
                     letterSpacing: "0.04em",
                   }}
@@ -274,14 +274,14 @@ export default function CalendarDatePicker({
                     className={cn(
                       "relative flex h-9 items-center justify-center rounded-lg text-[12px] transition-colors",
                       isSelected
-                        ? "bg-[var(--color-brand)] font-semibold text-[var(--color-text-inverse)]"
+                        ? "bg-[var(--dg-color-brand)] font-semibold text-[var(--dg-color-text-inverse)]"
                         : isDisabled
-                          ? "cursor-not-allowed text-[var(--color-text-faint)] opacity-35"
-                          : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]",
+                          ? "cursor-not-allowed text-[var(--dg-color-text-faint)] opacity-35"
+                          : "text-[var(--dg-color-text-primary)] hover:bg-[var(--dg-color-bg-secondary)]",
                       !isSelected &&
                         !isDisabled &&
                         !isCurrentMonth &&
-                        "text-[var(--color-text-faint)]",
+                        "text-[var(--dg-color-text-faint)]",
                     )}
                   >
                     <span>{day.getDate()}</span>
@@ -289,7 +289,9 @@ export default function CalendarDatePicker({
                       <span
                         className={cn(
                           "absolute bottom-1 h-1 w-1 rounded-full",
-                          isSelected ? "bg-[var(--color-text-inverse)]" : "bg-[var(--color-brand)]",
+                          isSelected
+                            ? "bg-[var(--dg-color-text-inverse)]"
+                            : "bg-[var(--dg-color-brand)]",
                         )}
                       />
                     ) : null}
@@ -305,7 +307,7 @@ export default function CalendarDatePicker({
                 justifyContent: "space-between",
                 gap: 8,
                 paddingTop: 10,
-                borderTop: "1px solid var(--color-border-light)",
+                borderTop: "1px solid var(--dg-color-border-light)",
               }}
             >
               <Button

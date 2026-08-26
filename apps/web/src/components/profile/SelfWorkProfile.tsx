@@ -141,13 +141,13 @@ export function SelfWorkSchedule({
           </div>
         </div>
         <div className="dg-card-body flex flex-col gap-3">
-          <p className="m-0 text-[14px] text-[var(--color-text-muted)]">
+          <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
             Use this private feed in Google Calendar, Apple Calendar, or Outlook.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-              <Calendar className="size-4 shrink-0 text-[var(--color-text-muted)]" />
-              <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--color-text-secondary)]">
+            <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] px-3 py-2">
+              <Calendar className="size-4 shrink-0 text-[var(--dg-color-text-muted)]" />
+              <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--dg-color-text-secondary)]">
                 {typeof window !== "undefined"
                   ? `${window.location.origin}/api/calendar`
                   : "/api/calendar"}
@@ -168,7 +168,7 @@ export function SelfWorkSchedule({
               Copy URL
             </Button>
           </div>
-          <p className="m-0 text-[12px] text-[var(--color-text-subtle)]">
+          <p className="m-0 text-[12px] text-[var(--dg-color-text-subtle)]">
             You must be logged in for the feed to work. The URL returns your shifts for the next 4
             weeks.
           </p>

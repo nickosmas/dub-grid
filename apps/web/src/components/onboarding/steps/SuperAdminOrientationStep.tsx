@@ -63,9 +63,9 @@ export default function SuperAdminOrientationStep({
               alignItems: "flex-start",
               gap: 16,
               padding: "16px 20px",
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
             }}
           >
             <div
@@ -73,8 +73,8 @@ export default function SuperAdminOrientationStep({
                 width: 42,
                 height: 42,
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-brand-bg, #eff6ff)",
-                color: "var(--color-brand)",
+                background: "var(--dg-color-brand-bg, #eff6ff)",
+                color: "var(--dg-color-brand)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -88,7 +88,7 @@ export default function SuperAdminOrientationStep({
                 style={{
                   fontSize: 15,
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                   marginBottom: 3,
                 }}
               >
@@ -97,7 +97,7 @@ export default function SuperAdminOrientationStep({
               <div
                 style={{
                   fontSize: 13,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   lineHeight: 1.5,
                 }}
               >

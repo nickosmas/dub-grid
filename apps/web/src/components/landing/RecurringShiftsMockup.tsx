@@ -80,8 +80,8 @@ export default function RecurringShiftsMockup() {
       {/* Unsaved-changes banner — matches the sticky info banner in the real component */}
       <div
         style={{
-          background: "var(--color-info-bg)",
-          border: "1px solid var(--color-info-border)",
+          background: "var(--dg-color-info-bg)",
+          border: "1px solid var(--dg-color-info-border)",
           borderRadius: 10,
           padding: "10px 20px",
           display: "flex",
@@ -98,7 +98,7 @@ export default function RecurringShiftsMockup() {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "var(--color-info)",
+              background: "var(--dg-color-info)",
               boxShadow: "0 0 0 4px rgba(59,130,246,0.2)",
             }}
           />
@@ -106,7 +106,7 @@ export default function RecurringShiftsMockup() {
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: "var(--color-info-text)",
+              color: "var(--dg-color-info-text)",
             }}
           >
             {DIRTY_COUNT} unsaved change
@@ -117,11 +117,11 @@ export default function RecurringShiftsMockup() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               padding: "6px 14px",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               borderRadius: 6,
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
             }}
           >
             Save Draft
@@ -130,7 +130,7 @@ export default function RecurringShiftsMockup() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--color-danger)",
+              color: "var(--dg-color-danger)",
               padding: "6px 14px",
               borderRadius: 6,
               background: "transparent",
@@ -142,10 +142,10 @@ export default function RecurringShiftsMockup() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--color-text-inverse)",
+              color: "var(--dg-color-text-inverse)",
               padding: "6px 18px",
               borderRadius: 6,
-              background: "var(--color-brand)",
+              background: "var(--dg-color-brand)",
             }}
           >
             Save Changes
@@ -160,7 +160,7 @@ export default function RecurringShiftsMockup() {
             margin: 0,
             fontSize: 28,
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             letterSpacing: "-0.02em",
             lineHeight: 1.2,
           }}
@@ -171,7 +171,7 @@ export default function RecurringShiftsMockup() {
           style={{
             margin: "6px 0 0",
             fontSize: 13,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.5,
           }}
         >
@@ -196,11 +196,11 @@ export default function RecurringShiftsMockup() {
             gap: 10,
             height: 32,
             padding: "0 10px",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: 6,
-            background: "var(--color-surface)",
+            background: "var(--dg-color-surface)",
             fontSize: 12,
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
             fontWeight: 500,
             minWidth: 160,
           }}
@@ -213,7 +213,7 @@ export default function RecurringShiftsMockup() {
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            style={{ color: "var(--color-text-faint)" }}
+            style={{ color: "var(--dg-color-text-faint)" }}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -230,7 +230,7 @@ export default function RecurringShiftsMockup() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-text-faint)"
+            stroke="var(--dg-color-text-faint)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -250,11 +250,11 @@ export default function RecurringShiftsMockup() {
               display: "flex",
               alignItems: "center",
               padding: "0 10px 0 32px",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               borderRadius: 6,
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               fontSize: 12,
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
             }}
           >
             Search
@@ -265,9 +265,9 @@ export default function RecurringShiftsMockup() {
       {/* Grid card */}
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: 8,
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}
@@ -277,8 +277,8 @@ export default function RecurringShiftsMockup() {
           style={{
             display: "grid",
             gridTemplateColumns: TEMPLATE,
-            background: "var(--color-bg)",
-            borderBottom: "1px solid var(--color-border)",
+            background: "var(--dg-color-bg)",
+            borderBottom: "1px solid var(--dg-color-border)",
           }}
         >
           <div
@@ -286,10 +286,10 @@ export default function RecurringShiftsMockup() {
               padding: "10px 12px",
               fontSize: 11,
               fontWeight: 600,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               textTransform: "uppercase" as const,
               letterSpacing: "0.04em",
-              borderRight: "1px solid var(--color-border-light)",
+              borderRight: "1px solid var(--dg-color-border-light)",
             }}
           >
             Staff
@@ -301,7 +301,7 @@ export default function RecurringShiftsMockup() {
                 padding: "10px 4px",
                 fontSize: 11,
                 fontWeight: 600,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
                 textTransform: "uppercase" as const,
                 letterSpacing: "0.04em",
                 textAlign: "center" as const,
@@ -314,7 +314,9 @@ export default function RecurringShiftsMockup() {
 
         {ENTRIES.map((entry, rowIdx) => {
           const designation = DESIGNATION_COLORS[entry.cert];
-          const rowBg = entry.isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
+          const rowBg = entry.isCurrentUser
+            ? "var(--dg-color-today-bg)"
+            : "var(--dg-color-surface)";
 
           return (
             <div
@@ -322,7 +324,7 @@ export default function RecurringShiftsMockup() {
               style={{
                 display: "grid",
                 gridTemplateColumns: TEMPLATE,
-                borderTop: rowIdx > 0 ? "1px solid var(--color-border-light)" : undefined,
+                borderTop: rowIdx > 0 ? "1px solid var(--dg-color-border-light)" : undefined,
                 background: rowBg,
               }}
             >
@@ -333,7 +335,7 @@ export default function RecurringShiftsMockup() {
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "7px 12px",
-                  borderRight: "1px solid var(--color-border-light)",
+                  borderRight: "1px solid var(--dg-color-border-light)",
                   background: rowBg,
                   height: CELL_HEIGHT,
                   boxSizing: "border-box" as const,
@@ -347,7 +349,7 @@ export default function RecurringShiftsMockup() {
                     minWidth: 0,
                     fontWeight: 600,
                     fontSize: 13,
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     whiteSpace: "nowrap" as const,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -369,8 +371,8 @@ export default function RecurringShiftsMockup() {
                         fontWeight: 700,
                         padding: "1px 5px",
                         borderRadius: 10,
-                        background: "var(--color-brand-bg)",
-                        color: "var(--color-brand)",
+                        background: "var(--dg-color-brand-bg)",
+                        color: "var(--dg-color-brand)",
                         whiteSpace: "nowrap" as const,
                         flexShrink: 0,
                       }}
@@ -408,7 +410,7 @@ export default function RecurringShiftsMockup() {
                     style={{
                       position: "relative",
                       height: CELL_HEIGHT,
-                      borderLeft: "1px solid var(--color-border-light)",
+                      borderLeft: "1px solid var(--dg-color-border-light)",
                     }}
                   >
                     {shift ? (
@@ -444,14 +446,14 @@ export default function RecurringShiftsMockup() {
                           bottom: 4,
                           left: 4,
                           background: "transparent",
-                          border: "1px dashed var(--color-border-light)",
+                          border: "1px dashed var(--dg-color-border-light)",
                           borderRadius: 8,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           fontSize: 12,
                           fontWeight: 500,
-                          color: "var(--color-text-faint)",
+                          color: "var(--dg-color-text-faint)",
                         }}
                       >
                         --

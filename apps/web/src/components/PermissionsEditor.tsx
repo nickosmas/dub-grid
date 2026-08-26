@@ -293,14 +293,14 @@ function ToggleSwitch({
       className={`
         relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent
         transition-colors duration-200 ease-in-out
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-2
-        ${on ? "bg-[var(--color-brand)]" : "bg-[var(--color-border)]"}
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--dg-color-brand)] focus-visible:ring-offset-2
+        ${on ? "bg-[var(--dg-color-brand)]" : "bg-[var(--dg-color-border)]"}
         ${disabled ? "opacity-40 cursor-default" : "cursor-pointer"}
       `}
     >
       <span
         className={`
-          pointer-events-none inline-block h-5 w-5 rounded-full bg-[var(--color-text-inverse)] shadow-sm ring-0
+          pointer-events-none inline-block h-5 w-5 rounded-full bg-[var(--dg-color-text-inverse)] shadow-sm ring-0
           transition-transform duration-200 ease-in-out
           ${on ? "translate-x-5" : "translate-x-0"}
         `}
@@ -351,26 +351,28 @@ function ModuleRow({
   const isActive = viewOn || editOn;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--color-bg)] transition-colors items-center">
+    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--dg-color-bg)] transition-colors items-center">
       {/* Module info */}
       <div className="col-span-1 md:col-span-8 flex items-start">
         <div
-          className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)]" : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)]"}`}
+          className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]" : "bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-faint)]"}`}
         >
           <Icon />
         </div>
         <div>
-          <h4 className="font-medium text-[14px] text-[var(--color-text-primary)]">{mod.title}</h4>
-          <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 pr-4 leading-relaxed">
+          <h4 className="font-medium text-[14px] text-[var(--dg-color-text-primary)]">
+            {mod.title}
+          </h4>
+          <p className="text-[13px] text-[var(--dg-color-text-muted)] mt-0.5 pr-4 leading-relaxed">
             {mod.description}
           </p>
         </div>
       </div>
 
       {/* Toggles */}
-      <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--color-border-light)]">
+      <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--dg-color-border-light)]">
         <div className="flex flex-col items-center justify-center gap-1.5">
-          <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">
+          <span className="md:hidden text-[11px] font-medium text-[var(--dg-color-text-subtle)] uppercase">
             View
           </span>
           {hasView ? (
@@ -380,17 +382,17 @@ function ModuleRow({
               onChange={onToggleView}
             />
           ) : (
-            <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+            <span className="text-[13px] text-[var(--dg-color-text-faint)]">—</span>
           )}
         </div>
         <div className="flex flex-col items-center justify-center gap-1.5">
-          <span className="md:hidden text-[11px] font-medium text-[var(--color-text-subtle)] uppercase">
+          <span className="md:hidden text-[11px] font-medium text-[var(--dg-color-text-subtle)] uppercase">
             Edit
           </span>
           {hasEdit ? (
             <ToggleSwitch on={editOn} disabled={editDisabled} onChange={onToggleEdit} />
           ) : (
-            <span className="text-[13px] text-[var(--color-text-faint)]">—</span>
+            <span className="text-[13px] text-[var(--dg-color-text-faint)]">—</span>
           )}
         </div>
       </div>
@@ -547,10 +549,12 @@ export default function PermissionsEditor({
       >
         <div className="flex flex-col flex-1 min-h-0">
           {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="px-6 py-4 border-b border-[var(--color-border-light)] bg-[var(--color-bg)] shrink-0">
-            <p className="text-[14px] text-[var(--color-text-muted)] leading-relaxed">{subtitle}</p>
+          <div className="px-6 py-4 border-b border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg)] shrink-0">
+            <p className="text-[14px] text-[var(--dg-color-text-muted)] leading-relaxed">
+              {subtitle}
+            </p>
             {showPermissionCounter && (
-              <p className="text-[12px] text-[var(--color-text-faint)] mt-1">
+              <p className="text-[12px] text-[var(--dg-color-text-faint)] mt-1">
                 {enabledCount} of {allKeys.length} permissions enabled
               </p>
             )}
@@ -567,7 +571,7 @@ export default function PermissionsEditor({
           {/* ── Scrollable content ──────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Column headers — desktop only */}
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-[var(--color-border-light)] text-[11px] font-semibold text-[var(--color-text-subtle)] uppercase tracking-wider">
+            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-[var(--dg-color-border-light)] text-[11px] font-semibold text-[var(--dg-color-text-subtle)] uppercase tracking-wider">
               <div className="col-span-8">Module & Access Level</div>
               <div className="col-span-2 text-center">View</div>
               <div className="col-span-2 text-center">Edit</div>
@@ -576,14 +580,14 @@ export default function PermissionsEditor({
             {groupedModules.map((group) => (
               <div key={group.category} className="pb-1">
                 {/* Category header */}
-                <div className="px-6 py-3 bg-[var(--color-bg)]">
-                  <h3 className="text-[13px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                <div className="px-6 py-3 bg-[var(--dg-color-bg)]">
+                  <h3 className="text-[13px] font-semibold text-[var(--dg-color-text-secondary)] uppercase tracking-wider">
                     {group.label}
                   </h3>
                 </div>
 
                 {/* Module rows */}
-                <div className="divide-y divide-[var(--color-border-light)]">
+                <div className="divide-y divide-[var(--dg-color-border-light)]">
                   {group.modules.map((mod) => (
                     <ModuleRow
                       key={mod.id}
@@ -601,7 +605,7 @@ export default function PermissionsEditor({
 
           {/* ── Footer ──────────────────────────────────────────────────── */}
           <EditorActionRow
-            className="px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]"
+            className="px-6 py-4 shrink-0 border-t border-[var(--dg-color-border-light)]"
             secondaryAction={
               <Button
                 className="dg-btn dg-btn-secondary"

@@ -20,7 +20,7 @@
    Phone 2. "My Schedule" (Me) with an in-progress (On Duty) hero shift.
    Phone 3. The shift-requests "Available" tab. ── */
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Home,
@@ -44,34 +44,34 @@ import {
    packages/design-tokens, referenced here as CSS custom properties so the
    phone screens follow the page theme like every other landing mockup. ── */
 const C = {
-  background: "var(--color-bg)",
-  surface: "var(--color-surface)",
-  surfaceSecondary: "var(--color-bg-secondary)",
-  surfaceMuted: "var(--color-row-alt)",
-  border: "var(--color-border)",
-  borderSubtle: "var(--color-border-light)",
-  textPrimary: "var(--color-text-primary)",
-  textSecondary: "var(--color-text-secondary)",
-  textMuted: "var(--color-text-muted)",
-  textSubtle: "var(--color-text-subtle)",
-  textInverse: "var(--color-text-inverse)",
-  brand: "var(--color-brand)",
-  brandSoft: "var(--color-brand-bg)",
-  brandBorder: "var(--color-brand-border)",
-  success: "var(--color-success)",
-  successText: "var(--color-success-text)",
-  successSoft: "var(--color-success-bg)",
-  successBorder: "var(--color-success-border)",
-  warning: "var(--color-warning)",
-  warningText: "var(--color-warning-text)",
-  warningSoft: "var(--color-warning-bg)",
-  warningBorder: "var(--color-warning-border)",
-  danger: "var(--color-danger)",
-  dangerText: "var(--color-danger-text)",
-  dangerSoft: "var(--color-danger-bg)",
-  dangerBorder: "var(--color-danger-border)",
-  shadow: "var(--color-shadow)",
-  shadowStrong: "var(--color-shadow-strong)",
+  background: "var(--dg-color-bg)",
+  surface: "var(--dg-color-surface)",
+  surfaceSecondary: "var(--dg-color-bg-secondary)",
+  surfaceMuted: "var(--dg-color-row-alt)",
+  border: "var(--dg-color-border)",
+  borderSubtle: "var(--dg-color-border-light)",
+  textPrimary: "var(--dg-color-text-primary)",
+  textSecondary: "var(--dg-color-text-secondary)",
+  textMuted: "var(--dg-color-text-muted)",
+  textSubtle: "var(--dg-color-text-subtle)",
+  textInverse: "var(--dg-color-text-inverse)",
+  brand: "var(--dg-color-brand)",
+  brandSoft: "var(--dg-color-brand-bg)",
+  brandBorder: "var(--dg-color-brand-border)",
+  success: "var(--dg-color-success)",
+  successText: "var(--dg-color-success-text)",
+  successSoft: "var(--dg-color-success-bg)",
+  successBorder: "var(--dg-color-success-border)",
+  warning: "var(--dg-color-warning)",
+  warningText: "var(--dg-color-warning-text)",
+  warningSoft: "var(--dg-color-warning-bg)",
+  warningBorder: "var(--dg-color-warning-border)",
+  danger: "var(--dg-color-danger)",
+  dangerText: "var(--dg-color-danger-text)",
+  dangerSoft: "var(--dg-color-danger-bg)",
+  dangerBorder: "var(--dg-color-danger-border)",
+  shadow: "var(--dg-color-shadow)",
+  shadowStrong: "var(--dg-color-shadow-strong)",
 };
 
 /* ── ScheduleScreen.tsx's ME_HERO_CARD_GRADIENT_LIGHT/_DARK + matching
@@ -80,7 +80,11 @@ const C = {
    theme read rather than a CSS var. ── */
 function useMockupIsDark(): boolean {
   const { resolvedTheme } = useTheme();
-  return resolvedTheme === "dark";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  return mounted && resolvedTheme === "dark";
 }
 
 const ME_HERO_GRADIENT_LIGHT =

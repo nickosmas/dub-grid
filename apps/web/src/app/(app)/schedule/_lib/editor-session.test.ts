@@ -77,6 +77,13 @@ describe("schedule editor session helpers", () => {
     expect(shiftEditableIdentityMatches(base, draft)).toBe(false);
   });
 
+  it("classifies an entry matching its published state as no draft at all", () => {
+    // What the grid's drag-drop relies on: dropping a shift onto the cell that
+    // already published that exact shift leaves nothing to publish, so the cell
+    // must not come back wearing a draft border.
+    expect(computeScheduleEntryDraftKind(makeShiftEntry())).toBeNull();
+  });
+
   it("keeps time-only edits out of editable identity comparisons", () => {
     const base = makeShiftEntry({ customStartTime: "07:00" });
     const draft = makeShiftEntry({ customStartTime: "08:00" });

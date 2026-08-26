@@ -70,7 +70,7 @@ export default function ConfirmDialog({
     variant === "danger" ? "dg-btn dg-btn-danger-filled" : "dg-btn dg-btn-primary";
 
   const confirmStyle: React.CSSProperties | undefined =
-    variant === "warning" ? { background: "var(--color-warning)", border: "none" } : undefined;
+    variant === "warning" ? { background: "var(--dg-color-warning)", border: "none" } : undefined;
 
   const descId = "confirm-dialog-desc";
   const actionDisabled = confirmBusy || secondaryBusy;
@@ -88,7 +88,7 @@ export default function ConfirmDialog({
         id={descId}
         style={{
           fontSize: "var(--dg-fs-body-sm)",
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
           marginBottom: 24,
           lineHeight: 1.5,
         }}

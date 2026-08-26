@@ -320,18 +320,18 @@ export default function NotificationBell({
           justifyContent: "center",
           width: 36,
           height: 36,
-          background: open ? "var(--color-bg-secondary)" : "transparent",
-          border: "1px solid " + (open ? "var(--color-border)" : "transparent"),
+          background: open ? "var(--dg-color-bg-secondary)" : "transparent",
+          border: "1px solid " + (open ? "var(--dg-color-border)" : "transparent"),
           borderRadius: "var(--dg-btn-radius)",
           cursor: "pointer",
           position: "relative",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           transition: "background 150ms ease, border-color 150ms ease",
         }}
         onMouseEnter={(e) => {
           if (!open) {
-            e.currentTarget.style.background = "var(--color-bg-secondary)";
-            e.currentTarget.style.borderColor = "var(--color-border)";
+            e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+            e.currentTarget.style.borderColor = "var(--dg-color-border)";
           }
         }}
         onMouseLeave={(e) => {
@@ -363,7 +363,7 @@ export default function NotificationBell({
               width: 16,
               height: 16,
               borderRadius: "50%",
-              background: "var(--color-danger)",
+              background: "var(--dg-color-danger)",
               color: "#fff",
               fontSize: unreadCountFontSize,
               fontWeight: 700,
@@ -390,8 +390,8 @@ export default function NotificationBell({
             right: 0,
             width: 360,
             maxHeight: 440,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-radius-lg)",
             boxShadow: "var(--shadow-menu)",
             zIndex: 200,
@@ -407,14 +407,14 @@ export default function NotificationBell({
               alignItems: "center",
               justifyContent: "space-between",
               padding: "12px 16px",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             <span
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Alerts
@@ -429,7 +429,7 @@ export default function NotificationBell({
                   cursor: "pointer",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
-                  color: "var(--color-link)",
+                  color: "var(--dg-color-link)",
                   fontFamily: "inherit",
                   padding: 0,
                 }}
@@ -446,7 +446,7 @@ export default function NotificationBell({
                 style={{
                   padding: 24,
                   textAlign: "center",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -457,7 +457,7 @@ export default function NotificationBell({
                 style={{
                   padding: 32,
                   textAlign: "center",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -479,9 +479,9 @@ export default function NotificationBell({
                       gap: 12,
                       width: "100%",
                       padding: "12px 16px",
-                      background: isUnread ? "var(--color-info-bg)" : "transparent",
+                      background: isUnread ? "var(--dg-color-info-bg)" : "transparent",
                       border: "none",
-                      borderBottom: "1px solid var(--color-border-light)",
+                      borderBottom: "1px solid var(--dg-color-border-light)",
                       cursor: isUnread ? "pointer" : "default",
                       fontFamily: "inherit",
                       textAlign: "left",
@@ -494,11 +494,11 @@ export default function NotificationBell({
                         width: 32,
                         height: 32,
                         borderRadius: "50%",
-                        background: "var(--color-bg-secondary)",
+                        background: "var(--dg-color-bg-secondary)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        color: isUnread ? "var(--color-info)" : "var(--color-text-muted)",
+                        color: isUnread ? "var(--dg-color-info)" : "var(--dg-color-text-muted)",
                       }}
                     >
                       <NotificationIcon type={n.type} />
@@ -509,7 +509,7 @@ export default function NotificationBell({
                           style={{
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: isUnread ? 700 : 600,
-                            color: "var(--color-text-primary)",
+                            color: "var(--dg-color-text-primary)",
                           }}
                         >
                           {n.title}
@@ -520,7 +520,7 @@ export default function NotificationBell({
                               width: 6,
                               height: 6,
                               borderRadius: "50%",
-                              background: "var(--color-info)",
+                              background: "var(--dg-color-info)",
                               flexShrink: 0,
                             }}
                           />
@@ -529,7 +529,7 @@ export default function NotificationBell({
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           marginTop: 2,
                           lineHeight: 1.4,
                         }}
@@ -539,7 +539,7 @@ export default function NotificationBell({
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-subtle)",
+                          color: "var(--dg-color-text-subtle)",
                           marginTop: 4,
                         }}
                       >
@@ -567,11 +567,11 @@ export default function NotificationBell({
                 width: "100%",
                 padding: "10px 16px",
                 border: "none",
-                borderTop: "1px solid var(--color-border-light)",
-                background: "var(--color-surface)",
+                borderTop: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-surface)",
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
-                color: "var(--color-link)",
+                color: "var(--dg-color-link)",
                 cursor: "pointer",
                 fontFamily: "inherit",
               }}
@@ -587,11 +587,11 @@ export default function NotificationBell({
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "10px 16px",
-                borderTop: "1px solid var(--color-border-light)",
-                background: "var(--color-surface)",
+                borderTop: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-surface)",
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
-                color: "var(--color-link)",
+                color: "var(--dg-color-link)",
                 textDecoration: "none",
                 fontFamily: "inherit",
               }}
