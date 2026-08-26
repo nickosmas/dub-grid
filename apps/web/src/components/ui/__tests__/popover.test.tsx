@@ -42,6 +42,7 @@ describe("ui/popover", () => {
     const arrow = document.body.querySelector('[data-slot="popover-arrow"]');
     expect(arrow).not.toBeNull();
     expect(arrow?.tagName).toBe("svg");
+    expect(arrow).toHaveStyle({ height: "16px", width: "16px" });
 
     rerender(
       <Popover open={false}>

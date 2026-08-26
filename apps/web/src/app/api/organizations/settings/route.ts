@@ -40,6 +40,7 @@ const bodySchema = z.object({
   certificationLabel: z.string().trim().max(50).optional(),
   roleLabel: z.string().trim().max(50).optional(),
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
+  showShiftDetailHoverCards: z.boolean().optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
     .string()
@@ -337,6 +338,8 @@ export async function PUT(req: NextRequest) {
             })
           : currentOrg.roleLabel,
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
+      showShiftDetailHoverCards:
+        fields.showShiftDetailHoverCards ?? currentOrg.showShiftDetailHoverCards,
       timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
@@ -392,6 +395,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("shiftDisplayMode")) {
       update.shift_display_mode = nextOrg.shiftDisplayMode;
+    }
+    if (changeKeys.has("showShiftDetailHoverCards")) {
+      update.show_shift_detail_hover_cards = nextOrg.showShiftDetailHoverCards;
     }
     if (changeKeys.has("timezone")) {
       update.timezone = nextOrg.timezone;

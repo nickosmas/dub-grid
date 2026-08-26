@@ -360,6 +360,31 @@ describe("PUT /api/organizations/settings", () => {
     expect(cacheDel).not.toHaveBeenCalled();
   });
 
+  it("persists the shift detail hover-card setting", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", {
+      show_shift_detail_hover_cards: true,
+    });
+    const updatedRow = makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+      show_shift_detail_hover_cards: false,
+    });
+
+    organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+    organizationUpdateMaybeSingle.mockResolvedValueOnce({ data: updatedRow, error: null });
+
+    const response = await PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        showShiftDetailHoverCards: false,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ show_shift_detail_hover_cards: false }),
+    );
+  });
+
   it("rejects invalid organization phone numbers with field errors", async () => {
     const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
 

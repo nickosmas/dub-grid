@@ -72,6 +72,8 @@ export interface Organization {
   roleLabel: string;
   departmentLabel: string;
   shiftDisplayMode: ShiftDisplayMode;
+  /** Whether schedule shift pills reveal their full detail card on hover. */
+  showShiftDetailHoverCards?: boolean;
   timezone: string | null;
   payPeriodStartDate: string | null;
   archivedAt?: string | null;

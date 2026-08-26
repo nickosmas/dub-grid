@@ -71,6 +71,7 @@ export interface ScheduleGridOptions {
   isCellInteractive: boolean;
   canDragShifts: boolean;
   shiftDisplayMode: ShiftDisplayMode;
+  showShiftDetailHoverCards: boolean;
   showPublishDiffOverlay: boolean;
   showAudit: boolean;
 }
@@ -191,6 +192,7 @@ export interface BuildScheduleGridModelInput {
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
+  showShiftDetailHoverCards?: boolean;
   showPublishDiffOverlay?: boolean;
   showAudit?: boolean;
   accessors: ScheduleGridAccessors;
@@ -229,6 +231,7 @@ export function buildScheduleGridModel({
   isCellInteractive = true,
   canDragShifts = isCellInteractive,
   shiftDisplayMode = "code",
+  showShiftDetailHoverCards = true,
   showPublishDiffOverlay,
   showAudit = false,
   accessors,
@@ -432,6 +435,7 @@ export function buildScheduleGridModel({
       isCellInteractive,
       canDragShifts,
       shiftDisplayMode,
+      showShiftDetailHoverCards,
       showPublishDiffOverlay: showPublishDiffOverlay ?? false,
       showAudit,
     },

@@ -60,6 +60,7 @@ CREATE TABLE public.organizations (
   department_label     TEXT,
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
+  show_shift_detail_hover_cards BOOLEAN NOT NULL DEFAULT true,
   timezone             TEXT NOT NULL DEFAULT 'UTC',
   pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,

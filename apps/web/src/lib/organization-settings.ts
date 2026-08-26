@@ -18,6 +18,7 @@ export type OrganizationSettingsKey =
   | "roleLabel"
   | "departmentLabel"
   | "shiftDisplayMode"
+  | "showShiftDetailHoverCards"
   | "enforceConflictPrevention"
   | "defaultShiftEnabled"
   | "coverageRuleConfig"
@@ -93,6 +94,11 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     format: (value) =>
       value === "code" || value === "name" ? SHIFT_DISPLAY_MODE_LABELS[value] : DEFAULT_EMPTY,
   },
+  showShiftDetailHoverCards: {
+    label: "Shift Detail Hover Cards",
+    sensitive: false,
+    format: (value) => (value ? "Enabled" : "Disabled"),
+  },
   payPeriodStartDate: {
     label: "Pay Period Start Date",
     sensitive: true,
@@ -153,6 +159,7 @@ export function pickOrganizationSettings(organization: Organization): Organizati
     roleLabel: organization.roleLabel,
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
+    showShiftDetailHoverCards: organization.showShiftDetailHoverCards ?? true,
     enforceConflictPrevention: organization.enforceConflictPrevention,
     defaultShiftEnabled: organization.defaultShiftEnabled,
     coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
