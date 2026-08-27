@@ -5708,15 +5708,16 @@ function SchedulerContent() {
                     className="dg-draft-banner-dot"
                     style={{ background: "var(--dg-color-info-text)" }}
                   />
-                  <span style={{ fontWeight: 600 }}>Also unpublished nearby:</span>
+                  <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
                   <span style={{ opacity: 0.85 }}>
                     {(() => {
                       const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
                       const unit =
                         spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                       // Counted from the loaded window only, so it can shrink
-                      // after a far jump recenters the fetch. Saying "nearby"
-                      // keeps that from reading as "nothing left to publish".
+                      // after a far jump recenters the fetch. Referencing other
+                      // weeks makes the schedule relationship clear without
+                      // implying a physical location.
                       return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} within the loaded dates (${outOfWindowDraftGroupRanges.join(", ")})`;
                     })()}
                   </span>
