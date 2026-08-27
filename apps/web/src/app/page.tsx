@@ -44,9 +44,9 @@ type Feature = {
 const FEATURES: Feature[] = [
   {
     icon: CalendarDays,
-    title: "Build the week",
+    title: "Easy scheduling",
     description:
-      "Drag, drop, done. Build the week in a grid that prints cleanly and publishes when you're ready.",
+      "Click, drag, drop... Your choice! Build the week in a grid that prints cleanly and publishes when you're ready.",
   },
   {
     icon: Users,
