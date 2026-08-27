@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import AppShell from "@/components/AppShell";
 import { fetchOrganizationBilling } from "@/features/billing/client";
-import { fetchOnboardingStatus } from "@/features/onboarding/client";
 
 let mockPathname = "/dashboard";
 let mockSection: string | null = null;
@@ -29,6 +28,7 @@ const mockPermissions = {
 
 const mockOrganizationData = {
   org: { id: "org-1", name: "Acme" },
+  entryGate: { onboardingCompleted: false, billingLocked: null as boolean | null },
   setupStatus: {
     isComplete: false,
     missing: {
@@ -66,7 +66,6 @@ vi.mock("@/hooks", () => ({
 }));
 
 vi.mock("@/features/onboarding/client", () => ({
-  fetchOnboardingStatus: vi.fn(),
   // Same-session completion/phase guards are sessionStorage-backed; default them
   // off so these scenarios exercise the setupStatus-driven gate logic.
   isOnboardingComplete: vi.fn(() => false),
@@ -76,10 +75,6 @@ vi.mock("@/features/onboarding/client", () => ({
 
 vi.mock("@/features/billing/client", () => ({
   fetchOrganizationBilling: vi.fn(),
-}));
-
-vi.mock("@/features/billing/useBillingRealtimeInvalidation", () => ({
-  useBillingRealtimeInvalidation: vi.fn(),
 }));
 
 vi.mock("@/components/onboarding/SetupPendingScreen", () => ({
@@ -148,13 +143,9 @@ beforeEach(() => {
     },
   };
   mockOrganizationData.loading = false;
+  mockOrganizationData.entryGate = { onboardingCompleted: false, billingLocked: null };
   mockEmployeesData.employees = [];
   mockEmployeesData.loading = false;
-  vi.mocked(fetchOnboardingStatus).mockResolvedValue({
-    completed: false,
-    completedAt: null,
-    tooltipToursCompleted: {},
-  });
   vi.mocked(fetchOrganizationBilling).mockResolvedValue({
     orgId: "org-1",
     orgName: "Acme",
@@ -186,11 +177,7 @@ describe("OnboardingGate setup lock", () => {
   it("shows setup pending for regular users even when onboarding is completed", async () => {
     mockPermissions.role = "user";
     mockPermissions.canManageOrg = false;
-    vi.mocked(fetchOnboardingStatus).mockResolvedValue({
-      completed: true,
-      completedAt: "2026-05-02T00:00:00.000Z",
-      tooltipToursCompleted: {},
-    });
+    mockOrganizationData.entryGate.onboardingCompleted = true;
 
     renderGate();
 
@@ -241,11 +228,7 @@ describe("OnboardingGate setup lock", () => {
       },
     };
     mockEmployeesData.employees = [{ id: "employee-1" }];
-    vi.mocked(fetchOnboardingStatus).mockResolvedValue({
-      completed: true,
-      completedAt: "2026-05-02T00:00:00.000Z",
-      tooltipToursCompleted: {},
-    });
+    mockOrganizationData.entryGate.onboardingCompleted = true;
 
     renderGate();
 
@@ -263,11 +246,7 @@ describe("OnboardingGate setup lock", () => {
       },
     };
     mockEmployeesData.employees = [];
-    vi.mocked(fetchOnboardingStatus).mockResolvedValue({
-      completed: true,
-      completedAt: "2026-05-02T00:00:00.000Z",
-      tooltipToursCompleted: {},
-    });
+    mockOrganizationData.entryGate.onboardingCompleted = true;
 
     renderGate();
 
@@ -280,7 +259,6 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     expect(screen.getByText("Protected app")).toBeInTheDocument();
-    expect(fetchOnboardingStatus).not.toHaveBeenCalled();
   });
 
   it("redirects super admins to billing recovery when billing is locked", async () => {
@@ -295,31 +273,7 @@ describe("OnboardingGate setup lock", () => {
       },
     };
     mockEmployeesData.employees = [{ id: "employee-1" }];
-    vi.mocked(fetchOrganizationBilling).mockResolvedValue({
-      orgId: "org-1",
-      orgName: "Acme",
-      orgSlug: "acme",
-      status: "canceled",
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-      cancelAt: null,
-      canceledAt: null,
-      subscriptionSeats: null,
-      appUserCount: 1,
-      seatDelta: null,
-      hasStripeCustomer: true,
-      hasStripeSubscription: false,
-      stripeConfigured: true,
-      canManageBilling: true,
-      billingAccess: {
-        state: "locked",
-        reason: "payment_status",
-        isLocked: true,
-        shouldNotifyAdmins: true,
-        daysUntilTrialEnd: null,
-        trialGraceEndsAt: null,
-      },
-    });
+    mockOrganizationData.entryGate.billingLocked = true;
 
     renderGate();
 
@@ -343,31 +297,7 @@ describe("OnboardingGate setup lock", () => {
       },
     };
     mockEmployeesData.employees = [{ id: "employee-1" }];
-    vi.mocked(fetchOrganizationBilling).mockResolvedValue({
-      orgId: "org-1",
-      orgName: "Acme",
-      orgSlug: "acme",
-      status: "canceled",
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-      cancelAt: null,
-      canceledAt: null,
-      subscriptionSeats: null,
-      appUserCount: 1,
-      seatDelta: null,
-      hasStripeCustomer: true,
-      hasStripeSubscription: false,
-      stripeConfigured: true,
-      canManageBilling: true,
-      billingAccess: {
-        state: "locked",
-        reason: "payment_status",
-        isLocked: true,
-        shouldNotifyAdmins: true,
-        daysUntilTrialEnd: null,
-        trialGraceEndsAt: null,
-      },
-    });
+    mockOrganizationData.entryGate.billingLocked = true;
 
     renderGate();
 
@@ -381,31 +311,7 @@ describe("OnboardingGate setup lock", () => {
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.loading = true;
     mockEmployeesData.loading = true;
-    vi.mocked(fetchOrganizationBilling).mockResolvedValue({
-      orgId: "org-1",
-      orgName: "Acme",
-      orgSlug: "acme",
-      status: "canceled",
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-      cancelAt: null,
-      canceledAt: null,
-      subscriptionSeats: null,
-      appUserCount: 1,
-      seatDelta: null,
-      hasStripeCustomer: true,
-      hasStripeSubscription: false,
-      stripeConfigured: true,
-      canManageBilling: true,
-      billingAccess: {
-        state: "locked",
-        reason: "payment_status",
-        isLocked: true,
-        shouldNotifyAdmins: true,
-        daysUntilTrialEnd: null,
-        trialGraceEndsAt: null,
-      },
-    });
+    mockOrganizationData.entryGate.billingLocked = true;
 
     renderGate();
 

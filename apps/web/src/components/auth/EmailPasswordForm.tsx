@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Form } from "@/components/Form";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -30,17 +30,6 @@ export function EmailPasswordForm({
   forgotPasswordHref?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [slow, setSlow] = useState(false);
-
-  useEffect(() => {
-    if (!loading) {
-      setSlow(false);
-      return;
-    }
-    const timeout = window.setTimeout(() => setSlow(true), 15_000);
-    return () => window.clearTimeout(timeout);
-  }, [loading]);
-
   return (
     <Form onSubmit={onSubmit} className="dg-auth-form">
       <div>
@@ -96,13 +85,6 @@ export function EmailPasswordForm({
           {submitLabel}
         </ButtonLoading>
       </button>
-      {loading ? (
-        <p className="dg-form-hint dg-auth-progress" role="status">
-          {slow
-            ? "Signing in is taking longer than usual. We’re still working in the background."
-            : "Signing you in…"}
-        </p>
-      ) : null}
     </Form>
   );
 }
