@@ -102,6 +102,7 @@ describe("OrgLogin submit states", () => {
       expect(submitBtn).toBeDisabled();
       // Spinner SVG replaces button text while loading
       expect(submitBtn.querySelector("svg")).toBeInTheDocument();
+      expect(screen.queryByText("Signing you in…")).not.toBeInTheDocument();
     });
   });
 
@@ -129,6 +130,35 @@ describe("OrgLogin submit states", () => {
     // Button must be re-enabled — loading=false on error
     const button = screen.getByRole("button", { name: /sign in/i });
     expect(button).not.toBeDisabled();
+  });
+
+  it("directs gridmaster accounts to the portal without storing a tenant session", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/validate-domain")) {
+        return Promise.resolve(validateDomainResponse());
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            success: false,
+            code: "GRIDMASTER_PORTAL_REQUIRED",
+            error: "Gridmaster accounts must sign in through the Gridmaster Portal.",
+          }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    });
+
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
+    submitForm(container);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This account uses the Gridmaster Portal.",
+      );
+    });
+    expect(mockSetSession).not.toHaveBeenCalled();
   });
 
   it("renders the org name on the first paint, never the raw slug", () => {
