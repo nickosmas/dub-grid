@@ -14,10 +14,18 @@ import type {
   ShiftCategory,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { fetchWithTimeout, RequestTimeoutError } from "@/lib/fetch-with-timeout";
+
+const ORGANIZATION_BOOTSTRAP_TIMEOUT_MS = 5_000;
 
 export interface OrganizationBootstrap {
   org: Organization | null;
   isGridmaster: boolean;
+  entryGate: {
+    onboardingCompleted: boolean;
+    /** Only present for a super-admin's own organization. */
+    billingLocked: boolean | null;
+  };
   /**
    * Active employees in the org, as a count rather than the roster.
    * SetupGuard only needs to know whether the org has any staff, and asking
@@ -57,8 +65,14 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestOrganizationJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(resolveClientUrl(input), init);
+async function requestOrganizationJson<T>(
+  input: string,
+  init?: RequestInit,
+  timeoutMs?: number,
+): Promise<T> {
+  const response = timeoutMs
+    ? await fetchWithTimeout(resolveClientUrl(input), init, timeoutMs)
+    : await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
     ? ((await response.json()) as Record<string, unknown>)
@@ -86,13 +100,18 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
  * under two keys. The server now always includes them.
  */
 export function fetchOrganizationBootstrap(signal?: AbortSignal): Promise<OrganizationBootstrap> {
-  return requestOrganizationJson<OrganizationBootstrap>("/api/organization/bootstrap", { signal });
+  return requestOrganizationJson<OrganizationBootstrap>(
+    "/api/organization/bootstrap",
+    { signal },
+    ORGANIZATION_BOOTSTRAP_TIMEOUT_MS,
+  );
 }
 
 export function isRetryableOrganizationBootstrapError(error: unknown): boolean {
   if (error instanceof OrganizationRequestError) {
     return error.status === 408 || error.status === 429 || error.status >= 500;
   }
+  if (error instanceof RequestTimeoutError) return true;
   // Browser fetch rejects network/connection failures without a response.
   return error instanceof TypeError;
 }

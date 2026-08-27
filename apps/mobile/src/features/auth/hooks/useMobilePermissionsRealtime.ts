@@ -20,16 +20,14 @@ import { BOOTSTRAP_QUERY_KEY_PREFIX } from "./useBootstrap";
 export function useMobilePermissionsRealtime({
   accessToken,
   userId,
-  disabled = false,
   queryClient,
 }: {
   accessToken: string | null;
   userId: string | null;
-  disabled?: boolean;
   queryClient: QueryClient;
 }) {
   useEffect(() => {
-    if (!accessToken || !userId || disabled) return;
+    if (!accessToken || !userId) return;
 
     const supabase = getSupabaseClient();
     if (
@@ -79,5 +77,5 @@ export function useMobilePermissionsRealtime({
       unsubscribeMembership();
       unsubscribeEmployee();
     };
-  }, [accessToken, disabled, queryClient, userId]);
+  }, [accessToken, queryClient, userId]);
 }

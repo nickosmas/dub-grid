@@ -37,16 +37,14 @@ const ORG_FILTER_TABLES: MobileRealtimeTable[] = [
 export function useMobileRealtimeInvalidation({
   accessToken,
   orgId,
-  disabled = false,
   queryClient,
 }: {
   accessToken: string | null;
   orgId: string | null;
-  disabled?: boolean;
   queryClient: QueryClient;
 }) {
   useEffect(() => {
-    if (!accessToken || !orgId || disabled) return;
+    if (!accessToken || !orgId) return;
 
     const supabase = getSupabaseClient();
     if (
@@ -80,5 +78,5 @@ export function useMobileRealtimeInvalidation({
         console.error("Mobile realtime freshness channel error", error);
       },
     });
-  }, [accessToken, disabled, orgId, queryClient]);
+  }, [accessToken, orgId, queryClient]);
 }

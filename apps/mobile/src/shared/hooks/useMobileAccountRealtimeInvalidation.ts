@@ -10,16 +10,14 @@ import { getSupabaseClient } from "../lib/supabase";
 export function useMobileAccountRealtimeInvalidation({
   accessToken,
   userId,
-  disabled = false,
   queryClient,
 }: {
   accessToken: string | null;
   userId: string | null;
-  disabled?: boolean;
   queryClient: QueryClient;
 }) {
   useEffect(() => {
-    if (!accessToken || !userId || disabled) return;
+    if (!accessToken || !userId) return;
 
     const supabase = getSupabaseClient();
     if (
@@ -53,5 +51,5 @@ export function useMobileAccountRealtimeInvalidation({
         },
       },
     );
-  }, [accessToken, disabled, queryClient, userId]);
+  }, [accessToken, queryClient, userId]);
 }

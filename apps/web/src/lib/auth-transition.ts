@@ -17,6 +17,10 @@ import { useSyncExternalStore } from "react";
  */
 const KEY = "dg_auth_transition";
 
+interface AuthTransitionState {
+  startedAt: number;
+}
+
 // Same-tab sessionStorage writes don't fire the "storage" event, so we notify
 // useSyncExternalStore subscribers ourselves whenever the flag flips.
 const listeners = new Set<() => void>();
@@ -27,16 +31,35 @@ function emit(): void {
 
 export function markAuthTransition(): void {
   try {
-    sessionStorage.setItem(KEY, "1");
+    const state: AuthTransitionState = { startedAt: Date.now() };
+    sessionStorage.setItem(KEY, JSON.stringify(state));
   } catch {
     // sessionStorage unavailable — splash simply won't pre-paint; harmless.
   }
   emit();
 }
 
+/**
+ * Returns the wall-clock start of the current sign-in handoff. Keeping this in
+ * the same session marker means loading surfaces can remount between auth,
+ * organization, and onboarding phases without resetting their recovery timer.
+ */
+export function getAuthTransitionStartedAt(): number | null {
+  try {
+    const raw = sessionStorage.getItem(KEY);
+    if (!raw || raw === "1") return null;
+    const value = JSON.parse(raw) as Partial<AuthTransitionState>;
+    return typeof value.startedAt === "number" && Number.isFinite(value.startedAt)
+      ? value.startedAt
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isAuthTransitionPending(): boolean {
   try {
-    return sessionStorage.getItem(KEY) === "1";
+    return sessionStorage.getItem(KEY) !== null;
   } catch {
     return false;
   }

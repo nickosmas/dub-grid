@@ -60,6 +60,7 @@ export interface OrganizationData {
   loading: boolean;
   loadError: string | null;
   bootstrapRetryable: boolean;
+  entryGate: OrganizationBootstrap["entryGate"] | null;
   setupStatus: SetupStatus;
   /** Active employees in the org — see OrganizationBootstrap.activeEmployeeCount. */
   activeEmployeeCount: number;
@@ -258,7 +259,6 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const effectiveOrgId = ctx.orgId ?? org?.id ?? null;
   useOrgRealtimeInvalidation({
     orgId: effectiveOrgId,
-    disabled: org?.featureOverrides?.disable_realtime === true,
     queryClient,
   });
 
@@ -613,6 +613,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     loading,
     loadError,
     bootstrapRetryable,
+    entryGate: bootstrap?.entryGate ?? null,
     setupStatus,
     activeEmployeeCount: bootstrap?.activeEmployeeCount ?? 0,
     setOrg,

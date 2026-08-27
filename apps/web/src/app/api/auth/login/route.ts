@@ -53,6 +53,30 @@ type OrchestrationOutcome =
 
 /** Returned when the user cannot access the organization named by the host. */
 const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
+const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
+const GRIDMASTER_PORTAL_REQUIRED_MESSAGE =
+  "Gridmaster accounts must sign in through the Gridmaster Portal before impersonating an organization.";
+
+async function isGridmasterAccount(
+  userId: string,
+  claims: ReturnType<typeof decodeJwt>,
+): Promise<boolean> {
+  if (claims.platform_role === "gridmaster") return true;
+  // A present non-gridmaster claim came from the same access-token hook and is
+  // already authoritative for this session. Avoid an extra profile lookup on
+  // the normal organization-login path.
+  if (typeof claims.platform_role === "string") return false;
+
+  // A newly issued token can occasionally predate the custom access-token
+  // hook. Check the authoritative profile so that stale claims cannot let a
+  // Gridmaster enter an organization login flow before the token is refreshed.
+  const { data } = await getServiceClient()
+    .from("profiles")
+    .select("platform_role")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.platform_role === "gridmaster";
+}
 
 /**
  * Re-scope a newly-created session to the organization encoded in the request
@@ -128,8 +152,8 @@ async function orchestratePostSignIn(
   initialSession: SessionTokens,
   claims: ReturnType<typeof decodeJwt>,
   req: NextRequest,
+  isGridmaster: boolean,
 ): Promise<OrchestrationOutcome> {
-  const isGridmaster = claims.platform_role === "gridmaster";
   let session = initialSession;
   let effectiveClaims = claims;
   let didSwitchOrg = false;
@@ -364,11 +388,31 @@ export async function POST(req: NextRequest) {
   // ever calling setBrowserSession, so orchestration (which assumes a
   // fully-usable session) would be wasted work here.
   const emailConfirmed = !!data.user.email_confirmed_at;
+  const claims = decodeJwt(session.access_token);
+  const isGridmaster = await timer.time("gridmaster_login_intent", () =>
+    isGridmasterAccount(data.user.id, claims),
+  );
+  const loginHost = parseHost(req.headers.get("host") ?? "").subdomain;
+
+  // A Gridmaster's tenant access always starts from the platform portal and a
+  // verified impersonation session. Reject this before the browser receives
+  // tokens, including for MFA-enrolled accounts.
+  if (isGridmaster && loginHost !== "gridmaster") {
+    const res = NextResponse.json(
+      {
+        success: false,
+        code: GRIDMASTER_PORTAL_REQUIRED_CODE,
+        error: GRIDMASTER_PORTAL_REQUIRED_MESSAGE,
+      },
+      { status: 403 },
+    );
+    timer.applyTo(res.headers);
+    return res;
+  }
 
   if (!mfaRequired && emailConfirmed) {
-    const claims = decodeJwt(session.access_token);
     const outcome = await timer.time("post_signin_orchestration", () =>
-      orchestratePostSignIn(session, claims, req),
+      orchestratePostSignIn(session, claims, req, isGridmaster),
     );
     if (!outcome.ok) {
       const res = NextResponse.json(
