@@ -633,9 +633,7 @@ export function InboxView() {
                 onClick={handleLoadMore}
                 disabled={loadingMore}
               >
-                <ButtonLoading loading={loadingMore} loadingLabel="Loading">
-                  Load more
-                </ButtonLoading>
+                <ButtonLoading loading={loadingMore}>Load more</ButtonLoading>
               </Button>
             </div>
           )}
@@ -658,7 +656,6 @@ export function InboxView() {
               : `This marks all ${facets?.totalUnread ?? 0} unread alerts as read.`
           }
           confirmLabel="Mark all read"
-          confirmPendingLabel="Marking read"
           variant="info"
           onConfirm={handleMarkAllRead}
           onCancel={() => setConfirmingMarkAllRead(false)}

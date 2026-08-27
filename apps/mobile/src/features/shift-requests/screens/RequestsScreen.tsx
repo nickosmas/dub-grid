@@ -944,9 +944,6 @@ export default function RequestsScreen() {
       <ConfirmationModal
         body={requestActionConfirmation?.feedback.message}
         confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
-        confirmPendingLabel={
-          requestActionConfirmation?.feedback.confirmPendingLabel ?? "Confirming"
-        }
         confirmTone={
           requestActionConfirmation?.feedback.confirmStyle === "destructive" ? "danger" : "primary"
         }
@@ -1105,7 +1102,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Cancel"
                     loading={isLoading}
-                    loadingLabel="Cancelling"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1129,7 +1125,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Claim"
                     loading={isLoading}
-                    loadingLabel="Claiming"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1154,7 +1149,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Accept"
                     loading={isLoading}
-                    loadingLabel="Accepting"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1176,7 +1170,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Decline"
                     loading={isLoading}
-                    loadingLabel="Declining"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1202,7 +1195,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Approve"
                     loading={isLoading}
-                    loadingLabel="Approving"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1223,7 +1215,6 @@ function RequestCard({
                     disabled={Boolean(pendingAction)}
                     label="Reject"
                     loading={isLoading}
-                    loadingLabel="Rejecting"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1343,7 +1334,6 @@ function OpenShiftCard({
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
                 label="Volunteer"
                 loading={isLoading}
-                loadingLabel="Volunteering"
                 onPress={() => {
                   if (openShift.canVolunteer === false) {
                     return;

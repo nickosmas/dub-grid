@@ -71,7 +71,6 @@ export function PendingRequestsCard({
                   compact
                   label="Cancel request"
                   loading={isCancelling}
-                  loadingLabel="Cancelling"
                   onPress={() => onCancel(request)}
                   tone="secondary"
                 />

@@ -798,6 +798,16 @@ describe("fetchMobileScheduleEntries", () => {
         },
       ],
     },
+    {
+      name: "a removed employee relation",
+      employeeRelation: {
+        id: "196d610f-2283-486c-a9e0-197852969a31",
+        first_name: "Nic",
+        last_name: "Kosmas",
+        org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+        status: "removed",
+      },
+    },
   ])(
     "keeps published schedule entries when employees comes back as $name",
     async ({ employeeRelation }) => {

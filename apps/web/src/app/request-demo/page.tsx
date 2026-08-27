@@ -407,7 +407,6 @@ export default function RequestDemoPage() {
             >
               <ButtonLoading
                 loading={loading}
-                loadingLabel="Submitting Request"
                 spinnerColor="var(--dg-color-text-inverse)"
                 spinnerSize={20}
               >

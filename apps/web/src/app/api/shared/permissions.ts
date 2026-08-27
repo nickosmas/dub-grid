@@ -87,6 +87,10 @@ function lockedOrganizationResponse() {
   );
 }
 
+function archivedOrganizationResponse() {
+  return NextResponse.json({ error: "This organization is no longer available." }, { status: 403 });
+}
+
 /**
  * isOrganizationSetupComplete, but it stops re-running once an org has passed.
  *
@@ -407,7 +411,7 @@ export async function requireOrgPermissions(
       serviceClient.from("profiles").select("platform_role").eq("id", auth.user.id).maybeSingle(),
       serviceClient
         .from("organizations")
-        .select("suspended_at, subscription_status, trial_ends_at")
+        .select("archived_at, suspended_at, subscription_status, trial_ends_at")
         .eq("id", orgId)
         .maybeSingle(),
       isCallerInactive(serviceClient, auth.user.id, orgId),
@@ -416,6 +420,15 @@ export async function requireOrgPermissions(
   const isGridmaster = profile?.platform_role === "gridmaster";
   if (!isGridmaster && !membership) {
     return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+  }
+
+  // The Edge proxy intentionally excludes /api routes. Without this server
+  // check, a user holding a pre-archive JWT could continue calling every
+  // service-role route that uses this helper until their token refreshes.
+  // Gridmasters retain access so the platform can inspect or restore an
+  // archived Organization through its dedicated management tools.
+  if (!isGridmaster && organization?.archived_at != null) {
+    return { response: archivedOrganizationResponse() };
   }
 
   const role = isGridmaster

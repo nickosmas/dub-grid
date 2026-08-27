@@ -111,7 +111,6 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           title="Delete organization"
           variant="danger"
           confirmLabel="Delete organization"
-          confirmPendingLabel="Deleting"
           isLoading={isDeleting}
           confirmDisabled={typed !== confirmPhrase}
           onCancel={closeDialog}

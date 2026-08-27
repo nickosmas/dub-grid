@@ -61,6 +61,7 @@ function buildSource(
         user_id: null,
       },
     ],
+    historicalEmployees: [],
     focusAreas: [{ id: 10, name: "North" }],
     roles: [{ id: 20, name: "RN", abbr: "RN" }],
     certifications: [{ id: 30, name: "CNA", abbr: "CNA" }],
@@ -250,6 +251,67 @@ describe("operations reports", () => {
       accountAccessStatus: "Invitation pending",
     });
     expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe("DAY Caregiver");
+  });
+
+  it("attributes removed employees in historical schedule reports without restoring them to the current roster", () => {
+    const removedEmployee = {
+      ...buildSource().employees[0],
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      employee_number: 1003,
+      first_name: "Riley",
+      last_name: "Stone",
+      email: "riley@example.com",
+      status: "removed",
+      seniority: 3,
+      user_id: null,
+    };
+    const payload = buildOperationsReportPayload(
+      buildSource({
+        historicalEmployees: [removedEmployee],
+        publishedRows: [
+          ...buildSource().publishedRows,
+          {
+            emp_id: removedEmployee.id,
+            date: "2026-05-03",
+            focus_area_id: 10,
+            published_absence_type_id: null,
+            published_custom_start_time: null,
+            published_custom_end_time: null,
+            resolvedAssignmentIds: [],
+            resolvedSegments: [
+              {
+                shiftId: 60,
+                jobId: 70,
+                label: "DAY Caregiver",
+                startTime: "07:00",
+                endTime: "15:00",
+              },
+            ],
+          },
+        ],
+      }),
+      { startDate: "2026-05-03", endDate: "2026-05-04" },
+    );
+
+    expect(payload.reports.staffHours).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ employeeName: "Riley Stone", scheduledHours: 8 }),
+      ]),
+    );
+    expect(payload.reports.scheduleMatrix.rows).toEqual(
+      expect.arrayContaining([expect.objectContaining({ employeeName: "Riley Stone" })]),
+    );
+    expect(payload.reports.coverage[0]).toMatchObject({ scheduled: 2, openSlots: 0 });
+
+    expect(payload.filterOptions.employees.map((employee) => employee.label)).not.toContain(
+      "Riley Stone",
+    );
+    expect(
+      payload.reports.employeeDirectory.map((employee) => employee.employeeName),
+    ).not.toContain("Riley Stone");
+    expect(payload.reports.rosterStatus.map((employee) => employee.employeeName)).not.toContain(
+      "Riley Stone",
+    );
   });
 
   it("resolves the current pay period from the organization anchor", () => {

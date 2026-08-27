@@ -68,7 +68,6 @@ export function Button({
   expanded,
   disabled = false,
   loading,
-  loadingLabel,
   fullWidth,
   haptic = "selection",
   onPress,
@@ -96,13 +95,6 @@ export function Button({
    * by row, say); an `onPress` returning a promise already spins on its own.
    */
   loading?: boolean;
-  /**
-   * What the button says while it is busy: the same action in progress
-   * ("Saving", not "Save"). The label is never dropped for the spinner, so a
-   * busy button still says what it is doing; without this it keeps `label`,
-   * which reads as work not yet started.
-   */
-  loadingLabel?: string;
   /** Defaults to true for text buttons, false for `iconOnly`. */
   fullWidth?: boolean;
   haptic?: PressHaptic;
@@ -146,7 +138,7 @@ export function Button({
     scale: iconOnly ? mobileMotion.press.iconOnlyScale : mobileMotion.press.scale,
   });
 
-  const content = isBusy ? (loadingLabel ?? label) : (children ?? label);
+  const content = children ?? label;
   const iconNode = icon ? (
     <Ionicons color={labelColor} name={icon} size={metrics.icon} />
   ) : (
@@ -184,10 +176,8 @@ export function Button({
       ]}
     >
       <View style={[styles.content, { gap: iconOnly ? 0 : metrics.gap }]}>
-        {/* The spinner stands in for the icon while the button works, and the
-            label stays beside it: a busy button should still say what it is
-            doing. An icon-only button has no label to keep, so it is the
-            spinner alone. */}
+        {/* The spinner stands in for the icon while the button works. The
+            action label stays unchanged; an icon-only button is spinner-only. */}
         {isBusy ? <ActivityIndicator color={labelColor} size="small" /> : null}
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (

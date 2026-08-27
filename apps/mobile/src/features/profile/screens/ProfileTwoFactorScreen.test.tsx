@@ -90,7 +90,10 @@ describe("ProfileTwoFactorScreen", () => {
       data: { id: "factor-1", totp: { secret: "SECRET123" } },
       error: null,
     });
-    const challengeAndVerify = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const challengeAndVerify = vi.fn().mockResolvedValue({
+      data: { access_token: "aal2-token" },
+      error: null,
+    });
     getSupabaseClient.mockReturnValue({
       auth: { mfa: { listFactors, enroll, challengeAndVerify, unenroll: vi.fn() } },
     } as never);
@@ -117,7 +120,7 @@ describe("ProfileTwoFactorScreen", () => {
 
     await waitFor(() => {
       expect(challengeAndVerify).toHaveBeenCalledWith({ factorId: "factor-1", code: "123456" });
-      expect(updateProfileMfaStatus).toHaveBeenCalledWith("token-123", { enabled: true });
+      expect(updateProfileMfaStatus).toHaveBeenCalledWith("aal2-token", { enabled: true });
     });
   });
 

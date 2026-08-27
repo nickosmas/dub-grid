@@ -438,7 +438,6 @@ function ToolsMenu({
             >
               <ButtonLoading
                 loading={Boolean(isApplyingRecurring)}
-                loadingLabel="Filling"
                 spinnerSize={14}
                 icon={
                   <svg
@@ -477,7 +476,6 @@ function ToolsMenu({
             >
               <ButtonLoading
                 loading={Boolean(isImportingPrevious)}
-                loadingLabel="Importing"
                 spinnerSize={14}
                 icon={<ImportIcon size={14} />}
               >

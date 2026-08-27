@@ -24,6 +24,21 @@ export const PUBLISH_WINDOW_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
+/**
+ * Builds a display directory for historical schedule feedback. Callers choose
+ * which statuses to include; scheduler assignment controls remain active-only.
+ */
+export function buildEmployeeNameById(
+  employees: Iterable<{ id: string; firstName: string; lastName: string }>,
+): Map<string, string> {
+  return new Map(
+    Array.from(employees, (employee) => [
+      employee.id,
+      `${employee.firstName} ${employee.lastName}`.trim(),
+    ]),
+  );
+}
+
 export function clampProgress(progress: number): number {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }

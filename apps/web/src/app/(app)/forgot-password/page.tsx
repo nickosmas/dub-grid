@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
 import { resetBrowserPasswordForEmail } from "@/features/account/client";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 
 function ForgotPasswordContent() {
   const [email, setEmail] = useState("");
@@ -45,10 +46,10 @@ function ForgotPasswordContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
+        <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         {sent ? (
           <AuthStateCard
@@ -95,7 +96,6 @@ function ForgotPasswordContent() {
               >
                 <ButtonLoading
                   loading={loading}
-                  loadingLabel="Sending Reset Link"
                   spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >

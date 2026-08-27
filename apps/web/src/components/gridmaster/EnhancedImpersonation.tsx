@@ -276,7 +276,7 @@ export default function EnhancedImpersonation({
             disabled={loading}
             style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
-            <ButtonLoading loading={loading} loadingLabel="Ending Session" spinnerSize={14}>
+            <ButtonLoading loading={loading} spinnerSize={14}>
               End Session
             </ButtonLoading>
           </Button>
@@ -538,7 +538,6 @@ export default function EnhancedImpersonation({
                   >
                     <ButtonLoading
                       loading={loading}
-                      loadingLabel="Starting Impersonation"
                       spinnerSize={16}
                     >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </Button>
@@ -765,7 +764,6 @@ export default function EnhancedImpersonation({
                   >
                     <ButtonLoading
                       loading={loading}
-                      loadingLabel="Starting Impersonation"
                       spinnerSize={16}
                     >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </Button>
@@ -791,7 +789,6 @@ export default function EnhancedImpersonation({
           title="Start Impersonation"
           message={`Start impersonating "${selectedUser.email}" in ${selectedOrg.name} as ${roleOverride || selectedUser.orgRole || "user"}?`}
           confirmLabel="Start Impersonation"
-          confirmPendingLabel="Starting"
           variant="warning"
           isLoading={loading}
           onConfirm={handleStart}
@@ -804,7 +801,6 @@ export default function EnhancedImpersonation({
           title="End Impersonation"
           message="End the active impersonation session and return to your gridmaster session?"
           confirmLabel="End Session"
-          confirmPendingLabel="Ending Session"
           variant="danger"
           isLoading={loading}
           onConfirm={handleEnd}

@@ -546,7 +546,7 @@ export default function InviteEmployeeModal({
               disabled={!canSend}
               style={{ opacity: canSend ? 1 : 0.5 }}
             >
-              <ButtonLoading loading={sending} loadingLabel="Sending Invitation" spinnerSize={16}>
+              <ButtonLoading loading={sending} spinnerSize={16}>
                 Send Invitation
               </ButtonLoading>
             </Button>

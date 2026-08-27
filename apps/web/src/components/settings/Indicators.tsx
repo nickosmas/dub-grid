@@ -356,7 +356,6 @@ function IndicatorRow({
                     <Button
                       onClick={handleDeleteClick}
                       loading={deleting}
-                      loadingLabel="Deleting"
                       className="dg-btn dg-btn-danger dg-btn-sm"
                     >
                       Delete
@@ -383,9 +382,7 @@ function IndicatorRow({
                     disabled={saving || !canSave}
                     className="dg-btn dg-btn-primary dg-btn-sm"
                   >
-                    <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-                      {EDITOR_ACTION_LABELS.save}
-                    </ButtonLoading>
+                    <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
                   </Button>
                 }
               />

@@ -791,7 +791,6 @@ function ReportsContent() {
               onClick={() => handleExport("pdf")}
               type="button"
               loading={exportingFormat === "pdf"}
-              loadingLabel="Exporting"
               icon={<FileUp size={16} />}
             >
               Export PDF
@@ -807,7 +806,6 @@ function ReportsContent() {
               onClick={() => handleExport("csv")}
               type="button"
               loading={exportingFormat === "csv"}
-              loadingLabel="Exporting"
               icon={<Upload size={16} />}
             >
               Export CSV

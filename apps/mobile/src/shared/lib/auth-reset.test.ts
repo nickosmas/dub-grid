@@ -117,5 +117,21 @@ describe("auth-reset", () => {
       expect(replaceAuthSession).toHaveBeenCalledWith(null);
       expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
     });
+
+    it("still returns to login when local sign-out never settles", async () => {
+      vi.useFakeTimers();
+      try {
+        signOut.mockImplementation(() => new Promise(() => {}));
+
+        const reset = handleExpiredMobileSession();
+        await vi.advanceTimersByTimeAsync(5_000);
+        await reset;
+
+        expect(replaceAuthSession).toHaveBeenCalledWith(null);
+        expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

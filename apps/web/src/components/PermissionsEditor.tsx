@@ -621,11 +621,7 @@ export default function PermissionsEditor({
                 onClick={handleSave}
                 disabled={saving || !hasChanges}
               >
-                <ButtonLoading
-                  loading={saving}
-                  loadingLabel={EDITOR_ACTION_LABELS.saving}
-                  spinnerSize={16}
-                >
+                <ButtonLoading loading={saving} spinnerSize={16}>
                   {EDITOR_ACTION_LABELS.save}
                 </ButtonLoading>
               </Button>

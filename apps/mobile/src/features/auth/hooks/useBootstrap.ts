@@ -4,6 +4,7 @@ import {
   getUserIdFromAccessToken,
 } from "../../../shared/lib/access-token";
 import { getBootstrap } from "../../../shared/lib/api";
+import { isNetworkConnectionError } from "../../../shared/lib/errors";
 
 /**
  * Every bootstrap cache entry lives under this prefix, so invalidators can
@@ -43,7 +44,24 @@ export function buildBootstrapQueryKey(accessToken: string | null) {
 export function useBootstrap(accessToken: string | null) {
   return useQuery({
     queryKey: buildBootstrapQueryKey(accessToken),
-    queryFn: () => getBootstrap(accessToken!),
+    // Consume React Query's cancellation signal so a switch/logout cannot let
+    // an in-flight bootstrap request complete into a stale cache entry.
+    queryFn: (context) =>
+      context?.signal ? getBootstrap(accessToken!, context.signal) : getBootstrap(accessToken!),
     enabled: Boolean(accessToken),
+    retry: (failureCount, error) =>
+      failureCount < 3 && (isNetworkConnectionError(error) || isRetryableBootstrapStatus(error)),
+    retryDelay: (failureCount) => {
+      const capped = Math.min(1_000 * 2 ** failureCount, 30_000);
+      return Math.round(capped * (0.5 + Math.random() * 0.5));
+    },
   });
+}
+
+function isRetryableBootstrapStatus(error: unknown): boolean {
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? (error as { status?: unknown }).status
+      : null;
+  return status === 408 || status === 429 || (typeof status === "number" && status >= 500);
 }

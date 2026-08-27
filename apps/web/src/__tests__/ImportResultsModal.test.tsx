@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ImportResultsModal from "@/components/ImportResultsModal";
-import { summarizeImportPreviousOutcomes } from "@/app/(app)/schedule/_lib/operations";
+import {
+  buildEmployeeNameById,
+  summarizeImportPreviousOutcomes,
+} from "@/app/(app)/schedule/_lib/operations";
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
 function row(
@@ -105,5 +108,35 @@ describe("ImportResultsModal", () => {
     );
 
     expect(screen.getByText("an employee")).toBeInTheDocument();
+  });
+
+  it("renders inactive and removed employees from the historical name directory", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({ employeeId: "inactive", outcome: "skipped", reason: "employee_inactive" }),
+      row({
+        employeeId: "removed",
+        targetDate: "2026-08-03",
+        outcome: "skipped",
+        reason: "employee_inactive",
+      }),
+    ];
+
+    render(
+      <ImportResultsModal
+        sourceRange="Jul 19, 2026 – Aug 1, 2026"
+        targetRange="Aug 2, 2026 – Aug 15, 2026"
+        outcomes={outcomes}
+        breakdown={summarizeImportPreviousOutcomes(outcomes)}
+        nameByEmpId={buildEmployeeNameById([
+          { id: "inactive", firstName: "Ina", lastName: "Active" },
+          { id: "removed", firstName: "Riley", lastName: "Stone" },
+        ])}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Ina Active")).toBeInTheDocument();
+    expect(screen.getByText("Riley Stone")).toBeInTheDocument();
+    expect(screen.queryByText("an employee")).not.toBeInTheDocument();
   });
 });

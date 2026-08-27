@@ -9,12 +9,6 @@ interface ConfirmDialogProps {
   title: string;
   message: string | React.ReactNode;
   confirmLabel?: string;
-  /**
-   * The confirm action in progress ("Deleting"), shown beside the spinner while
-   * `isLoading`. Falls back to `confirmLabel`, which reads as unfinished work,
-   * so any dialog that can load should pass it.
-   */
-  confirmPendingLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "info";
   /**
@@ -26,7 +20,6 @@ interface ConfirmDialogProps {
   onConfirm: () => void | Promise<unknown>;
   onCancel: () => void;
   secondaryConfirmLabel?: string;
-  secondaryConfirmPendingLabel?: string;
   onSecondaryConfirm?: () => void | Promise<unknown>;
   isSecondaryLoading?: boolean;
   maxWidth?: number;
@@ -39,14 +32,12 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel = "Confirm",
-  confirmPendingLabel,
   cancelLabel = "Cancel",
   variant = "danger",
   isLoading,
   onConfirm,
   onCancel,
   secondaryConfirmLabel,
-  secondaryConfirmPendingLabel,
   onSecondaryConfirm,
   isSecondaryLoading,
   maxWidth = 420,
@@ -118,11 +109,7 @@ export default function ConfirmDialog({
           onClick={confirm.run}
           disabled={actionDisabled || confirmDisabled}
         >
-          <ButtonLoading
-            loading={confirmBusy}
-            loadingLabel={confirmPendingLabel ?? confirmLabel}
-            spinnerSize={16}
-          >
+          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
             {confirmLabel}
           </ButtonLoading>
         </Button>
@@ -133,11 +120,7 @@ export default function ConfirmDialog({
             onClick={secondaryConfirm.run}
             disabled={actionDisabled || secondaryConfirmDisabled}
           >
-            <ButtonLoading
-              loading={secondaryBusy}
-              loadingLabel={secondaryConfirmPendingLabel ?? secondaryConfirmLabel}
-              spinnerSize={16}
-            >
+            <ButtonLoading loading={secondaryBusy} spinnerSize={16}>
               {secondaryConfirmLabel}
             </ButtonLoading>
           </Button>

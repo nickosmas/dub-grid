@@ -62,22 +62,20 @@ describe("Button", () => {
     expect(hapticSelection).not.toHaveBeenCalled();
   });
 
-  it("blocks press while loading, and says what it is doing", () => {
+  it("blocks press while loading and keeps its action label", () => {
     const onPress = vi.fn();
-    render(<Button label="Sign in" loading loadingLabel="Signing in" onPress={onPress} />);
+    render(<Button label="Sign in" loading onPress={onPress} />);
 
     const button = screen.getByRole("button", { name: "Sign in" });
     expect(button).toBeDisabled();
     fireEvent.click(button);
     expect(onPress).not.toHaveBeenCalled();
 
-    // The label is never dropped for the spinner: it moves to the same action
-    // in progress, so the button still says what it is working on.
-    expect(screen.getByText("Signing in")).toBeInTheDocument();
-    expect(screen.queryByText("Sign in")).not.toBeInTheDocument();
+    expect(screen.getByText("Sign in")).toBeInTheDocument();
+    expect(screen.queryByText("Signing in")).not.toBeInTheDocument();
   });
 
-  it("keeps its own label while loading when no loadingLabel is given", () => {
+  it("keeps its own label while loading", () => {
     render(<Button label="Working" loading onPress={vi.fn()} />);
     expect(screen.getByText("Working")).toBeInTheDocument();
   });
@@ -93,7 +91,7 @@ describe("Button", () => {
   it("runs an async press once when it is double-tapped", async () => {
     let settle!: () => void;
     const onPress = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)));
-    render(<Button label="Save" loadingLabel="Saving" onPress={onPress} />);
+    render(<Button label="Save" onPress={onPress} />);
 
     // Both taps in one tick. A `loading` prop only disables the pressable once
     // React has re-rendered, so without the synchronous latch the second tap
@@ -105,7 +103,7 @@ describe("Button", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toBeDisabled();
-    expect(screen.getByText("Saving")).toBeInTheDocument();
+    expect(screen.getByText("Save")).toBeInTheDocument();
 
     // Settling reopens the latch, so a genuine second save is still possible.
     await act(async () => {

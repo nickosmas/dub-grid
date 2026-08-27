@@ -171,9 +171,7 @@ export default function ImpersonationBanner() {
           fontFamily: "inherit",
         }}
       >
-        <ButtonLoading loading={ending} loadingLabel="Ending Session">
-          End Session
-        </ButtonLoading>
+        <ButtonLoading loading={ending}>End Session</ButtonLoading>
       </Button>
     </div>
   );

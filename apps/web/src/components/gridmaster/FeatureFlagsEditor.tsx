@@ -163,9 +163,7 @@ export default function FeatureFlagsEditor({
             }}
             disabled={saving || !hasChanges}
           >
-            <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-              {EDITOR_ACTION_LABELS.save}
-            </ButtonLoading>
+            <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
           </Button>
         }
       />
@@ -175,7 +173,6 @@ export default function FeatureFlagsEditor({
           title="Save Runtime Control Changes"
           message="This change can affect live organization behavior. Review carefully before saving."
           confirmLabel="Save Changes"
-          confirmPendingLabel={EDITOR_ACTION_LABELS.saving}
           variant="warning"
           isLoading={saving}
           onConfirm={() => handleSave()}

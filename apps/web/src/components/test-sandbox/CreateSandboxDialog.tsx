@@ -82,7 +82,6 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
       title="Enter sandbox mode"
       message={message}
       confirmLabel="Enter sandbox"
-      confirmPendingLabel="Entering"
       cancelLabel="Cancel"
       variant="info"
       isLoading={isLoading}

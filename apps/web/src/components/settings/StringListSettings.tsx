@@ -480,9 +480,7 @@ export default function StringListSettings({
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
-          <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-            {EDITOR_ACTION_LABELS.save}
-          </ButtonLoading>
+          <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
         </Button>
       }
       style={{
@@ -894,7 +892,6 @@ export default function StringListSettings({
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "none";
                     }}
-                    loadingLabel="Checking"
                   >
                     Delete
                   </Button>

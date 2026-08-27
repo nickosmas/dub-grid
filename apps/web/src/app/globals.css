@@ -3053,6 +3053,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   margin-top: 4px;
 }
 
+.dg-auth-progress {
+  margin: 0;
+  text-align: center;
+}
+
 .dg-auth-back-link {
   margin-top: 20px;
   text-align: center;

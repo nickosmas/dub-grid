@@ -98,7 +98,6 @@ export default function ForgotPasswordScreen() {
           <Button
             label="Send reset code"
             loading={submitting}
-            loadingLabel="Sending"
             onPress={() => void requestReset()}
             size="lg"
           />

@@ -6,6 +6,14 @@ import { loadStoredPushDevice } from "./session";
 import { getSupabaseClient } from "./supabase";
 
 let activeReset: Promise<void> | null = null;
+const LOCAL_RESET_STEP_TIMEOUT_MS = 5_000;
+
+async function settleWithin(promise: Promise<unknown>): Promise<void> {
+  await Promise.race([
+    promise.catch(() => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, LOCAL_RESET_STEP_TIMEOUT_MS)),
+  ]);
+}
 
 /**
  * Tell the server to stop pushing to this device. Without it, a signed-out
@@ -46,14 +54,14 @@ export async function handleExpiredMobileSession(options?: {
       // Only meaningful while the session is still live, which is exactly the
       // case we still own. `skipSignOut` callers have already signed out, so
       // they are responsible for calling `disablePushForCurrentDevice` first.
-      await disablePushForCurrentDevice();
+      await settleWithin(disablePushForCurrentDevice());
     }
 
     queryClient.clear();
 
     if (!options?.skipSignOut) {
       try {
-        await getSupabaseClient().auth.signOut({ scope: "local" });
+        await settleWithin(getSupabaseClient().auth.signOut({ scope: "local" }));
       } catch {
         // Ignore local sign-out failures during forced session recovery.
       }

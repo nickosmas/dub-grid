@@ -86,9 +86,7 @@ export default function WizardShell({
               padding: "4px 8px",
             }}
           >
-            <ButtonLoading loading={Boolean(skipLoading)} loadingLabel="Skipping">
-              Skip setup
-            </ButtonLoading>
+            <ButtonLoading loading={Boolean(skipLoading)}>Skip setup</ButtonLoading>
           </Button>
         )}
       </div>

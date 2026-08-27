@@ -956,11 +956,7 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-secondary"
               style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}
             >
-              <ButtonLoading
-                loading={saveDraft.isRunning}
-                loadingLabel="Saving Draft"
-                spinnerSize={14}
-              >
+              <ButtonLoading loading={saveDraft.isRunning} spinnerSize={14}>
                 Save Draft
               </ButtonLoading>
             </Button>
@@ -981,9 +977,7 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-primary"
               style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
             >
-              <ButtonLoading loading={saving} loadingLabel="Saving">
-                Save Changes
-              </ButtonLoading>
+              <ButtonLoading loading={saving}>Save Changes</ButtonLoading>
             </Button>
           </div>
         </div>
@@ -1402,7 +1396,6 @@ export function RecurringScheduleSection({
               : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
           }
           confirmLabel={pendingRecurringAction === "save" ? "Save Changes" : "Discard"}
-          confirmPendingLabel={pendingRecurringAction === "save" ? "Saving" : "Discarding"}
           variant={pendingRecurringAction === "save" ? "warning" : "danger"}
           isLoading={saving}
           onConfirm={() => {

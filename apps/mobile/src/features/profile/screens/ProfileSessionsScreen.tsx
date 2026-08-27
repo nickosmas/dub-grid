@@ -248,7 +248,6 @@ export default function ProfileSessionsScreen() {
             <Button
               label="Signing out devices"
               loading={sessionScopeLoading != null}
-              loadingLabel="Signing out"
               onPress={() => setScopeSheetVisible(true)}
               tone="secondary"
             />
@@ -270,7 +269,6 @@ export default function ProfileSessionsScreen() {
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel="Sign Out"
-        confirmPendingLabel="Signing Out"
         confirmTone="danger"
         loading={revokeMutation.isPending || sessionScopeLoading != null}
         onCancel={() => setPendingConfirmation(null)}

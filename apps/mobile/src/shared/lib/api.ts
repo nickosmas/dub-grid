@@ -156,6 +156,13 @@ async function mobileRequest<T>(
 ): Promise<T> {
   const baseUrl = assertApiBaseUrl();
   const timeoutController = new AbortController();
+  const callerSignal = init.signal;
+  const abortFromCaller = () => timeoutController.abort();
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  }
   let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     timeoutController.abort();
   }, MOBILE_REQUEST_TIMEOUT_MS);
@@ -178,6 +185,7 @@ async function mobileRequest<T>(
       onNonJsonErrorMessage: createNonJsonApiErrorMessage,
     });
   } finally {
+    callerSignal?.removeEventListener("abort", abortFromCaller);
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
@@ -301,9 +309,15 @@ export function parseMobileNameMismatchError(error: unknown): MobileNameMismatch
   return new MobileNameMismatchError(challenge.details);
 }
 
-export function getBootstrap(accessToken: string): Promise<MobileBootstrapResponse> {
-  return mobileApiRequest("/api/mobile/v1/bootstrap", accessToken, { method: "GET" }, (value) =>
-    mobileBootstrapResponseSchema.parse(value),
+export function getBootstrap(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<MobileBootstrapResponse> {
+  return mobileApiRequest(
+    "/api/mobile/v1/bootstrap",
+    accessToken,
+    { method: "GET", signal },
+    (value) => mobileBootstrapResponseSchema.parse(value),
   );
 }
 

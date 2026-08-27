@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { OrganizationBadge } from "@/components/auth/OrganizationBadge";
 import { ShieldCheck } from "lucide-react";
 import { listBrowserMfaFactors, verifyBrowserTotpEnrollment } from "@/features/account/client";
@@ -77,10 +78,10 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
   return (
     <PageShell>
       <Card>
-        <div className="dg-auth-logo-block" style={{ marginBottom: 24 }}>
+        <ApexLandingLink className="dg-auth-logo-block" style={{ marginBottom: 24 }}>
           <DubGridLogo size={52} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         {orgSlug && baseDomain && (
           <OrganizationBadge
@@ -175,7 +176,6 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           >
             <ButtonLoading
               loading={loading}
-              loadingLabel="Verifying"
               spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={20}
             >

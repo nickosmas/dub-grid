@@ -372,7 +372,6 @@ export default function ProfileScreen() {
             <Button
               label="Force Sign Out"
               loading={isSigningOut}
-              loadingLabel="Signing Out"
               onPress={() => {
                 setPendingConfirmation({ kind: "logout", force: true });
               }}
@@ -546,7 +545,6 @@ export default function ProfileScreen() {
             <Button
               label="Sign Out"
               loading={isSigningOut}
-              loadingLabel="Signing Out"
               onPress={() => {
                 setPendingConfirmation({ kind: "logout" });
               }}
@@ -583,7 +581,6 @@ export default function ProfileScreen() {
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel={confirmationLabel}
-        confirmPendingLabel={isSwitchConfirmation ? "Switching" : "Signing Out"}
         confirmTone={isSwitchConfirmation ? "primary" : "danger"}
         loading={isSigningOut}
         onCancel={() => setPendingConfirmation(null)}

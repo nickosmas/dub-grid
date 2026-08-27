@@ -8,6 +8,7 @@ import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { isManagementOnly, isOnSchedule } from "./employmentStatus";
+import { AuthTransitionScreen } from "../components/AuthTransitionScreen";
 
 export type TabsGateResult =
   | { kind: "blocked"; element: ReactNode }
@@ -54,7 +55,19 @@ export function useTabsGate(): TabsGateResult {
   if (isLoading || bootstrapQuery.isLoading) {
     return {
       kind: "blocked",
-      element: null,
+      element: (
+        <AuthTransitionScreen
+          phase="organization"
+          onRetry={() => {
+            return bootstrapQuery.refetch().then(() => undefined);
+          }}
+          onSignOut={() => {
+            void handleExpiredMobileSession();
+          }}
+          retrying={bootstrapQuery.isFetching}
+          automaticallyRetry={bootstrapQuery.isError}
+        />
+      ),
     };
   }
 
@@ -76,6 +89,23 @@ export function useTabsGate(): TabsGateResult {
           onSignOut={() => {
             void handleExpiredMobileSession();
           }}
+        />
+      ),
+    };
+  }
+
+  if (bootstrapQuery.isError) {
+    return {
+      kind: "blocked",
+      element: (
+        <AuthTransitionScreen
+          phase="organization"
+          onRetry={() => bootstrapQuery.refetch().then(() => undefined)}
+          onSignOut={() => {
+            void handleExpiredMobileSession();
+          }}
+          retrying={bootstrapQuery.isFetching}
+          automaticallyRetry={true}
         />
       ),
     };

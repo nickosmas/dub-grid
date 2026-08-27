@@ -91,7 +91,6 @@ export function MemberAccessControls({
               title="Change role"
               message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
               confirmLabel="Change role"
-              confirmPendingLabel="Changing role"
               variant="warning"
               onCancel={() => setPendingRole(null)}
               // Awaited rather than fired into a `void` IIFE: the dialog stays

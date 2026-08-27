@@ -265,7 +265,6 @@ export default function AddPersonScreen() {
           disabled={!canSubmit || createMutation.isPending}
           label="Add person"
           loading={createMutation.isPending}
-          loadingLabel="Adding"
           onPress={() => createMutation.mutate()}
         />
         <Button
