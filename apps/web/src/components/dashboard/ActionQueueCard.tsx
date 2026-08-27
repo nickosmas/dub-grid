@@ -183,15 +183,6 @@ const TYPE_LABELS: Record<string, string> = {
 
 const TYPE_ORDER = ["approval", "coverage_gap", "draft", "swap_proposal", "pickup"];
 
-// What each row action says while it runs, beside its spinner.
-const RUNNING_LABELS: Record<string, string> = {
-  Accept: "Accepting",
-  Approve: "Approving",
-  Claim: "Claiming",
-  Decline: "Declining",
-  Reject: "Rejecting",
-};
-
 function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boolean }) {
   const [pendingAction, setPendingAction] = useState<{
     label: string;
@@ -221,7 +212,6 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
       {pendingAction && (
         <ConfirmDialog
           confirmLabel={pendingAction.label}
-          confirmPendingLabel={RUNNING_LABELS[pendingAction.label] ?? pendingAction.label}
           isLoading={isRunning}
           message={
             <>

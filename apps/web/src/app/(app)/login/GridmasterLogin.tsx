@@ -161,7 +161,6 @@ export default function GridmasterLogin() {
             loading={loading}
             onSubmit={handleSubmit}
             submitLabel="Access Portal"
-            submitPendingLabel="Signing In"
             forgotPasswordHref="/forgot-password"
           />
 

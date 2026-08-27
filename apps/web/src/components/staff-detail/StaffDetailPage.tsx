@@ -839,7 +839,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           title="Revoke Invitation?"
           message={`Revoke the pending invitation for ${quickRevokeInviteConfirm.email}? The current invite link will stop working.`}
           confirmLabel="Revoke Invitation"
-          confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={quickRevokingInvite}
           onConfirm={async () => {

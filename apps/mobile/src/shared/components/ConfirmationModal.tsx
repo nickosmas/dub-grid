@@ -21,7 +21,6 @@ export function ConfirmationModal({
   body,
   children,
   confirmLabel,
-  confirmPendingLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
   loading,
@@ -33,12 +32,6 @@ export function ConfirmationModal({
   body?: string;
   children?: ReactNode;
   confirmLabel: string;
-  /**
-   * The confirm action in progress ("Deleting"), shown beside the spinner while
-   * `loading`. Falls back to `confirmLabel`, which reads as work not yet
-   * started, so any dialog that can load should pass it.
-   */
-  confirmPendingLabel?: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
   /**
@@ -81,13 +74,7 @@ export function ConfirmationModal({
       {body ? <SheetCopy body={body} /> : null}
       {children}
       <SheetActions>
-        <Button
-          label={confirmLabel}
-          loading={isBusy}
-          loadingLabel={confirmPendingLabel}
-          onPress={confirm.run}
-          tone={confirmTone}
-        />
+        <Button label={confirmLabel} loading={isBusy} onPress={confirm.run} tone={confirmTone} />
         <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="neutral" />
       </SheetActions>
     </BottomSheetModal>

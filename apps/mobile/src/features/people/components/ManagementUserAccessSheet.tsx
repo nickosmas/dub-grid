@@ -176,7 +176,6 @@ export function ManagementUserAccessSheet({
             disabled={!canSubmit}
             label="Save Access"
             loading={isPending}
-            loadingLabel="Saving"
             onPress={() => onSubmit(draft)}
             tone="primary"
           />

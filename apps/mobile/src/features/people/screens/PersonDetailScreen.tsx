@@ -925,7 +925,6 @@ export default function PersonDetailScreen() {
                     compact
                     label="Reinvite"
                     loading={invitationMutation.isPending}
-                    loadingLabel="Sending"
                     onPress={() => setInvitationConfirmAction("resend")}
                     tone="link"
                   />
@@ -942,7 +941,6 @@ export default function PersonDetailScreen() {
                   compact
                   label="Send Invitation"
                   loading={invitationMutation.isPending}
-                  loadingLabel="Sending"
                   onPress={() => setInvitationConfirmAction("create")}
                   tone="link"
                 />
@@ -963,7 +961,6 @@ export default function PersonDetailScreen() {
                 disabled={statusMutation.isPending || isSelf}
                 label="Activate"
                 loading={statusMutation.isPending}
-                loadingLabel="Activating"
                 onPress={() => setConfirmAction("activate")}
                 tone="success"
               />
@@ -997,7 +994,6 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body="The staff profile will be updated."
         confirmLabel="Save"
-        confirmPendingLabel="Saving"
         loading={updateMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={confirmSave}
@@ -1008,7 +1004,6 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
-        confirmPendingLabel={statusPendingLabel}
         confirmTone={
           confirmAction === "deactivate"
             ? deactivateRemoves
@@ -1070,7 +1065,6 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
-        confirmPendingLabel={invitationPendingLabel}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
@@ -1143,7 +1137,6 @@ function AccountLinkChallengeModal({
           disabled={isPending}
           label={isMismatch ? "Use Account Name" : "Link Existing Account"}
           loading={isPending}
-          loadingLabel="Linking"
           onPress={onConfirm}
           tone="secondary"
         />
@@ -1381,7 +1374,6 @@ function EditPanel({
           disabled={saving || !hasChanges || hasValidationErrors}
           label="Save changes"
           loading={saving}
-          loadingLabel="Saving"
           onPress={onSave}
         />
         <Button

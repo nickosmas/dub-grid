@@ -9,6 +9,7 @@ import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { verifyBrowserOtp } from "@/features/account/client";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 
 /**
  * Intermediate click-through page for email verification links.
@@ -56,10 +57,10 @@ export default function AuthVerifyPage() {
   return (
     <PageShell>
       <Card>
-        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
+        <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         {!tokenHash || !type || error ? (
           <AuthStateCard
@@ -86,7 +87,6 @@ export default function AuthVerifyPage() {
             >
               <ButtonLoading
                 loading={loading}
-                loadingLabel="Verifying"
                 spinnerColor="var(--dg-color-text-inverse)"
                 spinnerSize={20}
               >

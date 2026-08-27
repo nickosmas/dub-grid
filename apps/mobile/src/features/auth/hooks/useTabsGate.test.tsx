@@ -36,6 +36,10 @@ vi.mock("../../notifications/hooks/usePushResponseHandler", () => ({
   usePushResponseHandler,
 }));
 
+vi.mock("../components/AuthTransitionScreen", () => ({
+  AuthTransitionScreen: () => <div>auth-transition</div>,
+}));
+
 let useTabsGate: (typeof import("./useTabsGate"))["useTabsGate"];
 
 beforeAll(async () => {
@@ -89,6 +93,22 @@ describe("useTabsGate canViewRequestsTab", () => {
     useBootstrap.mockReset();
     usePushRegistration.mockReset();
     usePushResponseHandler.mockReset();
+  });
+
+  it("keeps an authenticated user on a recovery screen when bootstrap fails", () => {
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: new Error("network"),
+      isError: true,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({}),
+    });
+
+    render(<TestHost />);
+
+    expect(screen.getByText("auth-transition")).toBeTruthy();
   });
 
   it("shows the Requests tab for an employee on the schedule", () => {

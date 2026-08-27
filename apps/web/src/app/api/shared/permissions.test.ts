@@ -21,6 +21,7 @@ type MockAccessRow = {
   } | null;
   profile?: { platform_role: string | null } | null;
   organization?: {
+    archived_at?: string | null;
     suspended_at: string | null;
     subscription_status: string | null;
     trial_ends_at: string | null;
@@ -220,6 +221,37 @@ describe("requireOrgPermissions", () => {
       expect("response" in result).toBe(true);
       if ("response" in result) {
         expect(result.response.status).toBe(403);
+      }
+    });
+
+    it("rejects a member of an archived organization even for recovery endpoints", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: { org_role: "super_admin", admin_permissions: null },
+          profile: { platform_role: "none" },
+          organization: {
+            archived_at: "2026-08-27T00:00:00.000Z",
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+        }),
+      );
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(
+        makeRequest(),
+        "11111111-1111-4111-8111-111111111111",
+        (permissions) => permissions.isSuperAdmin,
+        { allowDuringSetup: true, allowLockedOrganization: true },
+      );
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+        await expect(result.response.json()).resolves.toEqual({
+          error: "This organization is no longer available.",
+        });
       }
     });
 

@@ -194,9 +194,8 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   }
 
   // Latched rather than spinner-ed: the check-mark swap is already this
-  // button's feedback, and an icon-only control has no label to put in the
-  // progressive form. The latch just stops two overlapping copies racing their
-  // `copied` timers.
+  // button's feedback. The latch just stops two overlapping copies racing
+  // their `copied` timers.
   const copy = useAsyncAction(copySecret);
 
   // ── Idle state: show status and enable/disable button ──
@@ -249,7 +248,6 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           >
             <ButtonLoading
               loading={loading}
-              loadingLabel="Starting"
               spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={14}
             >
@@ -278,7 +276,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <Button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
-            <ButtonLoading loading={loading} loadingLabel="Disabling" spinnerSize={14}>
+            <ButtonLoading loading={loading} spinnerSize={14}>
               Confirm Disable
             </ButtonLoading>
           </Button>
@@ -421,7 +419,6 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         >
           <ButtonLoading
             loading={loading}
-            loadingLabel="Verifying"
             spinnerColor="var(--dg-color-text-inverse)"
             spinnerSize={14}
           >

@@ -406,7 +406,6 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
             loading={loading}
             onSubmit={handleSubmit}
             submitLabel="Sign In"
-            submitPendingLabel="Signing In"
             forgotPasswordHref="/forgot-password"
           />
 

@@ -186,7 +186,6 @@ export function ManagementUserActionsSheet({
               disabled={isPending}
               label="Reinvite"
               loading={invitationMutation.isPending}
-              loadingLabel="Sending"
               onPress={() => setInvitationConfirmAction("resend")}
               tone="primary"
             />
@@ -223,7 +222,6 @@ export function ManagementUserActionsSheet({
       <ConfirmationModal
         body="They'll come off the management roster."
         confirmLabel="Remove Access"
-        confirmPendingLabel="Removing"
         confirmTone="danger"
         loading={accessMutation.isPending}
         onCancel={() => setShowRemoveConfirmation(false)}

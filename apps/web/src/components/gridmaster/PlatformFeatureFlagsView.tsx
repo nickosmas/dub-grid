@@ -301,7 +301,6 @@ export default function PlatformFeatureFlagsView() {
               : `This restores it for every organization on the platform immediately. ${pendingInfo.description}`
           }
           confirmLabel={pendingFlag.enabled ? "Turn It Off" : "Turn It On"}
-          confirmPendingLabel="Updating"
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}
           onConfirm={() => {
@@ -388,9 +387,7 @@ export default function PlatformFeatureFlagsView() {
                 createMutation.isPending || !newKey.trim() || !newDescription.trim() || !!keyError
               }
             >
-              <ButtonLoading loading={createMutation.isPending} loadingLabel="Adding">
-                Add Feature Control
-              </ButtonLoading>
+              <ButtonLoading loading={createMutation.isPending}>Add Feature Control</ButtonLoading>
             </Button>
           </div>
         </Modal>

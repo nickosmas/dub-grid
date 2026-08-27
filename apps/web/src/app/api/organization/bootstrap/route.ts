@@ -43,6 +43,7 @@ import {
   SHIFT_CATEGORY_COLS,
 } from "@/lib/db/shared";
 import logger from "@/lib/logger";
+import { CacheKey, cacheThrough, TTL } from "@/lib/cache";
 
 async function resolveOrganizationId(
   req: NextRequest,
@@ -129,15 +130,22 @@ async function resolveOrganizationId(
 }
 
 async function handleGET(req: NextRequest, timer: Timer) {
+  let orgId: string | null = null;
+  let userId: string | null = null;
+
   try {
     const auth = await timer.time("auth", () => requireAuthenticatedUserWithClaims(req));
     if ("response" in auth) {
       return auth.response;
     }
 
-    const { orgId, isGridmaster } = await timer.time("resolve_org", () =>
+    userId = auth.user?.id ?? null;
+
+    const resolvedOrganization = await timer.time("resolve_org", () =>
       resolveOrganizationId(req, auth.claims, auth.user?.id ?? null),
     );
+    orgId = resolvedOrganization.orgId;
+    const { isGridmaster } = resolvedOrganization;
 
     if (isGridmaster && !orgId) {
       return NextResponse.json({
@@ -159,8 +167,9 @@ async function handleGET(req: NextRequest, timer: Timer) {
     if (!orgId) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
+    const authorizedOrgId = orgId;
 
-    const orgAuth = await requireOrgPermissions(req, orgId, () => true, {
+    const orgAuth = await requireOrgPermissions(req, authorizedOrgId, () => true, {
       allowLockedOrganization: true,
       allowDuringSetup: true,
       // Already verified at the top of this handler; without this the same
@@ -172,6 +181,76 @@ async function handleGET(req: NextRequest, timer: Timer) {
     }
 
     const serviceClient = orgAuth.serviceClient;
+    const [configResults, employeeCountResult] = await timer.time("fanout", () =>
+      Promise.all([
+        // Authorization above is deliberately outside this cache. The cached
+        // value is configuration for one org only; user, membership,
+        // permissions, session, impersonation, sandbox selection, and staff
+        // count remain request-scoped.
+        cacheThrough(CacheKey.bootstrapConfig(authorizedOrgId), TTL.MIDDLEWARE, () =>
+          Promise.all([
+            serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
+            serviceClient
+              .from("focus_areas")
+              .select(FOCUS_AREA_COLS)
+              .eq("org_id", orgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("shift_categories")
+              .select(SHIFT_CATEGORY_COLS)
+              .eq("org_id", orgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("jobs")
+              .select(JOB_COLS)
+              .eq("org_id", orgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("indicator_types")
+              .select(INDICATOR_TYPE_COLS)
+              .eq("org_id", orgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("certifications")
+              .select(NAMED_ITEM_COLS)
+              .eq("org_id", orgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("organization_roles")
+              .select(ORG_ROLE_COLS)
+              .eq("org_id", orgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("departments")
+              .select(DEPARTMENT_COLS)
+              .eq("org_id", orgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("coverage_requirements")
+              .select(COVERAGE_REQ_COLS)
+              .eq("org_id", orgId),
+            serviceClient
+              .from("absence_types")
+              .select(ABSENCE_TYPE_COLS)
+              .eq("org_id", orgId)
+              .order("sort_order", { ascending: true }),
+          ]),
+        ),
+        // Count only — SetupGuard needs to know an org has staff before it
+        // paints, and joining that question to this fan-out means first paint
+        // no longer waits on the full roster fetch behind it.
+        serviceClient
+          .from("employees")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "active"),
+      ]),
+    );
+
     const [
       orgResult,
       focusAreaResult,
@@ -183,65 +262,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       departmentResult,
       coverageReqResult,
       absenceTypeResult,
-      employeeCountResult,
-    ] = await timer.time("fanout", () =>
-      Promise.all([
-        serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
-        serviceClient
-          .from("focus_areas")
-          .select(FOCUS_AREA_COLS)
-          .eq("org_id", orgId)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("shift_categories")
-          .select(SHIFT_CATEGORY_COLS)
-          .eq("org_id", orgId)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("jobs")
-          .select(JOB_COLS)
-          .eq("org_id", orgId)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("indicator_types")
-          .select(INDICATOR_TYPE_COLS)
-          .eq("org_id", orgId)
-          .is("archived_at", null)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("certifications")
-          .select(NAMED_ITEM_COLS)
-          .eq("org_id", orgId)
-          .is("archived_at", null)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("organization_roles")
-          .select(ORG_ROLE_COLS)
-          .eq("org_id", orgId)
-          .is("archived_at", null)
-          .order("sort_order", { ascending: true }),
-        serviceClient
-          .from("departments")
-          .select(DEPARTMENT_COLS)
-          .eq("org_id", orgId)
-          .is("archived_at", null)
-          .order("sort_order", { ascending: true }),
-        serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
-        serviceClient
-          .from("absence_types")
-          .select(ABSENCE_TYPE_COLS)
-          .eq("org_id", orgId)
-          .order("sort_order", { ascending: true }),
-        // Count only — SetupGuard needs to know an org has staff before it
-        // paints, and joining that question to this fan-out means first paint
-        // no longer waits on the full roster fetch behind it.
-        serviceClient
-          .from("employees")
-          .select("id", { count: "exact", head: true })
-          .eq("org_id", orgId)
-          .eq("status", "active"),
-      ]),
-    );
+    ] = configResults;
 
     if (orgResult.error) throw orgResult.error;
     if (focusAreaResult.error) throw focusAreaResult.error;
@@ -299,7 +320,10 @@ async function handleGET(req: NextRequest, timer: Timer) {
       coverageRequirements,
     });
   } catch (error) {
-    logger.error({ error }, "organization bootstrap GET failed");
+    // `err` is Pino's structured-error field. Logging under `error` drops the
+    // stack and provider details in production, making a client-visible
+    // bootstrap failure impossible to diagnose from the log drain.
+    logger.error({ err: error, orgId, userId }, "organization bootstrap GET failed");
     return NextResponse.json(
       { error: "We couldn't load your organization. Refresh and try again." },
       { status: 500 },

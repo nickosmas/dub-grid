@@ -121,6 +121,18 @@ function bearerRequest(token: string) {
   });
 }
 
+function sandboxBearerRequest(token: string) {
+  const sandboxCookie = encodeURIComponent(
+    JSON.stringify({ sandboxOrgId: "sandbox-org", userId: USER_ID }),
+  );
+  return new NextRequest("http://localhost/api/test", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Cookie: `dubgrid-sandbox=${sandboxCookie}`,
+    },
+  });
+}
+
 /** No revocation markers present — the ordinary case. */
 function noRevocations() {
   cacheMocks.cacheGetMany.mockResolvedValue([null, null]);
@@ -299,6 +311,29 @@ describe("api auth helpers", () => {
       if (!("response" in result)) {
         expect(result.claims.org_id).toBe("org-1");
         expect(result.claims.org_role).toBe("admin");
+      }
+    });
+
+    it("fails closed when Test Sandbox ownership cannot be verified", async () => {
+      authMocks.serviceFrom.mockImplementation((table: string) => {
+        if (table === "organizations") {
+          return {
+            select: () => {
+              throw new Error("database unavailable");
+            },
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      const token = await signToken({ claims: { org_id: "real-org" } });
+
+      const result = await requireAuthenticatedUserWithClaims(sandboxBearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(503);
+      if ("response" in result) {
+        await expect(result.response.json()).resolves.toEqual({
+          error: "We couldn't verify your Test Sandbox. Please retry.",
+        });
       }
     });
 

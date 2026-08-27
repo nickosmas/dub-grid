@@ -173,14 +173,23 @@ export default function ProfileTwoFactorScreen() {
     setMfaLoading(true);
     setMfaError(null);
     try {
-      const { error } = await getSupabaseClient().auth.mfa.challengeAndVerify({
-        factorId: mfaFactorId,
-        code: mfaVerifyCode,
-      });
+      const { data: verifiedSession, error } =
+        await getSupabaseClient().auth.mfa.challengeAndVerify({
+          factorId: mfaFactorId,
+          code: mfaVerifyCode,
+        });
       if (error) throw error;
+      if (!verifiedSession?.access_token) {
+        throw new Error("We couldn't finish two-factor setup. Try again.");
+      }
 
-      if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: true });
-      await profileQuery.refetch();
+      // Verifying TOTP promotes the current Supabase session to AAL2. The
+      // accessToken captured by this render is still the password-only AAL1
+      // token, which the mobile API must reject once a verified factor exists.
+      // Use the promoted token returned by verification; AuthSessionProvider
+      // receives the same session update and refetches this profile under its
+      // new token key.
+      await updateProfileMfaStatus(verifiedSession.access_token, { enabled: true });
       pushToast({
         tone: "success",
         title: "Two-factor authentication enabled",
@@ -288,7 +297,6 @@ export default function ProfileTwoFactorScreen() {
               disabled={mfaLoading || mfaVerifyCode.length !== 6}
               label="Verify & enable"
               loading={mfaLoading}
-              loadingLabel="Verifying"
               onPress={() => void verifyMfaEnrollment()}
             />
             <Button
@@ -320,7 +328,6 @@ export default function ProfileTwoFactorScreen() {
             <Button
               label="Enable 2FA"
               loading={mfaLoading}
-              loadingLabel="Starting"
               onPress={() => void startMfaEnrollment()}
             />
           )}
@@ -329,7 +336,6 @@ export default function ProfileTwoFactorScreen() {
       <ConfirmationModal
         body="This will make your account less secure."
         confirmLabel="Disable"
-        confirmPendingLabel="Disabling"
         confirmTone="danger"
         loading={mfaLoading}
         onCancel={() => setIsConfirmingDisable(false)}

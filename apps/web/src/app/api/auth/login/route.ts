@@ -6,7 +6,7 @@ import {
   ACCOUNT_DISABLED_MESSAGE,
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
-import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -259,24 +259,37 @@ export async function POST(req: NextRequest) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  const { limited, reset, misconfigured } = await timer.time("ratelimit", () =>
-    checkRateLimit(loginLimiter, `login:${emailHash}`),
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const limits = await timer.time("ratelimit", () =>
+    Promise.all([
+      checkRateLimit(loginLimiter, `login:email:${emailHash}`),
+      checkRateLimit(loginIpLimiter, `login:ip:${clientIp}`),
+      checkRateLimit(loginSurgeLimiter, "login:global"),
+    ]),
   );
 
-  if (misconfigured) {
+  if (limits.some((limit) => limit.misconfigured)) {
     return NextResponse.json(
       { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
 
-  if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 900;
-    logger.warn({ emailHash, path: "/api/auth/login" }, "Login rate limited");
+  const limited = limits.filter((limit) => limit.limited);
+  if (limited.length > 0) {
+    const retryAfter = Math.max(
+      1,
+      ...limited.map((limit) => (limit.reset ? Math.ceil((limit.reset - Date.now()) / 1000) : 60)),
+    );
+    logger.warn(
+      { emailHash, path: "/api/auth/login", limitCount: limited.length },
+      "Login rate limited",
+    );
+    Sentry.captureMessage("Login load shed", "warning");
     return NextResponse.json(
       {
         success: false,
-        error: "Too many sign-in attempts. Wait a few minutes and try again.",
+        error: "Sign-in is busy right now. Please wait a moment and try again.",
         retryAfter,
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },

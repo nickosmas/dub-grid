@@ -63,11 +63,7 @@ export default function DraftBanner({
             className="dg-btn dg-btn-secondary dg-btn-sm"
             style={{ color: "var(--dg-color-danger-dark)" }}
           >
-            <ButtonLoading
-              loading={Boolean(isCanceling)}
-              loadingLabel="Discarding"
-              spinnerSize={12}
-            >
+            <ButtonLoading loading={Boolean(isCanceling)} spinnerSize={12}>
               Discard
             </ButtonLoading>
           </Button>
@@ -79,11 +75,7 @@ export default function DraftBanner({
             disabled={isDisabled || !canPublish}
             className="dg-btn dg-btn-primary dg-btn-sm"
           >
-            <ButtonLoading
-              loading={Boolean(isPublishing)}
-              loadingLabel="Publishing"
-              spinnerSize={12}
-            >
+            <ButtonLoading loading={Boolean(isPublishing)} spinnerSize={12}>
               Publish
             </ButtonLoading>
           </Button>

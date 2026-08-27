@@ -116,13 +116,9 @@ describe("Button", () => {
     expect(button).toHaveAttribute("type", "submit");
   });
 
-  it("shows a spinner and the progressive label while the action runs", async () => {
+  it("shows a spinner while keeping the action label while the action runs", async () => {
     const gate = deferred();
-    render(
-      <Button loadingLabel="Publishing" onClick={() => gate.promise}>
-        Publish
-      </Button>,
-    );
+    render(<Button onClick={() => gate.promise}>Publish</Button>);
     const button = screen.getByRole("button", { name: "Publish" });
     expect(button).not.toHaveAttribute("aria-busy");
 
@@ -130,11 +126,10 @@ describe("Button", () => {
       fireEvent.click(button);
     });
 
-    // The label is never dropped for the spinner: a busy button still says
-    // which action is running.
+    // The label is never dropped or rewritten while a button is busy.
     expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
-    expect(screen.getByText("Publishing")).toBeInTheDocument();
-    expect(screen.queryByText("Publish")).not.toBeInTheDocument();
+    expect(screen.getByText("Publish")).toBeInTheDocument();
+    expect(screen.queryByText("Publishing")).not.toBeInTheDocument();
     expect(screen.getByRole("button")).toHaveAttribute("aria-busy", "true");
 
     await act(async () => {
@@ -147,15 +142,15 @@ describe("Button", () => {
 
   it("shows the same spinner for a pending flag that lives outside the button", () => {
     render(
-      <Button loading loadingLabel="Deleting" onClick={vi.fn()}>
+      <Button loading onClick={vi.fn()}>
         Delete
       </Button>,
     );
-    expect(screen.getByText("Deleting")).toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
     expect(screen.getByRole("button")).toBeDisabled();
   });
 
-  it("still shows a spinner without a loadingLabel, keeping the label as-is", async () => {
+  it("keeps the original label when a button latches its own async action", async () => {
     const gate = deferred();
     render(<Button onClick={() => gate.promise}>Open</Button>);
     const button = screen.getByRole("button", { name: /Open/ });
@@ -164,8 +159,7 @@ describe("Button", () => {
     });
 
     // Most handlers arrive as props typed `=> void`, so the spinner cannot
-    // wait for someone to remember `loadingLabel`: it is the default, and the
-    // label survives rather than being swapped to a verb nobody supplied.
+    // depend on call-site copy; the original action label stays visible.
     expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
 
@@ -203,9 +197,7 @@ describe("Button", () => {
     const gate = deferred();
     render(
       <Button onClick={() => gate.promise}>
-        <ButtonLoading loading loadingLabel="Saving">
-          Save
-        </ButtonLoading>
+        <ButtonLoading loading>Save</ButtonLoading>
       </Button>,
     );
     const button = screen.getByRole("button");
@@ -216,7 +208,7 @@ describe("Button", () => {
     // The hand-wired flag and the latch are busy over the same span, so
     // without deferring to the children this button showed two spinners.
     expect(screen.getAllByRole("status")).toHaveLength(1);
-    expect(screen.getByText("Saving")).toBeInTheDocument();
+    expect(screen.getByText("Save")).toBeInTheDocument();
 
     await act(async () => {
       gate.resolve();
@@ -229,9 +221,7 @@ describe("Button", () => {
     render(
       <Button onClick={() => gate.promise}>
         <span>
-          <ButtonLoading loading loadingLabel="Publishing">
-            Publish
-          </ButtonLoading>
+          <ButtonLoading loading>Publish</ButtonLoading>
         </span>
       </Button>,
     );
@@ -245,11 +235,11 @@ describe("Button", () => {
     });
   });
 
-  it("spins itself when the children's own flag is not covering the work", async () => {
+  it("promotes a nested wrapper instead of adding a second spinner", async () => {
     const gate = deferred();
     render(
       <Button onClick={() => gate.promise}>
-        <ButtonLoading loading={false} loadingLabel="Saving">
+        <ButtonLoading loading={false} spinnerSize={13}>
           Save
         </ButtonLoading>
       </Button>,
@@ -258,9 +248,29 @@ describe("Button", () => {
       fireEvent.click(screen.getByRole("button"));
     });
 
-    // The children hold a `<ButtonLoading>` but it is not spinning, so
-    // deferring to it blindly would leave the button showing nothing.
+    // A nested wrapper remains the only spinner source. The parent promotes it
+    // while its own latch is busy instead of adding another spinner beside it.
     expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveAttribute("width", "13");
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+  });
+
+  it("honors spinner={false} for a nested loading wrapper", async () => {
+    const gate = deferred();
+    render(
+      <Button spinner={false} onClick={() => gate.promise}>
+        <ButtonLoading loading={false}>Save</ButtonLoading>
+      </Button>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     await act(async () => {
       gate.resolve();

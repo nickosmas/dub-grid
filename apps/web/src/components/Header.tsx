@@ -390,7 +390,6 @@ export default function Header({ orgName }: HeaderProps) {
       title="Exit sandbox to sign out"
       message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
       confirmLabel="Exit & sign out"
-      confirmPendingLabel="Signing out"
       cancelLabel="Cancel"
       variant="danger"
       isLoading={exitingForLogout}

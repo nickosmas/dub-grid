@@ -701,7 +701,6 @@ function ShiftCategoriesSettings({
               <Button
                 onClick={() => handleDeleteClick(cat.id)}
                 loading={isDeletingThis}
-                loadingLabel="Deleting"
                 className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 Delete
@@ -737,9 +736,7 @@ function ShiftCategoriesSettings({
               }
               className="dg-btn dg-btn-primary dg-btn-sm"
             >
-              <ButtonLoading loading={isSavingThis} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-                {EDITOR_ACTION_LABELS.save}
-              </ButtonLoading>
+              <ButtonLoading loading={isSavingThis}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
             </Button>
           }
         />

@@ -303,7 +303,10 @@ type ResolvedEntry = {
 
 export interface OperationsReportSourceData {
   org: OrganizationRow;
+  /** Current roster only: active and inactive employees, never removed rows. */
   employees: EmployeeReportRow[];
+  /** Removed employees retained solely to attribute historical records. */
+  historicalEmployees: EmployeeReportRow[];
   focusAreas: FocusAreaRow[];
   roles: NamedRow[];
   certifications: NamedRow[];
@@ -518,8 +521,11 @@ export function buildOperationsReportPayload(
   const reportDateSet = new Set(reportDates);
   const employeeIdSet = new Set(filters.employeeIds ?? []);
   const focusAreaIdSet = new Set(filters.focusAreaIds ?? []);
-  const employeeById = new Map(source.employees.map((row) => [row.id, row]));
-  const employeeNameById = new Map(source.employees.map((row) => [row.id, formatName(row)]));
+  const historicalEmployeeDirectory = [...source.employees, ...source.historicalEmployees];
+  const employeeById = new Map(historicalEmployeeDirectory.map((row) => [row.id, row]));
+  const employeeNameById = new Map(
+    historicalEmployeeDirectory.map((row) => [row.id, formatName(row)]),
+  );
   const focusAreaById = buildMap(source.focusAreas);
   const roleById = buildMap(source.roles);
   const certificationById = buildMap(source.certifications);
@@ -533,10 +539,22 @@ export function buildOperationsReportPayload(
   const jobById = buildMap(source.jobs);
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
   const shiftNameById = new Map(source.shiftCategories.map((row) => [row.id, row.name]));
-  const reportEmployees = source.employees.filter((employee) => {
+  const currentReportEmployees = source.employees.filter((employee) => {
     if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
   });
+  const currentEmployeeIdSet = new Set(source.employees.map((employee) => employee.id));
+  const historicalPublishedEntries = resolveEntries(source.publishedRows, absenceTypeById).filter(
+    (item) => reportDateSet.has(item.entry.date),
+  );
+  // A removed employee appears only beside records in the requested historical
+  // range. They remain excluded from current-roster lists and filter options.
+  const removedEmployeesWithHistoricalEntries = source.historicalEmployees.filter((employee) => {
+    if (currentEmployeeIdSet.has(employee.id) || employeeIdSet.size > 0) return false;
+    if (!hasAnyNumber(employee.focus_area_ids, focusAreaIdSet)) return false;
+    return historicalPublishedEntries.some((item) => item.entry.empId === employee.id);
+  });
+  const reportEmployees = [...currentReportEmployees, ...removedEmployeesWithHistoricalEntries];
   const reportEmployeeIdSet = new Set(reportEmployees.map((employee) => employee.id));
   const rosterEmployees = source.employees.filter((employee) => {
     if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
@@ -544,7 +562,7 @@ export function buildOperationsReportPayload(
     if (focusAreaIds.length === 0) return true;
     return hasAnyNumber(focusAreaIds, focusAreaIdSet);
   });
-  const entries = resolveEntries(source.publishedRows, absenceTypeById).filter((item) => {
+  const entries = historicalPublishedEntries.filter((item) => {
     if (!reportDateSet.has(item.entry.date)) return false;
     if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
     if (focusAreaIdSet.size === 0) return true;
@@ -759,7 +777,7 @@ export function buildOperationsReportPayload(
       }
       if (!reportDateSet.has(request.requester_shift_date)) return false;
       const requester = employeeById.get(request.requester_emp_id);
-      if (!requester || !reportEmployeeIdSet.has(requester.id)) return false;
+      if (!requester) return false;
       return hasAnyNumber(requester.focus_area_ids, focusAreaIdSet);
     })
     .map((request) => ({
@@ -1629,6 +1647,7 @@ export async function loadOperationsReport(
   const [
     orgRows,
     employees,
+    historicalEmployees,
     focusAreas,
     roles,
     certifications,
@@ -1656,6 +1675,16 @@ export async function loadOperationsReport(
         )
         .eq("org_id", input.orgId)
         .is("archived_at", null)
+        .order("seniority", { ascending: true }),
+    ),
+    fetchTableRows<EmployeeReportRow>(
+      serviceClient
+        .from("employees")
+        .select(
+          "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id",
+        )
+        .eq("org_id", input.orgId)
+        .not("archived_at", "is", null)
         .order("seniority", { ascending: true }),
     ),
     fetchTableRows<FocusAreaRow>(
@@ -1754,6 +1783,7 @@ export async function loadOperationsReport(
     {
       org,
       employees,
+      historicalEmployees,
       focusAreas,
       roles,
       certifications,

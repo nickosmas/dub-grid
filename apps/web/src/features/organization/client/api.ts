@@ -36,6 +36,17 @@ export interface OrganizationBootstrap {
   coverageRequirements: CoverageRequirement[];
 }
 
+export class OrganizationRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly retryAfterMs: number | null,
+  ) {
+    super(message);
+    this.name = "OrganizationRequestError";
+  }
+}
+
 function resolveClientUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;
@@ -54,7 +65,14 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Organization request failed."));
+    const retryAfterSeconds = Number(response.headers.get("retry-after"));
+    throw new OrganizationRequestError(
+      formatClientErrorMessage(body?.error, "Organization request failed."),
+      response.status,
+      Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? retryAfterSeconds * 1_000
+        : null,
+    );
   }
 
   return body as T;
@@ -67,8 +85,24 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
  * in exchange it split the cache so the same payload was fetched twice per page
  * under two keys. The server now always includes them.
  */
-export function fetchOrganizationBootstrap(): Promise<OrganizationBootstrap> {
-  return requestOrganizationJson<OrganizationBootstrap>("/api/organization/bootstrap");
+export function fetchOrganizationBootstrap(signal?: AbortSignal): Promise<OrganizationBootstrap> {
+  return requestOrganizationJson<OrganizationBootstrap>("/api/organization/bootstrap", { signal });
+}
+
+export function isRetryableOrganizationBootstrapError(error: unknown): boolean {
+  if (error instanceof OrganizationRequestError) {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+  // Browser fetch rejects network/connection failures without a response.
+  return error instanceof TypeError;
+}
+
+export function getOrganizationBootstrapRetryDelay(error: unknown, failureCount: number): number {
+  if (error instanceof OrganizationRequestError && error.retryAfterMs != null) {
+    return error.retryAfterMs;
+  }
+  const cappedDelay = Math.min(1_000 * 2 ** failureCount, 30_000);
+  return Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
 }
 
 export function fetchOrganizationDirectory(

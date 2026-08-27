@@ -76,6 +76,14 @@ vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
   };
 });
 
+vi.mock("../features/auth/components/AuthTransitionScreen", async () => {
+  const React = await import("react");
+  return {
+    AuthTransitionScreen: ({ phase }: { phase: string }) =>
+      React.createElement("div", {}, `auth-transition:${phase}`),
+  };
+});
+
 vi.mock("../features/auth/hooks/useBootstrap", () => ({ useBootstrap }));
 vi.mock("../shared/lib/auth-reset", () => ({ handleExpiredMobileSession: vi.fn() }));
 vi.mock("../shared/providers/AuthSessionProvider", () => ({ useSessionState }));
@@ -120,14 +128,16 @@ describe("TabsLayoutAndroid", () => {
     useBootstrap.mockReturnValue(bootstrap());
   });
 
-  // The one splash lives in StartupSplashGate, above the router; a second
-  // instance here restarts the brand animation mid-handoff.
-  it("renders nothing rather than a second splash while the session is restoring", () => {
+  // The launch splash lives above the router. Once it has completed, the tabs
+  // gate must give an in-app handoff status instead of showing a second splash
+  // or a blank screen.
+  it("shows a labeled handoff rather than a second splash while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
     render(<TabsLayoutAndroid />);
 
     expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
+    expect(screen.getByText("auth-transition:organization")).toBeInTheDocument();
   });
 
   it("redirects to login without a session", () => {
@@ -182,6 +192,7 @@ describe("TabsLayoutAndroid", () => {
     useBootstrap.mockReturnValue({
       ...bootstrap(),
       error: new Error("Organization unavailable. Sign in on the web to manage billing."),
+      isError: true,
     });
 
     render(<TabsLayoutAndroid />);

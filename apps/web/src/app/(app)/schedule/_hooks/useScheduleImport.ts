@@ -3,8 +3,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { addDays, formatDate, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
-import type { Employee } from "@/types";
+import { addDays, formatDate, formatDateKey } from "@/lib/utils";
 import {
   importPreviousSchedule,
   type ImportPreviousScheduleOutcome,
@@ -44,7 +43,7 @@ export function useScheduleImport({
   org,
   spanWeeks,
   weekStart,
-  employees,
+  employeeNameById,
   refetchScheduleData,
   startScheduleOperation,
   updateScheduleOperation,
@@ -54,7 +53,7 @@ export function useScheduleImport({
   org: { id: string } | null;
   spanWeeks: 1 | 2 | "month";
   weekStart: Date;
-  employees: Employee[];
+  employeeNameById: Map<string, string>;
   refetchScheduleData: (opts?: {
     ensureStart?: string;
     ensureEnd?: string;
@@ -104,9 +103,8 @@ export function useScheduleImport({
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
       if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
-        const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
         toast.info(
-          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId)}.`,
+          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, employeeNameById)}.`,
         );
         return;
       }
@@ -128,7 +126,7 @@ export function useScheduleImport({
     } finally {
       setIsImportingPrevious(false);
     }
-  }, [org, spanWeeks, weekStart, employees]);
+  }, [org, spanWeeks, weekStart, employeeNameById]);
 
   const handleImportPrevious = useCallback(async () => {
     if (!org || spanWeeks === "month" || !importPreview) return;
@@ -167,8 +165,11 @@ export function useScheduleImport({
       finishScheduleOperation("import_previous");
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
-      const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
-      const skipDescription = formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId);
+      const skipDescription = formatImportPreviousSkipDescription(
+        outcomes,
+        breakdown,
+        employeeNameById,
+      );
 
       if (breakdown.totalSkipped > 0) {
         setImportResults({
@@ -216,7 +217,7 @@ export function useScheduleImport({
     org,
     spanWeeks,
     importPreview,
-    employees,
+    employeeNameById,
     refetchScheduleData,
     startScheduleOperation,
     updateScheduleOperation,

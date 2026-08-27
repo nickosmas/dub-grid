@@ -734,9 +734,7 @@ function FocusAreaCoverageCard({
                   disabled={saving || !canEdit || !isDirty}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-                    {EDITOR_ACTION_LABELS.save}
-                  </ButtonLoading>
+                  <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
                 </Button>
               }
             />

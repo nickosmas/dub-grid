@@ -325,7 +325,6 @@ export default function NotificationsScreen() {
             compact
             label="Mark all read"
             loading={busy}
-            loadingLabel="Marking read"
             onPress={() => setConfirmingMarkAllRead(true)}
             tone="secondary"
           />
@@ -373,7 +372,6 @@ export default function NotificationsScreen() {
               tone="secondary"
               label="Load more"
               loading={notificationsQuery.isFetchingNextPage}
-              loadingLabel="Loading"
               onPress={() => notificationsQuery.fetchNextPage()}
             />
           ) : null}
@@ -387,7 +385,6 @@ export default function NotificationsScreen() {
         }
         cancelLabel="Cancel"
         confirmLabel="Mark all read"
-        confirmPendingLabel="Marking read"
         confirmTone="primary"
         loading={busy}
         onCancel={() => setConfirmingMarkAllRead(false)}

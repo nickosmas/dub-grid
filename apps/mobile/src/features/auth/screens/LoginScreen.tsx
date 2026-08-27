@@ -131,12 +131,22 @@ export default function LoginScreen() {
   const [showOrgHelp, setShowOrgHelp] = useState(false);
   const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [slowSubmission, setSlowSubmission] = useState(false);
   const [focusedField, setFocusedField] = useState<"organization" | "email" | "password" | null>(
     null,
   );
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
+
+  useEffect(() => {
+    if (!submitting && !orgLoading) {
+      setSlowSubmission(false);
+      return;
+    }
+    const timeout = setTimeout(() => setSlowSubmission(true), 15_000);
+    return () => clearTimeout(timeout);
+  }, [orgLoading, submitting]);
 
   useEffect(() => {
     // Both this and the consent gate's own storage read start at mount, and
@@ -440,9 +450,15 @@ export default function LoginScreen() {
               disabled={orgLoading || !orgSlug.trim()}
               label="Continue"
               loading={orgLoading}
-              loadingLabel="Checking"
               onPress={() => handleOrganizationContinue()}
             />
+            {orgLoading ? (
+              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+                {slowSubmission
+                  ? "This is taking longer than usual. We’re still checking your Organization."
+                  : "Preparing your Organization…"}
+              </Text>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"
@@ -545,9 +561,15 @@ export default function LoginScreen() {
               disabled={submitting || !isValidEmail(email) || !password}
               label="Sign In"
               loading={submitting}
-              loadingLabel="Signing In"
               onPress={() => handleLogin()}
             />
+            {submitting ? (
+              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+                {slowSubmission
+                  ? "Signing in is taking longer than usual. We’re still working in the background."
+                  : "Signing you in…"}
+              </Text>
+            ) : null}
 
             <View style={styles.linkRow}>
               <Pressable
@@ -616,9 +638,15 @@ export default function LoginScreen() {
               disabled={submitting || mfaCode.length !== 6}
               label="Verify and Sign In"
               loading={submitting}
-              loadingLabel="Verifying"
               onPress={() => handleMfaVerify()}
             />
+            {submitting ? (
+              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+                {slowSubmission
+                  ? "Verification is taking longer than usual. We’re still working in the background."
+                  : "Verifying your sign-in…"}
+              </Text>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"
@@ -758,6 +786,12 @@ const createStyles = (mobileColors: MobileColors) =>
     helperStrong: {
       ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textPrimary,
+    },
+    progressText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      lineHeight: 20,
     },
     errorRow: {
       flexDirection: "row",

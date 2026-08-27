@@ -1,0 +1,38 @@
+import { act, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import AuthTransitionScreen from "./AuthTransitionScreen";
+
+vi.mock("@/hooks/useLogout", () => ({
+  useLogout: () => ({ signOut: vi.fn() }),
+}));
+
+describe("AuthTransitionScreen", () => {
+  it("labels the wait, explains a slow transition, and exposes recovery after 30 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<AuthTransitionScreen onRetry={vi.fn()} phase="organization" />);
+
+      expect(
+        screen.getByRole("heading", { name: "Preparing your Organization" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(
+        screen.getByText(
+          "This is taking longer than usual. We’re still working in the background.",
+        ),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -382,9 +382,7 @@ export function ProfileChangeRequestQueue({
                   className="dg-btn dg-btn-primary dg-btn-sm"
                   onClick={() => setPendingResolution({ request, action: "approve" })}
                 >
-                  <ButtonLoading loading={resolvingId === request.id} loadingLabel="Approving">
-                    Approve
-                  </ButtonLoading>
+                  <ButtonLoading loading={resolvingId === request.id}>Approve</ButtonLoading>
                 </Button>
                 <Button
                   type="button"
@@ -415,7 +413,6 @@ export function ProfileChangeRequestQueue({
                 : "Reject this request? The requester will not receive the requested changes."
           }
           confirmLabel={pendingResolution.action === "approve" ? "Approve" : "Reject"}
-          confirmPendingLabel={pendingResolution.action === "approve" ? "Approving" : "Rejecting"}
           variant={
             pendingResolution.request.type === "account_deletion" &&
             pendingResolution.action === "approve"

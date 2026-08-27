@@ -11,6 +11,7 @@ import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import {
@@ -148,10 +149,10 @@ function ResetPasswordContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
+        <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         {state === "loading" ? (
           <AuthStateCard
@@ -245,7 +246,6 @@ function ResetPasswordContent() {
               >
                 <ButtonLoading
                   loading={loading}
-                  loadingLabel="Resetting Password"
                   spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >

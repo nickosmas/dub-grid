@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildEmployeeNameById,
   daysBetweenDateKeys,
   formatImportPreviousSkipDescription,
   getSkipReasonLabel,
@@ -131,6 +132,38 @@ describe("formatImportPreviousSkipDescription", () => {
     const breakdown = summarizeImportPreviousOutcomes(outcomes);
     const description = formatImportPreviousSkipDescription(outcomes, breakdown, new Map());
     expect(description).toContain("an employee on 7/4");
+  });
+
+  it("names inactive and removed employees when the historical directory includes them", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({
+        employeeId: "inactive",
+        targetDate: "2026-07-04",
+        outcome: "skipped",
+        reason: "employee_inactive",
+      }),
+      row({
+        employeeId: "removed",
+        targetDate: "2026-07-05",
+        outcome: "skipped",
+        reason: "employee_inactive",
+      }),
+    ];
+    const names = buildEmployeeNameById([
+      { id: "active", firstName: "Active", lastName: "Staff" },
+      { id: "inactive", firstName: "Ina", lastName: "Active" },
+      { id: "removed", firstName: "Riley", lastName: "Stone" },
+    ]);
+
+    const description = formatImportPreviousSkipDescription(
+      outcomes,
+      summarizeImportPreviousOutcomes(outcomes),
+      names,
+    );
+
+    expect(description).toContain("Ina Active on 7/4");
+    expect(description).toContain("Riley Stone on 7/5");
+    expect(description).not.toContain("an employee");
   });
 });
 
