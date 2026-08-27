@@ -58,9 +58,7 @@ describe("MobileRealtimeProvider", () => {
       data: {
         currentOrg: {
           id: "org-1",
-          featureFlags: {
-            disable_realtime: false,
-          },
+          featureFlags: {},
         },
       },
     });
@@ -76,18 +74,16 @@ describe("MobileRealtimeProvider", () => {
     expect(useMobileRealtimeInvalidation).toHaveBeenCalledWith({
       accessToken: "token-1",
       orgId: "org-1",
-      disabled: false,
       queryClient: mockQueryClient,
     });
     expect(useMobilePermissionsRealtime).toHaveBeenCalledWith({
       accessToken: "token-1",
       userId: "user-1",
-      disabled: false,
       queryClient: mockQueryClient,
     });
   });
 
-  it("respects the current org realtime feature flag", () => {
+  it("subscribes even when a legacy realtime pause flag is present", () => {
     useSessionState.mockReturnValue({
       accessToken: "token-1",
       isLoading: false,
@@ -113,13 +109,11 @@ describe("MobileRealtimeProvider", () => {
     expect(useMobileRealtimeInvalidation).toHaveBeenCalledWith({
       accessToken: "token-1",
       orgId: "org-1",
-      disabled: true,
       queryClient: mockQueryClient,
     });
     expect(useMobilePermissionsRealtime).toHaveBeenCalledWith({
       accessToken: "token-1",
       userId: "user-1",
-      disabled: true,
       queryClient: mockQueryClient,
     });
   });

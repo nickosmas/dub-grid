@@ -258,7 +258,6 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const effectiveOrgId = ctx.orgId ?? org?.id ?? null;
   useOrgRealtimeInvalidation({
     orgId: effectiveOrgId,
-    disabled: org?.featureOverrides?.disable_realtime === true,
     queryClient,
   });
 

@@ -2,7 +2,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import {
   fetchOrganizationEmployeeCount,
@@ -153,51 +152,6 @@ describe("gridmaster dirty save controls", () => {
       seatMismatches: [],
     });
     vi.mocked(updateGridmasterSubscription).mockResolvedValue({ success: true });
-  });
-
-  it("only shows runtime control Discard when there are unsaved realtime edits", async () => {
-    const user = userEvent.setup();
-
-    render(<FeatureFlagsEditor organization={makeOrganization()} />);
-
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/shift requests \(beta\)/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/maintenance mode/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /\+ add flag/i })).not.toBeInTheDocument();
-
-    await user.click(screen.getByLabelText(/pause live updates/i));
-    const discardButton = screen.getByRole("button", { name: /^discard$/i });
-    expect(saveButton).toBeEnabled();
-    expect(discardButton).toBeEnabled();
-
-    await user.click(discardButton);
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
-  });
-
-  it("disables runtime control Save again immediately after a successful save", async () => {
-    const user = userEvent.setup();
-
-    render(<FeatureFlagsEditor organization={makeOrganization()} />);
-
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
-
-    await user.click(screen.getByLabelText(/pause live updates/i));
-    expect(saveButton).toBeEnabled();
-
-    await user.click(saveButton);
-    await user.click(screen.getByRole("button", { name: /save changes/i }));
-
-    await waitFor(() => {
-      expect(saveButton).toBeDisabled();
-    });
-    expect(updateOrganizationSettings).toHaveBeenCalledWith({
-      orgId: "org-1",
-      expectedUpdatedAt: "2026-04-15T18:00:00.000000+00:00",
-      featureOverrides: { disable_realtime: true },
-    });
   });
 
   it("disables organization overview Review & Save until persisted values actually differ", async () => {
