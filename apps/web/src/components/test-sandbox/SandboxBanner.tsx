@@ -127,9 +127,7 @@ export default function SandboxBanner() {
             fontSize: "var(--dg-fs-caption)",
           }}
         >
-          <ButtonLoading loading={pendingAction === "reset"} loadingLabel="Resetting">
-            Reset sandbox
-          </ButtonLoading>
+          <ButtonLoading loading={pendingAction === "reset"}>Reset sandbox</ButtonLoading>
         </Button>
         <Button
           type="button"
@@ -142,9 +140,7 @@ export default function SandboxBanner() {
             fontSize: "var(--dg-fs-caption)",
           }}
         >
-          <ButtonLoading loading={pendingAction === "exit"} loadingLabel="Exiting">
-            Exit sandbox
-          </ButtonLoading>
+          <ButtonLoading loading={pendingAction === "exit"}>Exit sandbox</ButtonLoading>
         </Button>
       </div>
     </div>

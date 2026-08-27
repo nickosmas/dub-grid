@@ -305,10 +305,17 @@ export async function requireAuthenticatedUserWithClaims(
           };
         }
       } catch {
-        // Verification failed transiently — fall through to real claims.
-        // Better to under-route to the real org than mis-route on bad
-        // state. The user's data is at risk only on writes, and writes
-        // already require explicit org_id filtering at every callsite.
+        // A sandbox verification outage must never send a request to the
+        // caller's real Organization. Some endpoints legitimately use these
+        // claims as their effective org context, so falling through here
+        // would turn a transient dependency failure into a cross-context
+        // write or read. Fail closed and let the client retry instead.
+        return {
+          response: NextResponse.json(
+            { error: "We couldn't verify your Test Sandbox. Please retry." },
+            { status: 503 },
+          ),
+        };
       }
     }
   }

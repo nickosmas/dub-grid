@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Form } from "@/components/Form";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -18,7 +18,6 @@ export function EmailPasswordForm({
   loading,
   onSubmit,
   submitLabel,
-  submitPendingLabel,
   forgotPasswordHref,
 }: {
   email: string;
@@ -28,11 +27,19 @@ export function EmailPasswordForm({
   loading: boolean;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
-  /** The same action in progress, shown beside the spinner ("Signing In"). */
-  submitPendingLabel: string;
   forgotPasswordHref?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setSlow(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSlow(true), 15_000);
+    return () => window.clearTimeout(timeout);
+  }, [loading]);
 
   return (
     <Form onSubmit={onSubmit} className="dg-auth-form">
@@ -83,13 +90,19 @@ export function EmailPasswordForm({
       >
         <ButtonLoading
           loading={loading}
-          loadingLabel={submitPendingLabel}
           spinnerColor="var(--dg-color-text-inverse)"
           spinnerSize={20}
         >
           {submitLabel}
         </ButtonLoading>
       </button>
+      {loading ? (
+        <p className="dg-form-hint dg-auth-progress" role="status">
+          {slow
+            ? "Signing in is taking longer than usual. We’re still working in the background."
+            : "Signing you in…"}
+        </p>
+      ) : null}
     </Form>
   );
 }

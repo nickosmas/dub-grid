@@ -418,7 +418,6 @@ export function ProfilePanel({
           title: "Save changes?",
           message: "Confirm that you want to save these account and contact changes.",
           confirmLabel: "Confirm save",
-          confirmPendingLabel: EDITOR_ACTION_LABELS.saving,
           variant: "info" as const,
           loading: saving,
         }
@@ -427,7 +426,6 @@ export function ProfilePanel({
             title: "Send request?",
             message: "Confirm that you want to send this name change request.",
             confirmLabel: "Confirm request",
-            confirmPendingLabel: "Sending",
             variant: "info" as const,
             loading: submittingRequest,
           }
@@ -437,7 +435,6 @@ export function ProfilePanel({
               message:
                 "Confirm that you want to request account deletion. An admin will review and approve before your account is removed.",
               confirmLabel: "Request deletion",
-              confirmPendingLabel: "Requesting",
               variant: "danger" as const,
               loading: requestingDeletion,
             }
@@ -531,12 +528,7 @@ export function ProfilePanel({
                   disabled={saving || !hasAnyChanges || hasInvalidDraft}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  <ButtonLoading
-                    loading={saving}
-                    loadingLabel={EDITOR_ACTION_LABELS.saving}
-                    spinnerSize={14}
-                    icon={<Check size={14} />}
-                  >
+                  <ButtonLoading loading={saving} spinnerSize={14} icon={<Check size={14} />}>
                     Save changes
                   </ButtonLoading>
                 </button>
@@ -618,7 +610,6 @@ export function ProfilePanel({
                   >
                     <ButtonLoading
                       loading={savingAccess}
-                      loadingLabel={EDITOR_ACTION_LABELS.saving}
                       spinnerSize={14}
                       icon={<Check size={14} />}
                     >
@@ -700,10 +691,7 @@ export function ProfilePanel({
                   disabled={cancellingId === pendingNameRequest.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
-                  <ButtonLoading
-                    loading={cancellingId === pendingNameRequest.id}
-                    loadingLabel="Cancelling"
-                  >
+                  <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
                     Cancel request
                   </ButtonLoading>
                 </Button>
@@ -757,9 +745,7 @@ export function ProfilePanel({
               onClick={requestNameChange}
               className="dg-btn dg-btn-secondary dg-btn-sm self-start"
             >
-              <ButtonLoading loading={submittingRequest} loadingLabel="Sending Request">
-                Request name change
-              </ButtonLoading>
+              <ButtonLoading loading={submittingRequest}>Request name change</ButtonLoading>
             </Button>
             {loadingChangeRequests ? (
               <span
@@ -807,10 +793,7 @@ export function ProfilePanel({
                   disabled={cancellingId === pendingDeletion.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
-                  <ButtonLoading
-                    loading={cancellingId === pendingDeletion.id}
-                    loadingLabel="Cancelling"
-                  >
+                  <ButtonLoading loading={cancellingId === pendingDeletion.id}>
                     Cancel request
                   </ButtonLoading>
                 </Button>
@@ -824,7 +807,6 @@ export function ProfilePanel({
               >
                 <ButtonLoading
                   loading={requestingDeletion}
-                  loadingLabel="Requesting"
                   spinnerSize={14}
                   icon={<Trash2 size={14} style={{ marginRight: 4 }} />}
                 >
@@ -841,7 +823,6 @@ export function ProfilePanel({
           title={confirmation.title}
           message={confirmation.message}
           confirmLabel={confirmation.confirmLabel}
-          confirmPendingLabel={confirmation.confirmPendingLabel}
           variant={confirmation.variant}
           isLoading={confirmation.loading}
           onConfirm={confirmPending}

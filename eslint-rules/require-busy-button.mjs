@@ -13,8 +13,10 @@
  *  - a web `<button>` whose `onClick` is an async function (inline, or a
  *    handler declared `async` in the same file) and which carries neither a
  *    `disabled` attribute nor a `<ButtonLoading>` child;
- *  - a mobile `<Button>` / `<PressableRow>` whose `onPress` is async and which
- *    passes no `loadingLabel` (`<Button>`) or no busy handling at all.
+ *  - a mobile `<Button>` does not need call-site busy handling: it latches an
+ *    async `onPress` itself and renders its spinner beside the unchanged
+ *    action label. This preserves the action vocabulary while still making
+ *    progress visible.
  *
  * Deliberate limit: a rule sees one file at a time, so `onClick={onSave}`
  * where `onSave` arrives as a prop cannot be resolved and is not flagged. A
@@ -119,8 +121,6 @@ export const requireBusyButton = {
     messages: {
       webButton:
         "This button's onClick is async, so a double-click can run it twice: `disabled` only applies after React re-renders. Wrap the handler in `useAsyncAction` and give the button `disabled={action.isRunning}` plus a `<ButtonLoading loading={action.isRunning} loadingLabel=\"Saving\">` (the progressive form of this button's own verb).",
-      mobileButton:
-        'This <{{name}}> has an async onPress but no `loadingLabel`, so while it works it keeps saying `label`, which reads as work not yet started. Pass `loadingLabel` in the progressive form of the button\'s own verb ("Saving", not "Save"); the press itself is already latched.',
     },
     schema: [],
   },
@@ -147,17 +147,9 @@ export const requireBusyButton = {
           return;
         }
 
-        // `PressableRow` is deliberately absent: it latches its own async
-        // press and shows no spinner, so an async handler needs nothing added.
-        if (name.name === "Button") {
-          const onPress = getAttribute(node, "onPress");
-          if (!onPress || !attributeIsAsync(onPress, scopeFor(onPress))) return;
-          if (getAttribute(node, "loadingLabel")) return;
-          // An icon-only button has no label to put in the progressive form.
-          if (getAttribute(node, "iconOnly")) return;
-
-          context.report({ node, messageId: "mobileButton", data: { name: name.name } });
-        }
+        // Mobile Button owns the async latch and busy UI, including its
+        // unchanged action label and spinner. No call-site configuration is
+        // required (or desirable) for an async press.
       },
     };
   },

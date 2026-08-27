@@ -339,7 +339,7 @@ function ChangeRow({
 }
 
 /** Grouped expanded view: changes grouped by employee name */
-function ExpandedChangesGrouped({
+export function ExpandedChangesGrouped({
   changes,
   assignmentIdByPair,
   assignmentLabelMap,
@@ -743,11 +743,7 @@ export default function PublishHistoryPanel({
                 className="dg-btn dg-btn-secondary"
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 16px" }}
               >
-                <ButtonLoading
-                  loading={loadMore.isRunning}
-                  loadingLabel="Loading More"
-                  spinnerSize={14}
-                >
+                <ButtonLoading loading={loadMore.isRunning} spinnerSize={14}>
                   Load More
                 </ButtonLoading>
               </Button>

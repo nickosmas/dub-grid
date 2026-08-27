@@ -145,7 +145,6 @@ export default function OnboardingWizard({
           title="Skip Setup?"
           message="Are you sure you want to skip? You can configure your preferences later in Settings."
           confirmLabel="Yes, skip"
-          confirmPendingLabel="Skipping"
           cancelLabel="Go back"
           variant="warning"
           isLoading={skipLoading}

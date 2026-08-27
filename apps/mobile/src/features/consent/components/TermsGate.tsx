@@ -91,7 +91,6 @@ export function TermsGate({ children }: PropsWithChildren) {
           <Button
             label="Accept and continue"
             loading={saving}
-            loadingLabel="Accepting"
             onPress={() => void accept()}
             tone="primary"
           />

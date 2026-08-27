@@ -47,6 +47,7 @@ describe("cache module", () => {
       expect(CacheKey.orgRoles("org-1")).toBe("dg:org:org-1:orgRoles");
       expect(CacheKey.coverageReqs("org-1")).toBe("dg:org:org-1:coverageRequirements");
       expect(CacheKey.organization("org-1")).toBe("dg:org:org-1:organization");
+      expect(CacheKey.bootstrapConfig("org-1")).toBe("dg:org:org-1:bootstrapConfig");
     });
 
     it("builds employee-scoped keys correctly", () => {
@@ -111,6 +112,15 @@ describe("cache module", () => {
       mockDel.mockResolvedValueOnce(3);
       await cacheDel("key-1", "key-2", "key-3");
       expect(mockDel).toHaveBeenCalledWith("key-1", "key-2", "key-3");
+    });
+
+    it("also invalidates the aggregate bootstrap config for an organization config write", async () => {
+      mockDel.mockResolvedValueOnce(2);
+      await cacheDel(CacheKey.focusAreas("org-1"));
+      expect(mockDel).toHaveBeenCalledWith(
+        CacheKey.focusAreas("org-1"),
+        CacheKey.bootstrapConfig("org-1"),
+      );
     });
 
     it("does nothing when called with no keys", async () => {

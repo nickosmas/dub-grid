@@ -12,6 +12,8 @@ const deleteSandboxForUser = vi.fn();
 
 vi.mock("@/lib/rate-limit", () => ({
   loginLimiter: {},
+  loginIpLimiter: {},
+  loginSurgeLimiter: {},
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 
@@ -129,6 +131,19 @@ describe("POST /api/auth/login", () => {
     const res = await POST(makeRequest("acme.localhost"));
 
     expect(res.status).toBe(429);
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("sheds a login surge before calling the auth provider", async () => {
+    checkRateLimit
+      .mockResolvedValueOnce({ limited: false, misconfigured: false })
+      .mockResolvedValueOnce({ limited: false, misconfigured: false })
+      .mockResolvedValueOnce({ limited: true, reset: Date.now() + 3_000, misconfigured: false });
+
+    const res = await POST(makeRequest("acme.localhost"));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("3");
     expect(signInWithPassword).not.toHaveBeenCalled();
   });
 

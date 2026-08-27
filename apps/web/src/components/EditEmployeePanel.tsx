@@ -650,7 +650,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         color: "var(--dg-color-link)",
                       }}
                     >
-                      <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
+                      <ButtonLoading loading={revoking} spinnerSize={12}>
                         Reinvite
                       </ButtonLoading>
                     </Button>
@@ -671,7 +671,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         color: "var(--dg-color-danger)",
                       }}
                     >
-                      <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
+                      <ButtonLoading loading={revoking} spinnerSize={12}>
                         Revoke
                       </ButtonLoading>
                     </Button>

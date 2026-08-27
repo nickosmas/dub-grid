@@ -20,24 +20,20 @@ export default function ButtonSpinner({
 }
 
 /**
- * Wraps button children so that loading swaps the label for the same action in
- * progress: a spinner alongside `loadingLabel`. The label is never dropped, so
- * the button keeps saying what it is doing, and `loadingLabel` is required to
- * keep that wording in the progressive form ("Saving", not "Save").
+ * Wraps button children with a spinner while loading. The action label stays
+ * unchanged, so the button remains stable while it is busy.
  *
  * `icon` is the button's own leading icon, if it has one: it is the thing the
  * spinner takes the place of, rather than the spinner arriving beside it.
  */
 export function ButtonLoading({
   loading,
-  loadingLabel,
   children,
   icon,
   spinnerColor,
   spinnerSize,
 }: {
   loading: boolean;
-  loadingLabel: string;
   children: React.ReactNode;
   icon?: React.ReactNode;
   spinnerColor?: string;
@@ -64,7 +60,7 @@ export function ButtonLoading({
       }}
     >
       <ButtonSpinner color={spinnerColor} size={spinnerSize} />
-      {loadingLabel}
+      {children}
     </span>
   );
 }

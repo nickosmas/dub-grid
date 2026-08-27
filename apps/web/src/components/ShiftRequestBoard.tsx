@@ -36,7 +36,6 @@ interface ShiftRequestBoardProps {
 type Tab = "available" | "mine" | "approval";
 type PendingConfirmation = {
   confirmLabel: string;
-  confirmPendingLabel: string;
   key: string;
   message: ReactNode;
   onConfirm: () => void | Promise<unknown>;
@@ -373,7 +372,6 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Claim",
-              confirmPendingLabel: "Claiming",
               key: `claim:${req.id}`,
               message: (
                 <>
@@ -404,7 +402,6 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Accept",
-              confirmPendingLabel: "Accepting",
               key: `accept:${req.id}`,
               message: (
                 <>
@@ -427,7 +424,6 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Decline",
-              confirmPendingLabel: "Declining",
               key: `decline:${req.id}`,
               message: (
                 <>
@@ -486,7 +482,6 @@ export default function ShiftRequestBoard({
 
                   setPendingConfirmation({
                     confirmLabel: "Reject",
-                    confirmPendingLabel: "Rejecting",
                     key: `reject:${req.id}`,
                     message: (
                       <>
@@ -538,7 +533,6 @@ export default function ShiftRequestBoard({
             onClick={() =>
               setPendingConfirmation({
                 confirmLabel: "Approve",
-                confirmPendingLabel: "Approving",
                 key: `approve:${req.id}`,
                 message: (
                   <>
@@ -582,7 +576,6 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Cancel request",
-              confirmPendingLabel: "Cancelling",
               key: `cancel:${req.id}`,
               message: (
                 <>
@@ -622,7 +615,6 @@ export default function ShiftRequestBoard({
       {pendingConfirmation && (
         <ConfirmDialog
           confirmLabel={pendingConfirmation.confirmLabel}
-          confirmPendingLabel={pendingConfirmation.confirmPendingLabel}
           isLoading={runningConfirmationKey === pendingConfirmation.key}
           message={pendingConfirmation.message}
           title={pendingConfirmation.title}

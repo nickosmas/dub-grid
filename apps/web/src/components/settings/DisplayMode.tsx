@@ -605,9 +605,7 @@ export default function DisplayMode({
             disabled={!isModified || saving}
             className="dg-btn dg-btn-primary"
           >
-            <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-              {EDITOR_ACTION_LABELS.save}
-            </ButtonLoading>
+            <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
           </Button>
         </div>
       </div>

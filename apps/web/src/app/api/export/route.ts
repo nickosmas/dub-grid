@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { getServiceClient } from "@/lib/supabase-service";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
@@ -36,9 +36,7 @@ function buildCsv(headers: string[], rows: (string | number | null | undefined)[
   return [headerLine, ...dataLines].join("\n");
 }
 
-async function exportStaff(orgId: string) {
-  const supabase = getServiceClient();
-
+async function exportStaff(supabase: SupabaseClient, orgId: string) {
   const { data: employees, error } = await supabase
     .from("employees")
     .select(
@@ -100,9 +98,12 @@ async function exportStaff(orgId: string) {
   return buildCsv(headers, rows);
 }
 
-async function exportSchedule(orgId: string, startDate?: string, endDate?: string) {
-  const supabase = getServiceClient();
-
+async function exportSchedule(
+  supabase: SupabaseClient,
+  orgId: string,
+  startDate?: string,
+  endDate?: string,
+) {
   // Default to current week if no dates provided
   const now = new Date();
   const weekStart = new Date(now);
@@ -239,21 +240,25 @@ export async function GET(req: NextRequest) {
       return orgAuth.response;
     }
     const serviceClient = orgAuth.serviceClient;
+    // requireOrgPermissions may replace the caller-supplied id with their
+    // owned Test Sandbox. Service-role reads must use that effective id too;
+    // authorizing one Organization and exporting another is a tenant leak.
+    const effectiveOrgId = orgAuth.orgId;
 
     let csv: string;
     let filename: string;
 
     if (type === "staff") {
-      csv = await exportStaff(orgId);
+      csv = await exportStaff(serviceClient, effectiveOrgId);
       filename = `staff-export-${new Date().toISOString().split("T")[0]}.csv`;
     } else {
-      csv = await exportSchedule(orgId, startDate, endDate);
+      csv = await exportSchedule(serviceClient, effectiveOrgId, startDate, endDate);
       filename = `schedule-export-${startDate ?? "current"}-${endDate ?? "week"}.csv`;
     }
 
     // Audit log the export
     await serviceClient.from("audit_log").insert({
-      org_id: orgId,
+      org_id: effectiveOrgId,
       actor_id: user.id,
       actor_email: user.email,
       action: "data.exported",

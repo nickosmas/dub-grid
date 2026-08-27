@@ -890,7 +890,6 @@ export function BulkImportModal({
               >
                 <ButtonLoading
                   loading={importing}
-                  loadingLabel="Importing"
                   spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={16}
                 >

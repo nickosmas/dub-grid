@@ -363,7 +363,7 @@ export function AddManagementUserToScheduleModal({
               disabled={!canSubmit}
               style={{ opacity: canSubmit ? 1 : 0.5 }}
             >
-              <ButtonLoading loading={saving} loadingLabel="Adding" spinnerSize={16}>
+              <ButtonLoading loading={saving} spinnerSize={16}>
                 Add to Schedule
               </ButtonLoading>
             </Button>

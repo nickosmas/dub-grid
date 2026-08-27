@@ -6,12 +6,6 @@ export type MobileRequestActionBody = {
 
 export type MobileRequestActionFeedback = {
   confirmLabel: string;
-  /**
-   * The same action in progress, shown beside the spinner while the request is
-   * in flight ("Approving", not "Approve"). Each variant carries its own verb
-   * so a busy button still says which action is running.
-   */
-  confirmPendingLabel: string;
   confirmStyle?: "default" | "destructive";
   key: string;
   message: string;
@@ -55,7 +49,6 @@ export function getMobileRequestActionFeedback({
     case "volunteer_open_shift":
       return {
         confirmLabel: "Volunteer",
-        confirmPendingLabel: "Volunteering",
         key,
         message: "Volunteer for this open shift? We'll send it to your admin for approval.",
         title: "Volunteer for open shift?",
@@ -63,7 +56,6 @@ export function getMobileRequestActionFeedback({
     case "claim":
       return {
         confirmLabel: "Claim shift",
-        confirmPendingLabel: "Claiming shift",
         key,
         message: "Claim this open shift? We'll send it to your admin for approval.",
         title: "Claim this shift?",
@@ -71,7 +63,6 @@ export function getMobileRequestActionFeedback({
     case "accept":
       return {
         confirmLabel: "Accept",
-        confirmPendingLabel: "Accepting",
         key,
         message:
           "Accept this coverage request? The request will move forward for manager review if approval is required.",
@@ -80,7 +71,6 @@ export function getMobileRequestActionFeedback({
     case "decline":
       return {
         confirmLabel: "Decline",
-        confirmPendingLabel: "Declining",
         confirmStyle: "destructive",
         key,
         message:
@@ -90,7 +80,6 @@ export function getMobileRequestActionFeedback({
     case "approve":
       return {
         confirmLabel: "Approve",
-        confirmPendingLabel: "Approving",
         key,
         message: "Approve this request? This will finalize the staffing change.",
         title: "Approve request?",
@@ -98,7 +87,6 @@ export function getMobileRequestActionFeedback({
     case "reject":
       return {
         confirmLabel: "Reject",
-        confirmPendingLabel: "Rejecting",
         confirmStyle: "destructive",
         key,
         message: "Reject this request? The original schedule will stay in place.",
@@ -107,7 +95,6 @@ export function getMobileRequestActionFeedback({
     case "cancel":
       return {
         confirmLabel: "Cancel request",
-        confirmPendingLabel: "Canceling request",
         confirmStyle: "destructive",
         key,
         message: "Cancel this request? It will no longer be available for review.",
@@ -116,7 +103,6 @@ export function getMobileRequestActionFeedback({
     default:
       return {
         confirmLabel: "Confirm",
-        confirmPendingLabel: "Confirming",
         key,
         message: "Confirm this request action?",
         title: "Confirm action?",

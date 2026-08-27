@@ -932,7 +932,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
                     >
                       <ButtonLoading
                         loading={openingCheckout || openingPortal}
-                        loadingLabel="Opening"
                         spinnerSize={15}
                         icon={<ExternalLink size={15} aria-hidden="true" />}
                       >

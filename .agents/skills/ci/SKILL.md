@@ -1,0 +1,161 @@
+---
+name: ci
+description: Set up or normalize automatic GitHub checks for a Blueprint project around one documented Verify command. Detects the real stack, package manager, existing checks, default branch, and workflows; preserves existing CI; combines only configured typecheck, test, and build commands; runs the command locally; and stops before push or remote ruleset changes. Use when the user runs /ci, invokes $ci, asks to add CI, set up GitHub Actions, add pull-request checks, or create automatic GitHub checks.
+---
+
+# ci - set up automatic GitHub checks
+
+**First action:** Before project inspection, preflight, or any other tool call,
+publish `running` to `blueprint/.state/run.json` using the dashboard activity
+contract in `AGENTS.md`.
+
+Where this sits in the workflow:
+
+    /onboard or /adopt  ->  [ci]  ->  Verify locally  ->  GitHub runs Verify
+    (project commands)     (setup)    (same recipe)      (pull requests)
+
+This skill gives local work and GitHub one shared automated command. It is an
+optional setup task, not a requirement for using the Blueprint.
+
+Keep the beginner explanation simple:
+
+- **Verify is the recipe.** It runs checks the project already has.
+- **GitHub Actions is the worker.** It runs the same recipe automatically.
+- **A GitHub ruleset is the lock.** That optional remote setting can require the
+  worker to report green before merge.
+
+This skill configures the recipe and worker. It never changes the remote ruleset,
+pushes, publishes, deploys, or adds local git hooks.
+
+## Input
+
+No argument is required. A named provider or workflow preference is a request to
+review, not permission to replace existing CI. This skill's default provider is
+GitHub Actions because it creates GitHub pull-request checks.
+
+## Step 1 - inspect without changing files
+
+Read enough to identify the real project setup:
+
+- `AGENTS.md`, especially Commands and any documented `Verify` command
+- package or language manifests and task-runner files
+- lockfiles and the package manager they imply
+- existing typecheck, test, build, lint, and other quality commands
+- test configuration and actual test files
+- runtime version files such as `.nvmrc`, `.node-version`, `.python-version`,
+  `go.mod`, or `rust-toolchain.toml`
+- `.github/workflows/` and any documented external CI
+- git's current branch, configured default branch, and remotes when available
+
+Do not assume npm, Node.js, `main`, or GitHub from the Blueprint template. Do not
+run installs or edit files during inspection.
+
+If an existing workflow already provides equivalent pull-request checks, explain
+what it runs. If it is healthy and aligned with a documented Verify command,
+report that no setup is needed. If normalization would change existing CI, show
+the proposed change and get explicit approval before editing it.
+
+## Step 2 - define one Verify command
+
+Build one command from meaningful checks that actually exist, in this order:
+
+1. typecheck
+2. tests, only when a runner and real test command are configured
+3. build
+
+Omit missing checks. Do not install a test runner, invent an empty test suite, or
+add a placeholder command. Lint, formatting, coverage, browser tests, security
+scans, dependency audits, and version matrices are not part of the beginner
+default. Preserve them when existing CI already requires them, and discuss any
+normalization before changing that behavior.
+
+For JavaScript and TypeScript, add or reuse a package script named `verify` and
+invoke it with the detected package manager. For other stacks, use the existing
+native task runner or the smallest clear combined command. Document the exact
+invocation as `Verify` in the Commands section of `AGENTS.md`.
+
+Examples are explanatory only. Never copy them without detecting the project:
+
+```text
+Verify: npm run verify
+Verify: make verify
+Verify: cargo test && cargo build --locked
+```
+
+If no meaningful check exists, stop and explain what is missing. Do not create a
+workflow that always passes.
+
+## Step 3 - create or align the workflow
+
+Create `.github/workflows/verify.yml` only when that path is free. If it already
+exists, never overwrite it silently. Show the exact proposed diff and ask before
+changing it.
+
+The workflow should contain only what the detected project needs:
+
+- a clear workflow name such as `Verify`
+- `pull_request`
+- pushes to the detected default branch
+- `permissions: contents: read`
+- the real runtime version
+- checkout and the appropriate runtime setup action
+- the lockfile-safe dependency install command
+- one final step that runs the exact `Verify` command from `AGENTS.md`
+
+If the default branch cannot be identified from git or project context, ask
+before writing the push trigger instead of guessing. Preserve all other workflow
+files. When another workflow overlaps, report the overlap and ask whether to
+reuse, align, or leave it alone.
+
+## Step 4 - prove the setup locally
+
+Run the exact documented `Verify` command locally. The individual build, test,
+or typecheck commands may still be run separately for diagnosis, but the final
+proof must use Verify because that is what GitHub will run.
+
+If Verify fails, report the failing subcommand and stop. Do not weaken the
+command, remove a legitimate check, or describe CI as ready.
+
+Do not push the workflow. A local workflow file does nothing on GitHub until the
+user later approves a push.
+
+## Step 5 - report
+
+Finish with a concise setup report:
+
+- existing CI found and whether it was preserved or changed
+- exact `Verify` command
+- checks included and checks omitted
+- test gate status
+- workflow path and triggers
+- local Verify result
+- files changed
+- any overlap, uncertainty, or follow-up
+
+Explain that making the GitHub check required is a separate remote ruleset choice
+after the workflow is pushed. Do not change repository settings or treat that as
+part of this skill.
+
+## Interaction with other skills
+
+- `/tests` adds the real test command to an existing Verify command, but never
+  creates CI by itself.
+- `/implement`, `/complete`, and `/autopilot` run Verify when it is documented,
+  with their existing fallback behavior when it is absent.
+- `/doctor` diagnoses drift between `AGENTS.md`, the project command, and the
+  workflow. Missing CI remains informational.
+
+## Rules
+
+- Preserve existing CI and custom checks.
+- Never invent tests or install a runner as part of CI setup.
+- Never add git hooks, coverage, browser tests, security scans, or matrices by
+  default.
+- Never push or change a remote ruleset without separate explicit approval.
+- Keep one exact Verify command shared by local work and GitHub.
+
+## Formatting
+
+Format the output to match the project's conventions in
+`blueprint/context/ai-interaction.md`: concise, scannable markdown, with lists for
+enumerations and tables for matrices rather than dense paragraphs.

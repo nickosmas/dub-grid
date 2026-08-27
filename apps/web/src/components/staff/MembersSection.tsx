@@ -951,9 +951,7 @@ export function MembersSection({
                 onClick={loadMoreDirectory}
                 disabled={directoryLoadingMore}
               >
-                <ButtonLoading loading={directoryLoadingMore} loadingLabel="Loading">
-                  Load more
-                </ButtonLoading>
+                <ButtonLoading loading={directoryLoadingMore}>Load more</ButtonLoading>
               </Button>
             </div>
           )}

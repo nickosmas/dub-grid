@@ -209,7 +209,6 @@ export function ManagementAccessSheet({
             disabled={!canSubmit}
             label="Save Access"
             loading={isPending}
-            loadingLabel="Saving"
             onPress={() => onSubmit(draft)}
             tone="primary"
           />
@@ -230,7 +229,6 @@ export function ManagementAccessSheet({
       <ConfirmationModal
         body="They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
         confirmLabel="Remove Access"
-        confirmPendingLabel="Removing"
         confirmTone="danger"
         loading={isPending}
         onCancel={() => setShowRemoveConfirmation(false)}

@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useEffect, useRef } from "react";
-import AuthSplash from "@/components/AuthSplash";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import {
   isAuthTransitionPending,
   useAuthTransitionPending,
@@ -59,10 +59,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.replace("/login");
   }, [isLoading, user]);
 
-  // Bridge a login navigation with the branded splash; otherwise render nothing
-  // (a sign-out redirects to /login instantly — no logo flash).
+  // A post-login session handoff is a real wait, not decorative chrome. Give
+  // the user progress text and, after 30 seconds, a safe exit rather than an
+  // unlabeled blank frame.
   if (isLoading || !user) {
-    return authTransitionPending ? <AuthSplash /> : null;
+    return authTransitionPending ? <AuthTransitionScreen phase="signing-in" /> : null;
   }
 
   return <>{children}</>;

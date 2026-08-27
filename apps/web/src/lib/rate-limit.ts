@@ -31,6 +31,11 @@ function createSlidingWindowLimiter(limit: number, window: `${number} ${"s" | "m
   return redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) }) : null;
 }
 
+function positiveEnvNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
  * Public API rate limiter — 10 requests per 10 seconds per key (IP).
  * Returns `{ success: true }` if Redis is not configured (local dev).
@@ -67,6 +72,22 @@ export const passwordResetLimiter = createSlidingWindowLimiter(5, "15 m");
  * Provides brute-force protection at the application level.
  */
 export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
+
+/**
+ * A broad burst ceiling that protects shared-office users without replacing
+ * per-account brute-force protection. Both values are intentionally tunable
+ * so production load testing can adjust capacity without code changes.
+ */
+export const loginIpLimiter = createSlidingWindowLimiter(
+  positiveEnvNumber("LOGIN_IP_LIMIT_PER_MINUTE", 120),
+  "1 m",
+);
+
+/** A global circuit breaker for auth-provider protection during sign-in spikes. */
+export const loginSurgeLimiter = createSlidingWindowLimiter(
+  positiveEnvNumber("LOGIN_GLOBAL_LIMIT_PER_10_SECONDS", 500),
+  "10 s",
+);
 
 /**
  * Per-TARGET-email limiter — 5 emails per hour to a single recipient, keyed by

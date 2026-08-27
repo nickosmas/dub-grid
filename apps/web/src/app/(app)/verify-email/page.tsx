@@ -11,6 +11,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import Link from "next/link";
 import { resendBrowserSignupEmail, subscribeToBrowserAuthChanges } from "@/features/account/client";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 
 function VerifyEmailContent() {
   const [email, setEmail] = useState<string | null>(null);
@@ -73,10 +74,10 @@ function VerifyEmailContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
+        <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         <AuthStateCard
           icon="mail"
@@ -100,7 +101,6 @@ function VerifyEmailContent() {
             >
               <ButtonLoading
                 loading={resending}
-                loadingLabel="Sending"
                 spinnerColor="var(--dg-color-text-muted)"
                 spinnerSize={20}
               >

@@ -149,12 +149,7 @@ export default function GridmasterComplianceView({
           onClick={() => setExportConfirm(true)}
           disabled={exporting}
         >
-          <ButtonLoading
-            loading={exporting}
-            loadingLabel="Exporting"
-            spinnerSize={16}
-            icon={<Upload size={16} />}
-          >
+          <ButtonLoading loading={exporting} spinnerSize={16} icon={<Upload size={16} />}>
             Export High-Risk Audit
           </ButtonLoading>
         </Button>
@@ -334,7 +329,6 @@ export default function GridmasterComplianceView({
           title="Export High-Risk Audit"
           message="Export up to 1,000 high-risk activity records?"
           confirmLabel="Export"
-          confirmPendingLabel="Exporting"
           variant="warning"
           isLoading={exporting}
           onConfirm={handleExportHighRisk}

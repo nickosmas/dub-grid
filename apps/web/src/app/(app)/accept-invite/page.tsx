@@ -6,6 +6,7 @@ import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
@@ -195,10 +196,10 @@ function AcceptInviteContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
+        <ApexLandingLink className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
-        </div>
+        </ApexLandingLink>
 
         {state === "loading" || state === "processing" ? (
           <AuthStateCard
@@ -366,7 +367,6 @@ function AcceptInviteContent() {
               >
                 <ButtonLoading
                   loading={loading}
-                  loadingLabel={existingAccount ? "Signing In" : "Setting Password"}
                   spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >

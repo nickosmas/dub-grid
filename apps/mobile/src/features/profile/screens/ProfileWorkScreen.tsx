@@ -548,7 +548,6 @@ export default function ProfileWorkScreen() {
               : "Your changes will be saved."
         }
         confirmLabel={isNameRequest ? "Send request" : "Save"}
-        confirmPendingLabel={isNameRequest ? "Sending" : "Saving"}
         loading={saveMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={() => {
@@ -780,7 +779,6 @@ function EditPanel({
           disabled={saving || !hasChanges || hasValidationErrors}
           label={isNameRequest ? "Send request" : "Save changes"}
           loading={saving}
-          loadingLabel={isNameRequest ? "Sending" : "Saving"}
           onPress={onSave}
         />
         <Button
