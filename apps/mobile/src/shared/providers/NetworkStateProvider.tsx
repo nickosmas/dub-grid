@@ -158,3 +158,18 @@ export function useNetworkStatus() {
 
   return context;
 }
+
+/**
+ * For full-screen recovery UI that can also render in an isolated route error
+ * boundary or test harness. Unknown connectivity is treated as online so the
+ * UI stays actionable; the provider supplies the real state in the app tree.
+ */
+export function useOptionalNetworkStatus(): NetworkStatusContextValue {
+  return (
+    useContext(NetworkStatusContext) ?? {
+      hasResolvedState: false,
+      isOnline: true,
+      isOffline: false,
+    }
+  );
+}

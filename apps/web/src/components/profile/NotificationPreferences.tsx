@@ -301,7 +301,6 @@ export function NotificationPreferences({
           <Button onClick={save} disabled={!hasChanges || saving} className="dg-btn dg-btn-primary">
             <ButtonLoading
               loading={saving}
-              loadingLabel="Saving"
               spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={14}
             >

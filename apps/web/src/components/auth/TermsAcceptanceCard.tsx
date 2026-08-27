@@ -76,7 +76,6 @@ export default function TermsAcceptanceCard({
         >
           <ButtonLoading
             loading={loading}
-            loadingLabel="Accepting"
             spinnerColor="var(--dg-color-text-inverse)"
             spinnerSize={18}
           >

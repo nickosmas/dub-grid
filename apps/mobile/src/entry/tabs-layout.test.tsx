@@ -162,24 +162,22 @@ describe("TabsLayout", () => {
     });
   });
 
-  // StartupSplashGate, above the router, owns the app's one splash and is still
-  // covering the screen whenever this is reached on a cold launch. Rendering a
-  // second instance here restarted the brand animation mid-handoff, which is
-  // what read as the splash showing twice.
-  it("renders nothing rather than a second splash while the session is restoring", () => {
+  // StartupSplashGate owns the native launch splash, but a post-launch session
+  // handoff must still explain itself instead of rendering a blank frame.
+  it("shows a labeled handoff while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
-    const { container } = render(<TabsLayout />);
+    render(<TabsLayout />);
 
     expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText("Preparing your Organization")).toBeInTheDocument();
   });
 
   // Holding here is what keeps the Home tab from picking a screen (and a
   // skeleton shape) before it knows whether this is an admin. Every
   // `canView*` permission is also false until bootstrap lands, so releasing
   // early made the tab bar itself pop tabs in afterwards.
-  it("keeps blocking until bootstrap resolves, not just the session", () => {
+  it("keeps a labeled recovery state until bootstrap resolves", () => {
     useBootstrap.mockReturnValue({
       data: undefined,
       error: null,
@@ -188,9 +186,9 @@ describe("TabsLayout", () => {
       refetch: vi.fn(),
     });
 
-    const { container } = render(<TabsLayout />);
+    render(<TabsLayout />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText("Preparing your Organization")).toBeInTheDocument();
     expect(stackScreenMock).not.toHaveBeenCalled();
   });
 
@@ -365,6 +363,7 @@ describe("TabsLayout", () => {
       error: new Error(
         "Organization unavailable. Sign in on the web to finish organization setup.",
       ),
+      isError: true,
       isFetching: false,
       refetch,
     });

@@ -58,7 +58,6 @@ describe("ConfirmDialog", () => {
         title="Delete shift?"
         message="This cannot be undone."
         confirmLabel="Delete"
-        confirmPendingLabel="Deleting"
         onConfirm={onConfirm}
         onCancel={vi.fn()}
       />,
@@ -73,7 +72,7 @@ describe("ConfirmDialog", () => {
     });
 
     expect(onConfirm).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: /Deleting/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Delete/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
 
     await act(async () => {
@@ -87,7 +86,6 @@ describe("ConfirmDialog", () => {
         title="Remove member?"
         message="They lose access immediately."
         confirmLabel="Remove"
-        confirmPendingLabel="Removing"
         // The pending flag lives outside this dialog, keyed by row, so the
         // dialog must defer to it rather than to its own idle latch.
         isLoading
@@ -96,6 +94,6 @@ describe("ConfirmDialog", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Removing/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Remove/ })).toBeDisabled();
   });
 });

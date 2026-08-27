@@ -37,6 +37,8 @@ import {
 } from "./shared";
 import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
 
+const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
+
 /**
  * What the server already knows about this subdomain. A subdomain with no
  * organization never reaches this component — app/login/page.tsx redirects it
@@ -138,6 +140,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
+  const [gridmasterPortalRequired, setGridmasterPortalRequired] = useState(false);
   // Seeded from the server, which already resolved this subdomain (see
   // app/login/page.tsx). That is what keeps the heading from painting the raw
   // slug first: a client-only source — an effect, `typeof window`, localStorage
@@ -190,6 +193,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setGridmasterPortalRequired(false);
 
     try {
       // The server route does the whole post-sign-in sequence: re-scoping the
@@ -220,6 +224,12 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         }
         if (res.status === 403 && result.code === ACCOUNT_DISABLED_CODE) {
           setAccountDisabled(true);
+          setPassword("");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result.code === GRIDMASTER_PORTAL_REQUIRED_CODE) {
+          setGridmasterPortalRequired(true);
           setPassword("");
           setLoading(false);
           return;
@@ -373,6 +383,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   // and only picks up the param once the client-only effect has run.
   const apexOrigin = `${protocol}//${baseDomain}${parsed?.port ?? ""}`;
   const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
+  const gridmasterPortalHref = `${protocol}//gridmaster.${baseDomain}${parsed?.port ?? ""}/login`;
 
   if (mfaRequired) {
     return (
@@ -406,9 +417,16 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
             loading={loading}
             onSubmit={handleSubmit}
             submitLabel="Sign In"
-            submitPendingLabel="Signing In"
             forgotPasswordHref="/forgot-password"
           />
+
+          {gridmasterPortalRequired ? (
+            <p className="dg-form-hint dg-auth-progress" role="alert">
+              This account uses the Gridmaster Portal.{" "}
+              <a href={gridmasterPortalHref}>Open portal</a> to sign in and impersonate an
+              organization.
+            </p>
+          ) : null}
 
           <div className="dg-auth-org-navigation">
             <Button

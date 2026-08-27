@@ -1,19 +1,15 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedUserWithClaims = vi.fn();
+const requireOrgPermissions = vi.fn();
 const serviceFrom = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: () => null,
 }));
 
-vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
-}));
-
-vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({ from: serviceFrom }),
+vi.mock("@/app/api/shared/permissions", () => ({
+  requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
 import { POST } from "./route";
@@ -25,13 +21,12 @@ const OTHER_ORG_USER_ID = "33333333-3333-4333-8333-333333333333";
 
 // Each table gets a queue of results; the query builder is both awaitable
 // (profiles/employees end on `.in(...)`) and supports `.maybeSingle()` (the
-// viewer-membership access check). organization_memberships is queried
-// twice per request now (viewer access check, then the ids-scoping query),
-// so tests that use it enqueue two results in order.
+// ids-scoping query.
 const tableResults = new Map<string, Array<{ data: unknown; error: unknown }>>();
 // Records the args passed to `.in(...)` per table, in call order, so tests
 // can assert which ids actually reached a given table's query.
 const inCalls = new Map<string, unknown[][]>();
+const orgIdCalls: string[] = [];
 
 function enqueue(table: string, ...results: Array<{ data: unknown; error?: unknown }>) {
   tableResults.set(
@@ -47,7 +42,10 @@ function nextResult(table: string) {
 function makeQuery(table: string) {
   const query = {
     select: vi.fn(() => query),
-    eq: vi.fn(() => query),
+    eq: vi.fn((column: string, value: unknown) => {
+      if (column === "org_id") orgIdCalls.push(value as string);
+      return query;
+    }),
     in: vi.fn((_column: string, values: unknown[]) => {
       const calls = inCalls.get(table) ?? [];
       calls.push(values);
@@ -75,22 +73,18 @@ describe("POST /api/schedule/actor-names", () => {
     vi.clearAllMocks();
     tableResults.clear();
     inCalls.clear();
+    orgIdCalls.length = 0;
     serviceFrom.mockImplementation((table: string) => makeQuery(table));
-    requireAuthenticatedUserWithClaims.mockResolvedValue({
-      user: { id: VIEWER_ID, email: "viewer@example.com" },
-      session: { access_token: "test-token" },
-      claims: { sub: VIEWER_ID, org_id: ORG_ID, platform_role: "none" },
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: VIEWER_ID, email: "viewer@example.com" },
+      orgId: ORG_ID,
+      serviceClient: { from: serviceFrom },
     });
   });
 
   it("resolves names only for profile ids found for the requested org", async () => {
-    // Viewer is a member of the org -> access granted. Second result is the
-    // ids-scoping query: only the same-org id is an active member.
-    enqueue(
-      "organization_memberships",
-      { data: { user_id: VIEWER_ID } },
-      { data: [{ user_id: SAME_ORG_USER_ID }] },
-    );
+    // The ids-scoping query only reports the same-org member.
+    enqueue("organization_memberships", { data: [{ user_id: SAME_ORG_USER_ID }] });
     enqueue("profiles", {
       data: [{ id: SAME_ORG_USER_ID, first_name: "Ada", last_name: "Lovelace" }],
     });
@@ -108,11 +102,7 @@ describe("POST /api/schedule/actor-names", () => {
   it("never queries profiles with a cross-org id, even if the caller requests one", async () => {
     // The ids-scoping query only reports SAME_ORG_USER_ID as a member —
     // OTHER_ORG_USER_ID must never reach the profiles.in(...) call.
-    enqueue(
-      "organization_memberships",
-      { data: { user_id: VIEWER_ID } },
-      { data: [{ user_id: SAME_ORG_USER_ID }] },
-    );
+    enqueue("organization_memberships", { data: [{ user_id: SAME_ORG_USER_ID }] });
     enqueue("profiles", {
       data: [{ id: SAME_ORG_USER_ID, first_name: "Ada", last_name: "Lovelace" }],
     });
@@ -127,7 +117,7 @@ describe("POST /api/schedule/actor-names", () => {
   });
 
   it("returns no name for arbitrary ids the org has no record of", async () => {
-    enqueue("organization_memberships", { data: { user_id: VIEWER_ID } }, { data: [] });
+    enqueue("organization_memberships", { data: [] });
     enqueue("profiles", { data: [] });
     enqueue("employees", { data: [] });
 
@@ -139,12 +129,40 @@ describe("POST /api/schedule/actor-names", () => {
     expect(inCalls.get("profiles") ?? []).toHaveLength(0);
   });
 
-  it("forbids a non-gridmaster viewer who is not a member of the org", async () => {
-    enqueue("organization_memberships", { data: null });
+  it("returns the shared guard's membership rejection", async () => {
+    requireOrgPermissions.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ error: "Not an organization member." }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    });
 
     const response = await POST(makeRequest([SAME_ORG_USER_ID]));
 
     expect(response.status).toBe(403);
     expect(serviceFrom).not.toHaveBeenCalledWith("profiles");
+  });
+
+  it("uses the Test Sandbox id returned by the shared guard for every org-scoped read", async () => {
+    const SANDBOX_ORG_ID = "55555555-5555-4555-8555-555555555555";
+    requireOrgPermissions.mockResolvedValueOnce({
+      actor: { id: VIEWER_ID, email: "viewer@example.com" },
+      orgId: SANDBOX_ORG_ID,
+      serviceClient: { from: serviceFrom },
+    });
+    enqueue("organization_memberships", { data: [] });
+    enqueue("employees", { data: [] });
+
+    const response = await POST(makeRequest([SAME_ORG_USER_ID]));
+
+    expect(response.status).toBe(200);
+    expect(orgIdCalls).toContain(SANDBOX_ORG_ID);
+    expect(orgIdCalls).not.toContain(ORG_ID);
+    expect(requireOrgPermissions).toHaveBeenCalledWith(
+      expect.anything(),
+      ORG_ID,
+      expect.any(Function),
+      { allowDuringSetup: true, allowLockedOrganization: true },
+    );
   });
 });

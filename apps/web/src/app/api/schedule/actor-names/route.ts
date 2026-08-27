@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServiceClient } from "@/lib/supabase-service";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 
 const actorNamesSchema = z.object({
   orgId: z.string().uuid(),
@@ -16,33 +15,11 @@ function formatDisplayName(firstName: string | null, lastName: string | null): s
   return name || null;
 }
 
-async function ensureViewerCanAccessOrg(orgId: string, userId: string): Promise<boolean> {
-  const serviceClient = getServiceClient();
-  const { data, error } = await serviceClient
-    .from("organization_memberships")
-    .select("user_id")
-    .eq("org_id", orgId)
-    .eq("user_id", userId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return !!data;
-}
-
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUserWithClaims(req);
-    if ("response" in auth) {
-      return auth.response;
-    }
-
     let body: unknown;
     try {
       body = await req.json();
@@ -55,15 +32,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
-    if (auth.claims.platform_role !== "gridmaster") {
-      const hasAccess = await ensureViewerCanAccessOrg(parsed.data.orgId, auth.user.id);
-      if (!hasAccess) {
-        return NextResponse.json({ error: API_ERRORS.NOT_ORG_MEMBER }, { status: 403 });
-      }
+    // Route this read through the shared guard as well as mutations. It
+    // verifies membership and archive state and, crucially, redirects a
+    // sandboxed caller to their owned Test Sandbox before service-role reads.
+    const orgAuth = await requireOrgPermissions(req, parsed.data.orgId, () => true, {
+      allowDuringSetup: true,
+      allowLockedOrganization: true,
+    });
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
 
     const ids = Array.from(new Set(parsed.data.ids));
-    const serviceClient = getServiceClient();
+    const { orgId, serviceClient } = orgAuth;
 
     // profiles is a global (not per-org) table, so scope the lookup to ids
     // that are actually members of orgId first — otherwise any org member
@@ -71,7 +52,7 @@ export async function POST(req: NextRequest) {
     const { data: memberships, error: membershipError } = await serviceClient
       .from("organization_memberships")
       .select("user_id")
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", orgId)
       .in("user_id", ids)
       .is("archived_at", null);
 
@@ -109,7 +90,7 @@ export async function POST(req: NextRequest) {
       const { data: employees, error: employeeError } = await serviceClient
         .from("employees")
         .select("user_id, first_name, last_name")
-        .eq("org_id", parsed.data.orgId)
+        .eq("org_id", orgId)
         .in("user_id", unresolvedIds);
 
       if (employeeError) {

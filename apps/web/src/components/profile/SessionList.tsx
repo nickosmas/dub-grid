@@ -192,7 +192,7 @@ function SessionRow({
           className="dg-btn dg-btn-ghost dg-btn-xs"
           style={{ color: "var(--dg-color-danger)", flexShrink: 0 }}
         >
-          <ButtonLoading loading={revoking} loadingLabel="Signing out" spinnerSize={14}>
+          <ButtonLoading loading={revoking} spinnerSize={14}>
             Sign out
           </ButtonLoading>
         </Button>

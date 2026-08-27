@@ -99,7 +99,6 @@ import {
 } from "@/lib/client-facing";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
-import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
 import {
   archiveGridmasterOrganization,
   assignGridmasterOrgRoleByEmail,
@@ -121,8 +120,7 @@ export type OrganizationDetailTab =
   | "config"
   | "activity"
   | "invitations"
-  | "schedule"
-  | "features";
+  | "schedule";
 
 const TABS: { id: OrganizationDetailTab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -133,7 +131,6 @@ const TABS: { id: OrganizationDetailTab; label: string }[] = [
   { id: "activity", label: "Activity" },
   { id: "invitations", label: "Invitations" },
   { id: "schedule", label: "Schedule" },
-  { id: "features", label: "Runtime" },
 ];
 
 // A trialing org with no end date hasn't started its trial yet: show "Trial
@@ -408,14 +405,6 @@ export default function OrganizationDetail({
                 value={String(orgHealthQuery.data.supportSnapshot.scheduleCellsCreated30d)}
               />
               <InfoRow
-                label="Runtime overrides"
-                value={
-                  Object.keys(orgHealthQuery.data.featureOverrides).length
-                    ? Object.keys(orgHealthQuery.data.featureOverrides).join(", ")
-                    : "None"
-                }
-              />
-              <InfoRow
                 label="Risk flags"
                 value={
                   orgHealthQuery.data.riskFlags.length
@@ -555,9 +544,6 @@ export default function OrganizationDetail({
           orgId={organization.id}
           payPeriodStartDate={organization.payPeriodStartDate}
         />
-      )}
-      {!tabLoading && tab === "features" && (
-        <FeatureFlagsEditor organization={organization} onUpdated={onOrgUpdated} />
       )}
     </div>
   );

@@ -1,36 +1,51 @@
 "use client";
 
-import { Children, isValidElement, type ReactNode as RN } from "react";
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from "react";
+import { Children, cloneElement, Fragment, isValidElement, type ReactNode as RN } from "react";
+import type { ButtonHTMLAttributes, MouseEvent, ReactElement, ReactNode, Ref } from "react";
 
 import ButtonSpinner, { ButtonLoading } from "@/components/ButtonSpinner";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 /**
- * Whether the children already render a spinner of their own.
+ * Renders a nested loading wrapper as the button's sole spinner source.
  *
  * Most buttons that predate this component wire `<ButtonLoading>` themselves
- * from a local `saving` flag. That flag is set inside the very handler the
- * latch is holding, so the two are busy over the same span and the automatic
- * spinner would land beside the hand-wired one -- two spinners on one button.
- * Deferring to theirs keeps the wording they chose, which is better than what
- * this component can infer.
+ * from a local pending flag. That wrapper stays the single spinner source;
+ * when this button's latch starts first, it promotes the wrapper into loading.
  */
-function rendersOwnSpinner(node: RN, depth = 0): boolean {
-  if (depth > 6) return false;
-  return Children.toArray(node).some((child) => {
-    if (!isValidElement(child)) return false;
-    // A bare spinner is always spinning. A `<ButtonLoading>` only is when its
-    // own flag says so, and that distinction matters: a hand-wired flag that
-    // covers a shorter span than the latch would otherwise leave the button
-    // with no spinner at all for the rest of the request.
-    if (child.type === ButtonSpinner) return true;
-    if (child.type === ButtonLoading) {
-      return Boolean((child.props as { loading?: boolean }).loading);
+function renderWithOwnSpinner(
+  node: RN,
+  busy: boolean,
+  depth = 0,
+): { hasSpinner: boolean; node: RN } {
+  if (depth > 6) return { hasSpinner: false, node };
+  let hasSpinner = false;
+  const rendered = Children.map(node, (child) => {
+    if (!isValidElement(child)) return child;
+    if (child.type === ButtonSpinner) {
+      hasSpinner = true;
+      return child;
     }
+    if (child.type === ButtonLoading) {
+      hasSpinner = true;
+      const loadingChild = child as ReactElement<{ loading: boolean }>;
+      return cloneElement(loadingChild, {
+        loading: busy || Boolean(loadingChild.props.loading),
+      });
+    }
+    // Only structural wrappers can be safely cloned. Component children may
+    // contain render props (Base UI's `render`, for example) that must retain
+    // their exact shape, so ButtonLoading stays a direct/structural child.
+    if (child.type !== Fragment && typeof child.type !== "string") return child;
     const nested = (child.props as { children?: RN })?.children;
-    return nested != null && rendersOwnSpinner(nested, depth + 1);
+    if (nested == null) return child;
+    const renderedNested = renderWithOwnSpinner(nested, busy, depth + 1);
+    hasSpinner ||= renderedNested.hasSpinner;
+    return renderedNested.node === nested
+      ? child
+      : cloneElement(child, undefined, renderedNested.node);
   });
+  return { hasSpinner, node: rendered };
 }
 
 type NativeButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">;
@@ -51,14 +66,13 @@ type NativeButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"
  * too late.
  *
  * It also always looks busy while it works. A running latch shows a spinner
- * on its own, so no button can sit there dead during a slow request, and
- * `loadingLabel` upgrades that to the proper wording -- the same verb in
- * progress, `[spinner] Confirming` rather than `[spinner] Confirm`. That
- * default matters because most handlers arrive as props typed `=> void`,
- * where nothing at the call site can tell you whether work is async; making
- * the spinner opt-out rather than opt-in is what stops a button being missed.
- * A button already wiring its own `<ButtonLoading>` is detected and left
- * alone, so its spinner is the only one -- no call site has to opt out.
+ * beside the unchanged action label, so no button can sit there dead during a
+ * slow request. That default matters because most handlers arrive as props
+ * typed `=> void`, where nothing at the call site can tell you whether work is
+ * async; making the spinner opt-out rather than opt-in is what stops a button
+ * being missed.
+ * A button already wiring its own `<ButtonLoading>` uses that wrapper as the
+ * single spinner source, so no call site has to opt out.
  *
  * A synchronous `onClick` is left completely alone, which is what makes this
  * safe to swap in anywhere.
@@ -67,7 +81,6 @@ export function Button({
   onClick,
   disabled,
   loading,
-  loadingLabel,
   spinner,
   icon,
   spinnerSize,
@@ -75,12 +88,6 @@ export function Button({
   ...rest
 }: NativeButtonProps & {
   onClick?: (event: MouseEvent<HTMLButtonElement>) => unknown;
-  /**
-   * What the button says while its action runs: the same verb in progress
-   * ("Saving", not "Save"), keeping whatever the label names ("Saving Draft").
-   * Supplying it is what turns the spinner on.
-   */
-  loadingLabel?: string;
   /**
    * A pending state that lives outside this button -- a mutation's
    * `isPending`, or a flag set by a confirmation step that finishes the work
@@ -103,6 +110,7 @@ export function Button({
 }) {
   const action = useAsyncAction(onClick ?? (() => {}));
   const busy = loading || action.isRunning;
+  const spinnerChildren = renderWithOwnSpinner(children, Boolean(busy && spinner !== false));
 
   return (
     <button
@@ -113,20 +121,7 @@ export function Button({
       onClick={action.run}
       aria-busy={busy || undefined}
     >
-      {loadingLabel ? (
-        <ButtonLoading
-          loading={busy}
-          loadingLabel={loadingLabel}
-          icon={icon}
-          spinnerSize={spinnerSize}
-        >
-          {children}
-        </ButtonLoading>
-      ) : busy && spinner !== false && !rendersOwnSpinner(children) ? (
-        // No `loadingLabel`, but the action is running, so the button still
-        // has to look busy rather than merely dead. The label is kept as-is
-        // instead of being swapped -- worse wording than a proper
-        // `loadingLabel`, better than a control that shows nothing at all.
+      {busy && spinner !== false && !spinnerChildren.hasSpinner ? (
         <>
           <ButtonSpinner size={spinnerSize} />
           {children}
@@ -134,7 +129,7 @@ export function Button({
       ) : (
         <>
           {icon}
-          {children}
+          {spinnerChildren.node}
         </>
       )}
     </button>

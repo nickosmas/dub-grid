@@ -213,7 +213,6 @@ export default function ProfileSecurityScreen() {
                 }
                 label="Request account deletion"
                 loading={deletionRequestMutation.isPending}
-                loadingLabel="Requesting"
                 onPress={() => setIsConfirmingDeletion(true)}
                 tone="danger"
               />
@@ -224,7 +223,6 @@ export default function ProfileSecurityScreen() {
       <ConfirmationModal
         body="Your admin will be notified to start the deletion process."
         confirmLabel="Request"
-        confirmPendingLabel="Requesting"
         confirmTone="danger"
         loading={deletionRequestMutation.isPending}
         onCancel={() => setIsConfirmingDeletion(false)}

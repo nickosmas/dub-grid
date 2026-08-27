@@ -11,8 +11,6 @@ interface StepLayoutProps {
   onNext?: () => void;
   onBack?: () => void;
   nextLabel?: string;
-  /** What Next says while the step saves, beside its spinner. */
-  nextPendingLabel?: string;
   backLabel?: string;
   nextDisabled?: boolean;
   nextLoading?: boolean;
@@ -28,7 +26,6 @@ export default function StepLayout({
   onNext,
   onBack,
   nextLabel = "Continue",
-  nextPendingLabel = "Saving",
   backLabel = "Back",
   nextDisabled = false,
   nextLoading = false,
@@ -128,7 +125,6 @@ export default function StepLayout({
           >
             <ButtonLoading
               loading={nextLoading}
-              loadingLabel={nextPendingLabel}
               spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={18}
             >

@@ -162,6 +162,7 @@ import {
 } from "./_lib/editor-session";
 import {
   clampProgress,
+  buildEmployeeNameById,
   daysBetweenDateKeys,
   DRAFT_CHANGED_BROADCAST_KEY,
   FETCH_WINDOW_RECENTER_BUFFER_DAYS,
@@ -285,7 +286,22 @@ function SchedulerContent() {
   } = useOrganizationData();
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
-  const { employees, loading: empLoading } = useEmployees(orgId ?? org?.id ?? null);
+  const {
+    employees,
+    inactiveEmployees,
+    removedEmployees,
+    loading: empLoading,
+  } = useEmployees(orgId ?? org?.id ?? null);
+  // Assignment controls stay active-staff-only. Historical schedule feedback
+  // still needs names for every employee referenced by an older schedule.
+  const employeeDirectory = useMemo(
+    () => [...employees, ...inactiveEmployees, ...removedEmployees],
+    [employees, inactiveEmployees, removedEmployees],
+  );
+  const employeeNameById = useMemo(
+    () => buildEmployeeNameById(employeeDirectory),
+    [employeeDirectory],
+  );
   const segmentCompatibility = useMemo(
     () =>
       createShiftJobCompatibilityMaps({
@@ -893,7 +909,7 @@ function SchedulerContent() {
     org,
     spanWeeks,
     weekStart,
-    employees,
+    employeeNameById,
     refetchScheduleData,
     startScheduleOperation,
     updateScheduleOperation,
@@ -5692,15 +5708,16 @@ function SchedulerContent() {
                     className="dg-draft-banner-dot"
                     style={{ background: "var(--dg-color-info-text)" }}
                   />
-                  <span style={{ fontWeight: 600 }}>Also unpublished nearby:</span>
+                  <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
                   <span style={{ opacity: 0.85 }}>
                     {(() => {
                       const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
                       const unit =
                         spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                       // Counted from the loaded window only, so it can shrink
-                      // after a far jump recenters the fetch. Saying "nearby"
-                      // keeps that from reading as "nothing left to publish".
+                      // after a far jump recenters the fetch. Referencing other
+                      // weeks makes the schedule relationship clear without
+                      // implying a physical location.
                       return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} within the loaded dates (${outOfWindowDraftGroupRanges.join(", ")})`;
                     })()}
                   </span>
@@ -6324,7 +6341,6 @@ function SchedulerContent() {
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
                 confirmLabel="Volunteer"
-                confirmPendingLabel="Volunteering"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
@@ -6842,7 +6858,6 @@ function SchedulerContent() {
                   : `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
               }
               confirmLabel="Publish"
-              confirmPendingLabel="Publishing"
               variant={allCoverageGaps.length > 0 ? "warning" : "info"}
               isLoading={isPublishing}
               onConfirm={() => {
@@ -6858,7 +6873,6 @@ function SchedulerContent() {
               title="Auto Fill Shifts?"
               message={`This will fill ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring templates. Existing visible shifts will not be overwritten.`}
               confirmLabel="Fill Shifts"
-              confirmPendingLabel="Filling"
               variant="info"
               isLoading={isApplyingRecurring}
               onConfirm={handleApplyRecurring}
@@ -6892,18 +6906,14 @@ function SchedulerContent() {
                   breakdown.imported === 1 ? "" : "s"
                 } from ${sourceRange} into ${targetRange}.`;
                 if (breakdown.totalSkipped === 0) return copyLine;
-                const nameByEmpId = new Map(
-                  employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
-                );
                 const description = formatImportPreviousSkipDescription(
                   outcomes,
                   breakdown,
-                  nameByEmpId,
+                  employeeNameById,
                 );
                 return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
               })()}
               confirmLabel="Import Shifts"
-              confirmPendingLabel="Importing"
               variant="info"
               isLoading={isImportingPrevious}
               onConfirm={handleImportPrevious}
@@ -6916,7 +6926,7 @@ function SchedulerContent() {
               targetRange={importResults.targetRange}
               outcomes={importResults.outcomes}
               breakdown={importResults.breakdown}
-              nameByEmpId={new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]))}
+              nameByEmpId={employeeNameById}
               onClose={closeImportResults}
             />
           )}
@@ -6946,7 +6956,7 @@ function SchedulerContent() {
               shiftCategories={shiftCategories}
               jobs={jobs}
               focusAreas={focusAreas}
-              employees={employees}
+              employees={employeeDirectory}
               absenceTypes={allAbsenceTypes}
             />
           )}

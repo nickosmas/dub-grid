@@ -1798,9 +1798,20 @@ function AdminHomeScreenMockup() {
   );
 }
 
-export default function MobileAppMockup() {
+type MobileMockupScreen = "home" | "schedule" | "requests";
+
+type MobileAppMockupProps = {
+  className?: string;
+  screens?: MobileMockupScreen[];
+};
+
+export default function MobileAppMockup({
+  className = "",
+  screens = ["home", "schedule", "requests"],
+}: MobileAppMockupProps) {
   return (
     <div
+      className={className}
       style={{
         display: "flex",
         flexWrap: "wrap",
@@ -1809,15 +1820,29 @@ export default function MobileAppMockup() {
         alignItems: "flex-start",
       }}
     >
-      <Phone active="Home">
-        <AdminHomeScreenMockup />
-      </Phone>
-      <Phone active="Schedule">
-        <ScheduleScreen />
-      </Phone>
-      <Phone active="Requests">
-        <RequestsScreen />
-      </Phone>
+      {screens.map((screen) => {
+        if (screen === "home") {
+          return (
+            <Phone key={screen} active="Home">
+              <AdminHomeScreenMockup />
+            </Phone>
+          );
+        }
+
+        if (screen === "schedule") {
+          return (
+            <Phone key={screen} active="Schedule">
+              <ScheduleScreen />
+            </Phone>
+          );
+        }
+
+        return (
+          <Phone key={screen} active="Requests">
+            <RequestsScreen />
+          </Phone>
+        );
+      })}
     </div>
   );
 }

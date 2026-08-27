@@ -6,7 +6,7 @@ import {
   ACCOUNT_DISABLED_MESSAGE,
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
-import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -53,6 +53,30 @@ type OrchestrationOutcome =
 
 /** Returned when the user cannot access the organization named by the host. */
 const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
+const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
+const GRIDMASTER_PORTAL_REQUIRED_MESSAGE =
+  "Gridmaster accounts must sign in through the Gridmaster Portal before impersonating an organization.";
+
+async function isGridmasterAccount(
+  userId: string,
+  claims: ReturnType<typeof decodeJwt>,
+): Promise<boolean> {
+  if (claims.platform_role === "gridmaster") return true;
+  // A present non-gridmaster claim came from the same access-token hook and is
+  // already authoritative for this session. Avoid an extra profile lookup on
+  // the normal organization-login path.
+  if (typeof claims.platform_role === "string") return false;
+
+  // A newly issued token can occasionally predate the custom access-token
+  // hook. Check the authoritative profile so that stale claims cannot let a
+  // Gridmaster enter an organization login flow before the token is refreshed.
+  const { data } = await getServiceClient()
+    .from("profiles")
+    .select("platform_role")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.platform_role === "gridmaster";
+}
 
 /**
  * Re-scope a newly-created session to the organization encoded in the request
@@ -128,8 +152,8 @@ async function orchestratePostSignIn(
   initialSession: SessionTokens,
   claims: ReturnType<typeof decodeJwt>,
   req: NextRequest,
+  isGridmaster: boolean,
 ): Promise<OrchestrationOutcome> {
-  const isGridmaster = claims.platform_role === "gridmaster";
   let session = initialSession;
   let effectiveClaims = claims;
   let didSwitchOrg = false;
@@ -259,24 +283,37 @@ export async function POST(req: NextRequest) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  const { limited, reset, misconfigured } = await timer.time("ratelimit", () =>
-    checkRateLimit(loginLimiter, `login:${emailHash}`),
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const limits = await timer.time("ratelimit", () =>
+    Promise.all([
+      checkRateLimit(loginLimiter, `login:email:${emailHash}`),
+      checkRateLimit(loginIpLimiter, `login:ip:${clientIp}`),
+      checkRateLimit(loginSurgeLimiter, "login:global"),
+    ]),
   );
 
-  if (misconfigured) {
+  if (limits.some((limit) => limit.misconfigured)) {
     return NextResponse.json(
       { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
 
-  if (limited) {
-    const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 900;
-    logger.warn({ emailHash, path: "/api/auth/login" }, "Login rate limited");
+  const limited = limits.filter((limit) => limit.limited);
+  if (limited.length > 0) {
+    const retryAfter = Math.max(
+      1,
+      ...limited.map((limit) => (limit.reset ? Math.ceil((limit.reset - Date.now()) / 1000) : 60)),
+    );
+    logger.warn(
+      { emailHash, path: "/api/auth/login", limitCount: limited.length },
+      "Login rate limited",
+    );
+    Sentry.captureMessage("Login load shed", "warning");
     return NextResponse.json(
       {
         success: false,
-        error: "Too many sign-in attempts. Wait a few minutes and try again.",
+        error: "Sign-in is busy right now. Please wait a moment and try again.",
         retryAfter,
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
@@ -351,11 +388,31 @@ export async function POST(req: NextRequest) {
   // ever calling setBrowserSession, so orchestration (which assumes a
   // fully-usable session) would be wasted work here.
   const emailConfirmed = !!data.user.email_confirmed_at;
+  const claims = decodeJwt(session.access_token);
+  const isGridmaster = await timer.time("gridmaster_login_intent", () =>
+    isGridmasterAccount(data.user.id, claims),
+  );
+  const loginHost = parseHost(req.headers.get("host") ?? "").subdomain;
+
+  // A Gridmaster's tenant access always starts from the platform portal and a
+  // verified impersonation session. Reject this before the browser receives
+  // tokens, including for MFA-enrolled accounts.
+  if (isGridmaster && loginHost !== "gridmaster") {
+    const res = NextResponse.json(
+      {
+        success: false,
+        code: GRIDMASTER_PORTAL_REQUIRED_CODE,
+        error: GRIDMASTER_PORTAL_REQUIRED_MESSAGE,
+      },
+      { status: 403 },
+    );
+    timer.applyTo(res.headers);
+    return res;
+  }
 
   if (!mfaRequired && emailConfirmed) {
-    const claims = decodeJwt(session.access_token);
     const outcome = await timer.time("post_signin_orchestration", () =>
-      orchestratePostSignIn(session, claims, req),
+      orchestratePostSignIn(session, claims, req, isGridmaster),
     );
     if (!outcome.ok) {
       const res = NextResponse.json(

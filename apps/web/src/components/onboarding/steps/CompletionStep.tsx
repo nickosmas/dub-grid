@@ -123,7 +123,6 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
       >
         <ButtonLoading
           loading={loading}
-          loadingLabel="Finishing"
           spinnerColor="var(--dg-color-text-inverse)"
           spinnerSize={20}
         >

@@ -7,7 +7,7 @@ describe("ButtonLoading", () => {
   it("renders the icon and the idle label when it is not loading", () => {
     render(
       <button>
-        <ButtonLoading loading={false} loadingLabel="Saving" icon={<Check data-testid="check" />}>
+        <ButtonLoading loading={false} icon={<Check data-testid="check" />}>
           Save
         </ButtonLoading>
       </button>,
@@ -18,20 +18,19 @@ describe("ButtonLoading", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("shows the spinner beside the label, never instead of it", () => {
+  it("shows the spinner beside the unchanged action label", () => {
     render(
       <button>
-        <ButtonLoading loading loadingLabel="Saving" icon={<Check data-testid="check" />}>
+        <ButtonLoading loading icon={<Check data-testid="check" />}>
           Save
         </ButtonLoading>
       </button>,
     );
 
     expect(screen.getByRole("status")).toBeInTheDocument();
-    // The wording moves to the action in progress, and the leading icon is the
-    // thing the spinner stands in for.
-    expect(screen.getByRole("button")).toHaveTextContent("Saving");
-    expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    // The spinner replaces the leading icon, but the action label stays stable.
+    expect(screen.getByRole("button")).toHaveTextContent("Save");
+    expect(screen.queryByText("Saving")).not.toBeInTheDocument();
     expect(screen.queryByTestId("check")).not.toBeInTheDocument();
   });
 });

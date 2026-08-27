@@ -10,27 +10,23 @@ export function MobileRealtimeProvider({ children }: PropsWithChildren) {
   const { accessToken, session } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const currentOrg = bootstrapQuery.data?.currentOrg ?? null;
-  const disabled = currentOrg?.featureFlags.disable_realtime === true;
   const userId = session?.user?.id ?? null;
 
   useMobileRealtimeInvalidation({
     accessToken,
     orgId: currentOrg?.id ?? null,
-    disabled,
     queryClient,
   });
 
   useMobileAccountRealtimeInvalidation({
     accessToken,
     userId,
-    disabled,
     queryClient,
   });
 
   useMobilePermissionsRealtime({
     accessToken,
     userId,
-    disabled,
     queryClient,
   });
 

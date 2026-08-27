@@ -1837,9 +1837,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <ConfirmationModal
           body={requestActionConfirmation?.feedback.message}
           confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
-          confirmPendingLabel={
-            requestActionConfirmation?.feedback.confirmPendingLabel ?? "Confirming"
-          }
           confirmTone={
             requestActionConfirmation?.feedback.confirmStyle === "destructive"
               ? "danger"
@@ -2847,7 +2844,6 @@ function OpenShiftsSection({
               <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
             loading={isVolunteerLoading}
-            loadingLabel="Volunteering"
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
                 return;
@@ -2941,7 +2937,6 @@ function OpenShiftsSection({
             />
           }
           loading={isClaimLoading}
-          loadingLabel="Claiming"
           onPress={() => onClaim(item.request.id)}
           tone="secondary"
         />
@@ -3174,14 +3169,12 @@ function ShiftCoverRequestsSection({
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
                     label="Accept"
                     loading={isAcceptLoading}
-                    loadingLabel="Accepting"
                     onPress={() => onRespond(request.id, true)}
                   />
                   <Button
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
                     label="Decline"
                     loading={isDeclineLoading}
-                    loadingLabel="Declining"
                     onPress={() => onRespond(request.id, false)}
                     tone="neutral"
                   />

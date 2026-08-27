@@ -1,7 +1,5 @@
 export const EDITOR_ACTION_LABELS = {
   save: "Save",
-  /** What the save button says while the save is in flight, beside its spinner. */
-  saving: "Saving",
   cancel: "Cancel",
   discard: "Discard",
   close: "Close",

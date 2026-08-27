@@ -114,7 +114,7 @@ export function EmployeeStatusActions({
             className="dg-btn dg-btn-ghost dg-btn-xs"
             style={{ color: "var(--dg-color-link)" }}
           >
-            <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
+            <ButtonLoading loading={revoking} spinnerSize={12}>
               Reinvite
             </ButtonLoading>
           </Button>
@@ -125,7 +125,7 @@ export function EmployeeStatusActions({
               className="dg-btn dg-btn-ghost dg-btn-xs"
               style={{ color: "var(--dg-color-danger)" }}
             >
-              <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
+              <ButtonLoading loading={revoking} spinnerSize={12}>
                 Revoke
               </ButtonLoading>
             </Button>
@@ -316,7 +316,6 @@ export function EmployeeStatusActions({
           confirmLabel={
             pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
           }
-          confirmPendingLabel={pendingInvitationAction === "reinvite" ? "Reissuing" : "Revoking"}
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revoking}
           onConfirm={() => handleConfirmInvitationAction()}

@@ -1,19 +1,16 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useOrganizationData, usePermissions } from "@/hooks";
-import { fetchOrganizationBilling } from "@/features/billing/client";
-import { useBillingRealtimeInvalidation } from "@/features/billing/useBillingRealtimeInvalidation";
 import {
-  fetchOnboardingStatus,
   isOnboardingComplete,
   getOnboardingPhase,
   freezeOnboardingPhase,
 } from "@/features/onboarding/client";
-import AuthSplash from "@/components/AuthSplash";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { useAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -78,7 +75,9 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
     // flashing the app/blank while perms resolve and the onboarding decision is
     // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
     // perms cached, so this branch isn't hit and nothing changes there.
-    if (authTransitionPending && !isPublicRoute(pathname)) return <AuthSplash />;
+    if (authTransitionPending && !isPublicRoute(pathname)) {
+      return <AuthTransitionScreen phase="signing-in" />;
+    }
     return <>{children}</>;
   }
   if (!user) return <>{children}</>;
@@ -89,12 +88,11 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
 
   // User is authenticated with an org — check onboarding status
   return (
-    <Suspense fallback={<AuthSplash />}>
+    <Suspense fallback={<AuthTransitionScreen phase="organization" />}>
       <OnboardingCheckWithSection
         userId={user.id}
         orgId={perms.orgId}
         role={perms.role}
-        isSuperAdmin={perms.isSuperAdmin}
         canManageOrg={perms.canManageOrg}
         pathname={pathname}
       >
@@ -111,6 +109,7 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
  */
 import OnboardingWizard from "./OnboardingWizard";
 import SetupPendingScreen from "./SetupPendingScreen";
+import OrganizationBootstrapRecovery from "./OrganizationBootstrapRecovery";
 
 function BillingRedirect() {
   const router = useRouter();
@@ -126,7 +125,6 @@ function OnboardingCheck({
   userId,
   orgId,
   role,
-  isSuperAdmin,
   canManageOrg,
   pathname,
   section,
@@ -135,54 +133,32 @@ function OnboardingCheck({
   userId: string;
   orgId: string;
   role: string;
-  isSuperAdmin: boolean;
   canManageOrg: boolean;
   pathname: string;
   section: string | null;
   children: React.ReactNode;
 }) {
-  useBillingRealtimeInvalidation(orgId);
-  const canRecoverBilling = isSuperAdmin;
-  const { data: billing, isLoading: billingLoading } = useQuery({
-    queryKey: queryKeys.org.billing(orgId),
-    queryFn: () => fetchOrganizationBilling(orgId),
-    enabled: canRecoverBilling,
-    staleTime: 30_000,
-  });
-  // These three start together rather than in sequence.
-  //
-  // Both used to be gated on `Boolean(billing)`, which for a super_admin — the
-  // only role that fetches billing at all — meant the org bootstrap and the
-  // onboarding check could not begin until the billing round trip came back.
-  // Every super_admin sign-in therefore paid billing *then* everything else,
-  // staring at AuthSplash for the sum rather than the longest of them.
-  //
-  // The gate bought only the avoidance of two requests for an org that turns
-  // out to be locked, which is rare, and neither endpoint enforces the lock
-  // anyway — the redirect below is what does. Trading a serial round trip on
-  // every sign-in for two wasted ones in a rare state is the wrong way round.
-  const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ["onboarding-status", userId, orgId],
-    queryFn: () => fetchOnboardingStatus(orgId),
-    staleTime: 30_000,
-  });
-
+  const queryClient = useQueryClient();
   const {
     org,
     setupStatus,
     loading: orgLoading,
+    loadError,
+    bootstrapRetryable,
+    entryGate,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
   });
+  const retryOrganizationBootstrap = useCallback(async () => {
+    await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
+  }, [queryClient]);
 
   // Consume the post-login auth-transition flag once we've reached a settled
   // state (onboarding already complete, or a final wizard/app decision). Done in
   // an effect, NOT during render, so a discarded concurrent/strict-mode render
   // can't clear the splash flag before the navigation that needs it. (M-5)
   const onboardingComplete = isOnboardingComplete(userId, orgId);
-  const reachedFinalDecision =
-    onboardingComplete ||
-    (!billingLoading && billing?.billingAccess.isLocked !== true && !statusLoading && !orgLoading);
+  const reachedFinalDecision = onboardingComplete || (!orgLoading && entryGate !== null);
   useEffect(() => {
     if (reachedFinalDecision) consumeAuthTransition();
   }, [reachedFinalDecision]);
@@ -191,6 +167,19 @@ function OnboardingCheck({
   // a refetch momentarily reads onboarding-status as not-completed. Closes the
   // config→orientation double-show race. (Server onboarding_completed_at remains
   // the cross-session source of truth for the queries above.)
+  // This check must come before the other gate-loading branches. A failed
+  // bootstrap has no organization for the wizard steps to render, and an
+  // in-flight billing or onboarding query would otherwise cover the page with
+  // AuthSplash while the client has no path to recover.
+  if (loadError && !org) {
+    return (
+      <OrganizationBootstrapRecovery
+        automaticallyRetry={bootstrapRetryable}
+        onRetry={retryOrganizationBootstrap}
+      />
+    );
+  }
+
   if (onboardingComplete) {
     return <>{children}</>;
   }
@@ -198,16 +187,14 @@ function OnboardingCheck({
   // Render the branded splash (not a blank frame) while these gate queries
   // resolve — this route bypasses ProtectedRoute's splash, so without it the
   // post-login screen flashes blank before the wizard mounts.
-  if (billingLoading) return <AuthSplash />;
-
-  if (billing?.billingAccess.isLocked) {
+  if (entryGate?.billingLocked) {
     if (isBillingRecoveryRoute(pathname, section)) {
       return <>{children}</>;
     }
     return <BillingRedirect />;
   }
 
-  if (statusLoading || orgLoading) return <AuthSplash />;
+  if (orgLoading || entryGate === null) return <AuthTransitionScreen phase="organization" />;
 
   // (auth-transition flag is consumed by the effect above once settled — M-5)
 
@@ -253,7 +240,7 @@ function OnboardingCheck({
   }
 
   // orientation
-  if (onboardingStatus?.completed) return <>{children}</>;
+  if (entryGate.onboardingCompleted) return <>{children}</>;
 
   return <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={true} />;
 }

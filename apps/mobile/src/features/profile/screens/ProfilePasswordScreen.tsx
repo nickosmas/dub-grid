@@ -376,7 +376,6 @@ export default function ProfilePasswordScreen() {
               disabled={!passwordLooksReady || passwordSaving}
               label="Update password"
               loading={passwordSaving}
-              loadingLabel="Updating"
               onPress={requestPasswordChange}
             />
           </View>
@@ -385,7 +384,6 @@ export default function ProfilePasswordScreen() {
       <ConfirmationModal
         body="You'll be signed out of every device after the password is updated."
         confirmLabel="Update and sign out"
-        confirmPendingLabel="Updating"
         confirmTone="danger"
         loading={passwordSaving}
         onCancel={() => setIsConfirming(false)}

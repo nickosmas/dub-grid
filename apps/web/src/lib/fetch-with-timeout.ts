@@ -28,12 +28,14 @@ export async function fetchWithTimeout(
   init: RequestInit = {},
   timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<Response> {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
   try {
-    return await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    return await fetch(input, { ...init, signal });
   } catch (err) {
     // AbortSignal.timeout rejects with a TimeoutError DOMException. Translate
     // it so callers can tell "too slow" from "refused" and say so to the user.
-    if (err instanceof DOMException && err.name === "TimeoutError") {
+    if (timeoutSignal.aborted) {
       throw new RequestTimeoutError(timeoutMs);
     }
     throw err;

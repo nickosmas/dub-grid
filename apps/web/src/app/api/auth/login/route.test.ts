@@ -12,6 +12,8 @@ const deleteSandboxForUser = vi.fn();
 
 vi.mock("@/lib/rate-limit", () => ({
   loginLimiter: {},
+  loginIpLimiter: {},
+  loginSurgeLimiter: {},
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 
@@ -85,15 +87,26 @@ function makeSession(
 }
 
 function stubOrgLookup(orgId: string | null) {
-  serviceFrom.mockImplementation(() => ({
-    select: () => ({
-      eq: () => ({
-        is: () => ({
-          maybeSingle: async () => ({ data: orgId ? { id: orgId } : null, error: null }),
+  serviceFrom.mockImplementation((table: string) => {
+    if (table === "profiles") {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: { platform_role: null }, error: null }),
+          }),
+        }),
+      };
+    }
+    return {
+      select: () => ({
+        eq: () => ({
+          is: () => ({
+            maybeSingle: async () => ({ data: orgId ? { id: orgId } : null, error: null }),
+          }),
         }),
       }),
-    }),
-  }));
+    };
+  });
 }
 
 function makeRequest(
@@ -119,6 +132,13 @@ describe("POST /api/auth/login", () => {
       acceptedCurrentTerms: true,
       acceptedVersion: "v1",
     });
+    serviceFrom.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { platform_role: null }, error: null }),
+        }),
+      }),
+    }));
     rpc.mockResolvedValue({ data: null, error: null });
     refreshSession.mockResolvedValue({ data: { session: null }, error: null });
   });
@@ -129,6 +149,19 @@ describe("POST /api/auth/login", () => {
     const res = await POST(makeRequest("acme.localhost"));
 
     expect(res.status).toBe(429);
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("sheds a login surge before calling the auth provider", async () => {
+    checkRateLimit
+      .mockResolvedValueOnce({ limited: false, misconfigured: false })
+      .mockResolvedValueOnce({ limited: false, misconfigured: false })
+      .mockResolvedValueOnce({ limited: true, reset: Date.now() + 3_000, misconfigured: false });
+
+    const res = await POST(makeRequest("acme.localhost"));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("3");
     expect(signInWithPassword).not.toHaveBeenCalled();
   });
 
@@ -200,6 +233,78 @@ describe("POST /api/auth/login", () => {
     expect(body.destination).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
     expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
+  });
+
+  it("rejects a gridmaster on an organization login before returning tokens", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ platform_role: "gridmaster" }),
+        user: {
+          id: USER_ID,
+          email: "gm@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body).toMatchObject({ code: "GRIDMASTER_PORTAL_REQUIRED" });
+    expect(refreshSession).not.toHaveBeenCalled();
+    expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
+  });
+
+  it("rejects an MFA-enrolled gridmaster on an organization login before MFA begins", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ platform_role: "gridmaster" }),
+        user: {
+          id: USER_ID,
+          email: "gm@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        },
+      },
+      error: null,
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body).toMatchObject({ code: "GRIDMASTER_PORTAL_REQUIRED" });
+    expect(body).not.toHaveProperty("session");
+  });
+
+  it("uses the profile role to block a gridmaster whose newly-issued token is stale", async () => {
+    serviceFrom.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { platform_role: "gridmaster" }, error: null }),
+        }),
+      }),
+    }));
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "admin" }),
+        user: {
+          id: USER_ID,
+          email: "gm@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: "GRIDMASTER_PORTAL_REQUIRED" });
   });
 
   it("starts the active organization's trial for a super_admin", async () => {

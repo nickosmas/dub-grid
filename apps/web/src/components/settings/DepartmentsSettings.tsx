@@ -852,9 +852,7 @@ function DepartmentSection({
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
-          <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
-            {EDITOR_ACTION_LABELS.save}
-          </ButtonLoading>
+          <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
         </Button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
@@ -1074,7 +1072,6 @@ function DepartmentSection({
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "none";
                       }}
-                      loadingLabel="Checking"
                     >
                       Delete
                     </Button>

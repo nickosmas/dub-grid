@@ -165,9 +165,7 @@ export default function ChangeReviewModal({
             onClick={onConfirm}
             disabled={saving}
           >
-            <ButtonLoading loading={saving} loadingLabel="Saving">
-              {confirmLabel}
-            </ButtonLoading>
+            <ButtonLoading loading={saving}>{confirmLabel}</ButtonLoading>
           </Button>
         </div>
       </div>

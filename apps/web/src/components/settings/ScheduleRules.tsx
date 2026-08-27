@@ -318,9 +318,7 @@ export default function ScheduleRules({
             disabled={!isModified || saving}
             className="dg-btn dg-btn-primary"
           >
-            <ButtonLoading loading={saving} loadingLabel="Saving">
-              Save
-            </ButtonLoading>
+            <ButtonLoading loading={saving}>Save</ButtonLoading>
           </Button>
         </div>
 
@@ -329,7 +327,6 @@ export default function ScheduleRules({
             title="Save Schedule Rule"
             message="This change updates an organization-wide scheduling rule. Review carefully before saving."
             confirmLabel="Save Rule"
-            confirmPendingLabel="Saving"
             variant="warning"
             isLoading={saving}
             onConfirm={() => handleSave()}

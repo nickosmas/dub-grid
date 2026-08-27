@@ -55,6 +55,12 @@ export const CacheKey = {
   departments: (orgId: string) => `dg:org:${orgId}:departments`,
   coverageReqs: (orgId: string) => `dg:org:${orgId}:coverageRequirements`,
   organization: (orgId: string) => `dg:org:${orgId}:organization`,
+  /**
+   * Authorized bootstrap's shared, organization-only configuration fan-out.
+   * Never contains memberships, permissions, session state, employee records,
+   * or Test Sandbox context.
+   */
+  bootstrapConfig: (orgId: string) => `dg:org:${orgId}:bootstrapConfig`,
   allOrganizations: () => `dg:gm:allOrganizations`,
 
   // Moderate
@@ -172,8 +178,21 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
 export async function cacheDel(...keys: string[]): Promise<void> {
   const client = getRedis();
   if (!client || keys.length === 0) return;
+  // The bootstrap cache is a short-lived aggregate of these individual
+  // organization configuration resources. Derive its invalidation here so
+  // every existing config writer remains correct without having to remember a
+  // second cache key. Deliberately exclude users, sessions, memberships, and
+  // employee keys: none are part of the aggregate.
+  const bootstrapKeys = keys.flatMap((key) => {
+    const match =
+      /^dg:org:([^:]+):(organization|focusAreas|shiftCategories|jobs|indicatorTypes|certifications|orgRoles|departments|coverageRequirements|absenceTypes)(?::.*)?$/.exec(
+        key,
+      );
+    return match ? [CacheKey.bootstrapConfig(match[1])] : [];
+  });
+  const keysToDelete = [...new Set([...keys, ...bootstrapKeys])];
   try {
-    await withTimeout(client.del(...keys), REDIS_TIMEOUT_MS, null);
+    await withTimeout(client.del(...keysToDelete), REDIS_TIMEOUT_MS, null);
   } catch (err) {
     if (_debugMode) {
       console.warn(`[cache] DEL failed:`, err instanceof Error ? err.message : err);

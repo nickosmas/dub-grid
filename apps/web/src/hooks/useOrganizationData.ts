@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
-import { formatClientErrorMessage } from "@/lib/client-facing";
+import { formatClientErrorMessage, isSessionExpiredError } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
@@ -13,6 +13,8 @@ import { fetchAccountOrgContext } from "@/features/account/client";
 import { useOrgRealtimeInvalidation } from "./useOrgRealtimeInvalidation";
 import {
   fetchOrganizationBootstrap,
+  getOrganizationBootstrapRetryDelay,
+  isRetryableOrganizationBootstrapError,
   type OrganizationBootstrap,
 } from "@/features/organization/client";
 import type {
@@ -57,6 +59,8 @@ export interface OrganizationData {
   absenceTypeMap: Map<number, string>;
   loading: boolean;
   loadError: string | null;
+  bootstrapRetryable: boolean;
+  entryGate: OrganizationBootstrap["entryGate"] | null;
   setupStatus: SetupStatus;
   /** Active employees in the org — see OrganizationBootstrap.activeEmployeeCount. */
   activeEmployeeCount: number;
@@ -236,9 +240,18 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   // (effectiveOrgId), which is a different question from whether to ask.
   const bootstrapQuery = useQuery({
     queryKey: bootstrapQueryKey,
-    queryFn: fetchOrganizationBootstrap,
+    // Consume React Query's signal so sign-out, org changes, and an unmounted
+    // gate cannot let an old bootstrap response populate the current shell.
+    queryFn: (context) => fetchOrganizationBootstrap(context?.signal),
     enabled,
     staleTime: 5 * 60_000,
+    // A transient failed fan-out must not take the whole authenticated app
+    // down. This critical request has a bounded retry budget; permanent
+    // failures are handled by OnboardingGate's recovery surface instead of a
+    // generic error toast over an empty page.
+    retry: (failureCount, error) =>
+      failureCount < 3 && isRetryableOrganizationBootstrapError(error),
+    retryDelay: (failureCount, error) => getOrganizationBootstrapRetryDelay(error, failureCount),
   });
 
   const bootstrap = bootstrapQuery.data;
@@ -246,7 +259,6 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const effectiveOrgId = ctx.orgId ?? org?.id ?? null;
   useOrgRealtimeInvalidation({
     orgId: effectiveOrgId,
-    disabled: org?.featureOverrides?.disable_realtime === true,
     queryClient,
   });
 
@@ -401,12 +413,23 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
         "We couldn't load organization. Refresh and try again.",
       )
     : null;
+  const bootstrapRetryable =
+    bootstrapQuery.isError && isRetryableOrganizationBootstrapError(bootstrapQuery.error);
 
   const handledErrorsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (bootstrapQuery.error && !handledErrorsRef.current.has("bootstrap")) {
       handledErrorsRef.current.add("bootstrap");
-      handleApiError(bootstrapQuery.error);
+      // The bootstrap is a page-level dependency, not a background action.
+      // Its recovery UI is rendered by OnboardingGate; a toast here is both
+      // redundant and, because no page can render without this data, can be
+      // the only thing a client sees. Preserve the special session-expiry
+      // handling, which signs out safely, and send every other failure to
+      // monitoring without exposing server failure copy to the client.
+      Sentry.captureException(bootstrapQuery.error);
+      if (isSessionExpiredError(bootstrapQuery.error)) {
+        void handleApiError(bootstrapQuery.error);
+      }
     }
     if (!bootstrapQuery.error && handledErrorsRef.current.has("bootstrap")) {
       handledErrorsRef.current.delete("bootstrap");
@@ -589,6 +612,8 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     absenceTypeMap,
     loading,
     loadError,
+    bootstrapRetryable,
+    entryGate: bootstrap?.entryGate ?? null,
     setupStatus,
     activeEmployeeCount: bootstrap?.activeEmployeeCount ?? 0,
     setOrg,

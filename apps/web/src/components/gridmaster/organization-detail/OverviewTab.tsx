@@ -587,7 +587,6 @@ export function OverviewTab({
               : `Are you sure you want to archive "${organization.name}"? The organization will be hidden from active listings but all data will be preserved.`
           }
           confirmLabel={organization.archivedAt ? "Restore" : "Archive"}
-          confirmPendingLabel={organization.archivedAt ? "Restoring" : "Archiving"}
           variant={organization.archivedAt ? "info" : "danger"}
           isLoading={archiving}
           onConfirm={handleArchive}
@@ -651,9 +650,7 @@ export function OverviewTab({
                 disabled={suspending}
                 style={{ flexShrink: 0 }}
               >
-                <ButtonLoading loading={suspending} loadingLabel="Unsuspending">
-                  Unsuspend
-                </ButtonLoading>
+                <ButtonLoading loading={suspending}>Unsuspend</ButtonLoading>
               </Button>
             </>
           ) : (
@@ -743,7 +740,6 @@ export function OverviewTab({
           title="Unsuspend Organization"
           message={`Unsuspend "${organization.name}"? Members will regain access to the app.`}
           confirmLabel="Unsuspend"
-          confirmPendingLabel="Unsuspending"
           variant="warning"
           isLoading={suspending}
           onConfirm={handleUnsuspend}

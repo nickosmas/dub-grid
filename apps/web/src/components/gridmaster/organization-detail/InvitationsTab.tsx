@@ -179,9 +179,7 @@ export function InvitationsTab({
                             onClick={() => setRevokeConfirm(inv)}
                             disabled={revoking === inv.id}
                           >
-                            <ButtonLoading loading={revoking === inv.id} loadingLabel="Revoking">
-                              Revoke
-                            </ButtonLoading>
+                            <ButtonLoading loading={revoking === inv.id}>Revoke</ButtonLoading>
                           </Button>
                         )}
                       </td>
@@ -199,7 +197,6 @@ export function InvitationsTab({
           title="Revoke Invitation"
           message={`Revoke the invitation for "${revokeConfirm.email}"? They will not be able to use the current invite link after this change.`}
           confirmLabel="Revoke Invitation"
-          confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={revoking === revokeConfirm.id}
           onConfirm={() => handleRevoke(revokeConfirm)}

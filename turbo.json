@@ -25,7 +25,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**", "build/**"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "build/**"],
       "inputs": ["$TURBO_DEFAULT$", ".env*", "../../.env*"],
       "env": [
         "NEXT_PUBLIC_SUPABASE_URL",
