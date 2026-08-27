@@ -357,13 +357,7 @@
   --dg-color-shadow-strong: rgba(0, 0, 0, 0.75);
   --dg-color-grid-divider-strong: #a1a1aa;
   --dg-color-table-divider-strong: #ffffff;
-  --dg-color-auth-shell-bg: linear-gradient(
-    to bottom,
-    #0b2d75 0%,
-    #1d3aa0 42%,
-    #0a1442 70%,
-    #000 100%
-  );
+  --dg-color-auth-shell-bg: linear-gradient(to bottom, #040e33 0%, #000 60%, #000 100%);
   --dg-color-onboarding-shell-bg: linear-gradient(to bottom, #000 0%, #000 40%, #040e33 100%);
   --dg-color-cta-shell-bg: linear-gradient(to top right, #0a1442 0%, #1d3aa0 55%, #2075ff 100%);
   --shadow-raised: 0 1px 4px rgba(0, 0, 0, 0.6);
