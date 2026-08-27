@@ -22,7 +22,13 @@ const THEME_CYCLE = [
   { value: "system", Icon: Monitor, label: "Theme: system. Switch to light mode." },
 ] as const;
 
-export default function ThemeToggleButton({ className = "" }: { className?: string }) {
+export default function ThemeToggleButton({
+  className = "",
+  onDarkSurface = false,
+}: {
+  className?: string;
+  onDarkSurface?: boolean;
+}) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -43,7 +49,11 @@ export default function ThemeToggleButton({ className = "" }: { className?: stri
     <Button
       type="button"
       onClick={() => setTheme(next.value)}
-      className={`p-2 text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)] transition-colors ${className}`}
+      className={`p-2 transition-colors ${
+        onDarkSurface
+          ? "text-white/80 hover:text-white"
+          : "text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)]"
+      } ${className}`}
       aria-label={current.label}
     >
       {!mounted ? <span className="dg-theme-toggle-placeholder" /> : <Icon size={20} />}

@@ -194,9 +194,6 @@ export function invalidateOrgRealtimeQueries(
  * cross-tab broadcast — once per mounted instance. Debouncing did not help:
  * it is per subscription, so it coalesced within a channel, never across them.
  *
- * A caller that is `disabled` simply does not acquire, which preserves the
- * previous per-caller semantics rather than letting whoever mounted first
- * decide for everyone.
  */
 const orgSubscriptions = new Map<string, { count: number; unsubscribe: () => void }>();
 
@@ -253,15 +250,13 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
 
 export function useOrgRealtimeInvalidation({
   orgId,
-  disabled = false,
   queryClient,
 }: {
   orgId: string | null;
-  disabled?: boolean;
   queryClient: QueryClient;
 }) {
   useEffect(() => {
-    if (!orgId || disabled) return;
+    if (!orgId) return;
     return acquireOrgSubscription(orgId, queryClient);
-  }, [disabled, orgId, queryClient]);
+  }, [orgId, queryClient]);
 }

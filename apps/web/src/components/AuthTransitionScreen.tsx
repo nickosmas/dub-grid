@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LoaderIcon } from "lucide-react";
 import { Button } from "@/components/Button";
 import { useLogout } from "@/hooks/useLogout";
+import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
 
 type TransitionPhase = "signing-in" | "organization" | "onboarding";
 
@@ -39,13 +40,15 @@ export default function AuthTransitionScreen({
   offline?: boolean;
 }) {
   const { signOut } = useLogout();
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [startedAt] = useState(() => getAuthTransitionStartedAt() ?? Date.now());
+  const [elapsedSeconds, setElapsedSeconds] = useState(() =>
+    Math.floor((Date.now() - startedAt) / 1_000),
+  );
   const copy = PHASE_COPY[phase];
   const isSlow = elapsedSeconds >= 15;
   const showEscape = elapsedSeconds >= 30;
 
   useEffect(() => {
-    const startedAt = Date.now();
     const interval = window.setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1_000));
     }, 1_000);
@@ -75,12 +78,14 @@ export default function AuthTransitionScreen({
       }}
     >
       <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
-        <LoaderIcon
-          aria-hidden="true"
-          className="animate-spin"
-          size={32}
-          style={{ color: "var(--dg-color-brand)", marginBottom: 24 }}
-        />
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+          <LoaderIcon
+            aria-hidden="true"
+            className="animate-spin"
+            size={32}
+            style={{ color: "var(--dg-color-brand)" }}
+          />
+        </div>
         <h1
           style={{
             margin: "0 0 12px",

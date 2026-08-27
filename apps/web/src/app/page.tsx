@@ -11,17 +11,18 @@ import { Button } from "@/components/Button";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
-import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
 import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
-import StaffViewMockup from "@/components/landing/StaffViewMockup";
-import SettingsMockup from "@/components/landing/SettingsMockup";
-import RecurringShiftsMockup from "@/components/landing/RecurringShiftsMockup";
-import DashboardMockup from "@/components/landing/DashboardMockup";
+import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
 import MobileAppMockup from "@/components/landing/MobileAppMockup";
 import {
+  BellRing,
   CalendarDays,
+  KeyRound,
+  LockKeyhole,
   Users,
   Shield,
+  ShieldCheck,
+  SlidersHorizontal,
   Repeat,
   Settings,
   Radio,
@@ -61,9 +62,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: Radio,
-    title: "Always live",
-    description:
-      "Publish the schedule and it reaches every screen instantly. No stale printouts, no one working off the old version.",
+    title: "Stay in sync",
+    description: "Publish the schedule and connected web and mobile apps refresh as changes land.",
   },
   {
     icon: BarChart3,
@@ -87,6 +87,43 @@ const FEATURES: Feature[] = [
     title: "Invite only",
     description:
       "Every account starts from a link that expires in 72 hours. No open sign-ups, no surprises.",
+  },
+];
+
+const SECURITY_FEATURES: Feature[] = [
+  {
+    icon: ShieldCheck,
+    title: "Role-based access",
+    description: "Owners, admins, and staff see only the parts of DubGrid that match their role.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Admin permissions",
+    description:
+      "Choose exactly which scheduling and people-management actions each admin can take.",
+  },
+  {
+    icon: KeyRound,
+    title: "Two-factor authentication",
+    description: "Add a verified authenticator step to protect sign-ins for sensitive roles.",
+  },
+  {
+    icon: Mail,
+    title: "Invite-only accounts",
+    description:
+      "Every account starts with an individual invitation link that expires after 72 hours.",
+  },
+  {
+    icon: BellRing,
+    title: "Security activity alerts",
+    description:
+      "Stay informed about password, email, MFA, new-device, and account-access changes.",
+  },
+  {
+    icon: LockKeyhole,
+    title: "Protected organization data",
+    description:
+      "Data is encrypted in transit and at rest, with row-level access controls for each organization.",
   },
 ];
 
@@ -256,28 +293,29 @@ export default function RootPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--dg-color-surface)] text-[var(--dg-color-text-primary)] font-sans overflow-x-hidden">
+    <div className="landing-page min-h-screen text-[var(--dg-color-text-primary)] font-sans overflow-x-hidden">
+      <div className="landing-hero-gradient" aria-hidden="true" />
       {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--dg-color-surface)]/80 backdrop-blur-xl border-b border-[var(--dg-color-border-light)]">
+      <nav className="landing-nav fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <DubGridLogo size={28} color="var(--dg-color-brand)" />
-            <DubGridWordmark fontSize={18} />
+            <DubGridLogo size={28} color="#ffffff" />
+            <DubGridWordmark fontSize={18} color="#ffffff" />
           </div>
 
           <div className="flex items-center gap-4">
-            <ThemeToggleButton />
+            <ThemeToggleButton onDarkSurface />
             <Link
               href="/login"
               prefetch={false}
-              className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg"
+              className="landing-nav-sign-in hidden sm:inline-flex dg-btn dg-btn-lg"
             >
               Sign In
             </Link>
             {/* Mobile hamburger */}
             <Button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 -mr-2 text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-secondary)] transition-colors"
+              className="landing-nav-menu md:hidden p-2 -mr-2 transition-colors"
               aria-label="Open menu"
             >
               <Menu size={22} />
@@ -288,7 +326,7 @@ export default function RootPage() {
 
       {/* ── Mobile Menu Overlay ── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[var(--dg-color-surface)]/95 flex flex-col">
+        <div className="landing-mobile-menu fixed inset-0 z-[60] flex flex-col">
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
               <DubGridLogo size={28} color="var(--dg-color-brand)" />
@@ -313,50 +351,28 @@ export default function RootPage() {
       )}
 
       {/* ── Hero ── */}
-      <section className="relative flex items-center justify-center overflow-hidden">
-        {/* Mesh gradient background */}
-        <div className="absolute inset-0 -z-10">
-          <div
-            className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full opacity-[0.04]"
-            style={{
-              background: "radial-gradient(circle, var(--dg-color-brand) 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03]"
-            style={{
-              background: "radial-gradient(circle, var(--dg-color-brand) 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.02]"
-            style={{
-              background: "radial-gradient(circle, var(--dg-color-brand) 0%, transparent 60%)",
-            }}
-          />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-14">
+      <section className="landing-hero relative flex items-center justify-center overflow-hidden">
+        <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-28 sm:pb-32">
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-[var(--dg-color-text-primary)] leading-[1.05]">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-white leading-[1.05]">
             Scheduling, done right.
             <br />
-            <span className="text-[var(--dg-color-brand)]">Ditch the spreadsheet.</span>
+            <span className="text-white/80">Ditch the spreadsheet.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-6 text-lg md:text-xl text-[var(--dg-color-text-muted)] max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg md:text-xl text-white/85 max-w-2xl mx-auto leading-relaxed">
             Built for the way care teams actually work. Quick to build the schedule, easy to fill a
             gap, and right in your pocket on iOS and Android.
           </p>
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-            <Link href="/request-demo" className="dg-btn dg-btn-primary dg-btn-lg">
+            <Link href="/request-demo" className="landing-hero-primary dg-btn dg-btn-lg">
               Request Demo
               <ArrowRight size={18} />
             </Link>
-            <a href="#features" className="dg-btn dg-btn-secondary dg-btn-lg">
+            <a href="#features" className="landing-hero-secondary dg-btn dg-btn-lg">
               See Features
             </a>
           </div>
@@ -364,18 +380,25 @@ export default function RootPage() {
       </section>
 
       {/* ── Schedule Grid Mockup ── */}
-      <RevealSection className="-mt-10 pb-12 sm:pb-16">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="[perspective:1200px]">
-            <div className="[transform:rotateX(2deg)] origin-bottom">
-              <ScheduleGridMockup />
-            </div>
+      <RevealSection className="landing-hero-screenshot -mt-20 pb-12 sm:pb-16">
+        <div className="landing-hero-screenshot-stage max-w-5xl mx-auto px-6">
+          <div className="landing-hero-phone landing-hero-phone-left" aria-hidden="true">
+            <MobileAppMockup screens={["home"]} />
           </div>
+          <div className="landing-hero-phone landing-hero-phone-right" aria-hidden="true">
+            <MobileAppMockup screens={["schedule"]} />
+          </div>
+          <LandingScreenshot
+            asset={landingScreenshots.schedule}
+            priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1024px"
+            className="landing-screenshot-hero"
+          />
         </div>
       </RevealSection>
 
       {/* ── Bento Feature Grid ── */}
-      <RevealSection id="features" className="py-16 sm:py-20 lg:py-24 bg-[var(--dg-color-bg)]">
+      <RevealSection id="features" className="py-16 sm:py-20 lg:py-24">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -392,7 +415,7 @@ export default function RootPage() {
               return (
                 <div
                   key={feature.title}
-                  className="group rounded-2xl border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)] p-6 lg:p-8 hover:border-[var(--dg-color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
+                  className="landing-feature-card group rounded-2xl border border-[var(--dg-color-border-light)] p-6 lg:p-8 hover:border-[var(--dg-color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
                 >
                   <div className="w-10 h-10 rounded-xl bg-[var(--dg-color-bg-secondary)] flex items-center justify-center mb-4 group-hover:bg-[var(--dg-color-border-light)] transition-colors duration-150">
                     <Icon
@@ -414,7 +437,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Dashboard Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20">
+      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -424,44 +447,15 @@ export default function RootPage() {
               Coverage, hours, and open shifts on one screen. Catch a gap before it catches you.
             </p>
           </div>
-          <DashboardMockup />
-        </div>
-      </RevealSection>
-
-      {/* ── Settings Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--dg-color-bg)]">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
-              Make it your own
-            </h2>
-            <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Rename focus areas, certifications, and roles so the app speaks the same language as
-              your team.
-            </p>
-          </div>
-          <SettingsMockup />
-        </div>
-      </RevealSection>
-
-      {/* ── Recurring Shifts Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
-              Set it once.
-            </h2>
-            <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Set each person's usual weekly shifts, then apply the template across any date range
-              in a click.
-            </p>
-          </div>
-          <RecurringShiftsMockup />
+          <LandingScreenshot
+            asset={landingScreenshots.dashboard}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1024px"
+          />
         </div>
       </RevealSection>
 
       {/* ── Staff View Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--dg-color-bg)]">
+      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -473,13 +467,16 @@ export default function RootPage() {
             </p>
           </div>
           <div className="max-w-4xl mx-auto">
-            <StaffViewMockup />
+            <LandingScreenshot
+              asset={landingScreenshots.team}
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 85vw, 896px"
+            />
           </div>
         </div>
       </RevealSection>
 
       {/* ── Mobile App Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--dg-color-bg)]">
+      <RevealSection className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
@@ -496,33 +493,53 @@ export default function RootPage() {
         </div>
       </RevealSection>
 
-      {/* ── CTA ──
-          Background sits on its own layer (not the section's own bg) since
-          dark mode swaps the flat brand-blue fill for a gradient sweep
-          (--color-cta-shell-bg), and Tailwind's arbitrary-value bg utility
-          only sets background-color — it can't hold a gradient value. */}
-      <RevealSection className="py-16 sm:py-20 lg:py-24 relative overflow-hidden">
-        <div className="absolute inset-0" style={{ background: "var(--dg-color-cta-shell-bg)" }} />
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
+      {/* ── Security features ── */}
+      <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+              Security that stays out of your way
+            </h2>
+            <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
+              Keep account access protected with clear security controls that are easy to review.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SECURITY_FEATURES.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div
+                  key={feature.title}
+                  className="landing-feature-card rounded-2xl border border-[var(--dg-color-border-light)] p-6"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[var(--dg-color-bg-secondary)] flex items-center justify-center mb-4">
+                    <Icon size={20} className="text-[var(--dg-color-text-muted)]" />
+                  </div>
+                  <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)] mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-[var(--dg-color-text-muted)] leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </RevealSection>
 
-        <div className="relative max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+      {/* ── CTA ── */}
+      <RevealSection className="landing-cta-section py-12 sm:py-16 lg:py-20">
+        <div className="landing-cta max-w-5xl mx-auto px-6 py-14 sm:px-10 sm:py-16 lg:px-16 lg:py-20 text-center">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-[var(--dg-color-text-primary)]">
             Done with
             <br />
             the spreadsheet?
           </h2>
-          <p className="text-lg text-white/60 mt-4 max-w-xl mx-auto">
+          <p className="text-lg text-[var(--dg-color-text-muted)] mt-4 max-w-xl mx-auto">
             Your team deserves something that just works.
           </p>
-          <Link href="/request-demo" className="mt-8 dg-btn dg-btn-on-brand-solid dg-btn-lg">
+          <Link href="/request-demo" className="mt-8 dg-btn dg-btn-primary dg-btn-lg">
             Request Demo
             <ArrowRight size={18} />
           </Link>
