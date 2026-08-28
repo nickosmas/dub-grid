@@ -43,6 +43,11 @@ export default defineConfig(async () => {
     test: {
       environment: "jsdom",
       setupFiles: [path.resolve(__dirname, "./src/__tests__/setup.ts")],
+      // The suite includes local Supabase integration tests and expensive
+      // property-based UI tests. Running them alongside the full UI suite
+      // exhausts local resources and causes false timeout failures.
+      minWorkers: 1,
+      maxWorkers: 1,
     },
   });
 });
