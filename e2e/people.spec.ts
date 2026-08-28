@@ -12,6 +12,6 @@ test("an authenticated admin can open the People roster", async ({ page }) => {
   // that substring-match the nav label.
   await page.getByRole("link", { name: "People", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/people/);
+  await expect(page).toHaveURL(/\/people/, { timeout: 15_000 });
   await expect(page.getByRole("link", { name: "People", exact: true })).toBeVisible();
 });

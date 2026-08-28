@@ -465,7 +465,7 @@ Organizations are routed via subdomains:
 - `dubgrid.com` → Landing page / login
 - `gridmaster.dubgrid.com` → Gridmaster command center
 
-Edge middleware (`apps/web/src/middleware.ts`) enforces:
+The Next.js request proxy (`apps/web/src/proxy.ts`) enforces:
 
 - JWT verification and role calculation
 - Subdomain-to-org matching
@@ -509,7 +509,7 @@ Everything for the web app lives under `apps/web/`. UI features are organized in
 
 | File / Directory                                          | Purpose                                                                                                                                                                                                                                                        |
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/middleware.ts`                              | Edge middleware for RBAC + subdomain routing                                                                                                                                                                                                                   |
+| `apps/web/src/proxy.ts`                                   | Next.js request proxy for RBAC + subdomain routing                                                                                                                                                                                                             |
 | `apps/web/next.config.ts`                                 | Next.js configuration + security headers                                                                                                                                                                                                                       |
 | `apps/web/src/app/schedule/page.tsx`                      | Main scheduler UI — grid, toolbar, DND                                                                                                                                                                                                                         |
 | `apps/web/src/app/dashboard/page.tsx`                     | Organization dashboard with analytics                                                                                                                                                                                                                          |

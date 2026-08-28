@@ -21,46 +21,46 @@ export const landingScreenshots = {
   schedule: {
     alt: "Calm Haven's two-week staff schedule in DubGrid",
     light: {
-      src: "/landing/screenshots/schedule-grid-latest.webp",
-      width: 2400,
-      height: 1402,
-      aspectRatioClass: "aspect-[1200/701]",
+      src: "/landing/screenshots/schedule-grid-latest.png",
+      width: 4112,
+      height: 2402,
+      aspectRatioClass: "aspect-[4112/2402]",
     },
     dark: {
-      src: "/landing/screenshots/schedule-grid-dark-latest.webp",
-      width: 2400,
-      height: 1401,
-      aspectRatioClass: "aspect-[2400/1401]",
+      src: "/landing/screenshots/schedule-grid-dark-latest.png",
+      width: 4112,
+      height: 2400,
+      aspectRatioClass: "aspect-[4112/2400]",
     },
   },
   dashboard: {
     alt: "Calm Haven's scheduling dashboard with coverage and shift summaries",
     light: {
-      src: "/landing/screenshots/dashboard-latest.webp",
-      width: 2400,
-      height: 1402,
-      aspectRatioClass: "aspect-[1200/701]",
+      src: "/landing/screenshots/dashboard-latest.png",
+      width: 4112,
+      height: 2402,
+      aspectRatioClass: "aspect-[4112/2402]",
     },
     dark: {
-      src: "/landing/screenshots/dashboard-dark.webp",
-      width: 2400,
-      height: 1400,
-      aspectRatioClass: "aspect-[12/7]",
+      src: "/landing/screenshots/dashboard-dark.png",
+      width: 4112,
+      height: 2398,
+      aspectRatioClass: "aspect-[4112/2398]",
     },
   },
   team: {
     alt: "Calm Haven's team directory in DubGrid",
     light: {
-      src: "/landing/screenshots/team-directory-provided.webp",
-      width: 2400,
-      height: 1403,
-      aspectRatioClass: "aspect-[2400/1403]",
+      src: "/landing/screenshots/team-directory-provided.png",
+      width: 4112,
+      height: 2404,
+      aspectRatioClass: "aspect-[4112/2404]",
     },
     dark: {
-      src: "/landing/screenshots/team-directory-dark.webp",
-      width: 2400,
-      height: 1401,
-      aspectRatioClass: "aspect-[2400/1401]",
+      src: "/landing/screenshots/team-directory-dark.png",
+      width: 4112,
+      height: 2400,
+      aspectRatioClass: "aspect-[4112/2400]",
     },
   },
 } satisfies Record<string, LandingScreenshotAsset>;
@@ -90,6 +90,7 @@ export function LandingScreenshot({
         width={variant.width}
         height={variant.height}
         priority={priority}
+        quality={95}
         sizes={sizes}
         className="h-full w-full object-cover"
       />

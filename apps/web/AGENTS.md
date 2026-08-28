@@ -2,8 +2,9 @@
 
 Scope: `apps/web`, package `@dubgrid/web`.
 
-Next.js 16 App Router. Routes under `apps/web/src/app`. Middleware at
-`apps/web/src/middleware.ts`. API Route Handlers under `apps/web/src/app/api`.
+Next.js 16 App Router. Routes under `apps/web/src/app`. The Next.js request
+proxy is `apps/web/src/proxy.ts`. API Route Handlers live under
+`apps/web/src/app/api`.
 
 ## Verified Commands
 
@@ -22,7 +23,7 @@ Next.js 16 App Router. Routes under `apps/web/src/app`. Middleware at
 apps/web/
   src/
     app/                            # Next.js App Router
-    middleware.ts                   # Edge RBAC + org isolation (jwtVerify + decodeJwt fallback)
+    proxy.ts                        # Edge RBAC + org isolation (jwtVerify + decodeJwt fallback)
       api/                          # Route Handlers
         auth/                       # login, start-trial, etc.
         mobile/v1/                  # Mobile API (auth, bootstrap, me, notifications, org,
@@ -58,7 +59,7 @@ apps/web/
     hooks/                          # Shared React hooks
     lib/                            # Server + client utilities
       api-auth.ts                   # requireAuthenticated* — local JWT verify, no getUser() call
-      auth/verify-token.ts          # JWKS keyset + local ES256 verification (shared w/ middleware)
+      auth/verify-token.ts          # JWKS keyset + local ES256 verification (shared with proxy)
       auth/revocation.ts            # Redis revocation markers — the other half of local verify
       csrf.ts                       # validateCsrfOrigin — call on all mutating Route Handlers
       cache.ts                      # Upstash Redis cache helpers
@@ -91,7 +92,7 @@ apps/web/
 ## API, Auth, and Tenant Safety
 
 - Validate input and check auth/authz inside every Route Handler or shared server helper.
-- Do not rely on middleware alone for authorization.
+- Do not rely on the request proxy alone for authorization.
 - Mutating handlers must not use GET.
 - Call `validateCsrfOrigin(req)` at the top of all mutating browser-facing Route Handlers.
 - All mutations MUST use the effective (sandbox-redirected) `orgId` from
@@ -104,11 +105,11 @@ apps/web/
 - **OnboardingGate**: `components/onboarding/OnboardingGate.tsx`. Not `SetupLockGate`.
 - **Trial activation**: `POST /api/auth/start-trial` calls `start_trial_for_org` RPC.
   Called only on first `super_admin` login. Idempotent.
-- **Org soft-delete**: `archived_at` on `organizations` revokes access at middleware,
+- **Org soft-delete**: `archived_at` on `organizations` revokes access at the request proxy,
   `get_my_organizations`, JWT hook, and `switch_org`.
 - **Post-login soft nav**: `router.replace("/dashboard")` + `AuthSplash` bridge.
   Logout: swift, no splash, always redirects to `/login`.
-- **Middleware JWT fallback**: `jwtVerify` catch block falls back to `decodeJwt`
+- **Request-proxy JWT fallback**: `jwtVerify` catch block falls back to `decodeJwt`
   (unverified) for non-gridmaster users. Never remove this fallback. RLS is the
   real security boundary.
 - **Email templates**: React Email source in `src/emails/`. Run `email:build` to

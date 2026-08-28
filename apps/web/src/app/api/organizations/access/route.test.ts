@@ -6,6 +6,7 @@ const requireAuthenticatedUser = vi.fn();
 const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
+const revokeAllUserSessions = vi.fn();
 const membershipSelectEq2 = vi.fn();
 const membershipUpdateEq3 = vi.fn();
 const profileMaybeSingle = vi.fn();
@@ -34,6 +35,9 @@ vi.mock("@/lib/access-management", () => ({
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+}));
+vi.mock("@/lib/auth/revocation", () => ({
+  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
 }));
 // Identity-ish mapper so tests can control the shape of `currentUser` directly
 // via the mocked membership row, instead of dealing with the real mapping.
@@ -129,9 +133,10 @@ describe("DELETE /api/organizations/access", () => {
     });
     getUserById.mockResolvedValue({ data: { user: { email: "target@test.com" } } });
     auditInsert.mockResolvedValue({ error: null });
+    revokeAllUserSessions.mockResolvedValue(undefined);
   });
 
-  it("mutates the effective (sandbox-redirected) org, not the raw requested org id (H-1)", async () => {
+  it("mutates the effective (sandbox-redirected) org and revokes the removed user's sessions", async () => {
     // requireOrgPermissions redirects: caller's request carries the REAL org,
     // but a sandbox cookie is active, so the effective org is the sandbox.
     requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID });
@@ -159,6 +164,7 @@ describe("DELETE /api/organizations/access", () => {
     // Every downstream call must use the SANDBOX org, never the raw requested org.
     expect(membershipSelectEq2).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID);
     expect(membershipUpdateEq3).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID, UPDATED_AT);
+    expect(revokeAllUserSessions).toHaveBeenCalledWith(TARGET_USER_ID);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,

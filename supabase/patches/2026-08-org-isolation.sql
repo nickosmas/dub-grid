@@ -25,14 +25,13 @@
 BEGIN;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. caller_org_id() fails closed                                    [audit C1]
+-- 1. caller_org_id() fails closed and checks live membership          [audit C1]
 --
 -- Every org-scoped RLS policy is `USING (org_id = public.caller_org_id())`.
--- The access-token hook strips org_id exactly when a membership is invalid, and
--- this function then fell back to profiles.org_id — which nothing nulls on the
--- soft archive that "remove from organization" actually performs. A removed
--- member's own token therefore kept resolving to the org they were removed
--- from, permanently, with full SELECT over it.
+-- The access-token hook strips org_id when a new token is minted for an
+-- invalid membership, but an already-issued token still carries its old claim.
+-- Validate that claim against the current membership row so soft-archiving a
+-- member immediately makes every org-scoped RLS policy reject that token.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.caller_org_id()
@@ -40,7 +39,18 @@ RETURNS UUID
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT NULLIF(auth.jwt() ->> 'org_id', '')::UUID;
+  SELECT claimed.org_id
+  FROM (
+    SELECT NULLIF(auth.jwt() ->> 'org_id', '')::UUID AS org_id
+  ) AS claimed
+  WHERE claimed.org_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM public.organization_memberships AS membership
+      WHERE membership.user_id = auth.uid()
+        AND membership.org_id = claimed.org_id
+        AND membership.archived_at IS NULL
+    );
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────

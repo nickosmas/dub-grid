@@ -43,6 +43,17 @@ async function clearBlockingOverlays(page: Page): Promise<void> {
   }
 }
 
+/**
+ * The marker changes only after OrgLogin's mount effect runs. Waiting for it
+ * keeps form interactions from landing on inert server-rendered markup in
+ * WebKit.
+ */
+export async function waitForClientHydration(page: Page): Promise<void> {
+  await expect(page.getByTestId("organization-login")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 15_000,
+  });
+}
+
 /** Logs in as the seeded QA super admin on its organization subdomain. */
 export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   // A first-ever login for a fresh seed runs through up to four sequential
@@ -52,6 +63,7 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   test.setTimeout(60_000);
 
   await page.goto(`${QA_SUPER_ADMIN_ORIGIN}/login`);
+  await waitForClientHydration(page);
 
   await page.getByLabel("Email").fill(QA_SUPER_ADMIN_EMAIL);
   // Plain getByLabel("Password") is ambiguous here — it also matches the

@@ -311,8 +311,14 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
       );
       expect(profileRows[0].org_id).toBeNull();
 
-      // And an outstanding token with no claim resolves to nothing.
-      await setJwtClaims({ sub: userId, role: "authenticated" });
+      // An outstanding token still carries the old org_id claim, but the live
+      // membership guard makes it resolve to nothing immediately.
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        org_id: profileOrgId,
+        org_role: "user",
+      });
       const { rows } = await sqlDb.query<{ cid: string | null }>(
         `SELECT public.caller_org_id()::text AS cid`,
       );

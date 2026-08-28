@@ -32,7 +32,25 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
         ),
       )
       .toBe(true);
+    await expect
+      .poll(() =>
+        screenshot.evaluate((image) =>
+          image instanceof HTMLImageElement
+            ? new URL(image.currentSrc).searchParams.get("q")
+            : null,
+        ),
+      )
+      .toBe("95");
   }
+
+  await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
+  await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
+    "border-top-color",
+    "rgb(255, 255, 255)",
+  );
+
+  await expect(page.locator(".landing-cta")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.locator(".landing-cta")).toHaveCSS("box-shadow", "none");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -81,4 +99,10 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
       )
       .toBe(true);
   }
+
+  await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
+  await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
+    "border-top-color",
+    "rgb(59, 66, 82)",
+  );
 });

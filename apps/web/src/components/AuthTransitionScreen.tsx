@@ -11,15 +11,15 @@ type TransitionPhase = "signing-in" | "organization" | "onboarding";
 const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
   "signing-in": {
     title: "Signing you in",
-    detail: "We’re securely starting your session.",
+    detail: "Securing your session and getting things ready.",
   },
   organization: {
-    title: "Preparing your Organization",
-    detail: "We’re loading the information you need to get started.",
+    title: "Getting your organization ready",
+    detail: "Just a moment while we prepare everything you need.",
   },
   onboarding: {
-    title: "Loading your setup",
-    detail: "We’re checking what needs to happen next.",
+    title: "Almost there",
+    detail: "We’re finishing a few things before you begin.",
   },
 };
 
@@ -56,9 +56,9 @@ export default function AuthTransitionScreen({
   }, []);
 
   const detail = offline
-    ? "You appear to be offline. We’ll continue when your connection returns."
+    ? "You’re offline. We’ll continue when you’re connected again."
     : isSlow
-      ? "This is taking longer than usual. We’re still working in the background."
+      ? "This is taking a little longer than usual. We’re still getting things ready."
       : copy.detail;
 
   return (

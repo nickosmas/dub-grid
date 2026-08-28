@@ -25,21 +25,23 @@ function resolveMigration(fileName: string) {
  */
 describe("org isolation SQL boundaries", () => {
   const functions = readFileSync(resolveMigration("002_functions_triggers.sql"), "utf8");
+  const membershipGuard = readFileSync(resolveMigration("005_live_membership_guard.sql"), "utf8");
   const grants = readFileSync(resolveMigration("004_grants.sql"), "utf8");
 
-  // Every org-scoped RLS policy is `USING (org_id = public.caller_org_id())`,
-  // so a fallback inside this function is a fallback inside all ~150 of them.
-  // It used to read profiles.org_id when the JWT claim was absent — and the
-  // access-token hook strips that claim precisely when the membership is
-  // invalid, so a removed member fell through to the org they were removed
-  // from and kept full SELECT over it, permanently.
-  it("resolves the caller's org from the JWT claim alone, with no profiles fallback", () => {
-    const definition = functions.slice(
-      functions.indexOf("CREATE OR REPLACE FUNCTION public.caller_org_id()"),
+  // Every org-scoped RLS policy is `USING (org_id = public.caller_org_id())`.
+  // A stale JWT claim must therefore be tied to a current, unarchived
+  // membership rather than trusted on its own.
+  it("requires a current membership for the JWT org claim, with no profiles fallback", () => {
+    const definition = membershipGuard.slice(
+      membershipGuard.indexOf("CREATE OR REPLACE FUNCTION public.caller_org_id()"),
     );
     const body = definition.slice(0, definition.indexOf("$$;") + 3);
 
-    expect(body).toContain("SELECT NULLIF(auth.jwt() ->> 'org_id', '')::UUID;");
+    expect(body).toContain("NULLIF(auth.jwt() ->> 'org_id', '')::UUID AS org_id");
+    expect(body).toContain("FROM public.organization_memberships AS membership");
+    expect(body).toContain("membership.user_id = auth.uid()");
+    expect(body).toContain("membership.org_id = claimed.org_id");
+    expect(body).toContain("membership.archived_at IS NULL");
     expect(body).not.toContain("profiles");
     expect(body).not.toContain("COALESCE");
   });
@@ -153,7 +155,9 @@ describe("org isolation SQL boundaries", () => {
 
     // Same definitions, not a description of them: this file must be runnable
     // on its own, with nothing left to copy by hand.
-    expect(patch).toContain("SELECT NULLIF(auth.jwt() ->> 'org_id', '')::UUID;");
+    expect(patch).toContain("NULLIF(auth.jwt() ->> 'org_id', '')::UUID AS org_id");
+    expect(patch).toContain("FROM public.organization_memberships AS membership");
+    expect(patch).toContain("membership.archived_at IS NULL");
     expect(patch).toContain("CREATE TRIGGER trg_membership_archived");
     expect(patch).toContain("WHERE s.supabase_session_id = v_session_id");
     expect(patch).toContain("IF v_was_default OR EXISTS (");

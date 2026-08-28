@@ -12,8 +12,9 @@
  */
 
 export const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
+const isLocalTarget = /^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/.test(BASE_URL);
 export const TEST_EMAIL = __ENV.TEST_EMAIL || "nicodamusalois@gmail.com";
-export const TEST_EMAILS = (__ENV.TEST_EMAILS || `${TEST_EMAIL},nicokosmas.dev@gmail.com`)
+export const TEST_EMAILS = (__ENV.TEST_EMAILS || TEST_EMAIL)
   .split(",")
   .map((email) => email.trim())
   .filter(Boolean);
@@ -48,7 +49,9 @@ export const scenarios = {
 };
 
 export const thresholds = {
-  http_req_duration: ["p(95)<500"], // 95% of reads < 500ms
+  // Local full-stack requests include the developer machine and local Supabase.
+  // Keep a bounded smoke budget there; deployed targets retain the tighter SLA.
+  http_req_duration: [isLocalTarget ? "p(95)<2000" : "p(95)<500"],
   http_req_failed: ["rate<0.01"], // <1% error rate
-  "http_req_duration{type:write}": ["p(95)<1000"], // writes < 1s
+  "http_req_duration{type:write}": [isLocalTarget ? "p(95)<2000" : "p(95)<1000"],
 };
