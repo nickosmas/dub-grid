@@ -7,7 +7,10 @@ this file, so there is a single source of truth.
 
 ## What this is
 
-A description of your project and the problem it solves.
+DubGrid is a multi-tenant employee scheduling platform for care facilities.
+It replaces spreadsheet scheduling with connected Next.js web and Expo mobile
+apps, shared domain packages, Supabase-backed real-time collaboration, and
+role-based organization access.
 
 This project is built with the **AI Blueprint**, a workflow layer, not an
 app skeleton. To start a new project, scaffold the app first in an empty folder
@@ -191,7 +194,7 @@ checks do not make the Blueprint unusable.
 
 <!-- blueprint:onboarding-required -->
 
-For a standard Next.js project. Change or remove if you're using something else.
+Current DubGrid commands:
 
 - Dev server: `npm run dev` (http://localhost:3000)
 - Build: `npm run build`

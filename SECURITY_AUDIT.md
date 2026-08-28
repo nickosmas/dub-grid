@@ -70,16 +70,17 @@ implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
 
 **Impact:** This app performs route gating, billing-lock enforcement, org
 suspension/archival redirects, and impersonation-context rewriting in
-`apps/web/src/middleware.ts`. The middleware-bypass advisories were therefore
+`apps/web/src/proxy.ts`. The proxy-bypass advisories were therefore
 directly relevant.
 
 > **Correction (2026-08-25):** at the time of this audit the middleware file
 > sat at `apps/web/middleware.ts` — outside the `src/` directory Next.js reads
 > when the app lives at `src/app` — so it was never invoked, and none of the
 > enforcement described in this document was actually running. The
-> middleware-bypass advisories above were moot for the same reason. Moved to
-> `apps/web/src/middleware.ts` and confirmed executing; the claims below now
-> hold. See the CHANGELOG entry under Unreleased / Security. Data exposure was bounded because the app correctly treats
+> middleware-bypass advisories above were moot for the same reason. It was
+> first moved under `src` and is now the Next.js request proxy at
+> `apps/web/src/proxy.ts`; the active request boundary has been confirmed
+> executing. See the CHANGELOG entry under Unreleased / Security. Data exposure was bounded because the app correctly treats
 > RLS as the real security boundary (all org-scoped tables enforce
 > `caller_org_id()`), so a bypass alone does not leak another tenant's rows.
 
@@ -120,7 +121,7 @@ providing defense-in-depth against cross-site cookie replay.
 
 ### F-4 — CSP `script-src` uses `'unsafe-inline'` (no nonce) — **Low** — ✅ Fixed
 
-**Location:** `apps/web/middleware.ts` (CSP generation, lines ~87-180)
+**Location:** `apps/web/src/proxy.ts` (CSP generation)
 
 **Fix history and current state (verified in code):**
 
@@ -139,7 +140,7 @@ then the split CSP was re-applied:
 2. `/billing-required/page.tsx` also has `export const dynamic = "force-dynamic"`
    (it is in the authed middleware path and would otherwise be statically
    prerendered with a nonce CSP it cannot carry).
-3. `apps/web/middleware.ts` now builds two CSP variants:
+3. `apps/web/src/proxy.ts` now builds two CSP variants:
    - **Authenticated app** (production): `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com` — no `'unsafe-inline'`
    - **Static/public pages** (marketing, login, auth flows): `script-src 'self' 'unsafe-inline' ...` — these are pre-rendered and hold no user data or injection sinks
    - **Development** (both variants): `'unsafe-inline'` so HMR/React Refresh work
@@ -232,7 +233,7 @@ auth.uid()`), self-action guard, admin-tier guard (admins cannot touch
   admin/super_admin/gridmaster or assign privileged roles), last-super_admin
   guard, advisory lock, idempotency, audit log, JWT refresh lock. Direct
   `org_role` UPDATEs blocked by `guard_org_role_change` trigger.
-- **Middleware JWT fallback** (`middleware.ts`) — `jwtVerify` then `decodeJwt`
+- **Proxy JWT fallback** (`proxy.ts`) — `jwtVerify` then `decodeJwt`
   fallback never trusts `gridmaster` from an unverified token; RLS is the real
   boundary. Matches documented invariant.
 - **Stripe webhook** (`api/stripe/webhook/route.ts`) — verifies
@@ -460,7 +461,7 @@ called with a cross-org id even when one is requested.
 #### F-15 — Impersonation cookie not cross-validated against `impersonation_sessions` — **Informational** — ✅ Fixed
 
 **Location:** `apps/web/src/lib/impersonation.ts`; consumers in
-`middleware.ts`, `api/organization/bootstrap/route.ts`,
+`proxy.ts`, `api/organization/bootstrap/route.ts`,
 `api/account/permissions/route.ts`.
 
 **Root cause:** the impersonation cookie is client-writable (set via

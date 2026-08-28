@@ -266,7 +266,7 @@ The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute interval
 
 ### Middleware Processing
 
-`apps/web/src/middleware.ts` processes auth cookies on every request:
+`apps/web/src/proxy.ts` processes auth cookies on every request:
 
 1. Creates a Supabase server client from request cookies via `createServerClient`
 2. Calls `supabase.auth.getSession()` to read the session
@@ -562,7 +562,7 @@ Sign in ───────────────────────►
                                   reads user_sessions.active_org_id
                                   sets JWT claims
 
-Navigate ──────────────────────► apps/web/src/middleware.ts
+Navigate ──────────────────────► apps/web/src/proxy.ts
                                   read auth cookie (sb-*-auth-token)
                                   verify JWT (JWKS; fallback to decodeJwt)
                                   read dubgrid-sandbox cookie → DB ownership check
@@ -647,6 +647,6 @@ Bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` **and** `a
 | `supabase/migrations/001_schema.sql`                          | `cookie_consents`, `profiles`, `user_sessions` schema                                                    |
 | `supabase/migrations/002_functions_triggers.sql`              | `custom_access_token_hook`, `flag_inactive_accounts`, `purge_scheduled_accounts`, `gdpr_erase_user_data` |
 | `supabase/migrations/003_rls_policies.sql`                    | `cookie_consents` RLS policies                                                                           |
-| `apps/web/src/middleware.ts`                                  | Auth cookie verification, sandbox + impersonation handling, RBAC                                         |
+| `apps/web/src/proxy.ts`                                       | Auth cookie verification, sandbox + impersonation handling, RBAC                                         |
 | `apps/mobile/src/features/consent/lib/consent.ts`             | Mobile consent store + ATT scaffolding                                                                   |
 | `apps/mobile/src/features/consent/components/ConsentGate.tsx` | Mobile first-launch consent sheet                                                                        |

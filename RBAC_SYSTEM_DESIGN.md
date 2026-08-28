@@ -9,7 +9,7 @@ Version 2.2 | Updated 2026-05-25 | Confidential
 
 > **Monorepo note:** DubGrid is an npm-workspaces + Turborepo monorepo. Two apps —
 > `@dubgrid/web` (Next.js 16 App Router, `apps/web`) and `@dubgrid/mobile`
-> (Expo SDK 54 / React Native, `apps/mobile`) — sit on top of 9 shared
+> (Expo SDK 54 / React Native, `apps/mobile`) — sit on top of 11 shared
 > `packages/*` libraries. All RBAC-relevant permission logic now lives in the
 > platform-neutral **`@dubgrid/authz`** package (`ROLE_LEVEL`, `ALL_PERMS` /
 > `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`,
@@ -20,13 +20,13 @@ Version 2.2 | Updated 2026-05-25 | Confidential
 > consumes these via `apps/web/src/features/permissions/` (`usePermissions.ts`,
 > `core`, `client`, `shared`, `index`); the mobile backend orchestration in
 > `@dubgrid/mobile-api-core` consumes `@dubgrid/authz` directly. Paths in this
-> document reflect the monorepo layout (`apps/web/...`, `apps/web/src/middleware.ts`).
+> document reflect the monorepo layout (`apps/web/...`, `apps/web/src/proxy.ts`).
 
 ---
 
 ## 1. System Overview & Architecture
 
-DubGrid is a multi-tenant SaaS scheduling platform governed by a four-tier RBAC model. This document defines the complete technical implementation — from database schema to Vercel Edge Middleware — with explicit strategies to eliminate every class of race condition that can arise during authentication, role changes, and concurrent data writes.
+DubGrid is a multi-tenant SaaS scheduling platform governed by a four-tier RBAC model. This document defines the technical implementation — from database schema to the Vercel edge request proxy — with explicit strategies to eliminate race conditions that can arise during authentication, role changes, and concurrent data writes.
 
 ### 1.1 The Four-Tier Hierarchy
 
@@ -787,13 +787,13 @@ $$;
 }
 ```
 
-> **Claims are at the TOP LEVEL** of the JWT, NOT inside `app_metadata`. This is critical — the middleware reads `payload.platform_role`, not `payload.app_metadata.role`.
+> **Claims are at the TOP LEVEL** of the JWT, NOT inside `app_metadata`. This is critical — the request proxy reads `payload.platform_role`, not `payload.app_metadata.role`.
 
 ---
 
 ## 6. Vercel Edge Middleware
 
-The middleware (`apps/web/src/middleware.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
+The Next.js request proxy (`apps/web/src/proxy.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
 
 - **Org access check (archived + suspended + billing)** — looks up `suspended_at`,
   `archived_at`, `subscription_status`, and `trial_ends_at` for the caller's org,
@@ -809,10 +809,10 @@ The middleware (`apps/web/src/middleware.ts`) runs at the CDN edge — geographi
   (force-dynamic) app and a `'unsafe-inline'` policy on static/public pages.
 - **`jwtVerify` → `decodeJwt` fallback** — see the security note below; this fallback is load-bearing and must not be removed.
 - **Claim backfill from DB** — if the verified/decoded claims are missing `platform_role`
-  or `org_role`, the middleware resolves them from `profiles` + `organization_memberships`
+  or `org_role`, the request proxy resolves them from `profiles` + `organization_memberships`
   (Redis-cached) rather than denying the request.
 
-Post-login gating that is **not** in the middleware — onboarding/setup state — is enforced
+Post-login gating that is **not** in the request proxy — onboarding/setup state — is enforced
 client-side by `OnboardingGate` (`apps/web/src/components/onboarding/OnboardingGate.tsx`),
 which reads the `@/features/onboarding/client` guards (`fetchOnboardingStatus`,
 `isOnboardingComplete`, `getOnboardingPhase`, `freezeOnboardingPhase`). While setup is
@@ -832,10 +832,10 @@ auth-settle gap so the gate / route guards do not bounce a just-logged-in user t
 | `{slug}.dubgrid.com/schedule`   | all authenticated org users     | Redirect → `/login`    |
 | `dubgrid.com`                   | unauthenticated (public routes) | N/A                    |
 
-> **`/people` is NOT gated by role in the middleware.** Any authenticated org member can
-> open it (the comment in `middleware.ts` says so explicitly); employee mutations are
+> **`/people` is NOT gated by role in the request proxy.** Any authenticated org member can
+> open it (the comment in `proxy.ts` says so explicitly); employee mutations are
 > gated deeper by `canManageEmployees` at the API + RLS layer. Only `/settings` is gated
-> to `admin` level and above in the middleware (page-level guards still enforce
+> to `admin` level and above in the request proxy (page-level guards still enforce
 > per-section permissions). The staff roster route is `/people`
 > (`apps/web/src/app/people/page.tsx`, `people/[id]/page.tsx`) — the legacy `/staff`
 > route no longer exists. The staff-configuration settings sub-route is
@@ -848,7 +848,7 @@ auth-settle gap so the gate / route guards do not bounce a just-logged-in user t
 ### 6.2 Middleware Implementation
 
 ```ts
-// apps/web/src/middleware.ts (Vercel Edge Runtime)
+// apps/web/src/proxy.ts (Vercel Edge Runtime)
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
@@ -880,12 +880,12 @@ function calculateEffectiveRole(claims: JWTClaims): string {
   return claims.platform_role === "gridmaster" ? "gridmaster" : (claims.org_role ?? "user");
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const host = req.headers.get("host") ?? "";
   const pathname = req.nextUrl.pathname;
   const subdomain = parseHost(host).subdomain;
 
-  // Public routes — no auth required (full list in apps/web/src/middleware.ts)
+  // Public routes — no auth required (full list in apps/web/src/proxy.ts)
   if (
     pathname === "/" ||
     pathname === "/login" ||
@@ -933,7 +933,7 @@ export async function middleware(req: NextRequest) {
   // Fallback: if claims are missing, resolve from DB
   if (!claims.platform_role || !claims.org_role) {
     // Fetch from profiles + organization_memberships
-    // (see apps/web/src/middleware.ts for full implementation)
+    // (see apps/web/src/proxy.ts for full implementation)
   }
 
   const effectiveRole = calculateEffectiveRole(claims);
@@ -979,12 +979,12 @@ export const config = {
 
 > **Security Note: Middleware is not the last line of defense**
 >
-> The Edge Middleware provides latency-optimized routing and UX-level gating. It is NOT the security layer — that role belongs exclusively to Supabase RLS (Section 4). A sophisticated attacker who bypasses middleware still hits RLS, which cannot be bypassed from the client.
+> The edge request proxy provides latency-optimized routing and UX-level gating. It is NOT the security layer — that role belongs exclusively to Supabase RLS (Section 4). A sophisticated attacker who bypasses the proxy still hits RLS, which cannot be bypassed from the client.
 >
 > **The `jwtVerify` → `decodeJwt` fallback MUST stay.** `jwtVerify` against the
 > remote JWKS can fail in production (key-fetch hiccups, clock skew, transient
-> network errors). When it does, the middleware falls back to the _unverified_
-> `decodeJwt` for **non-gridmaster** users — because RLS, not middleware, is the
+> network errors). When it does, the request proxy falls back to the _unverified_
+> `decodeJwt` for **non-gridmaster** users — because RLS, not the proxy, is the
 > real security boundary, and locking every admin/user out on a JWKS blip is
 > unacceptable. Gridmaster is the one exception: a `platform_role: 'gridmaster'`
 > claim coming from an unverified token is rejected outright. Removing this
@@ -1144,7 +1144,7 @@ const { data: session } = await supabase.rpc("start_impersonation", {
 
 // 2. RPC creates an impersonation_sessions row (30-min expiry).
 // 3. The impersonation context rides in the dubgrid-impersonation cookie,
-//    which the middleware re-verifies server-side against the DB on every request.
+//    which the request proxy re-verifies server-side against the DB on every request.
 // 4. Navigating to /gridmaster auto-ends the session (end_reason = 'navigation').
 
 // End impersonation (or it auto-expires after 30 min).
@@ -1187,7 +1187,7 @@ await supabase.rpc("end_impersonation", { p_session_id: session.session_id });
 > privilege state. DubGrid does **not** call a privileged `admin.signOut` Edge Function for
 > this. Instead a `jwt_refresh_locks` row makes the JWT hook return a `403` on the next
 > token mint (forcing re-auth after a role change), and for a suspended/archived org the
-> hook strips org claims while the middleware denies access — so no stale token can keep
+> hook strips org claims while the request proxy denies access — so no stale token can keep
 > elevated access.
 
 ### 10.2 user_sessions Table (Track Devices Individually)
@@ -1439,12 +1439,12 @@ The following features are recommended before a production launch.
 
 #### Multi-Factor Authentication (MFA) — Enrollment Done, Enforcement Advisory
 
-| Property         | Detail                                                                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.         |
-| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                          |
-| Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `middleware.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts. |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                                 |
+| Property         | Detail                                                                                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.    |
+| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                     |
+| Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `proxy.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts. |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                            |
 
 #### Failed Login Attempt Tracking & Account Lockout
 

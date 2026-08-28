@@ -27,7 +27,7 @@ If you discover a security vulnerability in DubGrid, please report it responsibl
 
 DubGrid implements defense-in-depth across every layer:
 
-### Edge Middleware (`apps/web/src/middleware.ts`)
+### Next.js request proxy (`apps/web/src/proxy.ts`)
 
 - JWT signature verification via Supabase JWKS endpoint (ES256)
 - Per-request nonce-based CSP for the authenticated app (`strict-dynamic`, no `unsafe-inline`); static/public pages use `unsafe-inline`

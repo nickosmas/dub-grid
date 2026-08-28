@@ -52,6 +52,11 @@ export type OrgLoginSeed =
 export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: OrgLoginSeed }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Same-org login → soft nav (smooth, no reload). After an ORG SWITCH → hard
   // nav: a soft nav leaves useOrganizationData's one-time org context pinned to
@@ -399,47 +404,49 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   return (
     <PublicRoute>
       <PageShell signInDisclaimer>
-        <Card>
-          {/* Logo — links to apex landing page */}
-          <a href={apexHref} className="dg-auth-logo-block dg-auth-logo-block--spacious">
-            <DubGridLogo size={52} />
-            <DubGridWordmark />
-          </a>
+        <div data-testid="organization-login" data-hydrated={isHydrated}>
+          <Card>
+            {/* Logo — links to apex landing page */}
+            <a href={apexHref} className="dg-auth-logo-block dg-auth-logo-block--spacious">
+              <DubGridLogo size={52} />
+              <DubGridWordmark />
+            </a>
 
-          <p className="dg-auth-org-prefix">Sign in to</p>
-          <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
+            <p className="dg-auth-org-prefix">Sign in to</p>
+            <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
 
-          <EmailPasswordForm
-            email={email}
-            setEmail={setEmail}
-            password={password}
-            setPassword={setPassword}
-            loading={loading}
-            onSubmit={handleSubmit}
-            submitLabel="Sign In"
-            forgotPasswordHref="/forgot-password"
-          />
+            <EmailPasswordForm
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              loading={loading}
+              onSubmit={handleSubmit}
+              submitLabel="Sign In"
+              forgotPasswordHref="/forgot-password"
+            />
 
-          {gridmasterPortalRequired ? (
-            <p className="dg-form-hint dg-auth-progress" role="alert">
-              This account uses the Gridmaster Portal.{" "}
-              <a href={gridmasterPortalHref}>Open portal</a> to sign in and impersonate an
-              organization.
-            </p>
-          ) : null}
+            {gridmasterPortalRequired ? (
+              <p className="dg-form-hint dg-auth-progress" role="alert">
+                This account uses the Gridmaster Portal.{" "}
+                <a href={gridmasterPortalHref}>Open portal</a> to sign in and impersonate an
+                organization.
+              </p>
+            ) : null}
 
-          <div className="dg-auth-org-navigation">
-            <Button
-              type="button"
-              onClick={() => {
-                window.location.href = withThemeParam(apexLoginHref(), theme);
-              }}
-              className="dg-auth-link"
-            >
-              &larr; Use a different organization
-            </Button>
-          </div>
-        </Card>
+            <div className="dg-auth-org-navigation">
+              <Button
+                type="button"
+                onClick={() => {
+                  window.location.href = withThemeParam(apexLoginHref(), theme);
+                }}
+                className="dg-auth-link"
+              >
+                &larr; Use a different organization
+              </Button>
+            </div>
+          </Card>
+        </div>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
       </PageShell>
     </PublicRoute>

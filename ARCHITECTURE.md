@@ -92,7 +92,7 @@ The mobile app intentionally has **no** dependency on Supabase packages or serve
 
 ### Subdomain-Based Routing
 
-Every organization gets a unique subdomain. The middleware resolves the subdomain to an org context before any page renders.
+Every organization gets a unique subdomain. The request proxy resolves the subdomain to an org context before any page renders.
 
 | URL Pattern                 | Resolution                       |
 | --------------------------- | -------------------------------- |
@@ -105,9 +105,9 @@ Every organization gets a unique subdomain. The middleware resolves the subdomai
 
 Tenant isolation is enforced at three levels:
 
-1. **Middleware** — Verifies the user's JWT `org_slug` matches the subdomain. Redirects on mismatch. Also performs a Redis-cached org-suspension check.
+1. **Request proxy** — Verifies the user's JWT `org_slug` matches the subdomain. Redirects on mismatch. Also performs a Redis-cached org-suspension check.
 2. **Application** — All data queries (server-side) include `org_id` from the authenticated session.
-3. **Database (RLS)** — Every table policy filters by `caller_org_id()`, extracted from the JWT. Even if application code is buggy, RLS prevents cross-tenant data access. **RLS is the real security boundary** — middleware is a fast first filter, not the sole gate.
+3. **Database (RLS)** — Every table policy filters by `caller_org_id()`, extracted from the JWT. Even if application code is buggy, RLS prevents cross-tenant data access. **RLS is the real security boundary** — the request proxy is a fast first filter, not the sole gate.
 
 ### Local Development
 
@@ -119,11 +119,11 @@ Subdomains are simulated using `dubgrid.local` entries in `/etc/hosts`. The `par
 
 ### Three Security Layers
 
-| Layer                                              | Where              | What It Does                                                                             | Failure Mode                  |
-| -------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------- |
-| **Edge Middleware** (`apps/web/src/middleware.ts`) | Vercel CDN edge    | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login`         |
-| **Custom JWT Claims**                              | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in            | User gets default `user` role |
-| **Row-Level Security**                             | PostgreSQL         | Every query filtered by `caller_org_id()` and role checks                                | Query returns empty / blocked |
+| Layer                                               | Where              | What It Does                                                                             | Failure Mode                  |
+| --------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------- |
+| **Next.js request proxy** (`apps/web/src/proxy.ts`) | Vercel CDN edge    | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login`         |
+| **Custom JWT Claims**                               | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in            | User gets default `user` role |
+| **Row-Level Security**                              | PostgreSQL         | Every query filtered by `caller_org_id()` and role checks                                | Query returns empty / blocked |
 
 > **Middleware JWT fallback:** the `jwtVerify` catch block falls back to `decodeJwt` (unverified) for non-gridmaster users — `jwtVerify` can fail in production, and RLS is the real boundary. Gridmaster is always blocked from unverified tokens. This fallback must never be removed.
 
@@ -457,7 +457,7 @@ DubGrid uses Supabase Realtime for three purposes:
 
 - **Edge Middleware** — runs at the CDN edge for low-latency RBAC, subdomain routing, and org-suspension checks.
 - **Static Prerendering** — all routes use simple page files (no catch-all routes) to enable static optimization.
-- **Security Headers** — static headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are configured in `apps/web/next.config.ts`. The per-request Content-Security-Policy is built in `apps/web/src/middleware.ts`: authenticated pages get a nonce + `strict-dynamic` policy in production.
+- **Security Headers** — static headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are configured in `apps/web/next.config.ts`. The per-request Content-Security-Policy is built in `apps/web/src/proxy.ts`: authenticated pages get a nonce + `strict-dynamic` policy in production.
 
 ### Supabase
 
@@ -507,14 +507,14 @@ DubGrid uses Supabase Realtime for three purposes:
 | **4-file migration strategy**             | Eliminates migration ordering issues, makes the full schema readable, simplifies resets. Trade-off: merge conflicts on a team, but acceptable at current size.                                                                                       |
 | **Subdomain-based multi-tenancy**         | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access.                                                                                                                         |
 | **JWT claims at top level**               | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting Supabase defaults to, which is harder to parse at the edge.                                                                                                     |
-| **RLS as the real security boundary**     | Middleware is a fast first filter that can fail; RLS at the database is the authoritative gate. Middleware keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out.                          |
+| **RLS as the real security boundary**     | The request proxy is a fast first filter that can fail; RLS at the database is the authoritative gate. The proxy keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out.                    |
 | **Per-person admin permissions (JSONB)**  | More flexible than fixed roles. 25 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*`. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
 | **Browser never touches data tables**     | All app data flows browser → `features/*/client/api.ts` → Route Handler → `lib/db/*`. Centralizes authorization and keeps Supabase access server-side; mobile follows the same shape via `/api/mobile/v1/*` → `mobile-api-core`.                     |
 | **No global state store**                 | React Query handles server state; local state handles UI. Avoids Redux/Zustand boilerplate for a primarily server-data-driven app.                                                                                                                   |
 | **Optimistic locking over pessimistic**   | Allows concurrent editing without blocking. Lock violations are rare (cell locks reduce conflicts further) and the UX beats waiting for locks.                                                                                                       |
 | **Simple routes (no catch-all)**          | Vercel statically prerenders simple routes at build time. Catch-all routes (`[[...slug]]`) force dynamic serverless rendering.                                                                                                                       |
 | **Invite-only registration**              | Care facilities control who has access. No public sign-up; invitations link to existing employee records.                                                                                                                                            |
-| **Three security layers**                 | Defense in depth: middleware for speed, JWT claims for identity, RLS for correctness. Any single layer can fail without compromising security.                                                                                                       |
+| **Three security layers**                 | Defense in depth: request proxy for speed, JWT claims for identity, RLS for correctness. Any single layer can fail without compromising security.                                                                                                    |
 
 ---
 
