@@ -17,7 +17,7 @@ describe("OrganizationBootstrapRecovery", () => {
       render(<OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={onRetry} />);
 
       expect(
-        screen.getByRole("heading", { name: "Getting your workspace ready" }),
+        screen.getByRole("heading", { name: "Getting your organization ready" }),
       ).toBeInTheDocument();
       expect(
         screen.getByText("Just a moment while we prepare everything you need."),

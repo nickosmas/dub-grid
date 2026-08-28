@@ -15,7 +15,7 @@ describe("AuthTransitionScreen", () => {
       const view = render(<AuthTransitionScreen onRetry={vi.fn()} phase="organization" />);
 
       expect(
-        screen.getByRole("heading", { name: "Getting your workspace ready" }),
+        screen.getByRole("heading", { name: "Getting your organization ready" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
 
