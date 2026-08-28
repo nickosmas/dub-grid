@@ -18,13 +18,13 @@ import {
   BellRing,
   CalendarDays,
   KeyRound,
-  LockKeyhole,
   Users,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
   Repeat,
   Settings,
+  ScrollText,
   Radio,
   BarChart3,
   Mail,
@@ -120,10 +120,9 @@ const SECURITY_FEATURES: Feature[] = [
       "Stay informed about password, email, MFA, new-device, and account-access changes.",
   },
   {
-    icon: LockKeyhole,
-    title: "Protected organization data",
-    description:
-      "Data is encrypted in transit and at rest, with row-level access controls for each organization.",
+    icon: ScrollText,
+    title: "Activity history",
+    description: "Review role, membership, billing, and configuration changes in one place.",
   },
 ];
 
