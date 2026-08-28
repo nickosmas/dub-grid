@@ -31,8 +31,8 @@ The loop we use for every feature. The spec for the feature being built lives in
 @blueprint/context/current-feature.md.
 
 Run `/feature` (or `/fix` for a bug or change that isn't a planned feature) to
-write the spec, `/implement` to build it on a branch, and `/complete` to log it
-and merge. The numbered loop below is what those skills follow.
+write the spec, `/implement` to build it on `dev`, and `/complete` to log it.
+The numbered loop below is what those skills follow.
 
 The skills are the structured path, not a requirement. You can also just describe
 a feature, fix, or change in chat at any time and we'll build it the same way; the
@@ -45,7 +45,9 @@ something done.
    feature (scope, dependencies, size); it writes nothing. Then run `/feature`
    (no number = the next unchecked item in `build-plan.md`) to generate
    @blueprint/context/current-feature.md, then review it together before any code.
-2. **Branch** - Create a new branch for the feature/fix.
+2. **Development branch** - Confirm `dev` is checked out. All implementation
+   and development commits stay on `dev`; never create a feature, fix, or
+   rollback branch.
 3. **Implement** - Build one small step from the spec at a time, not the whole
    feature at once.
 4. **Review** - Show the diff (not full files), with a short summary: what the
@@ -79,16 +81,18 @@ something done.
    the real feature-level commit. Verify, or the fallback checks, must pass first.
    When implementation is done, end with a compact review packet: changed files,
    checks run, manual try path, risks, and next action.
-10. **Safety + log** - `/complete` first checks the active spec, branch, changed
+10. **Safety + log** - `/complete` first checks the active spec, that `dev` is
+    checked out, and changed
     files, Verify or fallback check evidence, manual try path, and adapter sync when
     workflow files changed. Then it archives the spec to `blueprint/history/features/NN-name.md` (or
     `blueprint/history/fixes/`), checks the feature off in `blueprint/build-plan.md`, and
     resets `blueprint/context/current-feature.md` to its stub.
-11. **Feature commit** - `/complete` stages everything on the branch (step work
+11. **Feature commit** - `/complete` stages everything on `dev` (step work
     plus the logging changes) into one conventional feature commit.
-12. **Squash-merge** - `/complete` squash-merges the branch to main (explicit yes)
-    and deletes it, so the feature lands as one commit. Then it must ask
-    separately before pushing main; merge approval does not approve a push.
+12. **Release PR** - Keep `main` untouched during development. When explicitly
+    asked to prepare a release, create or update a PR from `dev` to `main` only
+    after auditing the diff and included commits. Do not merge, rewrite, or push
+    `main` without separate explicit authorization.
 13. **Release prep (optional)** - run `/release render` or `/release vercel`
     after a completed feature or milestone when you want local provider config,
     env var review, build/start checks, and a smoke-test path. `/release` must
@@ -97,7 +101,7 @@ something done.
 
 **Resuming after a context clear.** Progress lives in files, not the chat:
 `current-feature.md` holds the spec with each step checked off as it's done, and git
-holds the code (branch, commits, working tree). A fresh session auto-loads
+holds the code (`dev`, commits, working tree). A fresh session auto-loads
 `current-feature.md` through the project instructions (`AGENTS.md`, and
 `CLAUDE.md` for Claude Code), so `/implement` or `$implement` just continues from
 the first unchecked step - no separate save/load needed.
@@ -108,7 +112,7 @@ passes. If a required check fails, fix the issue first.
 Autopilot exists only as an explicit opt-in command: `/autopilot` or
 `$autopilot`. Do not suggest it as the default next action. When invoked, it runs
 one bounded pass without pausing after each passing implementation step. It may
-create checkpoint commits on the feature or fix branch after passing steps. It
+create checkpoint commits on `dev` after passing steps. It
 stops before `/complete`, merge, push, deploy, publish, destructive actions, or
 hiding failing checks.
 
@@ -123,10 +127,9 @@ decisions.
 
 ## Branching
 
-A new branch for every feature, fix, or rollback, using the prefixes in
-`blueprint/config.json`. Ask to delete the branch once merged. Continuous Mode's
-explicit invocation already authorizes deletion of each locally merged feature
-branch.
+Use `dev` for every feature, fix, rollback, and checkpoint. Never create a
+development branch or work on `main`. `main` is reserved for an explicitly
+requested release PR from `dev`.
 
 ## Commits
 
