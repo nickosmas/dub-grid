@@ -1,58 +1,44 @@
-# Stabilize local Playwright e2e execution
+# Improve landing screenshot fidelity and device framing
 
 **Type:** Fix
 
-**Status:** verified
+**Status:** ready for pull request
 
 ## Problem
 
-`npm run test:e2e` fails locally for two unrelated environment and runner
-reliability reasons. Firefox and WebKit executables have not been installed, and
-the local suite starts unbounded parallel workers against the Next development
-server. The latter causes Chromium navigation timeouts even though the same
-eight tests pass with one worker.
+Landing-page web screenshots look softer than their supplied sources and lack
+the visual framing that makes them read as product devices.
 
 ## Fix
 
-Make the repository's e2e command use a safe local worker limit while retaining
-the configured browser matrix. Document the required Playwright browser
-installation in the test command guidance so a fresh checkout has a direct
-recovery path. Do not change application behavior or reduce browser coverage.
+Keep the supplied screenshots at high enough encoded resolution for their
+rendered sizes, render them without avoidable browser downscaling, and add a
+landing-only theme-aware bezel. The bezel is white in light mode and gray in
+dark mode. Preserve the existing screenshot selection, layout, and responsive
+behavior.
 
 ## Build steps
 
-1. [x] Bound local Playwright worker concurrency in the shared configuration and
-       document the browser-install prerequisite for `test:e2e`.
+1. [x] Inspect the source and rendered image sizing, then replace any
+       undersized or over-compressed landing screenshot assets.
 
-   Done when: `npm run test:e2e` uses the full Chromium, Firefox, and WebKit
-   projects with a local worker limit that avoids development-server contention,
-   and the setup instruction identifies the exact browser-install command.
+   Done when: each rendered web screenshot uses an appropriately sized source
+   without visible compression or enlargement artifacts.
 
-2. [x] Wait for the login form to hydrate in every configured browser and keep
-       the People smoke test synchronized with the route transition.
+2. [x] Add a themed device bezel to landing web screenshots and cover it in the
+       existing landing browser tests.
 
-   Done when: WebKit submits the client login request after the login page is
-   interactive, and the People smoke test still proves that activating the
-   People navigation reaches `/people` without relying on a fixed delay.
+   Done when: web screenshots have a white bezel in light mode and a gray bezel
+   in dark mode without layout shift or horizontal overflow.
 
-3. [x] Make the default local load suites use an organization-login test account
-       and a bounded local full-stack latency budget.
+3. [ ] Create a `dev` to `main` pull request containing the retained landing
+       work and this visual fix.
 
-   Done when: both local k6 smoke suites reject failed requests while allowing
-   local machine and local Supabase overhead, and non-local targets retain the
-   stricter deployed-service thresholds.
-
-4. [x] Repair F-06 - revoke all sessions when an organization membership is archived.
-
-   Done when: removing a user invalidates their active sessions before the
-   endpoint returns, and focused coverage proves the revocation hook runs for
-   the archived membership.
+   Done when: the PR compares `dev` against `main` and includes every commit on
+   `dev` that is not yet in `main`.
 
 ## Verify
 
-- Install the configured Playwright browsers.
-- Run `npm run test:e2e` and confirm all browser projects complete without
-  navigation timeouts.
-- Run `npm run test:load` and `npm run test:load:auth` against the production
-  server on port 3000.
-- Run the focused organization-access route tests and session-revocation tests.
+- Run the focused landing Playwright tests at desktop and mobile widths.
+- Inspect the rendered landing page in both themes.
+- Run the web type check and production build.
