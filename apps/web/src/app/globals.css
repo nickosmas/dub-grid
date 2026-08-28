@@ -640,7 +640,7 @@ textarea {
 }
 
 .dark .landing-hero-gradient {
-  background: linear-gradient(180deg, #0b2d75 0%, #1d3aa0 38%, #0a1442 68%, #050609 100%);
+  background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 38%, #071535 68%, #050609 100%);
 }
 
 .landing-nav {
@@ -650,7 +650,7 @@ textarea {
 }
 
 .dark .landing-nav {
-  background: rgba(11, 45, 117, 0.55);
+  background: rgba(29, 58, 160, 0.55);
 }
 
 .landing-nav-sign-in {
@@ -762,7 +762,7 @@ textarea {
 }
 
 .dark .landing-mobile-menu {
-  background: linear-gradient(180deg, #0b2d75 0%, #1d3aa0 42%, #0a1442 70%, #050609 100%);
+  background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 42%, #071535 70%, #050609 100%);
 }
 
 .landing-screenshot {

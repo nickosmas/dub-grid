@@ -105,4 +105,9 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
     "border-top-color",
     "rgb(59, 66, 82)",
   );
+
+  await expect(page.locator(".landing-hero-gradient")).toHaveCSS(
+    "background-image",
+    "linear-gradient(rgb(29, 58, 160) 0%, rgb(11, 45, 117) 38%, rgb(7, 21, 53) 68%, rgb(5, 6, 9) 100%)",
+  );
 });
