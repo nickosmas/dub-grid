@@ -42,6 +42,12 @@ recovery path. Do not change application behavior or reduce browser coverage.
    local machine and local Supabase overhead, and non-local targets retain the
    stricter deployed-service thresholds.
 
+4. [x] Repair F-06 - revoke all sessions when an organization membership is archived.
+
+   Done when: removing a user invalidates their active sessions before the
+   endpoint returns, and focused coverage proves the revocation hook runs for
+   the archived membership.
+
 ## Verify
 
 - Install the configured Playwright browsers.
@@ -49,3 +55,4 @@ recovery path. Do not change application behavior or reduce browser coverage.
   navigation timeouts.
 - Run `npm run test:load` and `npm run test:load:auth` against the production
   server on port 3000.
+- Run the focused organization-access route tests and session-revocation tests.

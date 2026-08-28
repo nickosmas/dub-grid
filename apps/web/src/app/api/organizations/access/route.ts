@@ -15,6 +15,7 @@ import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { READ_ONLY_PERMS } from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -461,6 +462,12 @@ export async function DELETE(req: NextRequest) {
       if (latestUser) return buildConflictResponse(latestUser);
       return NextResponse.json({ error: "User membership not found" }, { status: 404 });
     }
+
+    // RLS derives the tenant from the token's org claim. Archiving the
+    // membership prevents future refreshes, but does not invalidate an access
+    // token that has already been issued. Revoke it before responding so the
+    // former member cannot continue reading this organization with that token.
+    await revokeAllUserSessions(userId);
 
     await writeAuditEntry({
       orgId,
