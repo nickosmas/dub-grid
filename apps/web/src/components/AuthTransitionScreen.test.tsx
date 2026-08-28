@@ -15,7 +15,7 @@ describe("AuthTransitionScreen", () => {
       const view = render(<AuthTransitionScreen onRetry={vi.fn()} phase="organization" />);
 
       expect(
-        screen.getByRole("heading", { name: "Preparing your Organization" }),
+        screen.getByRole("heading", { name: "Getting your organization ready" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
 
@@ -30,7 +30,7 @@ describe("AuthTransitionScreen", () => {
       });
       expect(
         screen.getByText(
-          "This is taking longer than usual. We’re still working in the background.",
+          "This is taking a little longer than usual. We’re still getting things ready.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();

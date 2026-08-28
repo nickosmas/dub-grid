@@ -8,7 +8,7 @@ All routes live under `apps/web/src/app/api/`.
 
 ## Authentication
 
-Authenticated endpoints require a valid Supabase session cookie (`sb-*-auth-token`). The edge middleware verifies JWT claims and injects `x-dubgrid-role`, `x-dubgrid-org-id`, and `x-dubgrid-org-slug` headers into every request.
+Authenticated endpoints require a valid Supabase session cookie (`sb-*-auth-token`). The Next.js request proxy verifies JWT claims and injects `x-dubgrid-role`, `x-dubgrid-org-id`, and `x-dubgrid-org-slug` headers into every request.
 
 The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` header instead of cookies.
 
@@ -27,6 +27,7 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 | POST   | `/api/consent`              | Record cookie consent preference                                          | None                                                   |
 | GET    | `/api/invitations/lookup`   | Look up an invitation by token (accept-invite page)                       | None                                                   |
 | POST   | `/api/invitations/register` | Create the invitee's pre-confirmed auth account (token is the credential) | `apiLimiter` per IP + `emailTargetLimiter` per address |
+| POST   | `/api/users/check-email`    | Check email availability for supported public flows                       | `apiLimiter` per IP                                    |
 
 ---
 
@@ -38,6 +39,7 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 | POST   | `/api/auth/organizations`  | Switch active organization (calls `switch_org` RPC)                             |
 | POST   | `/api/auth/start-trial`    | Start 14-day trial on first super_admin login (calls `start_trial_for_org` RPC) |
 | POST   | `/api/auth/track-session`  | Record per-device session entry                                                 |
+| POST   | `/api/auth/sign-out`       | Perform the server-side portion of local sign-out                               |
 | GET    | `/api/auth/data-export`    | GDPR personal data export (JSON download)                                       |
 | POST   | `/api/auth/gdpr-erase`     | GDPR full data anonymization                                                    |
 | DELETE | `/api/auth/delete-account` | Delete the authenticated user's account                                         |
@@ -92,25 +94,21 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 | PUT    | `/api/organizations/settings`           | Update org settings                                       |
 | GET    | `/api/onboarding`                       | Get onboarding state                                      |
 | POST   | `/api/onboarding`                       | Advance or complete onboarding step                       |
-| PUT    | `/api/settings/config`                  | —                                                         |
-| GET    | `/api/settings/config`                  | Read/write org-level config overrides                     |
+| GET    | `/api/settings/config`                  | Read org-level config overrides                           |
+| POST   | `/api/settings/config`                  | Update org-level config overrides                         |
 
 ---
 
 ### Employees
 
-| Method | Path                                 | Purpose                                            |
-| ------ | ------------------------------------ | -------------------------------------------------- |
-| POST   | `/api/employees/manage`              | Create or update an employee record                |
-| POST   | `/api/employees/status`              | Update employee status (active/benched/terminated) |
-| PATCH  | `/api/employees/identity`            | Update employee identity fields                    |
-| POST   | `/api/employees/from-user`           | Create an employee record from an existing user    |
-| POST   | `/api/employees/from-user/reconcile` | Reconcile user-to-employee link                    |
-| POST   | `/api/employees/link-user`           | Link an employee record to a user account          |
-| POST   | `/api/employees/link-user/reconcile` | Reconcile employee-to-user link                    |
-| GET    | `/api/people/change-requests`        | List pending people change requests                |
-| PATCH  | `/api/people/change-requests/[id]`   | Approve or reject a people change request          |
-| POST   | `/api/import/employees`              | Bulk-import employees from CSV                     |
+| Method | Path                               | Purpose                                            |
+| ------ | ---------------------------------- | -------------------------------------------------- |
+| POST   | `/api/employees/manage`            | Create or update an employee record                |
+| POST   | `/api/employees/status`            | Update employee status (active/benched/terminated) |
+| PATCH  | `/api/employees/identity`          | Update employee identity fields                    |
+| GET    | `/api/people/change-requests`      | List pending people change requests                |
+| PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request          |
+| POST   | `/api/import/employees`            | Bulk-import employees from CSV                     |
 
 ---
 
@@ -205,7 +203,6 @@ All gridmaster routes require `platform_role = 'gridmaster'` in the JWT. They ar
 | PATCH     | `/api/gridmaster/users`                       | Update a user's platform state                   |
 | GET       | `/api/gridmaster/users/[userId]/memberships`  | All org memberships for a user                   |
 | POST      | `/api/gridmaster/users/[userId]/force-logout` | Terminate all sessions for a user                |
-| GET       | `/api/gridmaster/organizations/manage`        | —                                                |
 | POST      | `/api/gridmaster/organizations/manage`        | Manage org lifecycle (suspend, restore, archive) |
 | GET       | `/api/gridmaster/invitations`                 | List invitations across all orgs                 |
 | GET       | `/api/gridmaster/audit-log`                   | Paginated audit log                              |
@@ -218,7 +215,6 @@ All gridmaster routes require `platform_role = 'gridmaster'` in the JWT. They ar
 | GET       | `/api/gridmaster/compliance`                  | Compliance report                                |
 | GET       | `/api/gridmaster/security`                    | Security overview                                |
 | GET       | `/api/gridmaster/security/sessions`           | Active sessions across orgs                      |
-| POST      | `/api/gridmaster/delete-org`                  | Hard-delete an org (gridmaster only)             |
 | POST      | `/api/gridmaster/password-reset`              | Force a password reset for any user              |
 | GET       | `/api/gridmaster/impersonation`               | Impersonation history                            |
 | POST      | `/api/gridmaster/impersonation`               | Start an impersonation session                   |
@@ -256,13 +252,22 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 
 ### People
 
-| Method      | Path                                    | Purpose                                     |
-| ----------- | --------------------------------------- | ------------------------------------------- |
-| GET         | `/api/mobile/v1/people`                 | Paginated people directory                  |
-| GET         | `/api/mobile/v1/people/[id]`            | Person detail                               |
-| PATCH       | `/api/mobile/v1/people/[id]`            | Update a person record                      |
-| PATCH       | `/api/mobile/v1/people/[id]/status`     | Update employee status                      |
-| POST/DELETE | `/api/mobile/v1/people/[id]/invitation` | Create or revoke an invitation for a person |
+| Method      | Path                                           | Purpose                                     |
+| ----------- | ---------------------------------------------- | ------------------------------------------- |
+| GET         | `/api/mobile/v1/people`                        | Paginated people directory                  |
+| GET         | `/api/mobile/v1/people/[id]`                   | Person detail                               |
+| PATCH       | `/api/mobile/v1/people/[id]`                   | Update a person record                      |
+| PATCH       | `/api/mobile/v1/people/[id]/status`            | Update employee status                      |
+| POST/DELETE | `/api/mobile/v1/people/[id]/invitation`        | Create or revoke an invitation for a person |
+| PUT/DELETE  | `/api/mobile/v1/people/[id]/management-access` | Grant or revoke management access           |
+
+### Management Users
+
+| Method      | Path                                                    | Purpose                                |
+| ----------- | ------------------------------------------------------- | -------------------------------------- |
+| GET, POST   | `/api/mobile/v1/management-users`                       | List or create mobile management users |
+| PUT, DELETE | `/api/mobile/v1/management-users/[personId]`            | Update or remove a management user     |
+| POST        | `/api/mobile/v1/management-users/[personId]/invitation` | Send a management-user invitation      |
 
 ### Notifications
 
@@ -281,6 +286,7 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 | GET      | `/api/mobile/v1/profile`                          | Authenticated user's profile       |
 | PATCH    | `/api/mobile/v1/profile/account`                  | Update account fields              |
 | PATCH    | `/api/mobile/v1/profile/phone`                    | Update phone number                |
+| PATCH    | `/api/mobile/v1/profile/mfa-status`               | Persist post-enrollment MFA status |
 | GET      | `/api/mobile/v1/profile/change-requests`          | List pending change requests       |
 | POST     | `/api/mobile/v1/profile/change-requests`          | Submit a change request            |
 | PATCH    | `/api/mobile/v1/profile/change-requests/[id]`     | Approve or reject a change request |

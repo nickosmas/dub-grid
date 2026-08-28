@@ -41,7 +41,7 @@ Before approving any change, verify:
 
 - [ ] All mutation endpoints call `validateCsrfOrigin` before processing the body.
 - [ ] All Route Handlers and Server Actions validate input with Zod before using it.
-- [ ] Authenticated endpoints call `requireAuthenticatedUser` or `requireOrgPermissions` before touching data. Session checks are inside the handler, not only in middleware.
+- [ ] Authenticated endpoints call `requireAuthenticatedUser` or `requireOrgPermissions` before touching data. Session checks are inside the handler, not only in the request proxy.
 - [ ] `requireOrgPermissions` returns the effective (sandbox-redirected) `orgId`. Mutations use that value, never a raw client-supplied `orgId`.
 - [ ] Destructive org mutations call `forbidIfSandboxCookie` to block sandbox-to-production escalation.
 - [ ] Self-action guards: no user can demote, bench, terminate, or remove their own account. Verify the `isSelfAction` check exists in new people-management code.

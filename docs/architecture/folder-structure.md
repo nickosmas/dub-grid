@@ -1,13 +1,13 @@
 # Folder Structure
 
-DubGrid is an npm workspaces monorepo orchestrated by Turborepo. There are two apps and 10 platform-neutral packages.
+DubGrid is an npm workspaces monorepo orchestrated by Turborepo. There are two apps and 11 platform-neutral packages.
 
 ```
 dub-grid/
 ├── apps/
 │   ├── web/          # @dubgrid/web — Next.js 16 / React 19 / Tailwind v4
 │   └── mobile/       # @dubgrid/mobile — Expo SDK 54 / React Native
-├── packages/         # 10 platform-neutral shared workspaces
+├── packages/         # 11 platform-neutral shared workspaces
 ├── supabase/         # Supabase config, migrations (4 files only), seed
 ├── load-tests/       # k6 load test scripts
 ├── scripts/          # CLI utilities (db reset, type generation, etc.)
@@ -118,7 +118,7 @@ apps/web/
 │   ├── types/                  # App-level TypeScript types
 │   └── __tests__/              # Cross-cutting unit tests and test helpers
 │
-├── middleware.ts               # Edge middleware: JWT verification, RBAC, org suspension
+├── src/proxy.ts                # Next.js request proxy: JWT verification, RBAC, org suspension
 ├── next.config.ts              # Next.js config, security headers, CSP
 ├── vitest.config.mts           # Vitest config (jsdom environment)
 └── package.json                # @dubgrid/web workspace
@@ -179,7 +179,7 @@ The mobile app communicates exclusively with `/api/mobile/v1/*` on the web app. 
 
 ## packages — Platform-Neutral Shared Workspaces
 
-All 10 packages must remain platform-neutral: no Next.js, Expo, React Native, DOM, or Node.js-only imports. A change to any package affects both apps.
+All 11 packages must remain platform-neutral: no Next.js, Expo, React Native, DOM, or Node.js-only imports. A change to any package affects both apps.
 
 | Package                    | Purpose                                                                                                                                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

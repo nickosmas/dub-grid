@@ -1,6 +1,10 @@
 # DubGrid
 
-Multi-tenant employee scheduling platform for care facilities. Replaces spreadsheet-based scheduling with a modern web app supporting multiple organizations, real-time collaboration, and comprehensive role-based access control.
+Multi-tenant employee scheduling platform for care facilities. DubGrid replaces spreadsheet-based scheduling with connected web and Expo mobile apps, real-time collaboration, and comprehensive role-based access control.
+
+## Current Product State
+
+DubGrid is an active, full-stack monorepo rather than a starter application. The web app is the primary scheduling and organization-management surface; the companion Expo app gives staff and managers access to schedules, requests, people, alerts, and account settings on the go. Both clients use the same authenticated API contracts, organization boundaries, and shared domain packages.
 
 ## Features
 
@@ -11,6 +15,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Draft/Publish Workflow** — All edits are drafts until published; discard or recover across sessions
 - **Recurring Shifts** — Day-of-week templates and repeating series (daily, weekly, biweekly)
 - **Real-Time Collaboration** — Live sync via Supabase Realtime with cell locks and presence indicators
+- **Web + Mobile** — Next.js web app plus an Expo mobile app for schedules, people, requests, alerts, and account settings
 - **Dashboard Analytics** — KPI cards, coverage charts, shift breakdowns, activity feeds with expandable detail views
 - **Staff Management** — Full employee lifecycle (add, edit, bench, terminate) with certifications, roles, and focus areas
 - **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity
@@ -21,6 +26,9 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Test Sandbox** — Clone an org's config into an isolated, time-limited sandbox you enter via an HttpOnly cookie (no JWT/session-context hop)
 - **Invite-Only Registration** — No public sign-up; 72-hour invitation tokens linked to employee records
 - **Password Reset & Email Verification** — Forgot password flow, password strength meter, email verification for new accounts
+- **Account Security** — TOTP multi-factor authentication, session/device management, security activity alerts, and account-recovery flows
+- **Resilient Auth & Onboarding** — Explicit recovery states for slow or failed organization bootstrap, rather than an empty authenticated shell
+- **Notification Inbox** — Searchable, filterable web and mobile inboxes with bulk actions, archiving, and push/deep-link support
 - **Print & Export** — Configurable print layout with legend, focus area selection, and date range; PDF/CSV export plus an iCalendar (`.ics`) feed
 
 ## Tech Stack
@@ -61,7 +69,13 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 npm install
 ```
 
-2. **Set up environment variables:**
+2. **Install Playwright browsers for end-to-end tests:**
+
+```bash
+npx playwright install chromium firefox webkit
+```
+
+3. **Set up environment variables:**
 
 ```bash
 cp .env.example .env.local
@@ -77,7 +91,7 @@ SUPABASE_SECRET_KEY=your-service-role-key
 # NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 ```
 
-3. **Start Supabase locally:**
+4. **Start Supabase locally:**
 
 ```bash
 supabase start
@@ -130,10 +144,10 @@ apps/
 │   │   ├── hooks/                  # Web-only React hooks
 │   │   ├── lib/                    # Data access, utilities, integrations
 │   │   ├── types/                  # Web TypeScript types
+│   │   ├── proxy.ts                # Next.js request proxy for RBAC, CSP, billing, and subdomain routing
 │   │   └── __tests__/              # Web unit + component tests
 │   ├── public/                     # Static web assets
 │   ├── messages/                   # next-intl locale messages
-│   ├── middleware.ts               # Edge middleware for RBAC + subdomain routing
 │   └── next.config.ts              # Next.js config + security headers
 │
 ├── mobile/
@@ -142,7 +156,7 @@ apps/
 │       ├── features/               # auth, schedule, people, requests, profile, notifications, onboarding
 │       └── shared/                 # mobile-wide providers, navigation, API client, theme, UI shells
 │
-packages/                           # 10 platform-neutral workspaces (built with tsc → dist/)
+packages/                           # 11 platform-neutral workspaces (built with tsc → dist/)
 ├── api-client/                     # HTTP client primitives (headers, JSON requests, errors)
 ├── authz/                          # Permission logic — roles, perms, JWT claim extraction
 ├── client-errors/                  # Shared client-facing error translation (web + mobile)
@@ -152,6 +166,7 @@ packages/                           # 10 platform-neutral workspaces (built with
 ├── design-tokens/                  # Shared design values
 ├── domain/                         # Platform-neutral domain types/enums + pure logic
 ├── mobile-api-core/                # Framework-neutral mobile backend orchestration
+├── realtime-core/                  # Shared realtime subscription and invalidation primitives
 ├── schedule-core/                  # Schedule transformation/calculation logic
 │
 supabase/
@@ -176,13 +191,14 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 | `npm run dev:web`                | Start the Next.js web app through TurboRepo               |
 | `npm run dev:web:lan`            | Start the Next.js web app on `0.0.0.0` for phone access   |
 | `npm run dev:webpack`            | Start the web app with the Webpack dev server             |
-| `npm run dev:mobile`             | Start the Expo mobile app in tunnel mode for Expo Go      |
+| `npm run dev:mobile`             | Start the Expo mobile app in LAN mode                     |
 | `npm run dev:mobile:phone`       | Start the Expo mobile app in tunnel mode for Expo Go      |
 | `npm run dev:mobile:lan`         | Start the Expo mobile app in LAN mode                     |
 | `npm run build`                  | Dependency-aware production build for the web app         |
 | `npm run build:packages`         | Build all `packages/*` workspaces (tsc → `dist/`)         |
 | `npm run start`                  | Start the web production server                           |
 | `npm run lint`                   | Run ESLint                                                |
+| `npm run format:check`           | Check Prettier formatting without writing files           |
 | `npm run type-check`             | Run workspace type-checks through TurboRepo               |
 | `npm test`                       | Run workspace tests through TurboRepo                     |
 | `npm run test:web`               | Run web workspace tests                                   |
@@ -196,12 +212,21 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 | `npm run gen:types`              | Generate Supabase TypeScript types from the local DB      |
 | `npm run seed`                   | Seed the local database (runs `seed.ts` → SQL seed files) |
 | `npm run db:reset`               | Reset local Supabase DB (runs migrations + seed)          |
+| `npm run db:reset:mobile`        | Reset the local DB and Android mobile storage             |
 | `npm run db:reset:remote`        | Reset remote Supabase DB (for staging environments)       |
 | `node scripts/doctor-mobile.mjs` | Diagnose the mobile app's local environment setup         |
 | `npm run use:local`              | Switch .env.local to local Supabase credentials           |
 | `npm run use:mobile:local`       | Generate `apps/mobile/.env.local` for local phone testing |
 | `npm run use:mobile:remote`      | Copy remote mobile envs into `apps/mobile/.env.local`     |
 | `npm run use:remote`             | Switch .env.local to remote Supabase credentials          |
+| `npm run deps:audit`             | Run the dependency advisory check                         |
+| `npm run deps:scan`              | Run the supply-chain scan                                 |
+
+`npm test` runs the workspace suites in parallel through Turbo. If a resource-constrained machine hits unrelated Vitest timeouts, rerun serially before treating it as a product regression:
+
+```bash
+npx turbo run test --concurrency=1
+```
 
 ## Emails
 
@@ -277,27 +302,27 @@ All schema lives in exactly **4 migration files** — never create additional fi
 
 ## Deployment
 
-Deployed on **Vercel** with a hosted **Supabase** backend. Edge middleware runs at the CDN layer for low-latency RBAC checks and subdomain routing.
+Deployed on **Vercel** with a hosted **Supabase** backend. The Next.js request proxy runs at the CDN layer for low-latency RBAC checks and subdomain routing.
 
 Key configuration:
 
 - All routes are simple pages (no catch-all routes) to enable static prerendering
-- Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/src/middleware.ts`
+- Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/src/proxy.ts`
 - Custom access token hook must be enabled in the Supabase dashboard
 
 ## Mobile On A Real Phone
 
-For the first stable phone workflow, use Expo Go against the hosted backend:
+For the most reliable first phone workflow, use Expo Go against the hosted backend through a tunnel:
 
 1. Run `npm run use:mobile:remote`
-2. Run `npm run dev:mobile`
+2. Run `npm run dev:mobile:phone`
 3. Scan the QR code with Expo Go on your phone
 
 Important:
 
 - `apps/mobile/.env.local` must point `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_API_BASE_URL` at a backend your phone can reach.
 - `127.0.0.1` and `localhost` only point back to the phone itself in Expo Go, so they will not reach services running on your laptop.
-- If Expo Go shows an `exp://192.168.x.x:8081` URL again, you are in LAN mode. Use `npm run dev:mobile` or `npm run dev:mobile:phone` instead.
+- `npm run dev:mobile` and `npm run dev:mobile:lan` use LAN mode. This is faster when the phone and computer share a reachable network; otherwise use `npm run dev:mobile:phone`.
 - If you want a local backend instead of the hosted one, run `npm run use:mobile:local`. It rewrites the repo's current local Supabase/web URLs to your laptop's private LAN IP and copies the local anon key into `apps/mobile/.env.local`.
 - For local phone testing, start the web app with `npm run dev:web:lan` so your phone can reach the API host written into `apps/mobile/.env.local`.
 
@@ -319,6 +344,7 @@ Important:
 | [docs/cookies-and-gdpr.md](docs/cookies-and-gdpr.md)                           | Cookie consent, GDPR data export, and account deletion                       |
 | [docs/secrets-rotation.md](docs/secrets-rotation.md)                           | Secret rotation procedures per environment                                   |
 | [docs/architecture/folder-structure.md](docs/architecture/folder-structure.md) | Monorepo + `apps/web` feature-module folder layout                           |
+| [docs/operations/auth-resilience.md](docs/operations/auth-resilience.md)       | Diagnosing and recovering organization-bootstrap failures                    |
 
 ## License
 

@@ -356,7 +356,7 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
 
 1. **Verify locally.** `lib/auth/verify-token.ts` checks the token's signature against
    Supabase's JWKS (ES256), plus `exp`, `iss`, and `aud`. The keyset is module-cached
-   and shared with `middleware.ts`. Tokens arrive either as an `Authorization: Bearer`
+   and shared with `proxy.ts`. Tokens arrive either as an `Authorization: Bearer`
    header (mobile) or the Supabase SSR cookie (web); the cookie path still goes through
    `getSession()`, which is a local cookie read that only reaches the network to
    refresh an expired token. There is **no** fallback to an unverified `decodeJwt` —

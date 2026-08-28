@@ -9,7 +9,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // The Next development server serializes enough work that local parallel
+  // navigation can time out before the first page has finished compiling.
+  workers: 1,
   reporter: "html",
   use: {
     baseURL,

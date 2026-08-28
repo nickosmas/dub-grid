@@ -17,10 +17,10 @@ describe("OrganizationBootstrapRecovery", () => {
       render(<OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={onRetry} />);
 
       expect(
-        screen.getByRole("heading", { name: "Preparing your Organization" }),
+        screen.getByRole("heading", { name: "Getting your organization ready" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText("We’re loading the information you need to get started."),
+        screen.getByText("Just a moment while we prepare everything you need."),
       ).toBeInTheDocument();
 
       await act(async () => {

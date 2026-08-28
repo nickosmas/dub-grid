@@ -2,7 +2,7 @@
 
 Scope: `packages/*`.
 
-All 10 packages are consumed by the Next.js web app, the Expo mobile app, or
+All 11 packages are consumed by the Next.js web app, the Expo mobile app, or
 both. Package changes can break multiple apps.
 
 ## Verified Packages
@@ -18,6 +18,7 @@ both. Package changes can break multiple apps.
 | `@dubgrid/design-tokens`   | `packages/design-tokens`   | Color and spacing tokens shared by web and mobile (`colorTokens`, etc.)                                                                                                                                                                    |
 | `@dubgrid/domain`          | `packages/domain`          | Core domain types and helpers: `Organization`, `AdminPermissions`, `PlatformRole`, `OrganizationRole`, `WorkspaceKind`, `isSelfAction`, `assertNotSelf`, `SelfActionForbiddenError`, billing helpers, notification metadata, request types |
 | `@dubgrid/mobile-api-core` | `packages/mobile-api-core` | Server-side logic for mobile API route handlers (auth, org, people-status, push, read, write, shift-requests, setup)                                                                                                                       |
+| `@dubgrid/realtime-core`   | `packages/realtime-core`   | Shared realtime subscription, channel, and invalidation primitives                                                                                                                                                                         |
 | `@dubgrid/schedule-core`   | `packages/schedule-core`   | Schedule entry types, shift display logic                                                                                                                                                                                                  |
 
 There is no `packages/shared` or `packages/ui` directory.
@@ -62,6 +63,7 @@ Prefer existing boundaries:
 - Error translation: `@dubgrid/client-errors`
 - Supabase queries: `@dubgrid/data-access`
 - Mobile API orchestration: `@dubgrid/mobile-api-core`
+- Realtime primitives: `@dubgrid/realtime-core`
 - DB type subsets: `@dubgrid/db-types`
 
 ## Verification

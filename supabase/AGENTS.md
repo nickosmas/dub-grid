@@ -87,7 +87,8 @@ payload (not inside `app_metadata`):
 
 - `platform_role`, `org_role`, `org_id`, `org_slug`
 
-The middleware reads these via `jwtVerify` / `decodeJwt` at the top level.
+The Next.js request proxy (`apps/web/src/proxy.ts`) reads these via `jwtVerify`
+/ `decodeJwt` at the top level.
 
 ## Key Tables
 

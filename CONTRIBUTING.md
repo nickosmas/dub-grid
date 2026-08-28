@@ -136,7 +136,7 @@ DubGrid is an npm-workspaces monorepo orchestrated by Turborepo. Put code in the
 
 - **`apps/web`** (`@dubgrid/web`) — Next.js 16 web app. Pages, API Route Handlers, web-only components and hooks, server-side `lib/db/`. All former repo-root `src/...` paths now live under `apps/web/src/...`.
 - **`apps/mobile`** (`@dubgrid/mobile`) — Expo / React Native app (Expo Router). Mobile features and shared UI. Talks only to `/api/mobile/v1/*` on the web app; never imports from `apps/web` directly.
-- **`packages/*`** — 10 platform-neutral shared workspaces: `api-client`, `authz`, `client-errors`, `contracts`, `data-access`, `db-types`, `design-tokens`, `domain`, `mobile-api-core`, `schedule-core`.
+- **`packages/*`** — 11 platform-neutral shared workspaces: `api-client`, `authz`, `client-errors`, `contracts`, `data-access`, `db-types`, `design-tokens`, `domain`, `mobile-api-core`, `realtime-core`, `schedule-core`.
 
 ### Package Boundary Rules
 
