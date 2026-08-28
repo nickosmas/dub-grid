@@ -1,44 +1,50 @@
-# Improve landing screenshot fidelity and device framing
+# Correct public legal-policy disclosures
 
 **Type:** Fix
 
-**Status:** ready for pull request
+**Status:** not started
+
+**Fixes:** F-07, F-08, F-09, F-10, F-11, F-12, F-13, F-14
 
 ## Problem
 
-Landing-page web screenshots look softer than their supplied sources and lack
-the visual framing that makes them read as product devices.
+The Privacy Policy, Terms of Service, and Cookie Policy contain public statements
+that conflict with the verified implementation or cannot be supported by repository
+or production evidence. The Terms and Privacy Policy also expose a registered-address
+placeholder.
 
 ## Fix
 
-Keep the supplied screenshots at high enough encoded resolution for their
-rendered sizes, render them without avoidable browser downscaling, and add a
-landing-only theme-aware bezel. The bezel is white in light mode and gray in
-dark mode. Preserve the existing screenshot selection, layout, and responsive
-behavior.
+Align the policies with verified behavior. Remove the placeholder rather than invent
+an address, accurately disclose consent-gated analytics and Sentry identifiers, and
+qualify or remove claims that need production, vendor-contract, historical, or
+scheduled-job confirmation. Keep the documents' shared terminology and links intact.
 
 ## Build steps
 
-1. [x] Inspect the source and rendered image sizing, then replace any
-       undersized or over-compressed landing screenshot assets.
+1. [ ] Correct the Privacy Policy's account-deletion, analytics, Sentry, retention,
+       vendor, and historical-operations statements; replace the missing-address
+       placeholder with the verified support contact.
 
-   Done when: each rendered web screenshot uses an appropriately sized source
-   without visible compression or enlargement artifacts.
+   Done when: the Privacy Policy makes no claim contradicted by the reviewed
+   implementation and does not state unverified production or historical facts as
+   established.
 
-2. [x] Add a themed device bezel to landing web screenshots and cover it in the
-       existing landing browser tests.
+2. [ ] Correct the Terms contact section and Cookie Policy's consent, Sentry, and
+       Vercel Analytics descriptions.
 
-   Done when: web screenshots have a white bezel in light mode and a gray bezel
-   in dark mode without layout shift or horizontal overflow.
+   Done when: neither document contains a placeholder, and each statement agrees
+   with the implemented consent flows and vendor behavior.
 
-3. [ ] Create a `dev` to `main` pull request containing the retained landing
-       work and this visual fix.
+3. [ ] Add focused regression coverage for the corrected public-copy invariants and
+       run the relevant web tests and type check.
 
-   Done when: the PR compares `dev` against `main` and includes every commit on
-   `dev` that is not yet in `main`.
+   Done when: the tests protect the corrected disclosures and the selected checks
+   pass.
 
 ## Verify
 
-- Run the focused landing Playwright tests at desktop and mobile widths.
-- Inspect the rendered landing page in both themes.
-- Run the web type check and production build.
+- Read all three rendered documents at `/privacy`, `/terms`, and `/cookie-policy`.
+- Confirm analytics can be enabled through both Accept all and Customize.
+- Confirm policy text matches account deletion, PostHog, Sentry, and Vercel behavior.
+- Run focused web tests and `npm --prefix apps/web run type-check`.
