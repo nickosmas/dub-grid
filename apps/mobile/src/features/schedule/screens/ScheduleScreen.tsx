@@ -126,6 +126,19 @@ import {
   type WeeklyHoursSummary,
 } from "../lib/schedule";
 import {
+  HERO_CARD_BACKGROUND_DARK,
+  HERO_CARD_BACKGROUND_LIGHT,
+  HERO_CARD_GRADIENT_DARK,
+  HERO_CARD_GRADIENT_END,
+  HERO_CARD_GRADIENT_LIGHT,
+  HERO_CARD_GRADIENT_LOCATIONS,
+  HERO_CARD_GRADIENT_START,
+  HERO_CARD_SHADOW_DARK,
+  HERO_CARD_SHADOW_LIGHT,
+  HERO_COLLABORATOR_BACKGROUND_DARK,
+  HERO_COLLABORATOR_BACKGROUND_LIGHT,
+} from "../lib/heroCardTheme";
+import {
   WEEK_SWIPE_FALLBACK_WIDTH,
   getCurrentTimeValue,
   getSegmentStartTime,
@@ -197,19 +210,6 @@ const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
 };
-const ME_HERO_CARD_BACKGROUND_LIGHT = "#2946C7";
-const ME_HERO_CARD_BACKGROUND_DARK = "#152238";
-const ME_HERO_COLLABORATOR_BACKGROUND_LIGHT = "#3A55CB";
-const ME_HERO_COLLABORATOR_BACKGROUND_DARK = "#1E2F66";
-// Matches the web hero gradient: dark bottom-left → light top-right. The
-// dark-mode variant keeps the same dark navy start but ends in the app's
-// own vivid dark-mode brand blue instead of a pale periwinkle, which would
-// read as a washed-out pastel blob against a near-black page.
-const ME_HERO_CARD_GRADIENT_LIGHT = ["#142579", "#2C49CC", "#6E90FF"] as const;
-const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
-const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
-const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
-const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
 /**
  * Week/month swipe springs, named so the two feels are legible and so the
  * schedule shares the app's motion vocabulary.
@@ -221,9 +221,6 @@ const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
  */
 const SWIPE_CANCEL_SPRING = mobileMotion.spring.gentle;
 const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
-
-const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
-const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 // `setLayoutAnimationEnabledExperimental` used to be the Android opt-in for
 // `LayoutAnimation`. Under the New Architecture it does nothing but warn on
@@ -2382,8 +2379,8 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const overflowCount = entries.length - visibleEntries.length;
   const collaboratorBackground = {
     backgroundColor: isDark
-      ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
-      : ME_HERO_COLLABORATOR_BACKGROUND_LIGHT,
+      ? HERO_COLLABORATOR_BACKGROUND_DARK
+      : HERO_COLLABORATOR_BACKGROUND_LIGHT,
   };
 
   return (
@@ -2644,17 +2641,17 @@ function MeHeroCard({
 
   const heroGradient = (
     <LinearGradient
-      colors={isDark ? ME_HERO_CARD_GRADIENT_DARK : ME_HERO_CARD_GRADIENT_LIGHT}
-      locations={ME_HERO_CARD_GRADIENT_LOCATIONS}
-      start={ME_HERO_CARD_GRADIENT_START}
-      end={ME_HERO_CARD_GRADIENT_END}
+      colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
+      locations={HERO_CARD_GRADIENT_LOCATIONS}
+      start={HERO_CARD_GRADIENT_START}
+      end={HERO_CARD_GRADIENT_END}
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
     />
   );
   const heroCardThemeStyle = {
-    backgroundColor: isDark ? ME_HERO_CARD_BACKGROUND_DARK : ME_HERO_CARD_BACKGROUND_LIGHT,
-    shadowColor: isDark ? ME_HERO_CARD_SHADOW_DARK : ME_HERO_CARD_SHADOW_LIGHT,
+    backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,
   };
 
   return (

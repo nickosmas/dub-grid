@@ -25,6 +25,7 @@ import {
   isNotificationActionSupportedOnMobile,
   openNotificationAction,
 } from "../lib/openNotificationAction";
+import { filterNotificationsForViewer } from "../lib/notification-visibility";
 import {
   bulkUpdateNotifications,
   getNotifications,
@@ -47,6 +48,7 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { useBootstrap } from "../../auth/hooks/useBootstrap";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -129,6 +131,8 @@ export default function NotificationsScreen() {
   const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
+  const bootstrapQuery = useBootstrap(accessToken);
+  const canApproveShiftRequests = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const facetsQuery = useNotificationFacets(accessToken);
   const facets = facetsQuery.data;
 
@@ -171,9 +175,17 @@ export default function NotificationsScreen() {
     placeholderData: keepPreviousData,
   });
 
+  // Alerts are addressed by role at send time, but a role can change after one
+  // is sent: an approver who has since become a regular user would otherwise
+  // keep a backlog of other people's approval requests they can no longer act
+  // on. Filtered here rather than server-side so a re-promotion restores them.
   const notifications = useMemo(
-    () => notificationsQuery.data?.pages.flatMap((p) => p.notifications) ?? [],
-    [notificationsQuery.data],
+    () =>
+      filterNotificationsForViewer(
+        notificationsQuery.data?.pages.flatMap((page) => page.notifications) ?? [],
+        { canApproveShiftRequests: canApproveShiftRequests },
+      ),
+    [canApproveShiftRequests, notificationsQuery.data],
   );
 
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
