@@ -709,9 +709,11 @@ export default function PersonDetailScreen() {
       {/* The page's heading is the identity block below, so the route keeps a
           plain static title rather than the person's name — printing the name
           in the bar and again under the avatar is the duplication this block
-          was built to avoid. It carries the same three facts the old meta grid
-          did, and no more: the org tier as its badge (web's People table calls
-          it "Access" too), then status and where their app account stands. */}
+          was built to avoid. It carries the org tier as its badge (web's People
+          table calls it "Access" too); staff status and app-account state are
+          administrative facts and only render for people who manage them.
+          No avatar status dot: it said the same thing as the status chip, and
+          without that chip it is an unlabelled colour nobody can read. */}
       <ProfileHero
         align="center"
         badge={orgRoleBadge.label}
@@ -723,21 +725,19 @@ export default function PersonDetailScreen() {
         }}
         avatarTextStyle={{ color: avatarTone.textColor }}
         initials={getProfileInitials(fullName)}
-        statusTone={person.status === "active" ? "success" : "muted"}
         title={fullName}
       >
-        {/* Every chip on one line. The access tier is the hero's badge now,
-            the same pill the profile tab and the People rows print, rather
-            than a muted line of its own down here. */}
-        <ProfileHeroFacts>
-          <ProfileHeroFactsRow>
-            <Chip
-              label={formatStatusLabel(person.status)}
-              tone={person.status === "active" ? "success" : "neutral"}
-            />
-            <Chip icon={accountChip.icon} label={accountChip.label} tone={accountChip.tone} />
-          </ProfileHeroFactsRow>
-        </ProfileHeroFacts>
+        {canManageEmployees ? (
+          <ProfileHeroFacts>
+            <ProfileHeroFactsRow>
+              <Chip
+                label={formatStatusLabel(person.status)}
+                tone={person.status === "active" ? "success" : "neutral"}
+              />
+              <Chip icon={accountChip.icon} label={accountChip.label} tone={accountChip.tone} />
+            </ProfileHeroFactsRow>
+          </ProfileHeroFacts>
+        ) : null}
       </ProfileHero>
 
       {!editing ? (
@@ -824,12 +824,16 @@ export default function PersonDetailScreen() {
           <ProfileSection title="Staffing">
             <ProfileList>
               {/* Web prints this beside the name in its staff header, and it is
-                  how people are identified in payroll conversations. */}
-              <ProfileInfoRow
-                iconName="card-outline"
-                label="Employee ID"
-                value={`#${person.employeeNumber}`}
-              />
+                  how people are identified in payroll conversations — which is
+                  also why it stays with the people who have those
+                  conversations rather than on every teammate's profile. */}
+              {canManageEmployees ? (
+                <ProfileInfoRow
+                  iconName="card-outline"
+                  label="Employee ID"
+                  value={`#${person.employeeNumber}`}
+                />
+              ) : null}
               <ProfileInfoRow
                 iconName="briefcase-outline"
                 label="Employment"

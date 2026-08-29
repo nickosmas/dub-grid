@@ -29,6 +29,8 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { isNotificationVisibleToViewer } from "../lib/notification-visibility";
 import {
   isNotificationActionSupportedOnMobile,
   openNotificationAction,
@@ -89,6 +91,10 @@ export default function NotificationDetailScreen() {
   const queryClient = useQueryClient();
   const id = typeof params.id === "string" ? params.id : null;
   const [busy, setBusy] = useState(false);
+  const bootstrapQuery = useBootstrap(accessToken);
+  const canApproveShiftRequests = Boolean(
+    bootstrapQuery.data?.permissions.canApproveShiftRequests,
+  );
 
   // Look in any cached notifications-infinite query for this id.
   const cachedNotification = useMemo<MobileNotification | null>(() => {
@@ -114,7 +120,14 @@ export default function NotificationDetailScreen() {
     },
   });
 
-  const notification = cachedNotification ?? detailQuery.data ?? null;
+  const resolvedNotification = cachedNotification ?? detailQuery.data ?? null;
+  // Same role gate the inbox applies, so a push tap or a stale deep link can't
+  // walk around it into an alert the viewer's role no longer covers.
+  const notification =
+    resolvedNotification &&
+    isNotificationVisibleToViewer(resolvedNotification, { canApproveShiftRequests })
+      ? resolvedNotification
+      : null;
   // In flight, or not started yet because the access token has not hydrated.
   const isResolvingNotification =
     detailQuery.isLoading || (!accessToken && Boolean(id) && !cachedNotification);

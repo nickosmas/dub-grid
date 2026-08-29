@@ -64,9 +64,6 @@ export type ProfileHeroAlign = "row" | "center";
 
 const ProfileHeroAlignContext = createContext<ProfileHeroAlign>("row");
 
-/** The dot on the avatar's corner. Omit it where there is no status to show. */
-export type ProfileHeroStatusTone = "success" | "muted";
-
 export function ProfileHero({
   align = "row",
   initials,
@@ -74,7 +71,6 @@ export function ProfileHero({
   subtitle,
   badge,
   badgeTone = "brand",
-  statusTone,
   avatarStyle,
   avatarTextStyle,
   style,
@@ -93,11 +89,6 @@ export function ProfileHero({
   subtitle?: string;
   badge?: string;
   badgeTone?: "brand" | "contrast" | "warning";
-  /**
-   * Paints a dot on the avatar's corner, ringed in the page background so it
-   * reads as cut out of the avatar rather than sitting on it.
-   */
-  statusTone?: ProfileHeroStatusTone;
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
   style?: StyleProp<ViewStyle>;
@@ -142,29 +133,12 @@ export function ProfileHero({
         {hasIdentity ? (
           <View style={[styles.heroTop, isCentered && styles.heroTopCentered]}>
             {initials ? (
-              <View style={styles.avatarFrame}>
-                <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
-                  <Text
-                    style={[
-                      styles.avatarText,
-                      isCentered && styles.avatarTextLarge,
-                      avatarTextStyle,
-                    ]}
-                  >
-                    {initials}
-                  </Text>
-                </View>
-                {statusTone ? (
-                  <View
-                    style={[
-                      styles.avatarStatusDot,
-                      isCentered && styles.avatarStatusDotLarge,
-                      statusTone === "success"
-                        ? styles.avatarStatusDotSuccess
-                        : styles.avatarStatusDotMuted,
-                    ]}
-                  />
-                ) : null}
+              <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
+                <Text
+                  style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
+                >
+                  {initials}
+                </Text>
               </View>
             ) : null}
             <View style={[styles.heroCopy, isCentered && styles.heroCopyCentered]}>
@@ -595,10 +569,6 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 14,
       paddingTop: 8,
     },
-    /** Relative only so the status dot can hang off the avatar's corner. */
-    avatarFrame: {
-      position: "relative",
-    },
     avatar: {
       alignItems: "center",
       backgroundColor: mobileColors.brand,
@@ -622,29 +592,6 @@ const createStyles = (mobileColors: MobileColors) =>
     avatarTextLarge: {
       fontSize: 32,
       lineHeight: 40,
-    },
-    avatarStatusDot: {
-      borderColor: mobileColors.background,
-      borderRadius: 9,
-      borderWidth: 3,
-      bottom: 0,
-      height: 18,
-      position: "absolute",
-      right: 0,
-      width: 18,
-    },
-    avatarStatusDotLarge: {
-      borderRadius: 11,
-      bottom: 4,
-      height: 22,
-      right: 4,
-      width: 22,
-    },
-    avatarStatusDotSuccess: {
-      backgroundColor: mobileColors.success,
-    },
-    avatarStatusDotMuted: {
-      backgroundColor: mobileColors.textSubtle,
     },
     heroCopy: {
       flex: 1,

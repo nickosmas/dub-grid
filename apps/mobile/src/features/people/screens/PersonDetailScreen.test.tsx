@@ -205,6 +205,51 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("·")).not.toBeInTheDocument();
   });
 
+  // Staff status, app-account state and the payroll number are administrative
+  // facts about a teammate, not things every colleague opening their profile
+  // has any business reading.
+  it("keeps administrative facts off a teammate's profile for a regular user", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+        roles: [{ id: 3, name: "Charge Nurse" }],
+        certifications: [],
+        departments: [{ id: 4, name: "North Wing" }],
+        permissions: {
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson() },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.queryByText("Employee ID")).not.toBeInTheDocument();
+    expect(screen.queryByText("#12")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByText("App access")).not.toBeInTheDocument();
+    expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+  });
+
   // The page said nothing about management access: the only trace of it was
   // whether the button at the foot read "Add to Management" or "Edit
   // Management Access", and the number an admin identifies someone by was

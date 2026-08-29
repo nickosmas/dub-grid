@@ -148,13 +148,36 @@ describe("ProfileSessionsScreen", () => {
     expect(screen.getByRole("button", { name: "Sign out this device" })).toBeInTheDocument();
   });
 
-  it("offers no per-device sign-out for the device you are on", () => {
+  it("signs the current device out locally from its own detail sheet", async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    getSupabaseClient.mockReturnValue({ auth: { signOut } } as never);
+    handleExpiredMobileSession.mockResolvedValue(undefined);
+
     render(<ProfileSessionsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Mina's iPhone" }));
 
     expect(screen.getAllByText("This device")).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Sign out this device" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
+
+    expect(screen.getByText("Sign out this device?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "You'll be signed out here and will need to sign in again. Your other devices stay signed in.",
+      ),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+    });
+
+    await waitFor(() => {
+      // A local sign-out, not a revoke by hash: the row's hash is this
+      // session's own.
+      expect(disablePushForCurrentDevice).toHaveBeenCalled();
+      expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(handleExpiredMobileSession).toHaveBeenCalledWith({ skipSignOut: true });
+    });
   });
 
   it("revokes one device from its detail sheet, after confirming", async () => {
@@ -187,7 +210,7 @@ describe("ProfileSessionsScreen", () => {
     // Neither destructive action is on the page until it is asked for.
     expect(screen.queryByRole("button", { name: "Sign out everywhere" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(
       screen.getByText("Every other device is signed out. You stay signed in here."),
@@ -215,7 +238,7 @@ describe("ProfileSessionsScreen", () => {
 
     render(<ProfileSessionsScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
 
     await act(async () => {

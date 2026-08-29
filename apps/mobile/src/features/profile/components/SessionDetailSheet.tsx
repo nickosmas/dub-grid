@@ -77,19 +77,18 @@ export function SessionDetailSheet({
               value={formatSessionTimestamp(session.lastActiveAt)}
             />
           </ProfileList>
-          {/* Signing this device out from its own detail sheet would drop the
-              user mid-flow with a sheet still open. The bulk sheet's "Sign out
-              everywhere" is the deliberate way to do that. */}
-          {session.isCurrent ? null : (
-            <SheetActions>
-              <Button
-                label="Sign out this device"
-                loading={revoking}
-                onPress={() => onRevoke(session)}
-                tone="danger"
-              />
-            </SheetActions>
-          )}
+          {/* Every device gets the same button, this one included: a sheet that
+              lists what a device is and then offers no way to end it sends the
+              user hunting through the bulk sheet for the one scope that also
+              signs out everything else. */}
+          <SheetActions>
+            <Button
+              label="Sign out this device"
+              loading={revoking}
+              onPress={() => onRevoke(session)}
+              tone="danger"
+            />
+          </SheetActions>
         </>
       ) : null}
     </BottomSheetModal>

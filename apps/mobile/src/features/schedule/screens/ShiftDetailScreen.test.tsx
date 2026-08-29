@@ -455,6 +455,168 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
   });
 
+  // The detail card carries the Home hero's live status and countdown, so a
+  // shift reads the same way from either screen.
+  it("counts down to a shift that has not started", () => {
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByText("Upcoming")).toBeInTheDocument();
+    expect(screen.getByText("Starting in 19h")).toBeInTheDocument();
+    expect(screen.queryByTestId("shift-detail-progress")).not.toBeInTheDocument();
+  });
+
+  it("shows on-duty status and remaining time for a shift in progress", () => {
+    useLocalSearchParams.mockReturnValue({
+      employeeId: "emp-1",
+      date: "2026-04-15",
+      rangeStart: "2026-04-15",
+      rangeEnd: "2026-04-22",
+      source: "mine",
+    });
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[1] === "requests") {
+        return {
+          data: { requests: [], openShifts: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      if (queryKey[2] === "team" || queryKey[1] === "shift-swap-options") {
+        return {
+          data: { entries: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: {
+          entries: [
+            {
+              employeeId: "emp-1",
+              employeeName: "Alex Kim",
+              date: "2026-04-15",
+              assignmentIds: [1],
+              shiftLabel: "D",
+              assignmentLabel: "D",
+              shiftName: "Day Shift",
+              absenceTypeId: null,
+              focusAreaId: 2,
+              focusAreaName: "ICU",
+              employeeFocusAreaIds: [1, 2],
+              displayFocusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              customStartTime: null,
+              customEndTime: null,
+              publishedAt: null,
+              publishedByName: null,
+            },
+          ],
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByText("On Duty")).toBeInTheDocument();
+    expect(screen.getByText("3h left")).toBeInTheDocument();
+    expect(screen.getByTestId("shift-detail-progress")).toBeInTheDocument();
+  });
+
+  it("marks a finished shift complete without a countdown", () => {
+    vi.setSystemTime(new Date("2026-04-16T04:00:00.000Z"));
+    useLocalSearchParams.mockReturnValue({
+      employeeId: "emp-1",
+      date: "2026-04-15",
+      rangeStart: "2026-04-15",
+      rangeEnd: "2026-04-22",
+      source: "mine",
+    });
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[1] === "requests") {
+        return {
+          data: { requests: [], openShifts: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      if (queryKey[2] === "team" || queryKey[1] === "shift-swap-options") {
+        return {
+          data: { entries: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: {
+          entries: [
+            {
+              employeeId: "emp-1",
+              employeeName: "Alex Kim",
+              date: "2026-04-15",
+              assignmentIds: [1],
+              shiftLabel: "D",
+              assignmentLabel: "D",
+              shiftName: "Day Shift",
+              absenceTypeId: null,
+              focusAreaId: 2,
+              focusAreaName: "ICU",
+              employeeFocusAreaIds: [1, 2],
+              displayFocusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              customStartTime: null,
+              customEndTime: null,
+              publishedAt: null,
+              publishedByName: null,
+            },
+          ],
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.queryByTestId("shift-detail-progress")).not.toBeInTheDocument();
+  });
+
   it("does not show Working with for general shifts", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       if (queryKey[1] === "requests") {

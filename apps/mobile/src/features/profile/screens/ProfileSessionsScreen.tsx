@@ -44,6 +44,9 @@ import {
 type SessionConfirmation =
   { kind: "scope"; scope: SignOutScope } | { kind: "revoke"; session: MobileProfileSession };
 
+/** The bulk scopes plus this device, which signs out locally rather than by hash. */
+type SignOutTarget = SignOutScope | "current";
+
 /**
  * Every device signed in to this account.
  *
@@ -62,7 +65,7 @@ export default function ProfileSessionsScreen() {
   const [openSession, setOpenSession] = useState<MobileProfileSession | null>(null);
   const [isScopeSheetVisible, setScopeSheetVisible] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<SessionConfirmation | null>(null);
-  const [sessionScopeLoading, setSessionScopeLoading] = useState<SignOutScope | null>(null);
+  const [sessionScopeLoading, setSessionScopeLoading] = useState<SignOutTarget | null>(null);
   const [isStaleOpen, setStaleOpen] = useState(false);
 
   const sessionsQuery = useQuery({
@@ -98,14 +101,20 @@ export default function ProfileSessionsScreen() {
   const active = sessionsQuery.data?.active ?? [];
   const stale = sessionsQuery.data?.stale ?? [];
 
-  async function handleSessionAction(scope: SignOutScope) {
+  async function handleSessionAction(target: SignOutTarget) {
     if (sessionScopeLoading) {
       return;
     }
 
-    setSessionScopeLoading(scope);
+    // Signing this device out is a local sign-out: the row's refresh-token hash
+    // is this session's own, so revoking it by hash would tear the session down
+    // from under the request that sent it.
+    const endsThisSession = target === "global" || target === "current";
+    const scope: SignOutScope | "local" = target === "current" ? "local" : target;
+
+    setSessionScopeLoading(target);
     try {
-      if (scope === "global") {
+      if (endsThisSession) {
         // This device is about to lose its session too, so stop its pushes
         // while the token is still valid.
         await disablePushForCurrentDevice();
@@ -121,7 +130,7 @@ export default function ProfileSessionsScreen() {
         return;
       }
 
-      if (scope === "global") {
+      if (endsThisSession) {
         await handleExpiredMobileSession({ skipSignOut: true });
       } else {
         await sessionsQuery.refetch();
@@ -151,11 +160,19 @@ export default function ProfileSessionsScreen() {
     }
 
     setOpenSession(null);
+
+    if (action.session.isCurrent) {
+      void handleSessionAction("current");
+      return;
+    }
+
     void revokeMutation.mutateAsync(action.session.refreshTokenHash);
   }
 
   const isScopeConfirmation = pendingConfirmation?.kind === "scope";
   const isGlobalConfirmation = isScopeConfirmation && pendingConfirmation.scope === "global";
+  const isCurrentDeviceConfirmation =
+    pendingConfirmation?.kind === "revoke" && pendingConfirmation.session.isCurrent;
   const confirmationTitle = isGlobalConfirmation
     ? "Sign out all devices?"
     : isScopeConfirmation
@@ -165,7 +182,9 @@ export default function ProfileSessionsScreen() {
     ? "Every device, including this one, will be signed out."
     : isScopeConfirmation
       ? "Every device except this one will be signed out."
-      : `${pendingConfirmation?.kind === "revoke" ? formatSessionDeviceLabel(pendingConfirmation.session) : "This device"} will lose access immediately.`;
+      : isCurrentDeviceConfirmation
+        ? "You'll be signed out here and will need to sign in again. Your other devices stay signed in."
+        : `${pendingConfirmation?.kind === "revoke" ? formatSessionDeviceLabel(pendingConfirmation.session) : "This device"} will lose access immediately.`;
 
   return (
     <Screen
@@ -246,7 +265,7 @@ export default function ProfileSessionsScreen() {
               signed in, not on the two ways to sign everything out. */}
           <ProfileSection>
             <Button
-              label="Signing out devices"
+              label="Sign out"
               loading={sessionScopeLoading != null}
               onPress={() => setScopeSheetVisible(true)}
               tone="secondary"
@@ -256,7 +275,7 @@ export default function ProfileSessionsScreen() {
       )}
 
       <SessionDetailSheet
-        revoking={revokeMutation.isPending}
+        revoking={revokeMutation.isPending || sessionScopeLoading === "current"}
         session={openSession}
         onDismiss={() => setOpenSession(null)}
         onRevoke={(session) => setPendingConfirmation({ kind: "revoke", session })}

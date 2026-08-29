@@ -32,25 +32,26 @@ export function ShiftDetailSkeleton({
 
   return (
     <SkeletonGroup style={styles.page}>
-      <View style={detailStyles.shiftDetailCard}>
+      <View style={detailStyles.shiftDetailSkeletonCard}>
         <View style={detailStyles.detailHeroHeader}>
           <View style={detailStyles.detailHeroCopy}>
+            <SkeletonPill height={16} width={92} />
             <SkeletonLine variant="screenTitle" width="72%" />
             <SkeletonLine variant="body" width="52%" />
           </View>
-          <SkeletonBlock height={28} radius={10} width={84} />
+          <SkeletonBlock height={68} radius={16} width={58} />
         </View>
-        <View style={detailStyles.detailInfoStack}>
+        <View style={styles.infoStack}>
           {skeletonRows(infoRows, (index) => (
             <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
-              <SkeletonBlock height={40} radius={12} width={40} />
+              <SkeletonCircle size={22} />
               <View style={styles.infoCopy}>
-                <SkeletonLine variant="caption" width="30%" />
                 <SkeletonLine variant="bodyStrong" width="58%" />
               </View>
             </View>
           ))}
         </View>
+        <SkeletonBlock height={7} radius={999} width="100%" />
         <View style={detailStyles.detailActionsRow}>
           <SkeletonPill height={56} style={styles.action} />
           <SkeletonPill height={56} style={styles.action} />
@@ -85,6 +86,9 @@ const createStyles = (_mobileColors: MobileColors) =>
   StyleSheet.create({
     page: {
       gap: mobileSpacing.sectionGap,
+    },
+    infoStack: {
+      gap: 12,
     },
     infoCopy: {
       flex: 1,
