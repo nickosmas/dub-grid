@@ -44,7 +44,7 @@
 - [ ] 17. **Mobile release catch-up** - close the remaining release-delta
       gaps while preserving the intentional web-only schedule authoring and
       organization-settings boundaries.
-  - [ ] 17a. **Mobile role certification eligibility** - expose role
+  - [x] 17a. **Mobile role certification eligibility** - expose role
         certification requirements to mobile and prevent incompatible new role
         selections before save.
   - [ ] 17b. **Canonical mobile dashboard model** - make web and mobile consume

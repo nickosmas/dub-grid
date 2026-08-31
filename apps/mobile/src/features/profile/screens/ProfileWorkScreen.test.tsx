@@ -253,6 +253,36 @@ describe("ProfileWorkScreen", () => {
     });
   });
 
+  it("blocks an incompatible new role while keeping the selected role removable", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        permissions: { canManageEmployees: true },
+        focusAreas: profileData.focusAreas,
+        departments: [],
+        certifications: [{ id: 5, name: "Registered Nurse", abbr: "RN" }],
+        currentOrg: { useCompactRoleCertificationLabels: true },
+        roles: [
+          { id: 3, name: "Supervisor", abbr: "SUP", requiredCertificationIds: [5] },
+          { id: 4, name: "Clinical Lead", abbr: "CL", requiredCertificationIds: [5] },
+        ],
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileWorkScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const selectedRole = screen.getByRole("button", { name: "SUP" });
+    const blockedRole = screen.getByRole("button", { name: "CL. Requires RN" });
+    expect(selectedRole).not.toBeDisabled();
+    expect(blockedRole).toBeDisabled();
+
+    fireEvent.click(selectedRole);
+    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+  });
+
   it("goes back without asking while there is nothing to lose", () => {
     render(<ProfileWorkScreen />);
 

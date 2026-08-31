@@ -633,6 +633,47 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
 
+  it("announces and blocks a role the person's certification does not satisfy", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+          useCompactRoleCertificationLabels: true,
+        },
+        focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+        roles: [
+          { id: 3, name: "Charge Nurse", abbr: "CN", requiredCertificationIds: [] },
+          { id: 4, name: "Clinical Lead", abbr: "CL", requiredCertificationIds: [5] },
+        ],
+        certifications: [{ id: 5, name: "Registered Nurse", abbr: "RN" }],
+        departments: [{ id: 4, name: "North Wing" }],
+        permissions: { canManageEmployees: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ certificationId: null, roleIds: [3] }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    expect(screen.getByRole("button", { name: "CN" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "CL. Requires RN" })).toBeDisabled();
+  });
+
   it("shows account found before asking to reconcile a different-name existing account", async () => {
     const mutationCalls: Array<{
       mutate: ReturnType<typeof vi.fn>;

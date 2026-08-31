@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import type {
   MobileFocusArea,
+  MobileBootstrapRole,
   MobileNamedItem,
   MobilePersonUpdateBody,
   MobileProfileResponse,
@@ -54,6 +55,10 @@ import {
   ProfileTextInput,
   formatProfileStatus,
 } from "../components/ProfilePrimitives";
+import {
+  getRoleCertificationRequirement,
+  isRoleCertificationBlocked,
+} from "../lib/role-certification";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
@@ -613,7 +618,7 @@ function EditPanel({
   onDiscard: () => void;
   onSave: () => void;
   roleLabel: string;
-  roles: MobileNamedItem[];
+  roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   saving: boolean;
 }) {
@@ -755,10 +760,27 @@ function EditPanel({
                 onToggle={(id) => toggle("focusAreaIds", id)}
               />
               <ProfileChoiceGroup
-                items={roles.map((item) => ({
-                  id: item.id,
-                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                }))}
+                items={roles.map((item) => {
+                  const disabled = isRoleCertificationBlocked({
+                    role: item,
+                    certificationId: draft.certificationId,
+                    selectedRoleIds: draft.roleIds,
+                    roleId: item.id,
+                  });
+                  return {
+                    id: item.id,
+                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                    disabled,
+                    disabledReason: disabled
+                      ? getRoleCertificationRequirement({
+                          role: item,
+                          certifications,
+                          certificationLabel,
+                          useCompactLabels: useCompactRoleCertificationLabels,
+                        })
+                      : undefined,
+                  };
+                })}
                 label={roleLabel}
                 selectedIds={draft.roleIds}
                 onToggle={(id) => toggle("roleIds", id)}

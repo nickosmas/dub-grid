@@ -13,6 +13,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MobileBootstrapResponse,
+  MobileBootstrapRole,
   MobileFocusArea,
   MobileNamedItem,
   MobilePerson,
@@ -87,6 +88,10 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import {
+  getRoleCertificationRequirement,
+  isRoleCertificationBlocked,
+} from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
 import {
@@ -1245,7 +1250,7 @@ function EditPanel({
   certifications: MobileNamedItem[];
   roleLabel: string;
   hasManagementAccess: boolean;
-  roles: MobileNamedItem[];
+  roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   hasChanges: boolean;
   onChange: (draft: EditDraft) => void;
@@ -1390,10 +1395,27 @@ function EditPanel({
             onToggle={(id) => toggle("focusAreaIds", id)}
           />
           <ProfileChoiceGroup
-            items={roles.map((item) => ({
-              id: item.id,
-              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-            }))}
+            items={roles.map((item) => {
+              const disabled = isRoleCertificationBlocked({
+                role: item,
+                certificationId: draft.certificationId,
+                selectedRoleIds: draft.roleIds,
+                roleId: item.id,
+              });
+              return {
+                id: item.id,
+                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                disabled,
+                disabledReason: disabled
+                  ? getRoleCertificationRequirement({
+                      role: item,
+                      certifications,
+                      certificationLabel,
+                      useCompactLabels: useCompactRoleCertificationLabels,
+                    })
+                  : undefined,
+              };
+            })}
             label={roleLabel}
             selectedIds={draft.roleIds}
             onToggle={(id) => toggle("roleIds", id)}
