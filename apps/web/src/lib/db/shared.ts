@@ -93,12 +93,20 @@ export async function upsertNamedEntities<T extends { id: number; name: string }
   items: T[];
   existingIds: Set<number>;
   toRow: (item: T, sortOrder: number) => Record<string, unknown>;
+  /** Compare against a persisted snapshot so no-op rows are not updated or counted. */
+  existingItems?: T[];
+  shouldUpdate?: (existing: T, next: T, sortOrder: number) => boolean;
 }): Promise<{ created: number; updated: number }> {
-  const { client, table, orgId, items, existingIds, toRow } = opts;
+  const { client, table, orgId, items, existingIds, toRow, existingItems, shouldUpdate } = opts;
+  const existingById = new Map((existingItems ?? []).map((item) => [item.id, item]));
 
   const toUpdate = items
     .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
+    .filter(({ item, sortOrder }) => {
+      if (item.id <= 0 || !existingIds.has(item.id)) return false;
+      const existing = existingById.get(item.id);
+      return !shouldUpdate || !existing || shouldUpdate(existing, item, sortOrder);
+    });
   const toInsert = items
     .map((item, i) => ({ item, sortOrder: i }))
     .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
@@ -272,7 +280,7 @@ export function resolveCodeLabels(
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
 export const ORGANIZATION_COLS =
-  "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, show_shift_detail_hover_cards, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, open_shift_visibility, subscription_status, trial_ends_at, trial_started_at, data_retention_days, feature_overrides, updated_at";
+  "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, show_shift_detail_hover_cards, use_compact_role_certification_labels, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, open_shift_visibility, subscription_status, trial_ends_at, trial_started_at, data_retention_days, feature_overrides, updated_at";
 export const ORGANIZATION_WITH_BILLING_COLS = `${ORGANIZATION_COLS}, stripe_customer_id, subscription_seats`;
 export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
@@ -284,7 +292,7 @@ export const JOB_COLS =
   "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, job_shift_overrides(shift_id, start_time, end_time, color), default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
 export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_order, archived_at";
 export const ORG_ROLE_COLS =
-  "id, org_id, name, abbr, is_schedule_role, department_ids, sort_order, archived_at";
+  "id, org_id, name, abbr, is_schedule_role, department_ids, required_certification_ids, sort_order, archived_at";
 export const EMPLOYEE_COLS =
   "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 export const COVERAGE_REQ_COLS =

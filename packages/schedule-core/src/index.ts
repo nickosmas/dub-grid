@@ -30,6 +30,9 @@ import {
 
 export * from "./types";
 export * from "./coverage";
+export * from "./coverage-assembly";
+export * from "./requests-assembly";
+export * from "./hours-assembly";
 export * from "./pay-period";
 export * from "./dates";
 import {
@@ -224,6 +227,15 @@ export function getFeaturedMeScheduleSegment(input: {
       return {
         item: nextItem,
         status: getScheduleEntryAbsenceTypeId(nextItem.entry) != null ? "away" : "upcoming",
+      };
+    }
+
+    const endedTodayItem = selectedDayItems[0] ?? null;
+
+    if (endedTodayItem) {
+      return {
+        item: endedTodayItem,
+        status: "scheduled",
       };
     }
 

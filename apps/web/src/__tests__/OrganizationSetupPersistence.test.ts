@@ -3,6 +3,7 @@ import { saveOrganizationSetupConfig } from "@/components/gridmaster/organizatio
 import type { Organization } from "@/types";
 
 const updateOrganizationSettings = vi.fn();
+const saveOrganizationSettingsWithRecovery = vi.fn();
 const saveDepartments = vi.fn();
 const upsertFocusArea = vi.fn();
 const saveCertifications = vi.fn();
@@ -21,6 +22,8 @@ vi.mock("@/features/gridmaster/client", () => ({
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
   updateOrganizationSettings: (...args: unknown[]) => updateOrganizationSettings(...args),
+  saveOrganizationSettingsWithRecovery: (...args: unknown[]) =>
+    saveOrganizationSettingsWithRecovery(...args),
 }));
 
 vi.mock("@/features/settings/client", () => ({
@@ -107,10 +110,10 @@ describe("saveOrganizationSetupConfig", () => {
     upsertJobDefinition.mockResolvedValue({});
   });
 
-  it("persists setup config using current department, focus area, shift, and job placement relationships", async () => {
+  it("persists Full Names setup using fallback job labels without asking for a code", async () => {
     const savedCount = await saveOrganizationSetupConfig({
       createdOrg: makeOrganization(),
-      shiftDisplayMode: "code",
+      shiftDisplayMode: "name",
       departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],
       focusAreas: [{ id: "focus-1", name: "Emergency", departmentId: "dept-1" }],
       certifications: [],
@@ -127,7 +130,7 @@ describe("saveOrganizationSetupConfig", () => {
       jobs: [
         {
           id: "job-1",
-          label: "rn",
+          label: "",
           name: "Registered Nurse",
           color: "#123456",
           departmentIds: ["dept-1"],
@@ -169,7 +172,7 @@ describe("saveOrganizationSetupConfig", () => {
       expect.objectContaining({
         orgId: "org-1",
         name: "Registered Nurse",
-        abbr: "RN",
+        abbr: "REGI",
         assignmentMode: "with_shift",
         eligibilityMode: "and",
         departmentIds: [10],
@@ -180,6 +183,12 @@ describe("saveOrganizationSetupConfig", () => {
         text: "",
         shiftTimeOverrides: {},
         shiftColorOverrides: {},
+      }),
+    );
+    expect(saveOrganizationSettingsWithRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseline: expect.objectContaining({ id: "org-1" }),
+        input: expect.objectContaining({ shiftDisplayMode: "name" }),
       }),
     );
     expect(updateOrganizationSettings).not.toHaveBeenCalled();

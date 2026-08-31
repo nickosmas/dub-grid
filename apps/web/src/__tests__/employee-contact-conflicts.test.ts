@@ -45,6 +45,21 @@ describe("getEmployeeContactConflict", () => {
     });
   });
 
+  it("reports protected account emails as reserved without exposing the account type", () => {
+    expect(
+      getEmployeeContactConflict({
+        code: "23505",
+        constraint: "employee_email_belongs_to_user",
+        message: "employee_email_belongs_to_gridmaster: belongs to a Gridmaster account",
+      }),
+    ).toEqual({
+      code: "EMPLOYEE_CONTACT_CONFLICT",
+      error: "That email address is reserved.",
+      field: "email",
+      message: "That email address is reserved.",
+    });
+  });
+
   it("ignores unrelated database errors", () => {
     expect(
       getEmployeeContactConflict({

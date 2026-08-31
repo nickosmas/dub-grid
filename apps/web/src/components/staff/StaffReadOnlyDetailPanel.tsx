@@ -91,8 +91,10 @@ export function StaffReadOnlyDetailPanel({
   }, [employee.id]);
 
   const focusAreaMap = new Map(focusAreas.map((fa) => [fa.id, fa.name]));
-  const roleMap = new Map(roles.map((r) => [r.id, r.name]));
-  const certMap = new Map(certifications.map((c) => [c.id, c.name]));
+  const roleMap = new Map(roles.map((role) => [role.id, role.name]));
+  const certMap = new Map(
+    certifications.map((certification) => [certification.id, certification.name]),
+  );
   const deptMap = new Map((departments ?? []).map((d) => [d.id, d.name]));
 
   const focusAreaNames = formatList(employee.focusAreaIds, focusAreaMap);

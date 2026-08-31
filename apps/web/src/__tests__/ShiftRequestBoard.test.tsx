@@ -84,6 +84,7 @@ function renderBoard({
       onResolve={onResolve}
       onCancel={onCancel}
       onClose={vi.fn()}
+      assignmentNameMap={new Map()}
     />,
   );
 

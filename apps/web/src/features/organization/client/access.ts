@@ -46,6 +46,55 @@ export class OrganizationSettingsConflictError extends Error {
   }
 }
 
+export type OrganizationSettingsSaveResult =
+  | { status: "saved"; organization: Organization }
+  | { status: "changed_elsewhere"; organization: Organization };
+
+function settingValuesMatch(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+/**
+ * Retries a stale settings write once only when none of its edited fields
+ * changed on the server. A real same-field race always keeps the server value.
+ */
+export async function saveOrganizationSettingsWithRecovery(args: {
+  baseline: Organization;
+  input: UpdateOrganizationSettingsInput;
+}): Promise<OrganizationSettingsSaveResult> {
+  const { baseline, input } = args;
+  try {
+    return { status: "saved", organization: await updateOrganizationSettings(input) };
+  } catch (error) {
+    if (!(error instanceof OrganizationSettingsConflictError)) throw error;
+
+    const editedKeys = Object.keys(input).filter(
+      (key) => key !== "orgId" && key !== "expectedUpdatedAt",
+    ) as (keyof Organization)[];
+    const targetChanged = editedKeys.some(
+      (key) => !settingValuesMatch(baseline[key], error.latestOrganization[key]),
+    );
+    if (targetChanged || !error.latestOrganization.updatedAt) {
+      return { status: "changed_elsewhere", organization: error.latestOrganization };
+    }
+
+    try {
+      return {
+        status: "saved",
+        organization: await updateOrganizationSettings({
+          ...input,
+          expectedUpdatedAt: error.latestOrganization.updatedAt,
+        }),
+      };
+    } catch (retryError) {
+      if (retryError instanceof OrganizationSettingsConflictError) {
+        return { status: "changed_elsewhere", organization: retryError.latestOrganization };
+      }
+      throw retryError;
+    }
+  }
+}
+
 function resolveClientUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;

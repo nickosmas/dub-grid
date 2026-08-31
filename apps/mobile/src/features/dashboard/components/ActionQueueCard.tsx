@@ -49,8 +49,6 @@ export function ActionQueueCard({
   return (
     <Card
       title="Pending approvals"
-      icon="checkmark-done-outline"
-      iconTone="brand"
       headerAccessory={
         requests.length > 0 ? (
           <CountBadge label={String(requests.length)} tone="brand" />

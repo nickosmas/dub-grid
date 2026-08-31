@@ -173,7 +173,7 @@ describe("Dashboard Metrics", () => {
       ...Object.fromEntries([createShift("emp1", mondayKey, [101])]),
     };
 
-    const sections = computeCoverageBySection(
+    const { sections } = computeCoverageBySection(
       [focusArea1],
       weekDates,
       shifts,
@@ -265,6 +265,7 @@ describe("Dashboard Metrics", () => {
       assignmentById,
       undefined,
       undefined,
+      undefined,
       {
         now: new Date("2026-04-06T10:00:00.000Z"),
         timeZone: "UTC",
@@ -278,6 +279,7 @@ describe("Dashboard Metrics", () => {
       [employee1, employee2],
       shifts,
       assignmentById,
+      undefined,
       undefined,
       undefined,
       {

@@ -3,10 +3,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Organization } from "@/types";
 import { Button } from "@/components/Button";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE, useEmployeeCount } from "@/hooks";
@@ -120,33 +117,33 @@ export default function OrganizationGeneral({
         maxLength: 60,
         required: true,
       });
-      const updated = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        name: normalizedName,
-        phone: nextOrganization.phone,
-        addressLine1: nextOrganization.addressLine1,
-        addressLine2: nextOrganization.addressLine2,
-        addressCity: nextOrganization.addressCity,
-        addressState: nextOrganization.addressState,
-        addressPostalCode: nextOrganization.addressPostalCode,
-        addressCountry: nextOrganization.addressCountry,
-        timezone: nextOrganization.timezone ?? "",
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          name: normalizedName,
+          phone: nextOrganization.phone,
+          addressLine1: nextOrganization.addressLine1,
+          addressLine2: nextOrganization.addressLine2,
+          addressCity: nextOrganization.addressCity,
+          addressState: nextOrganization.addressState,
+          addressPostalCode: nextOrganization.addressPostalCode,
+          addressCountry: nextOrganization.addressCountry,
+          timezone: nextOrganization.timezone ?? "",
+        },
       });
-      onSave(updated);
+      onSave(result.organization);
+      if (result.status === "changed_elsewhere") {
+        setForm(buildForm(result.organization));
+        setReviewOpen(false);
+        toast.info("Organization details were refreshed to the latest saved values.");
+        return;
+      }
       setReviewOpen(false);
       toast.success("Settings saved");
     } catch (err) {
       lastSaveErrorRef.current = err;
-      if (err instanceof OrganizationSettingsConflictError) {
-        onSave(err.latestOrganization);
-        setForm(buildForm(err.latestOrganization));
-        setReviewOpen(false);
-        toast.error(
-          "Organization details changed elsewhere. Review the latest values and try again.",
-        );
-        return;
-      }
       toast.error("We couldn't save those settings. Try again.");
       Sentry.captureException(err);
     } finally {

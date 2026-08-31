@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
@@ -61,11 +61,13 @@ export function EmptyStateCard({
     [mobileColors, isDark],
   );
   const variant = compact ? compactStyles : styles;
-  const { height: windowHeight } = useWindowDimensions();
+  // `Screen`'s scroll content stretches to fill the viewport when it's
+  // shorter than the screen (see its `flexGrow: 1`), so this only has to
+  // claim that space and center within it.
   const fillStyle =
     !compact && fillScreen
       ? {
-          minHeight: Math.max(360, Math.min(520, windowHeight * 0.55)),
+          flexGrow: 1,
           justifyContent: "center" as const,
         }
       : null;

@@ -162,22 +162,23 @@ describe("TabsLayout", () => {
     });
   });
 
-  // StartupSplashGate owns the native launch splash, but a post-launch session
-  // handoff must still explain itself instead of rendering a blank frame.
-  it("shows a labeled handoff while the session is restoring", () => {
+  // StartupSplashGate owns the native launch splash and is still covering
+  // the screen for the entire window the session takes to restore, so this
+  // renders nothing rather than a second, competing loading screen.
+  it("renders nothing while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
-    render(<TabsLayout />);
+    const { container } = render(<TabsLayout />);
 
     expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
-    expect(screen.getByText("Preparing your Organization")).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  // Holding here is what keeps the Home tab from picking a screen (and a
-  // skeleton shape) before it knows whether this is an admin. Every
-  // `canView*` permission is also false until bootstrap lands, so releasing
-  // early made the tab bar itself pop tabs in afterwards.
-  it("keeps a labeled recovery state until bootstrap resolves", () => {
+  // Bootstrap's first load no longer blocks the tab tree: every tab shows
+  // optimistically (see useTabsGate) and each destination screen owns its
+  // own useBootstrap call and skeleton, so it settles into the right shape
+  // once this resolves instead of the whole layout staying blank.
+  it("shows every tab optimistically while bootstrap's first load is in flight", () => {
     useBootstrap.mockReturnValue({
       data: undefined,
       error: null,
@@ -188,8 +189,8 @@ describe("TabsLayout", () => {
 
     render(<TabsLayout />);
 
-    expect(screen.getByText("Preparing your Organization")).toBeInTheDocument();
-    expect(stackScreenMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByText("Schedule")).toBeInTheDocument();
   });
 
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
@@ -212,11 +213,12 @@ describe("TabsLayout", () => {
     }
   });
 
-  // The large-title screens carry no header background at all: an explicit one
+  // Large-title screens carry no header background at all: an explicit one
   // makes an iOS 26 large title invisible, and painting it via
   // `headerBackground` makes the header translucent and stops it collapsing.
-  // The page's own `background` shows through instead. Detail screens keep the
-  // plain opaque header — they have no large title to lose.
+  // The Profile hub intentionally uses a compact transparent native header so
+  // UIKit can apply its scroll-edge treatment while it displays the person's
+  // name.
   it("uses native stack headers for request, people, and profile tab pages", () => {
     render(<RequestsLayout />);
     render(<PeopleLayout />);
@@ -224,12 +226,12 @@ describe("TabsLayout", () => {
 
     // Profile contributes nine: index, account, work, security, and the three
     // security flows split out of it (password, two-factor, sessions), plus
-    // notifications and privacy. People contributes three now that the
-    // management profile is retired: index, add, and the one person page.
-    expect(stackScreenMock).toHaveBeenCalledTimes(13);
+    // notifications and privacy. People contributes its tab root and add form;
+    // Staff Profile deliberately lives above the tabs in the root stack.
+    expect(stackScreenMock).toHaveBeenCalledTimes(12);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[5]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
@@ -266,32 +268,20 @@ describe("TabsLayout", () => {
         title: "Add Person",
       },
     });
-    // The person page is the section's exception: its heading is the centered
-    // identity block the screen draws, so it takes a plain static title. A
-    // large title here would be the person's name printed a second time, in a
-    // bar the page has already named under the avatar.
     expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
-      name: "[id]",
+      name: "index",
       options: {
         headerLargeTitle: false,
         headerLargeTitleEnabled: false,
-        title: "Staff Profile",
-      },
-    });
-    expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
-      name: "index",
-      options: {
-        headerLargeTitle: true,
-        headerLargeTitleEnabled: true,
-        // No background of any kind: an explicit one makes an iOS 26 large
-        // title invisible, and `headerBackground` costs it the collapse.
         headerStyle: undefined,
+        headerTransparent: true,
+        headerTitleStyle: expect.objectContaining({ color: "transparent" }),
         title: "Profile",
       },
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
-    expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
+    expect(stackScreenMock.mock.calls.slice(4).map((call) => call[0]?.name)).toEqual([
       "account",
       "work",
       "security",

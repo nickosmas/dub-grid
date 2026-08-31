@@ -59,16 +59,36 @@ export function getActionSeverity(action: string): ActionSeverity {
   return getAuditSeverity(action);
 }
 
-export function severityColor(severity: ActionSeverity): { bg: string; fg: string } {
+export function severityColor(severity: ActionSeverity): {
+  bg: string;
+  border: string;
+  fg: string;
+} {
   switch (severity) {
     case "create":
-      return { bg: "var(--dg-color-success-bg, #f0fdf4)", fg: "var(--dg-color-success, #16a34a)" };
+      return {
+        bg: "var(--dg-color-success-bg, #f0fdf4)",
+        border: "var(--dg-color-success-border, #bbf7d0)",
+        fg: "var(--dg-color-success-text, #166534)",
+      };
     case "delete":
-      return { bg: "var(--dg-color-danger-bg, #fde8e8)", fg: "var(--dg-color-danger)" };
+      return {
+        bg: "var(--dg-color-danger-bg, #fde8e8)",
+        border: "var(--dg-color-danger-border, #fecaca)",
+        fg: "var(--dg-color-danger-text, #b91c1c)",
+      };
     case "warning":
-      return { bg: "var(--dg-color-warning-bg, #fff8e6)", fg: "var(--dg-color-warning, #b08800)" };
+      return {
+        bg: "var(--dg-color-warning-bg, #fff8e6)",
+        border: "var(--dg-color-warning-border, #fde68a)",
+        fg: "var(--dg-color-warning-text, #92400e)",
+      };
     case "update":
-      return { bg: "var(--dg-color-bg-secondary)", fg: "var(--dg-color-text-secondary)" };
+      return {
+        bg: "var(--dg-color-bg-secondary)",
+        border: "var(--dg-color-border)",
+        fg: "var(--dg-color-text-primary)",
+      };
   }
 }
 

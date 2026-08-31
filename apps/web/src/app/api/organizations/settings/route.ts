@@ -41,6 +41,7 @@ const bodySchema = z.object({
   roleLabel: z.string().trim().max(50).optional(),
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
   showShiftDetailHoverCards: z.boolean().optional(),
+  useCompactRoleCertificationLabels: z.boolean().optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
     .string()
@@ -340,6 +341,8 @@ export async function PUT(req: NextRequest) {
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
       showShiftDetailHoverCards:
         fields.showShiftDetailHoverCards ?? currentOrg.showShiftDetailHoverCards,
+      useCompactRoleCertificationLabels:
+        fields.useCompactRoleCertificationLabels ?? currentOrg.useCompactRoleCertificationLabels,
       timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
@@ -398,6 +401,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("showShiftDetailHoverCards")) {
       update.show_shift_detail_hover_cards = nextOrg.showShiftDetailHoverCards;
+    }
+    if (changeKeys.has("useCompactRoleCertificationLabels")) {
+      update.use_compact_role_certification_labels = nextOrg.useCompactRoleCertificationLabels;
     }
     if (changeKeys.has("timezone")) {
       update.timezone = nextOrg.timezone;

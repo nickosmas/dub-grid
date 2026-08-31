@@ -100,6 +100,29 @@ async function fetchInvitation(orgId: string, invitationId: string): Promise<Inv
   return data ? rowToInvitation(data as DbInvitation) : null;
 }
 
+/**
+ * `one_pending_invite_per_email` is a partial unique index on
+ * invitations(org_id, email) WHERE accepted_at IS NULL AND revoked_at IS
+ * NULL. Editing a pending invitation's email to one that collides with a
+ * different live pending invitation hits this index directly (there's no
+ * app-level pre-check, unlike invitation creation's send_invitation RPC
+ * guard), so this needs its own friendly mapping.
+ */
+function isPendingInviteEmailConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    code?: unknown;
+    constraint?: unknown;
+    details?: unknown;
+    message?: unknown;
+  };
+  if (record.code !== "23505") return false;
+  const text = [record.constraint, record.details, record.message]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return text.includes("one_pending_invite_per_email");
+}
+
 function buildConflictResponse(latestInvitation: Invitation) {
   return NextResponse.json(
     {
@@ -241,6 +264,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     }
 
+    if (currentInvitation.revokedAt || currentInvitation.acceptedAt) {
+      return NextResponse.json(
+        { error: "This invitation is no longer pending. It was revoked or already accepted." },
+        { status: 409 },
+      );
+    }
+
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
     }
@@ -299,7 +329,18 @@ export async function PATCH(req: NextRequest) {
       )
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      if (isPendingInviteEmailConflict(error)) {
+        return NextResponse.json(
+          {
+            error:
+              "That email address already has a separate pending invitation. Revoke it first, or use a different email.",
+          },
+          { status: 409 },
+        );
+      }
+      throw error;
+    }
 
     if (!updatedInvitation) {
       const latestInvitation = await fetchInvitation(orgId, invitationId);

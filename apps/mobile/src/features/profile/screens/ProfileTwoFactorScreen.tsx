@@ -7,10 +7,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getProfile, updateProfileMfaStatus } from "../../../shared/lib/api";
-import {
-  getInlineErrorMessageOrToast,
-  pushClientFriendlyErrorToast,
-} from "../../../shared/lib/errors";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
@@ -66,7 +63,6 @@ export default function ProfileTwoFactorScreen() {
   const [mfaSecret, setMfaSecret] = useState<string | null>(null);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaVerifyCode, setMfaVerifyCode] = useState("");
-  const [mfaError, setMfaError] = useState<string | null>(null);
   const [isConfirmingDisable, setIsConfirmingDisable] = useState(false);
 
   const profileQuery = useQuery({
@@ -115,13 +111,11 @@ export default function ProfileTwoFactorScreen() {
     setMfaSecret(null);
     setMfaFactorId(null);
     setMfaVerifyCode("");
-    setMfaError(null);
   }
 
   async function startMfaEnrollment() {
     if (mfaLoading) return;
     setMfaLoading(true);
-    setMfaError(null);
     try {
       const { data: factorsData, error: listError } =
         await getSupabaseClient().auth.mfa.listFactors();
@@ -171,7 +165,6 @@ export default function ProfileTwoFactorScreen() {
   async function verifyMfaEnrollment() {
     if (!mfaFactorId || mfaVerifyCode.length !== 6 || mfaLoading) return;
     setMfaLoading(true);
-    setMfaError(null);
     try {
       const { data: verifiedSession, error } =
         await getSupabaseClient().auth.mfa.challengeAndVerify({
@@ -197,12 +190,11 @@ export default function ProfileTwoFactorScreen() {
       });
       resetMfaEnrollment();
     } catch (error) {
-      setMfaError(
-        getInlineErrorMessageOrToast(pushToast, {
-          error,
-          fallbackMessage: "Invalid verification code. Please try again.",
-        }),
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not verify code",
+        fallbackMessage: "Invalid verification code. Please try again.",
+      });
     } finally {
       setMfaLoading(false);
     }
@@ -260,7 +252,9 @@ export default function ProfileTwoFactorScreen() {
         <StatusBanner
           actionLabel="Try Again"
           body={contentState.message}
+          fillScreen
           title="Could not load two-factor status"
+          variant="centered"
           onAction={() => profileQuery.refetch()}
         />
       ) : isEnrolling ? (
@@ -268,7 +262,6 @@ export default function ProfileTwoFactorScreen() {
           title="Set up"
           description="Add a new entry in your authenticator app (Google Authenticator, Authy, 1Password, etc.) using this key, then enter the 6-digit code it generates."
         >
-          {mfaError ? <StatusBanner body={mfaError} title="Could not verify code" /> : null}
           <ProfilePanel>
             {mfaSecret ? (
               <View style={styles.mfaSecretRow}>
@@ -286,10 +279,7 @@ export default function ProfileTwoFactorScreen() {
               maxLength={6}
               placeholder="000000"
               value={mfaVerifyCode}
-              onChangeText={(text) => {
-                setMfaVerifyCode(text.replace(/\D/g, "").slice(0, 6));
-                setMfaError(null);
-              }}
+              onChangeText={(text) => setMfaVerifyCode(text.replace(/\D/g, "").slice(0, 6))}
             />
           </ProfilePanel>
           <View style={styles.actionsStack}>

@@ -243,4 +243,36 @@ describe("useShiftRequests", () => {
     ]);
     expect(result.current.badgeCount).toBe(1);
   });
+
+  it("omits date filters by default but threads them through when a dateRange is given", async () => {
+    mockFetchShiftRequests.mockResolvedValue([]);
+
+    const { rerender } = renderHook(
+      ({ dateRange }: { dateRange?: { startDate: string; endDate: string } }) =>
+        useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles", dateRange),
+      { initialProps: {} },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockFetchShiftRequests).toHaveBeenLastCalledWith(
+      "org-1",
+      expect.any(Map),
+      expect.not.objectContaining({ startDate: expect.anything() }),
+    );
+
+    rerender({ dateRange: { startDate: "2026-04-14", endDate: "2026-04-20" } });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockFetchShiftRequests).toHaveBeenLastCalledWith(
+      "org-1",
+      expect.any(Map),
+      expect.objectContaining({ startDate: "2026-04-14", endDate: "2026-04-20" }),
+    );
+  });
 });

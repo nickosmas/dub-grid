@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Employee, Invitation } from "@/types";
+import type { Employee } from "@/types";
 import { Button } from "@/components/Button";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
-import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export interface EmployeeStatusActionsProps {
@@ -13,12 +11,9 @@ export interface EmployeeStatusActionsProps {
   canEdit: boolean;
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
-  pendingInvitation?: Invitation;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onRemove: (empId: string, note?: string) => void;
-  onInvite?: (emp: Employee) => void;
-  onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   variant: "panel" | "page";
 }
 
@@ -28,22 +23,15 @@ export function EmployeeStatusActions({
   employee,
   canEdit,
   isSelf = false,
-  pendingInvitation,
   onDeactivate,
   onActivate,
   onRemove,
-  onInvite,
-  onRevoke,
   variant,
 }: EmployeeStatusActionsProps) {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
   const [note, setNote] = useState(employee.statusNote || "");
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
-  const [pendingInvitationAction, setPendingInvitationAction] = useState<
-    "reinvite" | "revoke" | null
-  >(null);
-  const [revoking, setRevoking] = useState(false);
 
   const isActive = employee.status === "active";
   const displayName = getEmployeeDisplayName(employee);
@@ -51,88 +39,15 @@ export function EmployeeStatusActions({
   // they're not on the schedule grid (see ProfilePage's isOnSchedule).
   const isScheduled = employee.focusAreaIds.length > 0;
 
-  async function handleConfirmInvitationAction() {
-    if (!pendingInvitation || !pendingInvitationAction) return;
-
-    if (onRevoke) {
-      setRevoking(true);
-      try {
-        const result = await onRevoke(pendingInvitation.id);
-        if (result === false) return;
-      } finally {
-        setRevoking(false);
-      }
-    }
-
-    if (pendingInvitationAction === "reinvite" && onInvite) {
-      onInvite(employee);
-    }
-    setPendingInvitationAction(null);
-  }
-
   function resetDeactivateForm() {
     setShowDeactivateConfirm(false);
     setOutcome("inactive");
   }
 
-  if (!canEdit) return null;
-
-  // Self-action guard: you can't deactivate / remove / activate your own record.
-  if (isSelf) {
-    return (
-      <p
-        style={{
-          fontSize: "var(--dg-fs-footnote)",
-          color: "var(--dg-color-text-muted)",
-          margin: 0,
-        }}
-      >
-        {SELF_ACTION_FORBIDDEN_MESSAGE}
-      </p>
-    );
-  }
-
-  // ── Invitation section (panel variant only) ──
-  const invitationSection =
-    variant === "panel" && pendingInvitation && onInvite ? (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 0",
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
-          Invitation pending
-        </span>
-        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-          <Button
-            disabled={revoking}
-            onClick={() => setPendingInvitationAction("reinvite")}
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ color: "var(--dg-color-link)" }}
-          >
-            <ButtonLoading loading={revoking} spinnerSize={12}>
-              Reinvite
-            </ButtonLoading>
-          </Button>
-          {onRevoke && (
-            <Button
-              disabled={revoking}
-              onClick={() => setPendingInvitationAction("revoke")}
-              className="dg-btn dg-btn-ghost dg-btn-xs"
-              style={{ color: "var(--dg-color-danger)" }}
-            >
-              <ButtonLoading loading={revoking} spinnerSize={12}>
-                Revoke
-              </ButtonLoading>
-            </Button>
-          )}
-        </div>
-      </div>
-    ) : null;
+  // Self-action guard: you can't deactivate / remove / activate your own
+  // record, so callers hide this whole section rather than show it with
+  // nothing actionable inside.
+  if (!canEdit || isSelf) return null;
 
   // ── Unified Deactivate confirmation ──
   // One modal asks Temporary vs Permanent. The primary button's verb + variant
@@ -247,7 +162,6 @@ export function EmployeeStatusActions({
 
   return (
     <>
-      {invitationSection}
       {showActivate && (
         <div
           style={{
@@ -301,27 +215,6 @@ export function EmployeeStatusActions({
             setShowActivateConfirm(false);
           }}
           onCancel={() => setShowActivateConfirm(false)}
-        />
-      )}
-      {pendingInvitationAction && pendingInvitation && (
-        <ConfirmDialog
-          title={
-            pendingInvitationAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"
-          }
-          message={
-            pendingInvitationAction === "reinvite"
-              ? `Revoke the existing invitation for ${pendingInvitation.email} and create a new one?`
-              : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
-          }
-          confirmLabel={
-            pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
-          }
-          variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
-          isLoading={revoking}
-          onConfirm={() => handleConfirmInvitationAction()}
-          onCancel={() => {
-            if (!revoking) setPendingInvitationAction(null);
-          }}
         />
       )}
       {showDeactivate && (

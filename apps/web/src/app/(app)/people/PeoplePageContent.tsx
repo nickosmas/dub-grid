@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 import type { NewEmployeeData } from "@/components/AddEmployeeModal";
+import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+import { queryKeys } from "@/lib/query-keys";
 
 function PeopleContent() {
   const {
@@ -36,8 +39,13 @@ function PeopleContent() {
     absenceTypes,
     loading: refLoading,
     loadError,
+    bootstrapRetryable,
     setupStatus,
   } = useOrganizationData();
+  const queryClient = useQueryClient();
+  const retryOrganizationBootstrap = useCallback(async () => {
+    await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
+  }, [queryClient]);
   const {
     employees,
     inactiveEmployees,
@@ -45,6 +53,7 @@ function PeopleContent() {
     loading: empLoading,
     handleAddEmployee,
     handleSaveEmployee,
+    handleSaveEmployeeWithReinvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,
@@ -79,16 +88,10 @@ function PeopleContent() {
 
   if (loadError && !org) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        }}
-      >
-        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
-      </div>
+      <OrganizationBootstrapRecovery
+        automaticallyRetry={bootstrapRetryable}
+        onRetry={retryOrganizationBootstrap}
+      />
     );
   }
 
@@ -106,6 +109,9 @@ function PeopleContent() {
             certifications={certifications}
             roles={orgRoles}
             onSave={handleSaveEmployee}
+            onSaveWithReinvite={(emp, oldInvitation) =>
+              handleSaveEmployeeWithReinvite(emp, oldInvitation, org?.name || "your organization")
+            }
             onRemove={handleRemoveEmployee}
             onDeactivate={handleDeactivateEmployee}
             onActivate={handleActivateEmployee}
@@ -129,6 +135,7 @@ function PeopleContent() {
             focusAreaLabel={org?.focusAreaLabel}
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}
+            useCompactRoleCertificationLabels={org?.useCompactRoleCertificationLabels ?? false}
             orgName={org?.name}
             shiftDisplayMode={org?.shiftDisplayMode}
             defaultShiftEnabled={org?.defaultShiftEnabled ?? true}

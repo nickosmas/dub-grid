@@ -9,7 +9,7 @@ const requireMobileAuth = vi.fn();
 const resolveMobileDateRange = vi.fn();
 const fetchMobileCoverageSummary = vi.fn();
 const fetchMobileShiftRequests = vi.fn();
-const fetchMobileOpenShiftContextRows = vi.fn();
+const fetchMobileOpenShiftContext = vi.fn();
 const fetchMobilePublishHistoryRows = vi.fn();
 const fetchMobileAcceptedInvitationRows = vi.fn();
 const fetchProfileNameRowsByIds = vi.fn();
@@ -19,10 +19,10 @@ vi.mock("@/features/mobile/server", () => ({
   resolveMobileDateRange,
   fetchMobileCoverageSummary,
   fetchMobileShiftRequests,
+  fetchMobileOpenShiftContext,
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
-  fetchMobileOpenShiftContextRows,
   fetchMobilePublishHistoryRows,
   fetchMobileAcceptedInvitationRows,
   fetchProfileNameRowsByIds,
@@ -51,10 +51,11 @@ describe("mobile dashboard route", () => {
       scheduleRows: [],
     });
     fetchMobileShiftRequests.mockResolvedValue([]);
-    fetchMobileOpenShiftContextRows.mockResolvedValue({
-      shiftCategoryRows: [],
-      coverageRequirementRows: [],
-      focusAreaRows: [{ id: 1, name: "ICU" }],
+    fetchMobileOpenShiftContext.mockResolvedValue({
+      assignments: [],
+      assignmentIdByPair: new Map(),
+      focusAreas: [{ id: 1, name: "ICU" }],
+      shiftCategories: [],
     });
     fetchMobilePublishHistoryRows.mockResolvedValue([]);
     fetchMobileAcceptedInvitationRows.mockResolvedValue([]);
@@ -182,8 +183,12 @@ describe("mobile dashboard route", () => {
         type: "pickup",
         status: "pending_approval",
         requesterName: "Alex Rivera",
-        requesterShiftDate: "2026-05-12",
+        // Far-future/never-expiring so resolveActiveShiftRequests's expiry
+        // and "already started" checks don't filter this out regardless of
+        // when the test actually runs.
+        requesterShiftDate: "2099-01-01",
         requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+        expiresAt: "2099-01-02T00:00:00.000Z",
         createdAt: "2026-05-10T09:00:00.000Z",
       },
     ]);

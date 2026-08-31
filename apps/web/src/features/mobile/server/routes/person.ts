@@ -3,8 +3,9 @@ import {
   mobilePersonResponseSchema,
   mobilePersonUpdateBodySchema,
   mobilePersonUpdateResponseSchema,
+  type MobilePerson,
 } from "@dubgrid/contracts";
-import { insertMobileAuditLogEntry, updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
+import { updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
 import { requireMobileAuth } from "@/features/mobile/server";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
@@ -31,6 +32,94 @@ async function loadMobilePerson(
   employeeId: string,
 ) {
   return (await loadMobilePersonWithAccess(serviceClient, orgId, employeeId))?.person ?? null;
+}
+
+function sameNumberSet(left: number[], right: number[]): boolean {
+  const sortedLeft = [...left].sort((a, b) => a - b);
+  const sortedRight = [...right].sort((a, b) => a - b);
+  return (
+    sortedLeft.length === sortedRight.length &&
+    sortedLeft.every((value, index) => value === sortedRight[index])
+  );
+}
+
+function employeeUpdateAuditDetails(
+  currentPerson: MobilePerson,
+  update: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    contactNotes: string;
+    employmentType: "full_time" | "part_time";
+    certificationId: number | null;
+    focusAreaIds: number[];
+    roleIds: number[];
+    departmentIds: number[];
+  },
+) {
+  const changedFields: string[] = [];
+  const from: Record<string, unknown> = {};
+  const to: Record<string, unknown> = {};
+  const add = (field: string, before: unknown, after: unknown, changed: boolean) => {
+    if (!changed) return;
+    changedFields.push(field);
+    from[field] = before;
+    to[field] = after;
+  };
+
+  add(
+    "firstName",
+    currentPerson.firstName,
+    update.firstName,
+    currentPerson.firstName !== update.firstName,
+  );
+  add(
+    "lastName",
+    currentPerson.lastName,
+    update.lastName,
+    currentPerson.lastName !== update.lastName,
+  );
+  add("phone", currentPerson.phone, update.phone, currentPerson.phone !== update.phone);
+  add("email", currentPerson.email, update.email, currentPerson.email !== update.email);
+  add(
+    "contactNotes",
+    currentPerson.contactNotes,
+    update.contactNotes,
+    currentPerson.contactNotes !== update.contactNotes,
+  );
+  add(
+    "employmentType",
+    currentPerson.employmentType,
+    update.employmentType,
+    currentPerson.employmentType !== update.employmentType,
+  );
+  add(
+    "certification",
+    currentPerson.certificationId,
+    update.certificationId,
+    currentPerson.certificationId !== update.certificationId,
+  );
+  add(
+    "focusAreas",
+    currentPerson.focusAreaIds,
+    update.focusAreaIds,
+    !sameNumberSet(currentPerson.focusAreaIds, update.focusAreaIds),
+  );
+  add(
+    "roles",
+    currentPerson.roleIds,
+    update.roleIds,
+    !sameNumberSet(currentPerson.roleIds, update.roleIds),
+  );
+  add(
+    "departments",
+    currentPerson.departmentIds,
+    update.departmentIds,
+    !sameNumberSet(currentPerson.departmentIds, update.departmentIds),
+  );
+
+  return { changedFields, from, to };
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -138,16 +227,34 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     );
   }
 
+  // Someone with management access doesn't need at least one focus area to
+  // fall back on — they can come off the schedule entirely and keep managing.
+  const hasManagementAccess = currentPerson.managementDepartmentIds.length > 0;
   const referenceErrors = await validateStaffOrgReferences(auth.serviceClient, auth.currentOrg.id, {
     certificationId: parsed.data.certificationId,
+    currentCertificationId: currentPerson.certificationId,
     departmentIds: parsed.data.departmentIds,
     focusAreaIds: parsed.data.focusAreaIds,
-    requireFocusArea: true,
+    requireFocusArea: !hasManagementAccess,
     roleIds: parsed.data.roleIds,
   });
   if (Object.keys(referenceErrors).length > 0) {
     return buildStaffValidationErrorResponse(referenceErrors);
   }
+
+  const update = {
+    firstName: parsed.data.firstName.trim(),
+    lastName: parsed.data.lastName.trim(),
+    phone: parsed.data.phone.trim(),
+    email: parsed.data.email.trim(),
+    contactNotes: parsed.data.contactNotes.trim(),
+    employmentType: parsed.data.employmentType ?? currentPerson.employmentType,
+    certificationId: parsed.data.certificationId,
+    focusAreaIds: parsed.data.focusAreaIds,
+    roleIds: parsed.data.roleIds,
+    departmentIds: parsed.data.departmentIds,
+  };
+  const auditDetails = employeeUpdateAuditDetails(currentPerson, update);
 
   let updatedRow;
   try {
@@ -155,16 +262,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       orgId: auth.currentOrg.id,
       employeeId: id,
       expectedVersion: parsed.data.expectedVersion,
-      firstName: parsed.data.firstName.trim(),
-      lastName: parsed.data.lastName.trim(),
-      phone: parsed.data.phone.trim(),
-      email: parsed.data.email.trim(),
-      contactNotes: parsed.data.contactNotes.trim(),
-      employmentType: parsed.data.employmentType,
-      certificationId: parsed.data.certificationId,
-      focusAreaIds: parsed.data.focusAreaIds,
-      roleIds: parsed.data.roleIds,
-      departmentIds: parsed.data.departmentIds,
+      audit: {
+        actorEmail: auth.user.email ?? null,
+        actorId: auth.user.id,
+        ...(auditDetails.changedFields.length > 0 ? { details: auditDetails } : {}),
+        ipAddress: getRequestIp(req),
+        userAgent: req.headers?.get("user-agent") ?? null,
+      },
+      ...update,
     });
   } catch (error) {
     const contactConflict = getEmployeeContactConflict(error);
@@ -185,31 +290,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       { status: 409 },
     );
   }
-
-  await insertMobileAuditLogEntry(auth.serviceClient, {
-    org_id: auth.currentOrg.id,
-    actor_id: auth.user.id,
-    actor_email: auth.user.email ?? null,
-    action: "employee.updated",
-    resource_type: "employee",
-    resource_id: id,
-    details: {
-      changedFields: [
-        "firstName",
-        "lastName",
-        "phone",
-        "email",
-        "contactNotes",
-        "employmentType",
-        "certificationId",
-        "focusAreaIds",
-        "roleIds",
-        "departmentIds",
-      ],
-    },
-    ip_address: getRequestIp(req),
-    user_agent: req.headers?.get("user-agent") ?? null,
-  });
 
   const person = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
   return NextResponse.json(

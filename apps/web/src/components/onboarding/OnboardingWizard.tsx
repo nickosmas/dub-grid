@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useOnboardingState, type StepConfig } from "./useOnboardingState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
@@ -56,6 +57,7 @@ export default function OnboardingWizard({
   userId,
   isOrgSetup,
 }: OnboardingWizardProps) {
+  const router = useRouter();
   // Freeze the variant at mount: as the user fills in shifts/jobs during
   // ScheduleStep, setupStatus.isComplete can flip true, which would otherwise
   // re-render the wizard from the 5-step config flow into the 3-step
@@ -81,7 +83,8 @@ export default function OnboardingWizard({
     setSkipLoading(true);
     try {
       await completeOnboarding();
-      window.location.reload();
+      toast.success("Onboarding skipped");
+      router.push("/dashboard");
     } catch (err) {
       Sentry.captureException(err);
       toast.error("We couldn't skip setup. Try again.");

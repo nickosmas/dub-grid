@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { NamedItem } from "@/types";
+import { formatLocalDateKey } from "@dubgrid/schedule-core";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,18 +35,48 @@ export function getEmployeeDisplayName(emp: { firstName: string; lastName: strin
   return `${emp.firstName} ${emp.lastName}`.trim();
 }
 
-export function getCertAbbr(certId?: number | string | null, certifications?: NamedItem[]): string {
-  if (certId == null || !certifications) return "";
-  const cert = certifications.find((c) => c.id === Number(certId));
-  return cert ? cert.abbr || cert.name : "";
+export function getCompactNamedItemLabel(item: Pick<NamedItem, "name" | "abbr">): string {
+  const name = item.name.trim();
+  const abbr = item.abbr.trim();
+  if (abbr && abbr !== name && abbr.length <= 6) return abbr;
+  const words = name.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length === 1) {
+    const word = words[0] ?? "";
+    return word.length <= 6 ? word : word.slice(0, 3).toUpperCase();
+  }
+  if (words.length > 1) {
+    const levelWords = words.filter((word) => /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)$/i.test(word));
+    const initials = words
+      .filter((word) => !levelWords.includes(word))
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase();
+    const levelSuffix = levelWords.map((word) => word.toUpperCase()).join(" ");
+    return levelSuffix ? `${initials} ${levelSuffix}`.trim() : initials;
+  }
+  return getInitials(name) || name.slice(0, 2).toUpperCase();
 }
 
-export function getRoleAbbrs(roleIds: (number | string)[], roles?: NamedItem[]): string[] {
+export function getCertAbbr(
+  certId?: number | string | null,
+  certifications?: NamedItem[],
+  useCompactLabels = true,
+): string {
+  if (certId == null || !certifications) return "";
+  const cert = certifications.find((c) => c.id === Number(certId));
+  return cert ? (useCompactLabels ? getCompactNamedItemLabel(cert) : cert.name) : "";
+}
+
+export function getRoleAbbrs(
+  roleIds: (number | string)[],
+  roles?: NamedItem[],
+  useCompactLabels = true,
+): string[] {
   if (!roles || !roleIds?.length) return [];
   return roleIds
     .map((id) => {
       const role = roles.find((r) => r.id === Number(id));
-      return role ? role.abbr || role.name : "";
+      return role ? (useCompactLabels ? getCompactNamedItemLabel(role) : role.name) : "";
     })
     .filter(Boolean);
 }
@@ -75,9 +106,11 @@ export function formatDate(date: Date): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export function formatDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
+// Delegates to @dubgrid/schedule-core's canonical local-date-key formatter —
+// the same function mobile's coverage/schedule pipeline now uses, so a
+// "YYYY-MM-DD" key means the exact same calendar day on both platforms
+// regardless of server timezone.
+export const formatDateKey = formatLocalDateKey;
 
 /**
  * Yields `{ dateKey, dayOfWeek, dayIndex }` for each calendar day in [start, end] inclusive.

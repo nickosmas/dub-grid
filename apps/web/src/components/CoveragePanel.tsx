@@ -24,7 +24,9 @@ function formatDate(date: Date): string {
 
 function formatShortageDetails(gap: CoverageGap): string {
   return gap.shortageDetails
-    .map((detail) => `${detail.assignmentLabel} short ${detail.shortage}`)
+    .map(
+      (detail) => `${detail.assignmentFullName ?? detail.assignmentLabel} short ${detail.shortage}`,
+    )
     .join(", ");
 }
 
@@ -281,9 +283,9 @@ export default function CoveragePanel({
                         {fa?.name ?? `Area #${focusAreaId}`}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {faGaps.map((gap) => (
+                        {faGaps.map((gap, gapIndex) => (
                           <div
-                            key={`${focusAreaId}-${gap.date.toISOString()}-${gap.shiftCategoryId}`}
+                            key={`${focusAreaId}-${gap.date.toISOString()}-${gap.shiftCategoryId}-${gap.assignmentId}-${gapIndex}`}
                             style={{
                               padding: "10px 12px",
                               borderRadius: "var(--dg-radius-lg)",

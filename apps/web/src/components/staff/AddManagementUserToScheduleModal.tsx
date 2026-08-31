@@ -336,7 +336,7 @@ export function AddManagementUserToScheduleModal({
                   unselectedBorderColor="transparent"
                   unselectedTextColor="var(--dg-color-text-faint)"
                 >
-                  {role.abbr}
+                  {role.name}
                 </SelectableTag>
               ))}
             </div>

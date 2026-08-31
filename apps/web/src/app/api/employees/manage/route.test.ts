@@ -49,7 +49,7 @@ const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 
 function makeServiceClient() {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "is", "gte", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit", "update", "insert"]) {
     chain[method] = vi.fn(() => chain);
   }
   chain.maybeSingle = vi.fn(() =>
@@ -68,6 +68,12 @@ function makeEmployee(overrides: Record<string, unknown> = {}) {
     status: "active",
     contactNotes: "Weekend availability",
     statusNote: "Hold",
+    employmentType: "full_time",
+    certificationId: null,
+    seniority: 1,
+    roleIds: [],
+    focusAreaIds: [],
+    departmentIds: [],
     deptAdminIds: [5],
     userId: PERSON_USER_ID,
     ...overrides,
@@ -96,6 +102,37 @@ function fetchEmployeeByIdRequest() {
       action: "fetchEmployeeById",
       orgId: ORG_ID,
       employeeId: EMPLOYEE_ID,
+    }),
+  });
+}
+
+function updateEmployeeRequest(overrides: Record<string, unknown> = {}) {
+  return new NextRequest("http://localhost/api/employees/manage", {
+    method: "POST",
+    body: JSON.stringify({
+      action: "updateEmployee",
+      orgId: ORG_ID,
+      employee: {
+        id: EMPLOYEE_ID,
+        firstName: "Mina",
+        lastName: "Diaz",
+        employmentType: "full_time",
+        status: "active",
+        statusChangedAt: null,
+        statusNote: "",
+        certificationId: null,
+        roleIds: [],
+        seniority: 1,
+        focusAreaIds: [],
+        phone: "",
+        email: "mina@dubgrid.com",
+        contactNotes: "",
+        userId: PERSON_USER_ID,
+        departmentIds: [],
+        deptAdminIds: [],
+        version: 0,
+        ...overrides,
+      },
     }),
   });
 }
@@ -187,6 +224,30 @@ describe("POST /api/employees/manage", () => {
         deptAdminIds: [],
         userId: null,
       });
+    });
+  });
+
+  describe("updateEmployee", () => {
+    it("rejects clearing focus areas for an employee with no management access", async () => {
+      mockAuth({ canManageEmployees: true });
+      fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
+
+      const response = await POST(updateEmployeeRequest());
+
+      expect(response.status).toBe(400);
+      const payload = await response.json();
+      expect(payload.fieldErrors.focusAreaIds).toBe("Select at least one focus area");
+    });
+
+    it("allows clearing focus areas for an employee who also holds management access", async () => {
+      mockAuth({ canManageEmployees: true });
+      fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+        { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
+      ]);
+
+      const response = await POST(updateEmployeeRequest());
+
+      expect(response.status).toBe(200);
     });
   });
 });

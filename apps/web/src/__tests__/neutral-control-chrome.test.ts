@@ -44,10 +44,6 @@ const printOptionsModal = readFileSync(
 );
 const repeatForm = readFileSync(resolveWebSource("components/RepeatForm.tsx"), "utf-8");
 const shiftPicker = readFileSync(resolveWebSource("components/ShiftPicker.tsx"), "utf-8");
-const staffDetailPage = readFileSync(
-  resolveWebSource("components/staff-detail/StaffDetailPage.tsx"),
-  "utf-8",
-);
 const cardPrimitive = readFileSync(resolveWebSource("components/ui/card.tsx"), "utf-8");
 const inputPrimitive = readFileSync(resolveWebSource("components/ui/input.tsx"), "utf-8");
 const sidebarPrimitive = readFileSync(resolveWebSource("components/ui/sidebar.tsx"), "utf-8");
@@ -140,7 +136,6 @@ describe("shared chrome theming", () => {
       printOptionsModal,
       repeatForm,
       shiftPicker,
-      staffDetailPage,
       membersSection,
       toolbar,
     ]) {

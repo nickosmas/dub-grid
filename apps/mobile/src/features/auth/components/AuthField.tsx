@@ -133,6 +133,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       textAlign: "center",
       fontSize: 26,
+      lineHeight: 32,
       letterSpacing: 10,
       fontWeight: "600",
     },

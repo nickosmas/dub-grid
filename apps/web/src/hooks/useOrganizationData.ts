@@ -56,6 +56,8 @@ export interface OrganizationData {
   orgRoles: NamedItem[];
   departments: Department[];
   assignmentLabelMap: Map<number, string>;
+  /** Same as `assignmentLabelMap` but always spelled out in full, for surfaces outside the grid. */
+  assignmentNameMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
   loading: boolean;
   loadError: string | null;
@@ -393,6 +395,26 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     ],
   );
 
+  const assignmentNameMap = useMemo(
+    () =>
+      includeAssignmentDefinitionCompatibility
+        ? buildAssignableShiftDisplayMap({
+            assignments: allAssignmentDefinitions,
+            shiftCategories,
+            jobs,
+            focusAreas,
+            shiftDisplayMode: "name",
+          })
+        : new Map<number, string>(),
+    [
+      allAssignmentDefinitions,
+      focusAreas,
+      includeAssignmentDefinitionCompatibility,
+      jobs,
+      shiftCategories,
+    ],
+  );
+
   const absenceTypeMap = useMemo(
     () =>
       new Map(
@@ -609,6 +631,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     orgRoles,
     departments,
     assignmentLabelMap,
+    assignmentNameMap,
     absenceTypeMap,
     loading,
     loadError,

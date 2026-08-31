@@ -8,16 +8,17 @@ import {
 } from "@dubgrid/mobile-api-core";
 import {
   fetchMobileAcceptedInvitationRows,
-  fetchMobileOpenShiftContextRows,
   fetchMobilePublishHistoryRows,
   fetchProfileNameRowsByIds,
 } from "@dubgrid/data-access";
 import {
   fetchMobileCoverageSummary,
+  fetchMobileOpenShiftContext,
   fetchMobileShiftRequests,
   requireMobileAuth,
   resolveMobileDateRange,
 } from "@/features/mobile/server";
+import { formatLocalDateKey } from "@dubgrid/schedule-core";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +40,12 @@ function getDefaultDashboardRange(): { startDate: string; endDate: string } {
   start.setDate(start.getDate() - start.getDay());
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
+  // formatLocalDateKey, not `.toISOString()` — the latter silently shifts
+  // the date back one day on any server timezone ahead of UTC (see
+  // parseLocalDateKey's doc comment in @dubgrid/schedule-core).
   return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
+    startDate: formatLocalDateKey(start),
+    endDate: formatLocalDateKey(end),
   };
 }
 
@@ -78,7 +82,7 @@ export async function GET(req: NextRequest) {
       {
         fetchMobileCoverageSummary,
         fetchMobileShiftRequests,
-        fetchMobileOpenShiftContext: fetchMobileOpenShiftContextRows,
+        fetchMobileOpenShiftContext,
         fetchMobilePublishHistoryRows,
         fetchMobileAcceptedInvitationRows,
         fetchProfileNameRowsByIds,

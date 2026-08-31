@@ -28,6 +28,14 @@ const rn = (departmentIds: number[] = []): NamedItem => ({
   departmentIds,
 });
 
+const lpn = (): NamedItem => ({
+  id: 2,
+  orgId: "org-1",
+  name: "LPN",
+  abbr: "LPN",
+  sortOrder: 1,
+});
+
 /** Three departments by default, so a multi-selection stays a genuine subset. */
 function renderCertifications(items: NamedItem[], departments = [NURSING, EMERGENCY, OUTPATIENT]) {
   const onSave = vi.fn().mockResolvedValue(undefined);
@@ -38,6 +46,21 @@ function renderCertifications(items: NamedItem[], departments = [NURSING, EMERGE
       onSave={onSave}
       placeholder="Certification"
       departments={departments}
+      initialEditing
+    />,
+  );
+  return onSave;
+}
+
+function renderNameFirstCertifications(items: NamedItem[]) {
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  render(
+    <StringListSettings
+      label="Certifications"
+      items={items}
+      onSave={onSave}
+      placeholder="Certification"
+      hideAbbr
       initialEditing
     />,
   );
@@ -146,5 +169,58 @@ describe("StringListSettings — department assignment", () => {
     await click(user, /^save$/i);
 
     expect(savedItem(onSave)).toMatchObject({ departmentIds: [] });
+  });
+
+  it("moves a row with its keyboard reorder control", async () => {
+    const user = userEvent.setup();
+    const onSave = renderCertifications([rn(), lpn()]);
+
+    const handle = screen.getByRole("button", { name: /reorder lpn/i });
+    handle.focus();
+    await user.keyboard("{ArrowUp}");
+    await click(user, /^save$/i);
+
+    expect(onSave).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ name: "LPN", sortOrder: 0 }),
+        expect.objectContaining({ name: "RN", sortOrder: 1 }),
+      ],
+      [],
+    );
+  });
+});
+
+describe("StringListSettings — name-first compact labels", () => {
+  it("keeps compact labels hidden until the user explicitly customizes them", async () => {
+    const user = userEvent.setup();
+    const onSave = renderNameFirstCertifications([{ ...rn(), name: "Charge Nurse", abbr: "CN" }]);
+
+    expect(screen.queryByPlaceholderText("Abbreviation")).not.toBeInTheDocument();
+
+    await click(user, /customize compact labels/i);
+    const compactLabel = screen.getByPlaceholderText("Abbreviation");
+    expect(compactLabel).toHaveValue("CN");
+
+    await user.clear(compactLabel);
+    await user.type(compactLabel, "LEAD");
+    await click(user, /^save$/i);
+
+    expect(savedItem(onSave)).toMatchObject({ name: "Charge Nurse", abbr: "LEAD" });
+  });
+
+  it("can return a custom compact label to its automatic value", async () => {
+    const user = userEvent.setup();
+    const onSave = renderNameFirstCertifications([{ ...rn(), name: "Charge Nurse", abbr: "LEAD" }]);
+
+    await click(user, /customize compact labels/i);
+    await click(user, /use automatic/i);
+
+    const automaticCell = screen.getByLabelText("Compact label for Charge Nurse");
+    expect(automaticCell).toHaveValue("");
+    expect(automaticCell).toHaveAttribute("placeholder", "Abbreviation");
+    expect(screen.getByRole("button", { name: "Using automatic: CN" })).toBeDisabled();
+    await click(user, /^save$/i);
+
+    expect(savedItem(onSave)).toMatchObject({ name: "Charge Nurse", abbr: "CN" });
   });
 });

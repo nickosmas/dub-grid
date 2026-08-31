@@ -4,8 +4,7 @@ import { useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHan
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
-import { useMediaQuery, MOBILE } from "@/hooks";
-import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
 import {
   validateEmail,
   validateNotes,
@@ -21,10 +20,25 @@ import {
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
+import {
+  describeCertificationRequirement,
+  satisfiesCertificationRequirement,
+} from "@/lib/credential-requirements";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { AccessStatusRow } from "@/components/staff/AccessStatusRow";
+import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import {
+  checkEmployeeEmailConflict,
+  type EmployeeEmailConflictResult,
+} from "@/features/employees/client";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
+  /** Needed only for the real-time duplicate-email check against other
+   *  active employees' contact emails. Omit to skip that check (e.g. the
+   *  self-profile embedding, which hides the email field entirely). */
+  orgId?: string;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   certificationLabel?: string;
@@ -33,12 +47,38 @@ export interface EditEmployeePanelProps {
   focusAreaLabel?: string;
   departments?: NamedItem[];
   departmentLabel?: string;
+  /** True when the employee also holds management access (a non-empty
+   *  org-membership department assignment). Lets them drop to zero focus
+   *  areas — coming off the schedule — without being orphaned, since they
+   *  still have management access to fall back on. */
+  isManagementUser?: boolean;
+  /** Hides first/last name, phone, and email — for embedding this panel
+   *  somewhere those are already editable elsewhere (the self-profile page's
+   *  own Account details section), so they aren't shown twice. */
+  hideIdentityFields?: boolean;
   onSave: (updatedEmployee: Employee) => void;
   onCancel: () => void;
   onDirtyChange?: (hasUnsavedChanges: boolean) => void;
+  /** Fires whenever the real-time duplicate-email check's result changes.
+   *  In `hideActions` mode the host renders its own Save button driven off
+   *  `onDirtyChange` alone, which doesn't know about this or any other
+   *  field-level validation state — without this, that button stays
+   *  enabled while a conflict is showing, and clicking it silently no-ops
+   *  (handleSave still blocks internally) instead of visibly disabling. */
+  onEmailConflictChange?: (hasConflict: boolean) => void;
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  /** Called instead of `onSave` when the admin confirms changing the email
+   *  while a pending invitation exists — saves the identity change (which
+   *  auto-revokes the old invitation) and sends a fresh one to the new
+   *  address, reusing the old invitation's role/departments. Required to
+   *  offer the "Save & Send" choice; without it, a changed email with a
+   *  pending invitation present falls back to a plain save. */
+  onSaveWithReinvite?: (
+    updatedEmployee: Employee,
+    oldInvitation: Invitation,
+  ) => void | Promise<void>;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
@@ -81,41 +121,102 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
   function EditEmployeePanel(
     {
       employee,
+      orgId,
       focusAreas,
       certifications,
       certificationLabel = "Certification",
       roles,
       roleLabel = "Roles",
       focusAreaLabel = "Focus Areas",
+      isManagementUser = false,
+      hideIdentityFields = false,
       onSave,
       onCancel,
       onDirtyChange,
+      onEmailConflictChange,
       onInvite,
       pendingInvitation,
       onRevoke,
+      onSaveWithReinvite,
       hideActions,
     }: EditEmployeePanelProps,
     ref,
   ) {
     const isMobile = useMediaQuery(MOBILE);
+    const isInSandbox = useIsInSandbox();
+    // Set while the "changing this email will revoke the pending invitation"
+    // confirm dialog is open — holds the already-validated employee payload
+    // handleSave built, so onConfirm/onCancel don't need to redo validation.
+    const [pendingReinviteSave, setPendingReinviteSave] = useState<Employee | null>(null);
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
 
-    const [revoking, setRevoking] = useState(false);
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [emailConflict, setEmailConflict] = useState(false);
+    const [emailConflictReason, setEmailConflictReason] =
+      useState<EmployeeEmailConflictResult["reason"]>(undefined);
+
+    // Pre-flight: flag a duplicate contact email before Save is pressed,
+    // instead of only surfacing it via the unique_active_employee_email_per_org
+    // constraint (or check_employee_email_belongs_to_user) after submit.
+    // Debounced, and only meaningful when the email actually changed to a
+    // valid, different value. Passes employee.userId so the check can tell
+    // "this employee's own login email" apart from "someone else's".
+    useEffect(() => {
+      const trimmed = form.email.trim();
+      if (
+        !orgId ||
+        !trimmed ||
+        trimmed === (employee.email || "").trim() ||
+        validateEmail(trimmed)
+      ) {
+        setEmailConflict(false);
+        setEmailConflictReason(undefined);
+        return;
+      }
+      let cancelled = false;
+      const timer = setTimeout(() => {
+        checkEmployeeEmailConflict(trimmed, orgId, employee.id, employee.userId)
+          .then((result) => {
+            if (!cancelled) {
+              setEmailConflict(result.conflict);
+              setEmailConflictReason(result.reason);
+            }
+          })
+          .catch((err) => {
+            // Soft fail by design (advisory check, the DB constraint still
+            // enforces correctness on submit) — but log it, since a silent
+            // failure here (e.g. a permission or network error) looks
+            // identical to "the check just doesn't work" with zero signal.
+            if (!cancelled) {
+              console.error("checkEmployeeEmailConflict failed", err);
+              setEmailConflict(false);
+              setEmailConflictReason(undefined);
+            }
+          });
+      }, 400);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [form.email, employee.email, employee.id, employee.userId, orgId]);
+
+    useEffect(() => {
+      onEmailConflictChange?.(emailConflict);
+    }, [emailConflict, onEmailConflictChange]);
 
     const fieldErrors = useMemo(
       () => ({
         firstName: touched.firstName ? validateRequired(form.firstName, "First name") : null,
         lastName: touched.lastName ? validateRequired(form.lastName, "Last name") : null,
         focusAreaIds:
-          touched.focusAreaIds && form.focusAreaIds.length === 0
+          touched.focusAreaIds && form.focusAreaIds.length === 0 && !isManagementUser
             ? `At least one ${focusAreaLabel.toLowerCase()} is required`
             : null,
         email: touched.email ? validateEmail(form.email) : null,
         phone: touched.phone ? validatePhone(form.phone) : null,
         contactNotes: touched.contactNotes ? validateNotes(form.contactNotes) : null,
       }),
-      [form, touched, focusAreaLabel],
+      [form, touched, focusAreaLabel, isManagementUser],
     );
 
     const markTouched = useCallback((field: string) => {
@@ -124,7 +225,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     useEffect(() => {
       setForm(buildEditForm(employee));
-      setRevoking(false);
       setTouched({});
     }, [employee]);
 
@@ -151,7 +251,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     }, [isModified, onDirtyChange]);
 
     const handleSave = useCallback(() => {
-      if (!form.firstName.trim() || !form.lastName.trim() || form.focusAreaIds.length === 0) {
+      if (
+        !form.firstName.trim() ||
+        !form.lastName.trim() ||
+        (form.focusAreaIds.length === 0 && !isManagementUser)
+      ) {
         setTouched({
           firstName: true,
           lastName: true,
@@ -166,7 +270,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         validateRequired(form.lastName, "Last name") ||
         validateEmail(form.email) ||
         validatePhone(form.phone) ||
-        validateNotes(form.contactNotes)
+        validateNotes(form.contactNotes) ||
+        emailConflict
       ) {
         setTouched({
           firstName: true,
@@ -178,7 +283,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         });
         return;
       }
-      onSave({
+      const nextEmployee: Employee = {
         ...employee,
         firstName: normalizeStaffName(form.firstName),
         lastName: normalizeStaffName(form.lastName),
@@ -190,8 +295,28 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         phone: normalizeOptionalUsPhone(form.phone),
         email: normalizeOptionalStaffEmail(form.email),
         contactNotes: normalizeStaffNotes(form.contactNotes),
-      });
-    }, [form, employee, onSave]);
+      };
+
+      // Changing the email while a pending invitation exists will silently
+      // revoke it (trg_revoke_invitation_on_email_change). Never let that
+      // happen as a side effect of a plain save — gate it behind an explicit
+      // choice instead of saving right away.
+      const emailChanged = (nextEmployee.email || "") !== (employee.email || "");
+      if (emailChanged && pendingInvitation && onSaveWithReinvite) {
+        setPendingReinviteSave(nextEmployee);
+        return;
+      }
+
+      onSave(nextEmployee);
+    }, [
+      form,
+      employee,
+      onSave,
+      onSaveWithReinvite,
+      pendingInvitation,
+      isManagementUser,
+      emailConflict,
+    ]);
 
     const handleDismiss = useCallback(() => {
       if (isModified) {
@@ -217,6 +342,35 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             : [...p.roleIds, roleId],
         })),
       [],
+    );
+
+    // Recomputed from props and form state on every render, so it answers to a
+    // change of either the selected certification or the org's role config.
+    const certificationsById = useMemo(
+      () => new Map(certifications.map((c) => [c.id, c])),
+      [certifications],
+    );
+
+    const isRoleBlocked = useCallback(
+      (roleId: number) => {
+        const role = roles.find((r) => r.id === roleId);
+        if (!role) return false;
+        return !satisfiesCertificationRequirement({
+          heldIds: [form.certificationId ?? null],
+          requiredIds: role.requiredCertificationIds ?? [],
+        });
+      },
+      [roles, form.certificationId, certificationsById],
+    );
+
+    const describeRoleRequirement = useCallback(
+      (role: NamedItem) =>
+        describeCertificationRequirement({
+          requiredIds: role.requiredCertificationIds ?? [],
+          itemsById: certificationsById,
+          emptyText: `a ${certificationLabel.toLowerCase()}`,
+        }),
+      [certificationsById, certificationLabel],
     );
 
     const toggleFocusArea = useCallback(
@@ -252,515 +406,519 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const readOnly = !canEdit;
 
     return (
-      <div style={{ padding: isMobile ? "16px 16px 24px" : "0 24px 28px" }}>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            ...(readOnly ? { opacity: 0.5, pointerEvents: "none" } : {}),
-          }}
-        >
-          {/* ── Details section ── */}
-          <div style={{ paddingTop: isMobile ? 0 : 20, paddingBottom: 20 }}>
-            <div style={sectionLabel}>Details</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <label style={fieldLabel}>
-                    First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                  </label>
-                  <input
-                    className="dg-input"
-                    value={form.firstName}
-                    onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
-                    onBlur={() => markTouched("firstName")}
-                    placeholder="e.g. Maria"
-                    readOnly={readOnly}
-                    style={
-                      fieldErrors.firstName ? { borderColor: "var(--dg-color-danger)" } : undefined
-                    }
-                  />
-                  {fieldErrors.firstName && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.firstName}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label style={fieldLabel}>
-                    Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                  </label>
-                  <input
-                    className="dg-input"
-                    value={form.lastName}
-                    onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
-                    onBlur={() => markTouched("lastName")}
-                    placeholder="e.g. Garcia"
-                    readOnly={readOnly}
-                    style={
-                      fieldErrors.lastName ? { borderColor: "var(--dg-color-danger)" } : undefined
-                    }
-                  />
-                  {fieldErrors.lastName && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.lastName}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label style={fieldLabel}>Employment</label>
-                <CustomSelect
-                  value={form.employmentType}
-                  options={[
-                    { value: "full_time", label: "Full-time" },
-                    { value: "part_time", label: "Part-time" },
-                  ]}
-                  onChange={(v) =>
-                    setForm((p) => ({
-                      ...p,
-                      employmentType: v === "part_time" ? "part_time" : "full_time",
-                    }))
-                  }
-                  disabled={readOnly}
-                  style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <label style={fieldLabel}>Phone</label>
-                  <input
-                    className="dg-input"
-                    value={form.phone}
-                    onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                    onBlur={() => markTouched("phone")}
-                    onBlurCapture={() => {
-                      if (!validatePhone(form.phone)) {
-                        setForm((p) => ({
-                          ...p,
-                          phone: normalizeOptionalUsPhone(p.phone),
-                        }));
-                      }
-                    }}
-                    placeholder="(415) 555-0100"
-                    readOnly={readOnly}
-                    style={
-                      fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined
-                    }
-                  />
-                  {fieldErrors.phone && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.phone}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label style={fieldLabel}>Email</label>
-                  <input
-                    className="dg-input"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    onBlur={() => markTouched("email")}
-                    placeholder="name@example.com"
-                    readOnly={readOnly}
-                    style={
-                      fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
-                    }
-                  />
-                  {employee.userId && form.email !== employee.email && (
-                    <p
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-warning)",
-                        margin: "4px 0 0",
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      Changing the contact email does not change their login email.
-                    </p>
-                  )}
-                  {fieldErrors.email && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.email}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label style={fieldLabel}>Internal notes</label>
-                <textarea
-                  className="dg-input"
-                  value={form.contactNotes}
-                  onChange={(e) => setForm((p) => ({ ...p, contactNotes: e.target.value }))}
-                  onBlur={() => markTouched("contactNotes")}
-                  placeholder="Preferences, availability, etc."
-                  rows={2}
-                  style={{
-                    resize: "vertical",
-                    minHeight: 64,
-                  }}
-                  readOnly={readOnly}
-                />
-                {fieldErrors.contactNotes && (
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-danger)",
-                      marginTop: 4,
-                    }}
-                    role="alert"
-                  >
-                    {fieldErrors.contactNotes}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Assignments section ── */}
+      <>
+        <div style={{ padding: isMobile ? "16px 16px 24px" : "0 24px 28px" }}>
           <div
             style={{
-              borderTop: "1px solid var(--dg-color-border-light)",
-              paddingTop: 20,
-              paddingBottom: 20,
+              display: "flex",
+              flexDirection: "column",
+              ...(readOnly ? { opacity: 0.5, pointerEvents: "none" } : {}),
             }}
           >
-            <div style={sectionLabel}>Assignments</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div>
-                <label style={fieldLabel}>{certificationLabel}</label>
-                <CustomSelect
-                  value={form.certificationId != null ? String(form.certificationId) : ""}
-                  options={[
-                    { value: "", label: "— None —" },
-                    ...certifications.map((d) => ({
-                      value: String(d.id),
-                      label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name,
-                    })),
-                  ]}
-                  onChange={(v) =>
-                    setForm((p) => ({
-                      ...p,
-                      certificationId: v ? Number(v) : null,
-                    }))
-                  }
-                  disabled={readOnly}
-                  style={{ width: "100%" }}
-                />
-              </div>
+            {/* ── Access status ── */}
+            <div style={{ paddingTop: isMobile ? 0 : 20 }}>
+              <AccessStatusRow
+                label={focusAreaLabel}
+                statusText={
+                  form.focusAreaIds.length > 0
+                    ? `Scheduled — ${form.focusAreaIds.length} ${focusAreaLabel.toLowerCase()}`
+                    : "Not scheduled"
+                }
+                tone={form.focusAreaIds.length > 0 ? "active" : "neutral"}
+                note={
+                  isManagementUser && form.focusAreaIds.length === 0
+                    ? "Saving now removes them from the schedule. They'll keep management access."
+                    : undefined
+                }
+                actionLabel={
+                  isManagementUser && form.focusAreaIds.length > 0 && !readOnly
+                    ? "Remove from Schedule"
+                    : undefined
+                }
+                onAction={
+                  isManagementUser && form.focusAreaIds.length > 0 && !readOnly
+                    ? () => {
+                        setForm((p) => ({ ...p, focusAreaIds: [] }));
+                        markTouched("focusAreaIds");
+                      }
+                    : undefined
+                }
+              />
+            </div>
 
-              <div>
-                <label style={fieldLabel}>
-                  {focusAreaLabel} <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {focusAreas.map((focusArea) => {
-                    const active = form.focusAreaIds.includes(focusArea.id);
-                    return (
-                      <SelectableTag
-                        key={focusArea.id}
-                        selected={active}
-                        onClick={() => {
-                          toggleFocusArea(focusArea.id);
-                          markTouched("focusAreaIds");
-                        }}
-                        disabled={readOnly}
-                        padding="5px 12px"
-                        unselectedBackground="var(--dg-color-bg-secondary)"
-                        unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--dg-color-text-faint)"
-                      >
-                        {focusArea.name}
-                      </SelectableTag>
-                    );
-                  })}
-                </div>
-                {fieldErrors.focusAreaIds && (
+            {/* ── Details section ── */}
+            <div style={{ paddingTop: 20, paddingBottom: 20 }}>
+              <div style={sectionLabel}>Details</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {!hideIdentityFields && (
                   <div
                     style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-danger)",
-                      marginTop: 4,
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gap: 10,
                     }}
-                    role="alert"
                   >
-                    {fieldErrors.focusAreaIds}
+                    <div>
+                      <label style={fieldLabel}>
+                        First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                      </label>
+                      <input
+                        className="dg-input"
+                        value={form.firstName}
+                        onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
+                        onBlur={() => markTouched("firstName")}
+                        placeholder="e.g. Maria"
+                        readOnly={readOnly}
+                        style={
+                          fieldErrors.firstName
+                            ? { borderColor: "var(--dg-color-danger)" }
+                            : undefined
+                        }
+                      />
+                      {fieldErrors.firstName && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {fieldErrors.firstName}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>
+                        Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                      </label>
+                      <input
+                        className="dg-input"
+                        value={form.lastName}
+                        onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+                        onBlur={() => markTouched("lastName")}
+                        placeholder="e.g. Garcia"
+                        readOnly={readOnly}
+                        style={
+                          fieldErrors.lastName
+                            ? { borderColor: "var(--dg-color-danger)" }
+                            : undefined
+                        }
+                      />
+                      {fieldErrors.lastName && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {fieldErrors.lastName}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
 
-              <div>
-                <label style={fieldLabel}>{roleLabel}</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {roles.map((role) => {
-                    const active = form.roleIds.includes(role.id);
-                    return (
-                      <MaybeHint
-                        key={role.id}
-                        content={role.name !== role.abbr ? role.name : undefined}
-                        side="top"
-                      >
+                <div>
+                  <label style={fieldLabel}>Employment</label>
+                  <CustomSelect
+                    value={form.employmentType}
+                    options={[
+                      { value: "full_time", label: "Full-time" },
+                      { value: "part_time", label: "Part-time" },
+                    ]}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        employmentType: v === "part_time" ? "part_time" : "full_time",
+                      }))
+                    }
+                    disabled={readOnly}
+                    style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
+                  />
+                </div>
+
+                {!hideIdentityFields && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <label style={fieldLabel}>Phone</label>
+                      <input
+                        className="dg-input"
+                        value={form.phone}
+                        onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                        onBlur={() => markTouched("phone")}
+                        onBlurCapture={() => {
+                          if (!validatePhone(form.phone)) {
+                            setForm((p) => ({
+                              ...p,
+                              phone: normalizeOptionalUsPhone(p.phone),
+                            }));
+                          }
+                        }}
+                        placeholder="(415) 555-0100"
+                        readOnly={readOnly}
+                        style={
+                          fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined
+                        }
+                      />
+                      {fieldErrors.phone && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {fieldErrors.phone}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>Email</label>
+                      <input
+                        className="dg-input"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                        onBlur={() => markTouched("email")}
+                        placeholder="name@example.com"
+                        readOnly={readOnly}
+                        style={
+                          fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
+                        }
+                      />
+                      {employee.userId && form.email !== employee.email && !emailConflict && (
+                        <p
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-warning)",
+                            margin: "4px 0 0",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          Changing the contact email does not change their login email.
+                        </p>
+                      )}
+                      {fieldErrors.email && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {fieldErrors.email}
+                        </div>
+                      )}
+                      {!fieldErrors.email && emailConflict && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {emailConflictReason === "gridmaster"
+                            ? "That email address is reserved."
+                            : "That email is already used by another person on your team."}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label style={fieldLabel}>Internal notes</label>
+                  <textarea
+                    className="dg-input"
+                    value={form.contactNotes}
+                    onChange={(e) => setForm((p) => ({ ...p, contactNotes: e.target.value }))}
+                    onBlur={() => markTouched("contactNotes")}
+                    placeholder="Preferences, availability, etc."
+                    rows={2}
+                    style={{
+                      resize: "vertical",
+                      minHeight: 64,
+                    }}
+                    readOnly={readOnly}
+                  />
+                  {fieldErrors.contactNotes && (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--dg-color-danger)",
+                        marginTop: 4,
+                      }}
+                      role="alert"
+                    >
+                      {fieldErrors.contactNotes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Assignments section ── */}
+            <div
+              style={{
+                borderTop: "1px solid var(--dg-color-border-light)",
+                paddingTop: 20,
+                paddingBottom: 20,
+              }}
+            >
+              <div style={sectionLabel}>Assignments</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <label style={fieldLabel}>{certificationLabel}</label>
+                  <CustomSelect
+                    value={form.certificationId != null ? String(form.certificationId) : ""}
+                    options={[
+                      { value: "", label: "— None —" },
+                      ...certifications.map((d) => ({
+                        value: String(d.id),
+                        label: d.name,
+                      })),
+                    ]}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        certificationId: v ? Number(v) : null,
+                      }))
+                    }
+                    disabled={readOnly}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={fieldLabel}>
+                    {focusAreaLabel}
+                    {!isManagementUser && (
+                      <span style={{ color: "var(--dg-color-danger)" }}> *</span>
+                    )}
+                  </label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {focusAreas.map((focusArea) => {
+                      const active = form.focusAreaIds.includes(focusArea.id);
+                      return (
                         <SelectableTag
+                          key={focusArea.id}
                           selected={active}
-                          onClick={() => toggleRole(role.id)}
+                          onClick={() => {
+                            toggleFocusArea(focusArea.id);
+                            markTouched("focusAreaIds");
+                          }}
                           disabled={readOnly}
                           padding="5px 12px"
                           unselectedBackground="var(--dg-color-bg-secondary)"
                           unselectedBorderColor="transparent"
                           unselectedTextColor="var(--dg-color-text-faint)"
                         >
-                          {role.abbr}
+                          {focusArea.name}
                         </SelectableTag>
-                      </MaybeHint>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  {fieldErrors.focusAreaIds && (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--dg-color-danger)",
+                        marginTop: 4,
+                      }}
+                      role="alert"
+                    >
+                      {fieldErrors.focusAreaIds}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={fieldLabel}>{roleLabel}</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {roles.map((role) => {
+                      const active = form.roleIds.includes(role.id);
+                      // An already-assigned role stays toggleable so changing the
+                      // certification mid-edit cannot strand a selection the user
+                      // can no longer clear. The API is the real gate either way.
+                      const blocked = !active && isRoleBlocked(role.id);
+                      const requirementHint = blocked
+                        ? `Requires ${describeRoleRequirement(role)}`
+                        : undefined;
+                      return (
+                        <MaybeHint key={role.id} content={requirementHint} side="top">
+                          <SelectableTag
+                            selected={active}
+                            onClick={() => toggleRole(role.id)}
+                            disabled={readOnly || blocked}
+                            padding="5px 12px"
+                            unselectedBackground="var(--dg-color-bg-secondary)"
+                            unselectedBorderColor="transparent"
+                            unselectedTextColor="var(--dg-color-text-faint)"
+                            disabledBackground={blocked ? "var(--dg-color-surface-alt)" : undefined}
+                            disabledBorderColor={
+                              blocked ? "var(--dg-color-border-strong)" : undefined
+                            }
+                            disabledTextColor={blocked ? "var(--dg-color-text-subtle)" : undefined}
+                            disabledOpacity={blocked ? 1 : undefined}
+                            style={
+                              blocked ? { borderStyle: "dashed", cursor: "not-allowed" } : undefined
+                            }
+                          >
+                            {role.name}
+                          </SelectableTag>
+                        </MaybeHint>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* ── Invite status ── */}
-        {canEdit && !employee.userId && employee.email && (pendingInvitation || onInvite) && (
-          <div
-            style={{
-              borderTop: "1px solid var(--dg-color-border-light)",
-              paddingTop: 16,
-              paddingBottom: 4,
-            }}
-          >
-            {pendingInvitation ? (
+          {/* ── Invite status ── */}
+          {canEdit &&
+            !employee.userId &&
+            employee.email &&
+            ((pendingInvitation && onRevoke) || onInvite) && (
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  background: "var(--dg-color-warning-bg)",
-                  border: "1px solid var(--dg-color-warning-border)",
-                  borderRadius: "var(--dg-radius-lg)",
-                  padding: "10px 14px",
+                  borderTop: "1px solid var(--dg-color-border-light)",
+                  paddingTop: 16,
+                  paddingBottom: 4,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    minWidth: 0,
-                  }}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--dg-color-warning-text)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flexShrink: 0 }}
-                  >
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        color: "var(--dg-color-warning-text)",
-                      }}
-                    >
-                      Invitation pending
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-warning-text)",
-                        marginTop: 1,
-                      }}
-                    >
-                      Sent to {pendingInvitation.email}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  {onInvite && (
-                    <Button
-                      disabled={revoking}
-                      onClick={async () => {
-                        if (onRevoke) {
-                          setRevoking(true);
-                          try {
+                {pendingInvitation && onRevoke ? (
+                  <PendingInvitationBanner
+                    pendingInvitation={pendingInvitation}
+                    onReinvite={
+                      onInvite
+                        ? async () => {
                             const result = await onRevoke(pendingInvitation.id);
                             if (result === false) return;
-                          } finally {
-                            setRevoking(false);
+                            onInvite(employee);
                           }
-                        }
-                        onInvite(employee);
-                      }}
-                      className="dg-btn dg-btn-ghost dg-btn-xs"
-                      style={{
-                        color: "var(--dg-color-link)",
-                      }}
+                        : undefined
+                    }
+                    onRevoke={onRevoke}
+                    isInSandbox={isInSandbox}
+                  />
+                ) : onInvite ? (
+                  <Button
+                    onClick={() => onInvite(employee)}
+                    className="dg-btn dg-btn-ghost"
+                    style={{
+                      color: "var(--dg-color-link)",
+                      fontSize: "var(--dg-fs-caption)",
+                      padding: "6px 10px",
+                      width: "100%",
+                      justifyContent: "center",
+                      border: "1px dashed var(--dg-color-brand-border)",
+                      borderRadius: "var(--dg-btn-radius)",
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <ButtonLoading loading={revoking} spinnerSize={12}>
-                        Reinvite
-                      </ButtonLoading>
-                    </Button>
-                  )}
-                  {onRevoke && (
-                    <Button
-                      disabled={revoking}
-                      onClick={async () => {
-                        setRevoking(true);
-                        try {
-                          await onRevoke(pendingInvitation.id);
-                        } finally {
-                          setRevoking(false);
-                        }
-                      }}
-                      className="dg-btn dg-btn-ghost dg-btn-xs"
-                      style={{
-                        color: "var(--dg-color-danger)",
-                      }}
-                    >
-                      <ButtonLoading loading={revoking} spinnerSize={12}>
-                        Revoke
-                      </ButtonLoading>
-                    </Button>
-                  )}
-                </div>
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    Send Invitation
+                  </Button>
+                ) : null}
               </div>
-            ) : onInvite ? (
-              <Button
-                onClick={() => onInvite(employee)}
-                className="dg-btn dg-btn-ghost"
-                style={{
-                  color: "var(--dg-color-link)",
-                  fontSize: "var(--dg-fs-caption)",
-                  padding: "6px 10px",
-                  width: "100%",
-                  justifyContent: "center",
-                  border: "1px dashed var(--dg-color-brand-border)",
-                  borderRadius: "var(--dg-btn-radius)",
-                }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                  <polyline points="22,6 12,13 2,6" />
-                </svg>
-                Send Invitation
-              </Button>
-            ) : null}
-          </div>
-        )}
+            )}
 
-        {/* ── Actions ── */}
-        <div
-          style={{
-            paddingTop: 16,
-            borderTop: "1px solid var(--dg-color-border-light)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {/* Primary actions */}
-          {!hideActions && canEdit && (
-            <EditorActionRow
-              secondaryAction={
-                <Button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
-                  {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
-                </Button>
-              }
-              primaryAction={
-                <Button
-                  onClick={handleSave}
-                  disabled={
-                    !isModified ||
-                    !form.firstName.trim() ||
-                    !form.lastName.trim() ||
-                    form.focusAreaIds.length === 0 ||
-                    Boolean(validateRequired(form.firstName, "First name")) ||
-                    Boolean(validateRequired(form.lastName, "Last name")) ||
-                    Boolean(validateEmail(form.email)) ||
-                    Boolean(validatePhone(form.phone)) ||
-                    Boolean(validateNotes(form.contactNotes))
-                  }
-                  className="dg-btn dg-btn-primary"
-                >
-                  {EDITOR_ACTION_LABELS.save}
-                </Button>
-              }
-            />
-          )}
-          {!hideActions && !canEdit && (
-            <EditorActionRow
-              secondaryAction={
-                <Button onClick={onCancel} className="dg-btn dg-btn-secondary">
-                  {EDITOR_ACTION_LABELS.close}
-                </Button>
-              }
-            />
-          )}
+          {/* ── Actions ── */}
+          <div
+            style={{
+              paddingTop: 16,
+              borderTop: "1px solid var(--dg-color-border-light)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {/* Primary actions */}
+            {!hideActions && canEdit && (
+              <EditorActionRow
+                secondaryAction={
+                  <Button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
+                    {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
+                  </Button>
+                }
+                primaryAction={
+                  <Button
+                    onClick={handleSave}
+                    disabled={
+                      !isModified ||
+                      !form.firstName.trim() ||
+                      !form.lastName.trim() ||
+                      (form.focusAreaIds.length === 0 && !isManagementUser) ||
+                      Boolean(validateRequired(form.firstName, "First name")) ||
+                      Boolean(validateRequired(form.lastName, "Last name")) ||
+                      Boolean(validateEmail(form.email)) ||
+                      Boolean(validatePhone(form.phone)) ||
+                      Boolean(validateNotes(form.contactNotes)) ||
+                      emailConflict
+                    }
+                    className="dg-btn dg-btn-primary"
+                  >
+                    {EDITOR_ACTION_LABELS.save}
+                  </Button>
+                }
+              />
+            )}
+            {!hideActions && !canEdit && (
+              <EditorActionRow
+                secondaryAction={
+                  <Button onClick={onCancel} className="dg-btn dg-btn-secondary">
+                    {EDITOR_ACTION_LABELS.close}
+                  </Button>
+                }
+              />
+            )}
+          </div>
         </div>
-      </div>
+        {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && (
+          <ConfirmDialog
+            title="Send a new invitation?"
+            message={
+              <>
+                Changing the email will revoke the pending invitation to{" "}
+                <strong>{pendingInvitation.email}</strong>. Save and send a new invitation to{" "}
+                <strong>{pendingReinviteSave.email}</strong>?
+              </>
+            }
+            confirmLabel="Save & Send"
+            cancelLabel="Cancel"
+            variant="warning"
+            onCancel={() => setPendingReinviteSave(null)}
+            onConfirm={async () => {
+              await onSaveWithReinvite(pendingReinviteSave, pendingInvitation);
+              setPendingReinviteSave(null);
+            }}
+          />
+        )}
+      </>
     );
   },
 );

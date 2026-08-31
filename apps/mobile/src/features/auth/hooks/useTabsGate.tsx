@@ -2,13 +2,13 @@ import { type ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
+import { NetworkConnectionRecoveryScreen } from "../screens/NetworkConnectionRecoveryScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
 import { usePushResponseHandler } from "../../notifications/hooks/usePushResponseHandler";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { isManagementOnly, isOnSchedule } from "./employmentStatus";
-import { AuthTransitionScreen } from "../components/AuthTransitionScreen";
 
 export type TabsGateResult =
   | { kind: "blocked"; element: ReactNode }
@@ -36,39 +36,17 @@ export function useTabsGate(): TabsGateResult {
   // depended on the whole query object, so it was torn down and re-added on
   // every render.
 
-  // Bootstrap blocks alongside the session, because until it lands nobody
-  // knows who this is. The Home tab has to pick between the admin dashboard
-  // and the personal schedule, and defaulting to one meant an admin got the
-  // schedule's skeleton first and the dashboard's second — two waves, the
-  // first of them the wrong shape. The tab bar has the same problem: every
-  // `canView*` below is false while bootstrap is in flight, so tabs popped in
-  // afterwards.
-  //
   // Renders nothing rather than a splash: `StartupSplashGate` owns the one
   // splash instance and is still covering the screen whenever this is reached
   // on a cold launch. A second instance here restarted the whole brand
   // animation mid-handoff, which is what read as a double splash.
   //
   // `isLoading` (not `isFetching`) so this is the cold first load only —
-  // refetches and org switches keep showing the screen you are on. Bootstrap is
-  // keyed by user id, so a token refresh no longer lands back in here either.
-  if (isLoading || bootstrapQuery.isLoading) {
-    return {
-      kind: "blocked",
-      element: (
-        <AuthTransitionScreen
-          phase="organization"
-          onRetry={() => {
-            return bootstrapQuery.refetch().then(() => undefined);
-          }}
-          onSignOut={() => {
-            void handleExpiredMobileSession();
-          }}
-          retrying={bootstrapQuery.isFetching}
-          automaticallyRetry={bootstrapQuery.isError}
-        />
-      ),
-    };
+  // refetches and org switches keep showing the screen you are on. This is
+  // strictly about the session itself; not knowing `accessToken` yet means
+  // the redirect-to-login decision right below can't be made.
+  if (isLoading) {
+    return { kind: "blocked", element: null };
   }
 
   if (!accessToken) {
@@ -98,14 +76,9 @@ export function useTabsGate(): TabsGateResult {
     return {
       kind: "blocked",
       element: (
-        <AuthTransitionScreen
-          phase="organization"
+        <NetworkConnectionRecoveryScreen
           onRetry={() => bootstrapQuery.refetch().then(() => undefined)}
-          onSignOut={() => {
-            void handleExpiredMobileSession();
-          }}
-          retrying={bootstrapQuery.isFetching}
-          automaticallyRetry={true}
+          isRetrying={bootstrapQuery.isFetching}
         />
       ),
     };
@@ -120,12 +93,23 @@ export function useTabsGate(): TabsGateResult {
   const isManagementOnlyUser =
     bootstrapQuery.data?.effectiveRole === "user" && isManagementOnly(focusAreaIds, departmentIds);
 
+  // Bootstrap's first load no longer blocks the tab tree — each destination
+  // screen already runs its own `useBootstrap` and shows its own skeleton
+  // (AdminHomeScreen/DashboardSkeleton, ScheduleScreen/ScheduleSkeleton,
+  // etc.), so it's safe to let the router mount early. Tab visibility can't
+  // read real permissions yet, so every tab shows optimistically rather than
+  // guessing from empty data; a tab that turns out not to apply (e.g. Home
+  // for a management-only user) disappears once this settles, in exchange
+  // for never having tabs pop IN after the fact.
   return {
     kind: "ready",
-    canViewTeamSchedule: bootstrapQuery.data?.permissions.canViewSchedule ?? false,
-    canViewRequestsTab:
-      isOnSchedule(focusAreaIds) ||
-      Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
-    canViewHomeTab: !isManagementOnlyUser,
+    canViewTeamSchedule: bootstrapQuery.isLoading
+      ? true
+      : (bootstrapQuery.data?.permissions.canViewSchedule ?? false),
+    canViewRequestsTab: bootstrapQuery.isLoading
+      ? true
+      : isOnSchedule(focusAreaIds) ||
+        Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+    canViewHomeTab: bootstrapQuery.isLoading ? true : !isManagementOnlyUser,
   };
 }

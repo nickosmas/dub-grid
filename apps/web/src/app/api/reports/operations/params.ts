@@ -14,6 +14,8 @@ export const operationsQuerySchema = z.object({
   endDate: z.string().date(),
   employeeIds: z.string().optional(),
   focusAreaIds: z.string().optional(),
+  shiftCategoryIds: z.string().optional(),
+  jobIds: z.string().optional(),
   dates: z.string().optional(),
 });
 
@@ -66,6 +68,18 @@ export function parseOperationsFilters(
     }
     return Number(value);
   });
+  const shiftCategoryIds = parseCsv(input.shiftCategoryIds).map((value) => {
+    if (!/^\d+$/.test(value)) {
+      throw new RangeError("Choose valid shift categories before generating the report.");
+    }
+    return Number(value);
+  });
+  const jobIds = parseCsv(input.jobIds).map((value) => {
+    if (!/^\d+$/.test(value)) {
+      throw new RangeError("Choose valid jobs before generating the report.");
+    }
+    return Number(value);
+  });
 
   const rangeDateSet = new Set(getDatesInReportRange(range));
   const dates = parseCsv(input.dates);
@@ -78,6 +92,8 @@ export function parseOperationsFilters(
   return {
     employeeIds,
     focusAreaIds,
+    shiftCategoryIds,
+    jobIds,
     dates,
   };
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
+import { mapInBatches } from "@/lib/async-batch";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { OrganizationUser, PlatformRole } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -11,6 +12,8 @@ import logger from "@/lib/logger";
 const searchSchema = z.object({
   orgId: z.string().uuid(),
 });
+
+const AUTH_LOOKUP_BATCH_SIZE = 25;
 
 async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUser[]> {
   const serviceClient = getServiceClient();
@@ -27,15 +30,13 @@ async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUse
   const membershipRows = (memberships ?? []) as DbOrganizationMembership[];
   const userIds = membershipRows.map((membership) => membership.user_id);
 
-  const [profilesResult, authUsersResult] = await Promise.all([
+  const profilesResult =
     userIds.length > 0
-      ? serviceClient
+      ? await serviceClient
           .from("profiles")
           .select("id, first_name, last_name, platform_role, created_at")
           .in("id", userIds)
-      : Promise.resolve({ data: [], error: null }),
-    Promise.all(userIds.map((userId) => serviceClient.auth.admin.getUserById(userId))),
-  ]);
+      : { data: [], error: null };
 
   if (profilesResult.error) throw profilesResult.error;
 
@@ -52,6 +53,15 @@ async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUse
   );
   const visibleMemberships = membershipRows.filter(
     (membership) => (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster",
+  );
+
+  // Only visible memberships reach the response, so gridmaster rows filtered out
+  // above never need an Auth lookup. Batching what remains keeps a large
+  // organization from opening one upstream request per member at once.
+  const authUsersResult = await mapInBatches(
+    visibleMemberships.map((membership) => membership.user_id),
+    AUTH_LOOKUP_BATCH_SIZE,
+    (userId) => serviceClient.auth.admin.getUserById(userId),
   );
 
   const authUsers = new Map(

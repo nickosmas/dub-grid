@@ -2,7 +2,7 @@ import { insertEmployee } from "@/features/employees/client";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import {
   createOrganizationInvitation,
-  updateOrganizationSettings,
+  saveOrganizationSettingsWithRecovery,
 } from "@/features/organization/client";
 import {
   saveCertifications,
@@ -15,6 +15,7 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { DEFAULT_PREDEFINED_COLOR_BG } from "@/lib/colors";
 import { normalizeCode, normalizeLineText } from "@/lib/form-validation";
+import { getCompactNamedItemLabel } from "@/lib/utils";
 import type { AssignableOrganizationRole, Organization } from "@/types";
 import type {
   CreatedEmployee,
@@ -133,10 +134,13 @@ export async function saveOrganizationSetupConfig({
   }
 
   if (shiftDisplayMode !== "code") {
-    await updateOrganizationSettings({
-      orgId: createdOrg.id,
-      expectedUpdatedAt: createdOrg.updatedAt ?? new Date(0).toISOString(),
-      shiftDisplayMode,
+    await saveOrganizationSettingsWithRecovery({
+      baseline: createdOrg,
+      input: {
+        orgId: createdOrg.id,
+        expectedUpdatedAt: createdOrg.updatedAt ?? new Date(0).toISOString(),
+        shiftDisplayMode,
+      },
     });
   }
 
@@ -209,7 +213,7 @@ export async function saveOrganizationSetupConfig({
               maxLength: 6,
               uppercase: true,
             })
-          : item.name.trim().slice(0, 4).toUpperCase(),
+          : getCompactNamedItemLabel(item),
         sortOrder: index,
       })),
       [],
@@ -235,7 +239,7 @@ export async function saveOrganizationSetupConfig({
               maxLength: 6,
               uppercase: true,
             })
-          : item.name.trim().slice(0, 4).toUpperCase(),
+          : getCompactNamedItemLabel(item),
         sortOrder: index,
       })),
       [],

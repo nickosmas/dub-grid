@@ -1,24 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderIcon } from "lucide-react";
 import { Button } from "@/components/Button";
+import ButtonSpinner from "@/components/ButtonSpinner";
 import { useLogout } from "@/hooks/useLogout";
 import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
 
-type TransitionPhase = "signing-in" | "organization" | "onboarding";
+type TransitionPhase = "signing-in" | "workspace" | "onboarding";
 
 const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
   "signing-in": {
     title: "Signing you in",
     detail: "Securing your session and getting things ready.",
   },
-  organization: {
-    title: "Getting your organization ready",
+  workspace: {
+    title: "Loading your workspace",
     detail: "Just a moment while we prepare everything you need.",
   },
   onboarding: {
-    title: "Almost there",
+    title: "Preparing your workspace",
     detail: "We’re finishing a few things before you begin.",
   },
 };
@@ -79,12 +79,7 @@ export default function AuthTransitionScreen({
     >
       <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-          <LoaderIcon
-            aria-hidden="true"
-            className="animate-spin"
-            size={32}
-            style={{ color: "var(--dg-color-brand)" }}
-          />
+          <ButtonSpinner size={32} color="var(--dg-color-brand)" />
         </div>
         <h1
           style={{

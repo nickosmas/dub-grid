@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ScheduleCellState } from "@dubgrid/contracts";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
@@ -20,6 +21,9 @@ import {
 export const OPERATIONS_REPORT_TYPES = [
   "employee-directory",
   "staff-hours",
+  "staff-activity",
+  "mentoring-hours",
+  "mentoring-detail",
   "coverage",
   "shift-period-summary",
   "shift-requests",
@@ -65,6 +69,58 @@ export interface StaffHoursReportRow {
   absenceCount: number;
   overtimeHours: number;
   overtime: boolean;
+  shiftBreakdown: string;
+  jobBreakdown: string;
+}
+
+export interface StaffActivitySummaryReportRow {
+  employeeId: string;
+  employeeName: string;
+  scheduledHours: number;
+  shiftCount: number;
+  workedDays: number;
+  shiftBreakdown: string;
+  jobBreakdown: string;
+  publishedAbsenceDays: number;
+  absenceBreakdown: string;
+  unscheduledDays: number;
+  approvedImpactCount: number;
+  allRequestCount: number;
+  initiatedRequestCount: number;
+  receivedRequestCount: number;
+  requestBreakdown: string;
+}
+
+export interface StaffActivityEventReportRow {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  shiftCategories: string;
+  requestType: string;
+  status: string;
+  participation: "initiated" | "received";
+  counterpart: string;
+  resolvedAt: string;
+}
+
+export interface MentoringHoursReportRow {
+  employeeId: string;
+  employeeName: string;
+  mentoringHours: number;
+  mentoredAssignmentCount: number;
+  mentoredDays: number;
+}
+
+export interface MentoringDetailReportRow {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  focusArea: string;
+  shift: string;
+  job: string;
+  startTime: string;
+  endTime: string;
+  mentoringHours: number;
 }
 
 export interface EmployeeDirectoryReportRow {
@@ -175,6 +231,8 @@ export interface ScheduleMatrixReportRow {
 export interface OperationsReportFilters {
   employeeIds?: string[];
   focusAreaIds?: number[];
+  shiftCategoryIds?: number[];
+  jobIds?: number[];
   dates?: string[];
 }
 
@@ -198,16 +256,26 @@ export interface OperationsReportPayload {
   filters: {
     employeeIds: string[];
     focusAreaIds: number[];
+    shiftCategoryIds: number[];
+    jobIds: number[];
     dates: string[];
   };
   filterOptions: {
     employees: OperationsReportEmployeeFilterOption[];
     focusAreas: OperationsReportFilterOption[];
+    shiftCategories: OperationsReportFilterOption[];
+    jobs: OperationsReportFilterOption[];
     dates: string[];
   };
   reports: {
     employeeDirectory: EmployeeDirectoryReportRow[];
     staffHours: StaffHoursReportRow[];
+    staffActivity: {
+      summaries: StaffActivitySummaryReportRow[];
+      events: StaffActivityEventReportRow[];
+    };
+    mentoringHours: MentoringHoursReportRow[];
+    mentoringDetail: MentoringDetailReportRow[];
     coverage: CoverageReportRow[];
     shiftPeriodSummary: ShiftPeriodSummaryReport;
     shiftRequests: ShiftRequestReportRow[];
@@ -279,7 +347,9 @@ type ShiftRequestRow = {
   requester_emp_id: string;
   target_emp_id: string | null;
   requester_shift_date: string;
+  requester_state?: ScheduleCellState | null;
   target_shift_date: string | null;
+  target_state?: ScheduleCellState | null;
   absence_type_id: number | null;
   created_at: string;
   resolved_at: string | null;
@@ -472,6 +542,20 @@ function segmentMatchesFocusAreas(
   return focusAreaId != null && focusAreaIdSet.has(focusAreaId);
 }
 
+function segmentMatchesShiftCategories(
+  segment: PublishedScheduleSegment,
+  shiftCategoryIdSet: Set<number>,
+): boolean {
+  return (
+    shiftCategoryIdSet.size === 0 ||
+    (segment.shiftId != null && shiftCategoryIdSet.has(segment.shiftId))
+  );
+}
+
+function segmentMatchesJobs(segment: PublishedScheduleSegment, jobIdSet: Set<number>): boolean {
+  return jobIdSet.size === 0 || jobIdSet.has(segment.jobId);
+}
+
 function getSegmentDurationHours(segment: PublishedScheduleSegment): number {
   if (segment.durationHours != null) return segment.durationHours;
   if (!segment.startTime || !segment.endTime) return 0;
@@ -480,31 +564,80 @@ function getSegmentDurationHours(segment: PublishedScheduleSegment): number {
   const start = startHour * 60 + startMinute;
   let end = endHour * 60 + endMinute;
   if (end <= start) end += 24 * 60;
-  return Math.max(0, (end - start) / 60);
+  return Math.max(0, (end - start - (segment.breakMinutes ?? 0)) / 60);
 }
 
 function getReportEntryDurationHours(
   item: ResolvedEntry,
   shiftById: Map<number, ShiftCategoryRow>,
   focusAreaIdSet: Set<number>,
+  shiftCategoryIdSet: Set<number>,
+  jobIdSet: Set<number>,
 ): number {
-  if (focusAreaIdSet.size === 0 || item.entry.kind !== "shift") {
+  if (
+    (focusAreaIdSet.size === 0 && shiftCategoryIdSet.size === 0 && jobIdSet.size === 0) ||
+    item.entry.kind !== "shift"
+  ) {
     return item.entry.durationHours;
   }
   const segments = item.entry.segments ?? [];
   if (segments.length === 0) {
-    return getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id))
+    return (focusAreaIdSet.size === 0 ||
+      getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id))) &&
+      shiftCategoryIdSet.size === 0 &&
+      jobIdSet.size === 0
       ? item.entry.durationHours
       : 0;
   }
   return segments
-    .filter((segment) => segmentMatchesFocusAreas(segment, item.source, shiftById, focusAreaIdSet))
+    .filter(
+      (segment) =>
+        segmentMatchesFocusAreas(segment, item.source, shiftById, focusAreaIdSet) &&
+        segmentMatchesShiftCategories(segment, shiftCategoryIdSet) &&
+        segmentMatchesJobs(segment, jobIdSet),
+    )
     .reduce((sum, segment) => sum + getSegmentDurationHours(segment), 0);
 }
 
 function hasAnyNumber(values: number[] | null | undefined, selected: Set<number>): boolean {
   if (selected.size === 0) return true;
   return (values ?? []).some((value) => selected.has(value));
+}
+
+function formatBreakdown(values: Map<string, { count: number; hours?: number }>): string {
+  return Array.from(values.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([label, value]) =>
+      value.hours == null
+        ? `${label} (${value.count})`
+        : `${label} (${value.count}, ${roundHours(value.hours)}h)`,
+    )
+    .join("; ");
+}
+
+function getRequestStateShiftCategoryIds(state: ScheduleCellState | null | undefined): number[] {
+  return (state?.segments ?? [])
+    .map((segment) => segment.shiftId)
+    .filter((shiftId): shiftId is number => shiftId != null);
+}
+
+function requestStateMatchesJobs(
+  state: ScheduleCellState | null | undefined,
+  jobIdSet: Set<number>,
+): boolean {
+  return (
+    jobIdSet.size === 0 || (state?.segments ?? []).some((segment) => jobIdSet.has(segment.jobId))
+  );
+}
+
+function requestStateMatchesShiftCategories(
+  state: ScheduleCellState | null | undefined,
+  shiftCategoryIdSet: Set<number>,
+): boolean {
+  return (
+    shiftCategoryIdSet.size === 0 ||
+    getRequestStateShiftCategoryIds(state).some((shiftId) => shiftCategoryIdSet.has(shiftId))
+  );
 }
 
 export function buildOperationsReportPayload(
@@ -521,6 +654,8 @@ export function buildOperationsReportPayload(
   const reportDateSet = new Set(reportDates);
   const employeeIdSet = new Set(filters.employeeIds ?? []);
   const focusAreaIdSet = new Set(filters.focusAreaIds ?? []);
+  const shiftCategoryIdSet = new Set(filters.shiftCategoryIds ?? []);
+  const jobIdSet = new Set(filters.jobIds ?? []);
   const historicalEmployeeDirectory = [...source.employees, ...source.historicalEmployees];
   const employeeById = new Map(historicalEmployeeDirectory.map((row) => [row.id, row]));
   const employeeNameById = new Map(
@@ -562,11 +697,24 @@ export function buildOperationsReportPayload(
     if (focusAreaIds.length === 0) return true;
     return hasAnyNumber(focusAreaIds, focusAreaIdSet);
   });
-  const entries = historicalPublishedEntries.filter((item) => {
+  const allReportEntries = historicalPublishedEntries.filter((item) => {
     if (!reportDateSet.has(item.entry.date)) return false;
     if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
-    if (focusAreaIdSet.size === 0) return true;
-    return getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id));
+    return true;
+  });
+  const entries = allReportEntries.filter((item) => {
+    if (item.entry.kind === "absence") return true;
+    if (
+      focusAreaIdSet.size > 0 &&
+      !getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id))
+    ) {
+      return false;
+    }
+    return (item.entry.segments ?? []).some(
+      (segment) =>
+        segmentMatchesShiftCategories(segment, shiftCategoryIdSet) &&
+        segmentMatchesJobs(segment, jobIdSet),
+    );
   });
   const shiftEntries = entries.filter((item) => item.entry.kind === "shift");
   const absenceEntries = entries.filter((item) => item.entry.kind === "absence");
@@ -588,6 +736,11 @@ export function buildOperationsReportPayload(
       id: String(focusArea.id),
       label: getNamedValue(focusArea),
     })),
+    shiftCategories: source.shiftCategories.map((shift) => ({
+      id: String(shift.id),
+      label: shift.name,
+    })),
+    jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
     dates: rangeDates,
   };
 
@@ -618,10 +771,44 @@ export function buildOperationsReportPayload(
     const absenceCount = employeeEntries.filter((item) => item.entry.kind === "absence").length;
     const scheduledHours = roundHours(
       workedEntries.reduce(
-        (sum, item) => sum + getReportEntryDurationHours(item, shiftById, focusAreaIdSet),
+        (sum, item) =>
+          sum +
+          getReportEntryDurationHours(
+            item,
+            shiftById,
+            focusAreaIdSet,
+            shiftCategoryIdSet,
+            jobIdSet,
+          ),
         0,
       ),
     );
+    const shiftBreakdownValues = new Map<string, { count: number; hours: number }>();
+    const jobBreakdownValues = new Map<string, { count: number; hours: number }>();
+    for (const item of workedEntries) {
+      for (const segment of item.entry.segments ?? []) {
+        if (
+          !segmentMatchesFocusAreas(segment, item.source, shiftById, focusAreaIdSet) ||
+          !segmentMatchesShiftCategories(segment, shiftCategoryIdSet) ||
+          !segmentMatchesJobs(segment, jobIdSet)
+        ) {
+          continue;
+        }
+        const label =
+          segment.shiftId == null
+            ? "General shift"
+            : (shiftNameById.get(segment.shiftId) ?? "Unknown shift");
+        const current = shiftBreakdownValues.get(label) ?? { count: 0, hours: 0 };
+        current.count += 1;
+        current.hours += getSegmentDurationHours(segment);
+        shiftBreakdownValues.set(label, current);
+        const jobLabel = jobById.get(segment.jobId) ?? "Unknown job";
+        const jobCurrent = jobBreakdownValues.get(jobLabel) ?? { count: 0, hours: 0 };
+        jobCurrent.count += 1;
+        jobCurrent.hours += getSegmentDurationHours(segment);
+        jobBreakdownValues.set(jobLabel, jobCurrent);
+      }
+    }
     const workedDays = new Set(workedEntries.map((item) => item.entry.date)).size;
     const overtimeHours = roundHours(Math.max(0, scheduledHours - overtimeThresholdHours));
 
@@ -636,8 +823,65 @@ export function buildOperationsReportPayload(
       absenceCount,
       overtimeHours,
       overtime: overtimeHours > 0,
+      shiftBreakdown: formatBreakdown(shiftBreakdownValues),
+      jobBreakdown: formatBreakdown(jobBreakdownValues),
     };
   });
+
+  const mentoringDetail: MentoringDetailReportRow[] = shiftEntries
+    .flatMap(({ entry, source: row }) =>
+      (entry.segments ?? []).flatMap((segment) => {
+        if (
+          segment.isMentored !== true ||
+          !segmentMatchesFocusAreas(segment, row, shiftById, focusAreaIdSet)
+        ) {
+          return [];
+        }
+
+        const focusAreaId = getSegmentFocusAreaId(segment, row, shiftById);
+        return [
+          {
+            employeeId: entry.empId,
+            employeeName: employeeNameById.get(entry.empId) ?? "Unknown employee",
+            date: entry.date,
+            focusArea:
+              focusAreaId == null
+                ? "No focus area"
+                : (focusAreaById.get(focusAreaId) ?? "Unknown focus area"),
+            shift:
+              segment.shiftId == null
+                ? "No shift"
+                : (shiftNameById.get(segment.shiftId) ?? "Unknown shift"),
+            job: jobById.get(segment.jobId) ?? "Unknown job",
+            startTime: segment.startTime ?? "",
+            endTime: segment.endTime ?? "",
+            mentoringHours: roundHours(getSegmentDurationHours(segment)),
+          },
+        ];
+      }),
+    )
+    .sort(
+      (left, right) =>
+        left.employeeName.localeCompare(right.employeeName) ||
+        left.date.localeCompare(right.date) ||
+        left.shift.localeCompare(right.shift) ||
+        left.job.localeCompare(right.job),
+    );
+  const mentoringDetailsByEmployeeId = new Map<string, MentoringDetailReportRow[]>();
+  for (const detail of mentoringDetail) {
+    const current = mentoringDetailsByEmployeeId.get(detail.employeeId) ?? [];
+    current.push(detail);
+    mentoringDetailsByEmployeeId.set(detail.employeeId, current);
+  }
+  const mentoringHours = Array.from(mentoringDetailsByEmployeeId.entries())
+    .map(([employeeId, details]) => ({
+      employeeId,
+      employeeName: details[0]?.employeeName ?? "Unknown employee",
+      mentoringHours: roundHours(details.reduce((sum, detail) => sum + detail.mentoringHours, 0)),
+      mentoredAssignmentCount: details.length,
+      mentoredDays: new Set(details.map((detail) => detail.date)).size,
+    }))
+    .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
 
   const coverage: CoverageReportRow[] = [];
   for (const requirement of source.coverageRequirements) {
@@ -711,57 +955,166 @@ export function buildOperationsReportPayload(
   const coveragePct = percent(totalScheduledForCoverage, totalRequired);
   const scheduledStaffCount = new Set(shiftEntries.map((item) => item.entry.empId)).size;
 
-  const shiftRequests = source.shiftRequests
-    .filter((request) => {
-      const requestDates = [request.requester_shift_date, request.target_shift_date ?? ""].filter(
+  const matchingShiftRequests = source.shiftRequests.filter((request) => {
+    const requestDates = [request.requester_shift_date, request.target_shift_date ?? ""].filter(
+      Boolean,
+    );
+    if (!requestDates.some((date) => reportDateSet.has(date))) return false;
+    if (employeeIdSet.size > 0) {
+      const requestEmployeeIds = [request.requester_emp_id, request.target_emp_id ?? ""].filter(
         Boolean,
       );
-      if (!requestDates.some((date) => reportDateSet.has(date))) return false;
-      if (employeeIdSet.size > 0) {
-        const requestEmployeeIds = [request.requester_emp_id, request.target_emp_id ?? ""].filter(
-          Boolean,
-        );
-        if (!requestEmployeeIds.some((id) => employeeIdSet.has(id))) return false;
+      if (!requestEmployeeIds.some((id) => employeeIdSet.has(id))) return false;
+    }
+    if (focusAreaIdSet.size > 0) {
+      const requestEmployees = [
+        employeeById.get(request.requester_emp_id),
+        request.target_emp_id ? employeeById.get(request.target_emp_id) : null,
+      ].filter((employee): employee is EmployeeReportRow => employee != null);
+      if (
+        !requestEmployees.some((employee) => hasAnyNumber(employee.focus_area_ids, focusAreaIdSet))
+      ) {
+        return false;
       }
-      if (focusAreaIdSet.size > 0) {
-        const requestEmployees = [
-          employeeById.get(request.requester_emp_id),
-          request.target_emp_id ? employeeById.get(request.target_emp_id) : null,
-        ].filter((employee): employee is EmployeeReportRow => employee != null);
-        if (
-          !requestEmployees.some((employee) =>
-            hasAnyNumber(employee.focus_area_ids, focusAreaIdSet),
-          )
-        ) {
-          return false;
-        }
-      }
-      return true;
-    })
-    .map((request) => {
-      const resolvedAt = request.resolved_at ?? "";
-      const resolutionHours = request.resolved_at
-        ? roundHours(
-            (new Date(request.resolved_at).getTime() - new Date(request.created_at).getTime()) /
-              3_600_000,
-          )
-        : null;
+    }
+    if (
+      !requestStateMatchesShiftCategories(request.requester_state, shiftCategoryIdSet) &&
+      !requestStateMatchesShiftCategories(request.target_state, shiftCategoryIdSet)
+    ) {
+      return false;
+    }
+    if (
+      !requestStateMatchesJobs(request.requester_state, jobIdSet) &&
+      !requestStateMatchesJobs(request.target_state, jobIdSet)
+    ) {
+      return false;
+    }
+    return true;
+  });
+  const shiftRequests = matchingShiftRequests.map((request) => {
+    const resolvedAt = request.resolved_at ?? "";
+    const resolutionHours = request.resolved_at
+      ? roundHours(
+          (new Date(request.resolved_at).getTime() - new Date(request.created_at).getTime()) /
+            3_600_000,
+        )
+      : null;
 
+    return {
+      id: request.id,
+      type: request.type,
+      status: request.status,
+      requester: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
+      target: request.target_emp_id
+        ? (employeeNameById.get(request.target_emp_id) ?? "Unknown employee")
+        : "",
+      requesterShiftDate: request.requester_shift_date,
+      targetShiftDate: request.target_shift_date ?? "",
+      createdAt: request.created_at,
+      resolvedAt,
+      resolutionHours,
+    };
+  });
+
+  const staffActivityEvents: StaffActivityEventReportRow[] = matchingShiftRequests.flatMap(
+    (request) => {
+      const participants: Array<{
+        employeeId: string;
+        counterpartId: string | null;
+        date: string;
+        state: ScheduleCellState | null;
+        participation: "initiated" | "received";
+      }> = [
+        {
+          employeeId: request.requester_emp_id,
+          counterpartId: request.target_emp_id,
+          date: request.requester_shift_date,
+          state: request.requester_state ?? null,
+          participation: "initiated",
+        },
+      ];
+      if (request.target_emp_id && request.target_shift_date) {
+        participants.push({
+          employeeId: request.target_emp_id,
+          counterpartId: request.requester_emp_id,
+          date: request.target_shift_date,
+          state: request.target_state ?? null,
+          participation: "received",
+        });
+      }
+      return participants
+        .filter(
+          (participant) =>
+            reportEmployeeIdSet.has(participant.employeeId) &&
+            reportDateSet.has(participant.date) &&
+            requestStateMatchesShiftCategories(participant.state, shiftCategoryIdSet) &&
+            requestStateMatchesJobs(participant.state, jobIdSet),
+        )
+        .map((participant) => ({
+          employeeId: participant.employeeId,
+          employeeName: employeeNameById.get(participant.employeeId) ?? "Unknown employee",
+          date: participant.date,
+          shiftCategories: getRequestStateShiftCategoryIds(participant.state)
+            .map((shiftId) => shiftNameById.get(shiftId) ?? "Unknown shift")
+            .join("; "),
+          requestType: request.type,
+          status: request.status,
+          participation: participant.participation,
+          counterpart: participant.counterpartId
+            ? (employeeNameById.get(participant.counterpartId) ?? "Unknown employee")
+            : "",
+          resolvedAt: request.resolved_at ?? "",
+        }));
+    },
+  );
+
+  const staffActivitySummaries: StaffActivitySummaryReportRow[] = reportEmployees.map(
+    (employee) => {
+      const staffHoursRow = staffHours.find((row) => row.employeeId === employee.id)!;
+      const employeeAbsences = absenceEntries.filter((item) => item.entry.empId === employee.id);
+      const absenceBreakdownValues = new Map<string, { count: number }>();
+      for (const item of employeeAbsences) {
+        const label = item.entry.label || "Unlabeled absence";
+        const current = absenceBreakdownValues.get(label) ?? { count: 0 };
+        current.count += 1;
+        absenceBreakdownValues.set(label, current);
+      }
+      const occupiedDates = new Set(
+        allReportEntries
+          .filter((item) => item.entry.empId === employee.id)
+          .map((item) => item.entry.date),
+      );
+      const employeeEvents = staffActivityEvents.filter(
+        (event) => event.employeeId === employee.id,
+      );
+      const requestBreakdownValues = new Map<string, { count: number }>();
+      for (const event of employeeEvents) {
+        const label = `${event.participation === "initiated" ? "Initiated" : "Received"} ${event.requestType} (${event.status})`;
+        const current = requestBreakdownValues.get(label) ?? { count: 0 };
+        current.count += 1;
+        requestBreakdownValues.set(label, current);
+      }
       return {
-        id: request.id,
-        type: request.type,
-        status: request.status,
-        requester: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
-        target: request.target_emp_id
-          ? (employeeNameById.get(request.target_emp_id) ?? "Unknown employee")
-          : "",
-        requesterShiftDate: request.requester_shift_date,
-        targetShiftDate: request.target_shift_date ?? "",
-        createdAt: request.created_at,
-        resolvedAt,
-        resolutionHours,
+        employeeId: employee.id,
+        employeeName: formatName(employee),
+        scheduledHours: staffHoursRow.scheduledHours,
+        shiftCount: staffHoursRow.shiftCount,
+        workedDays: staffHoursRow.workedDays,
+        shiftBreakdown: staffHoursRow.shiftBreakdown,
+        jobBreakdown: staffHoursRow.jobBreakdown,
+        publishedAbsenceDays: employeeAbsences.length,
+        absenceBreakdown: formatBreakdown(absenceBreakdownValues),
+        unscheduledDays: reportDates.filter((date) => !occupiedDates.has(date)).length,
+        approvedImpactCount: employeeEvents.filter((event) => event.status === "approved").length,
+        allRequestCount: employeeEvents.length,
+        initiatedRequestCount: employeeEvents.filter((event) => event.participation === "initiated")
+          .length,
+        receivedRequestCount: employeeEvents.filter((event) => event.participation === "received")
+          .length,
+        requestBreakdown: formatBreakdown(requestBreakdownValues),
       };
-    });
+    },
+  );
 
   const absenceRows: AbsenceCalloffReportRow[] = absenceEntries.map(({ entry }) => ({
     kind: "absence",
@@ -895,12 +1248,24 @@ export function buildOperationsReportPayload(
     filters: {
       employeeIds: [...employeeIdSet],
       focusAreaIds: [...focusAreaIdSet],
+      shiftCategoryIds: [...shiftCategoryIdSet],
+      jobIds: [...jobIdSet],
       dates: dates.length > 0 ? dates : [],
     },
     filterOptions,
     reports: {
       employeeDirectory,
       staffHours,
+      staffActivity: {
+        summaries: staffActivitySummaries,
+        events: staffActivityEvents.sort(
+          (left, right) =>
+            left.date.localeCompare(right.date) ||
+            left.employeeName.localeCompare(right.employeeName),
+        ),
+      },
+      mentoringHours,
+      mentoringDetail,
       coverage,
       shiftPeriodSummary,
       shiftRequests,
@@ -1746,7 +2111,7 @@ export async function loadOperationsReport(
       serviceClient
         .from("shift_requests")
         .select(
-          "id, type, status, requester_emp_id, target_emp_id, requester_shift_date, target_shift_date, absence_type_id, created_at, resolved_at, updated_at",
+          "id, type, status, requester_emp_id, target_emp_id, requester_shift_date, target_shift_date, requester_state, target_state, absence_type_id, created_at, resolved_at, updated_at",
         )
         .eq("org_id", input.orgId)
         .or(

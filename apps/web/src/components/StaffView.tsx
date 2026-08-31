@@ -23,6 +23,7 @@ import type {
   Department,
   Employee,
   FocusArea,
+  Invitation,
   JobDefinition,
   NamedItem,
   ShiftCategory,
@@ -99,6 +100,13 @@ interface StaffViewProps {
   certifications: NamedItem[];
   roles: NamedItem[];
   onSave: (emp: Employee) => void;
+  /** Called instead of `onSave` when the admin confirms changing an
+   *  on-schedule employee's email while a pending invitation exists — see
+   *  EditEmployeePanel. */
+  onSaveWithReinvite?: (
+    updatedEmployee: Employee,
+    oldInvitation: Invitation,
+  ) => void | Promise<void>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
@@ -126,6 +134,7 @@ interface StaffViewProps {
   shiftDisplayMode?: ShiftDisplayMode;
   defaultShiftEnabled?: boolean;
   setupIncomplete?: boolean;
+  useCompactRoleCertificationLabels?: boolean;
 }
 
 export default function StaffView({
@@ -136,6 +145,7 @@ export default function StaffView({
   certifications,
   roles,
   onSave,
+  onSaveWithReinvite,
   onRemove,
   onDeactivate,
   onActivate,
@@ -161,6 +171,7 @@ export default function StaffView({
   orgName,
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
+  useCompactRoleCertificationLabels = false,
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
@@ -240,8 +251,8 @@ export default function StaffView({
           collapsible="icon"
           className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
           style={{
-            top: "var(--header-height)",
-            height: "calc(100dvh - var(--header-height))",
+            top: "var(--dg-app-shell-header-height)",
+            height: "calc(100dvh - var(--dg-app-shell-header-height))",
           }}
           onWheel={(event: WheelEvent) => event.preventDefault()}
         >
@@ -325,7 +336,9 @@ export default function StaffView({
             focusAreas={focusAreas}
             certifications={certifications}
             roles={roles}
+            useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
             onSave={onSave}
+            onSaveWithReinvite={onSaveWithReinvite}
             onRemove={onRemove}
             onDeactivate={onDeactivate}
             onActivate={onActivate}
@@ -374,6 +387,7 @@ export default function StaffView({
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}
                 defaultShiftEnabled={defaultShiftEnabled}
+                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               />
             )}
           </div>

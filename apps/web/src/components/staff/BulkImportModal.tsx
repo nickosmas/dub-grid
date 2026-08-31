@@ -16,6 +16,8 @@ import {
   type ExistingEmployeeLite,
   type RowDuplicateClassification,
 } from "@/lib/employee-duplicate-detection";
+import { getImportReferenceErrors } from "./import-reference-validation";
+import type { FocusArea, NamedItem } from "@/types";
 
 interface ParsedRow {
   firstName: string;
@@ -196,12 +198,26 @@ function classificationRowBackground(
   return undefined;
 }
 
+function statusTitle(
+  classification: EnrichedClassification,
+  referenceErrors: string[],
+): string | undefined {
+  const duplicateTitle = classificationTitle(classification);
+  return [...referenceErrors, duplicateTitle].filter(Boolean).join(" ") || undefined;
+}
+
 export function BulkImportModal({
   orgId,
+  focusAreas,
+  certifications,
+  roles,
   onClose,
   onImported,
 }: {
   orgId: string;
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
   onClose: () => void;
   onImported: () => void;
 }) {
@@ -291,9 +307,33 @@ export function BulkImportModal({
     [rows, existingLite, rowsAsLite],
   );
 
+  const referenceErrorsByRow = useMemo(
+    () =>
+      rows.map((row) =>
+        getImportReferenceErrors(row, {
+          focusAreaNames: focusAreas.map((area) => area.name),
+          certificationNames: certifications.map((certification) => certification.name),
+          roleNames: roles.map((role) => role.name),
+        }),
+      ),
+    [rows, focusAreas, certifications, roles],
+  );
+
   const blockedCount = useMemo(
-    () => classifications.filter((c) => c.status === "blocked").length,
+    () =>
+      classifications.filter(
+        (classification, index) =>
+          classification.status === "blocked" || referenceErrorsByRow[index].length > 0,
+      ).length,
+    [classifications, referenceErrorsByRow],
+  );
+  const duplicateBlockedCount = useMemo(
+    () => classifications.filter((classification) => classification.status === "blocked").length,
     [classifications],
+  );
+  const referenceBlockedRows = useMemo(
+    () => referenceErrorsByRow.filter((errors) => errors.length > 0),
+    [referenceErrorsByRow],
   );
   const warningCount = useMemo(
     () => classifications.filter((c) => c.status === "warning").length,
@@ -305,8 +345,13 @@ export function BulkImportModal({
   // actually gets sent to the API. Kept around so server-side error row
   // numbers can be remapped back to what the admin saw in the preview table.
   const sendableIndices = useMemo(
-    () => rows.map((_, i) => i).filter((i) => classifications[i]?.status !== "blocked"),
-    [rows, classifications],
+    () =>
+      rows
+        .map((_, i) => i)
+        .filter(
+          (i) => classifications[i]?.status !== "blocked" && referenceErrorsByRow[i].length === 0,
+        ),
+    [rows, classifications, referenceErrorsByRow],
   );
 
   const handleRequestClose = useCallback(() => {
@@ -373,7 +418,12 @@ export function BulkImportModal({
       }));
       setResult({ ...(data as ImportResult), errors: remappedErrors });
       setStep("result");
-      if (data.inserted > 0) onImported();
+      if (data.inserted > 0) {
+        toast.success(
+          data.inserted === 1 ? "1 employee imported" : `${data.inserted} employees imported`,
+        );
+        onImported();
+      }
     } catch {
       toast.error("Import failed");
     } finally {
@@ -579,9 +629,23 @@ export function BulkImportModal({
                     >
                       <XCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                       <div>
-                        {importableCount} of {rows.length} row{rows.length !== 1 ? "s" : ""} will be
-                        imported. {blockedCount} duplicate{blockedCount !== 1 ? "s" : ""} of
-                        existing employees blocked.
+                        <div>
+                          {importableCount} of {rows.length} row{rows.length !== 1 ? "s" : ""} will
+                          be imported. {blockedCount} row{blockedCount !== 1 ? "s" : ""} blocked.
+                          {duplicateBlockedCount > 0 &&
+                            ` ${duplicateBlockedCount} duplicate${duplicateBlockedCount !== 1 ? "s" : ""} of existing employees.`}
+                        </div>
+                        {referenceBlockedRows.length > 0 && (
+                          <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+                            {referenceErrorsByRow.flatMap((errors, index) =>
+                              errors.map((error) => (
+                                <li key={`${index}-${error}`}>
+                                  Row {index + 1}: {error}
+                                </li>
+                              )),
+                            )}
+                          </ul>
+                        )}
                       </div>
                     </div>
                   )}
@@ -695,6 +759,9 @@ export function BulkImportModal({
                     <tbody>
                       {rows.slice(0, 20).map((row, i) => {
                         const classification = classifications[i];
+                        const referenceErrors = referenceErrorsByRow[i];
+                        const isBlocked =
+                          classification.status === "blocked" || referenceErrors.length > 0;
                         const isLastRow = i === Math.min(rows.length, 20) - 1;
                         const borderBottom = isLastRow
                           ? "none"
@@ -703,7 +770,9 @@ export function BulkImportModal({
                           <tr
                             key={`preview-${row.firstName}-${row.lastName}-${i}`}
                             style={{
-                              background: classificationRowBackground(classification.status),
+                              background: isBlocked
+                                ? classificationRowBackground("blocked")
+                                : classificationRowBackground(classification.status),
                             }}
                           >
                             <td
@@ -717,9 +786,9 @@ export function BulkImportModal({
                             </td>
                             <td
                               style={{ padding: "8px 12px", borderBottom }}
-                              title={classificationTitle(classification)}
+                              title={statusTitle(classification, referenceErrors)}
                             >
-                              {classification.status === "blocked" && (
+                              {isBlocked && (
                                 <XCircle
                                   size={16}
                                   style={{ color: "var(--dg-color-danger-text)" }}
@@ -860,19 +929,6 @@ export function BulkImportModal({
         >
           {step === "preview" && (
             <>
-              {importableCount === 0 && (
-                <span
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-danger-text)",
-                  }}
-                >
-                  All rows are duplicates of existing employees.
-                </span>
-              )}
               <Button
                 className="dg-btn dg-btn-secondary"
                 onClick={() => {

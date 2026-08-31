@@ -1089,7 +1089,7 @@ describe("mobile schedule helpers", () => {
     ]);
   });
 
-  it("does not feature a completed remaining shift today after a split shift is reduced", () => {
+  it("features the completed shift today after a split shift is reduced, instead of reporting empty", () => {
     const featured = getFeaturedMeScheduleSegment({
       entries: [
         {
@@ -1129,8 +1129,10 @@ describe("mobile schedule helpers", () => {
       currentTime: "16:40:00",
     });
 
-    expect(featured.status).toBe("empty");
-    expect(featured.item).toBeNull();
+    expect(featured.status).toBe("scheduled");
+    expect(featured.item?.date).toBe("2026-04-30");
+    expect(featured.item?.segment.startTime).toBe("07:00:00");
+    expect(featured.item?.segment.endTime).toBe("16:30:00");
   });
 
   it("uses the first shift in a future selected week for the me hero", () => {

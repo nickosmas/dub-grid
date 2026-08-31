@@ -201,6 +201,7 @@ export const createStyles = (mobileColors: MobileColors) =>
     },
     jobPillTextCompact: {
       fontSize: 12,
+      lineHeight: 16,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),

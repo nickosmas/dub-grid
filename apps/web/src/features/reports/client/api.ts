@@ -14,6 +14,9 @@ export const REPORT_OPTIONS: Array<{
 }> = [
   { value: "employee-directory", label: "Employee directory" },
   { value: "staff-hours", label: "Staff hours" },
+  { value: "staff-activity", label: "Staff activity" },
+  { value: "mentoring-hours", label: "Mentoring hours" },
+  { value: "mentoring-detail", label: "Mentoring detail" },
   { value: "coverage", label: "Coverage" },
   { value: "shift-period-summary", label: "Period summary" },
   { value: "shift-requests", label: "Shift requests" },
@@ -49,6 +52,12 @@ function buildReportParams(input: {
   }
   if (input.filters?.focusAreaIds?.length) {
     params.set("focusAreaIds", input.filters.focusAreaIds.join(","));
+  }
+  if (input.filters?.shiftCategoryIds?.length) {
+    params.set("shiftCategoryIds", input.filters.shiftCategoryIds.join(","));
+  }
+  if (input.filters?.jobIds?.length) {
+    params.set("jobIds", input.filters.jobIds.join(","));
   }
   if (input.filters?.dates?.length) {
     params.set("dates", input.filters.dates.join(","));

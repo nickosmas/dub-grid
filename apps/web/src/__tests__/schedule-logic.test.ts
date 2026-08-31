@@ -711,6 +711,7 @@ describe("computeCoverageGaps", () => {
       {
         assignmentId: 10,
         assignmentLabel: "D",
+        assignmentFullName: "D",
         required: 3,
         actual: 0,
         shortage: 3,
@@ -925,6 +926,7 @@ describe("computeCoverageGaps", () => {
       {
         assignmentId: 10,
         assignmentLabel: "D",
+        assignmentFullName: "D",
         required: 3,
         actual: 2,
         shortage: 1,

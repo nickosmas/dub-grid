@@ -46,6 +46,7 @@ function renderPanel(
       sortOrder: 0,
     },
   ],
+  contactEmail: string | null = null,
 ) {
   const onSave = vi.fn().mockResolvedValue(undefined);
   const onClose = vi.fn();
@@ -57,6 +58,7 @@ function renderPanel(
         isManagementUser: true,
         ...personOverrides,
       })}
+      contactEmail={contactEmail}
       departments={departments}
       departmentLabel="Departments"
       canManageScheduleEmployees
@@ -145,52 +147,6 @@ describe("ManagementStaffPanel", () => {
         email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [10],
-      });
-    });
-  });
-
-  it("lets an on-schedule person become schedule-only from the management panel", async () => {
-    const user = userEvent.setup();
-    const { onSave } = renderPanel(
-      {
-        personId: "emp-1",
-        source: "employee",
-        employeeId: "emp-1",
-        userId: "user-1",
-        employeeStatus: "active",
-        hasAppAccess: true,
-        // "On schedule" is gated on focusAreaIds (matches the schedule
-        // grid's own filter), not just `source === "employee"` — every
-        // member now has an employees row regardless of scheduling.
-        focusAreaIds: [1],
-        managementDepartmentIds: [10],
-        isManagementUser: true,
-      },
-      [
-        {
-          id: 10,
-          orgId: "org-1",
-          name: "Leadership",
-          abbr: "LEAD",
-          sortOrder: 0,
-        },
-      ],
-    );
-
-    await user.click(screen.getByRole("button", { name: /remove from management/i }));
-    expect(screen.getByText(/stay on the schedule/i)).toBeInTheDocument();
-
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
-    expect(saveButton).toBeEnabled();
-    await user.click(saveButton);
-
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith({
-        firstName: "Jordan",
-        lastName: "Lee",
-        email: "jordan@example.com",
-        phone: "(415) 425-3334",
-        managementDepartmentIds: [],
       });
     });
   });

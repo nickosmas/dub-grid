@@ -51,6 +51,7 @@ export function DirectoryCertificationCards({
   counts,
   certifications,
   certificationLabel,
+  useCompactRoleCertificationLabels = false,
   certifiedCount,
   uncertifiedCount,
   selectedCertification,
@@ -59,6 +60,7 @@ export function DirectoryCertificationCards({
   counts: StaffCertificationCount[];
   certifications: NamedItem[];
   certificationLabel: string;
+  useCompactRoleCertificationLabels?: boolean;
   certifiedCount: number;
   uncertifiedCount: number;
   selectedCertification: CertificationFilter;
@@ -93,7 +95,11 @@ export function DirectoryCertificationCards({
         // A dangling reference to a certification that has since been archived.
         // Shown so the tiles still sum to the certified total beside them.
         const isArchived = certificationId === "archived";
-        const label = isArchived ? "Archived" : (certification?.abbr ?? "—");
+        const label = isArchived
+          ? "Archived"
+          : ((useCompactRoleCertificationLabels
+              ? certification?.abbr || certification?.name
+              : certification?.name) ?? "—");
         const fullName = isArchived
           ? `Holders of an archived ${certificationLabel.toLowerCase()} entry`
           : (certification?.name ?? null);

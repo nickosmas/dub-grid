@@ -1,9 +1,15 @@
 ---
 name: autopilot
-description: Optional explicit Blueprint mode for one bounded spec and build pass. It can pick or resume the current feature, write the spec when needed, create or reuse the branch, implement small steps, run verification, apply the configured regular check, audit, and try-guide gates, create allowed checkpoint commits, repair confirmed high-severity findings from an enabled audit, and stop with a review packet. It never completes, merges, pushes, deploys, publishes, sends, or performs destructive actions without explicit approval. Use only when the user explicitly runs /autopilot, invokes $autopilot, or directly asks for Autopilot.
+description: Optional explicit Blueprint mode for one bounded spec and build pass on dev. It can pick or resume the current feature, write the spec when needed, implement small steps, run verification, apply the configured regular check, audit, and try-guide gates, create allowed checkpoint commits on dev, repair confirmed high-severity findings from an enabled audit, and stop with a review packet. It never completes, merges, pushes, deploys, publishes, sends, or performs destructive actions without explicit approval. Use only when the user explicitly runs /autopilot, invokes $autopilot, or directly asks for Autopilot.
 ---
 
 # autopilot - optional Blueprint loop
+
+## DubGrid branch override
+
+For DubGrid, all development work stays directly on `dev`. This replaces every
+other branch-creation, switching, merging, and deletion instruction in this
+skill: never create a development branch or work on `main`.
 
 **First action:** Before project inspection, preflight, or any other tool call,
 publish `running` to `blueprint/.state/run.json` using the dashboard activity

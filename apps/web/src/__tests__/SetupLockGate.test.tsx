@@ -235,6 +235,16 @@ describe("OnboardingGate setup lock", () => {
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
   });
 
+  it("keeps an established signed-in page visible while bootstrap refreshes", async () => {
+    mockOrganizationData.loading = true;
+    mockOrganizationData.entryGate = null as never;
+
+    renderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Loading your workspace")).not.toBeInTheDocument();
+  });
+
   it("treats org setup as complete even when no employees exist (adding employees is post-wizard)", async () => {
     mockOrganizationData.setupStatus = {
       isComplete: true,

@@ -20,7 +20,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
   mobileElevation,
@@ -59,34 +58,8 @@ export function getCardSurfaceStyle(mobileColors: MobileColors, isDark: boolean)
   };
 }
 
+/** Still used by callers with their own icon-bearing tiles (e.g. the dashboard hero card's metric tiles). */
 export type CardIconTone = "brand" | "warning" | "danger" | "success";
-
-function createCardIconTone(
-  mobileColors: MobileColors,
-): Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> {
-  return {
-    brand: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      iconColor: mobileColors.brand,
-    },
-    warning: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-      iconColor: mobileColors.warningText,
-    },
-    danger: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-      iconColor: mobileColors.dangerText,
-    },
-    success: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-      iconColor: mobileColors.successText,
-    },
-  };
-}
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   getScreenBottomPadding,
@@ -212,12 +185,18 @@ export function Screen({
       automaticallyAdjustKeyboardInsets={adjustsForKeyboard}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
+        flexGrow: 1,
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
         paddingBottom: getScreenBottomPadding(bottomPaddingMode, insets.bottom),
       }}
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
+      // UIKit will otherwise let a mostly-vertical drag briefly rubber-band on
+      // the horizontal axis. That exposes the navigation controller behind the
+      // page as a white corner at the top-right of a light screen.
+      alwaysBounceHorizontal={false}
+      directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
@@ -301,42 +280,30 @@ export function Card({
   body,
   detail,
   headerAccessory,
-  icon,
-  iconTone = "brand",
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
   headerAccessory?: ReactNode;
-  icon?: keyof typeof Ionicons.glyphMap;
-  iconTone?: CardIconTone;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const cardIconTone = useMemo(() => createCardIconTone(mobileColors), [mobileColors]);
-  const tone = cardIconTone[iconTone];
 
   return (
-    <View style={styles.card}>
+    <View style={styles.cardGroup}>
+      {/* The header sits on the page background, above the white surface —
+          a section heading over its content rather than inside it. */}
       <View style={styles.cardHeader}>
-        {icon ? (
-          <View
-            style={[
-              styles.cardIconFrame,
-              { backgroundColor: tone.backgroundColor, borderColor: tone.borderColor },
-            ]}
-          >
-            <Ionicons color={tone.iconColor} name={icon} size={16} />
-          </View>
-        ) : null}
         <View style={styles.cardHeaderCopy}>
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
         {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
       </View>
-      {body ? <Text style={styles.cardBody}>{body}</Text> : null}
-      {detail}
+      <View style={styles.card}>
+        {body ? <Text style={styles.cardBody}>{body}</Text> : null}
+        {detail}
+      </View>
     </View>
   );
 }
@@ -352,6 +319,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.background,
     },
     content: {
+      flexGrow: 1,
       paddingHorizontal: getScreenGutter(),
       gap: mobileSpacing.sectionGap,
     },
@@ -371,15 +339,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // not show through. `overflow: hidden` clips whatever the header draws to
       // the shell's own bounds.
       overflow: "hidden",
-      // `surface`, not `background` — this is the app bar on the only two
-      // screens that have one (the dashboard and both schedule scopes; every
-      // other screen takes the native header instead). White chrome over the
-      // slate page reads as a bar sitting above the content rather than as more
-      // page, and it matches the tab bar at the other end of the screen, which
-      // is already `surface`. It also puts the status-bar strip on white, since
-      // both of those routes run `headerShown: false` and this shell is what
-      // reaches under the notch.
-      backgroundColor: mobileColors.surface,
+      // Match native-stack headers and the page ground. This shell is visible
+      // behind an interactive back swipe from a child route; using `surface`
+      // here made that strip flash white while the destination was revealed.
+      backgroundColor: mobileColors.background,
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
@@ -401,39 +364,25 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       zIndex: 20,
       elevation: 20,
     },
+    cardGroup: {
+      gap: mobileSpace.md,
+    },
     card: getCardSurfaceStyle(mobileColors, isDark),
     cardHeader: {
       flexDirection: "row",
-      // Stays flex-start so a title that wraps to two lines grows downward from
-      // the icon's top rather than straddling it. Single-line titles are centred
-      // by the minHeight below instead.
-      alignItems: "flex-start",
+      alignItems: "center",
       justifyContent: "space-between",
       gap: mobileSpace.md,
     },
     cardHeaderCopy: {
       flex: 1,
       minWidth: 0,
-      // Matches the icon frame, so a one-line title sits optically centred
-      // against the icon instead of pinned to its top edge. A 22pt line inside a
-      // 32pt frame was reading as a 5pt upward offset.
-      minHeight: CARD_ICON_FRAME_SIZE,
-      justifyContent: "center",
     },
     cardHeaderAccessory: {
-      minHeight: CARD_ICON_FRAME_SIZE,
-      justifyContent: "center",
-    },
-    cardIconFrame: {
-      width: CARD_ICON_FRAME_SIZE,
-      height: CARD_ICON_FRAME_SIZE,
-      borderRadius: 10,
-      borderWidth: 1,
-      alignItems: "center",
       justifyContent: "center",
     },
     cardTitle: {
-      ...mobileText.sectionTitle,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
     cardBody: {

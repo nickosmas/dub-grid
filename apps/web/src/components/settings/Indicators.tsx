@@ -51,6 +51,7 @@ function IndicatorRow({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
+  const editorId = React.useId();
 
   // Only resync from props when the editor is closed. While the user has the
   // row expanded, mid-edit changes are preserved across parent re-renders that
@@ -191,8 +192,11 @@ function IndicatorRow({
         transition: "border-bottom-color 220ms ease",
       }}
     >
-      <div
+      <Button
+        type="button"
         className="dg-hover-row"
+        aria-expanded={expanded}
+        aria-controls={editorId}
         style={{
           display: "flex",
           alignItems: "center",
@@ -201,6 +205,10 @@ function IndicatorRow({
           borderRadius: 8,
           cursor: "pointer",
           transition: "background 0.15s",
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
         }}
         onClick={toggleExpanded}
       >
@@ -241,9 +249,10 @@ function IndicatorRow({
         >
           ▾
         </span>
-      </div>
+      </Button>
 
       <div
+        id={editorId}
         aria-hidden={!expanded}
         style={{
           display: "grid",

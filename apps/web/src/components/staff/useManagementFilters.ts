@@ -56,11 +56,13 @@ export function useManagementFilters({
   const [filterInvitation, setFilterInvitation] = useState<ManagementInvitationFilter>("all");
   const [sortKey, setSortKey] = useState<ManagementSortKey>("name");
 
-  const hasActiveFilters =
-    deptFilterId !== null ||
-    filterRole !== "all" ||
-    filterInvitation !== "all" ||
-    sortKey !== "name";
+  const activeFilterCount = [
+    deptFilterId !== null,
+    filterRole !== "all",
+    filterInvitation !== "all",
+    sortKey !== "name",
+  ].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
 
   function clearFilters() {
     setDeptFilterId(null);
@@ -123,6 +125,7 @@ export function useManagementFilters({
     setSortKey,
     filteredUsers,
     hasActiveFilters,
+    activeFilterCount,
     clearFilters,
   };
 }

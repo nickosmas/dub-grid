@@ -366,7 +366,7 @@ describe("AdminHomeScreen", () => {
       (24 * 60 * 60 * 1000);
     expect(initialSpanDays).toBe(6);
 
-    // One global toggle, in the hero card, drives every card on the page.
+    // One global toggle, at the top of the screen, drives every card on the page.
     fireEvent.click(screen.getByText("2 Weeks"));
 
     const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {

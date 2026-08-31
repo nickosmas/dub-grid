@@ -20,6 +20,7 @@ import {
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
 import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
+import { satisfiesCertificationRequirement } from "@/lib/credential-requirements";
 
 type EmployeeEligibilityInput = Pick<Employee, "certificationId" | "focusAreaIds" | "roleIds">;
 
@@ -83,6 +84,16 @@ function resolvePlacementFocusAreaIds(
   return departmentFocusAreas
     .filter((focusAreaId) => explicitFocusAreaIds.has(focusAreaId))
     .sort((left, right) => left - right);
+}
+
+function hasCompleteDefaultShiftPlacement(
+  job: Pick<JobDefinition, "departmentIds" | "focusAreaIds" | "focusAreaId" | "applicableShiftIds">,
+): boolean {
+  return (
+    getStoredJobDepartmentIds(job).length > 0 &&
+    getStoredJobFocusAreaIds(job).length > 0 &&
+    normalizePlacementIds(job.applicableShiftIds).length > 0
+  );
 }
 
 function buildScheduleAssignmentValues(
@@ -400,6 +411,10 @@ function isAssignmentDefinitionBackedByCurrentJobs(input: {
     return false;
   }
 
+  if (isDefaultShiftSystemJob(job) && !hasCompleteDefaultShiftPlacement(job)) {
+    return false;
+  }
+
   const assignmentMode = job.assignmentMode ?? (shift == null ? "shiftless" : "with_shift");
   const hasPlacementConstraints =
     job.focusAreaId != null ||
@@ -519,17 +534,24 @@ export function isEmployeeQualifiedForJob(
   > | null,
   fallbackRequiredCertificationIds: number[] = [],
   orgRoles?: NamedItem[],
+  certifications?: NamedItem[],
 ): boolean {
   const requiredCertificationIds = job?.requiredCertificationIds?.length
     ? job.requiredCertificationIds
     : fallbackRequiredCertificationIds;
   const eligibleRoleIds = getScheduleEligibleRoleIds(job, orgRoles);
 
-  const rolesOk =
-    eligibleRoleIds.length === 0 || eligibleRoleIds.some((roleId) => emp.roleIds.includes(roleId));
-  const certificationsOk =
-    requiredCertificationIds.length === 0 ||
-    (emp.certificationId != null && requiredCertificationIds.includes(emp.certificationId));
+  // Without the ladder lists the maps are empty, which makes both gates fall
+  // back to plain membership. That is exactly the pre-ladder behavior, and the
+  // server stays the authority either way.
+  const rolesOk = satisfiesCertificationRequirement({
+    heldIds: emp.roleIds,
+    requiredIds: eligibleRoleIds,
+  });
+  const certificationsOk = satisfiesCertificationRequirement({
+    heldIds: [emp.certificationId ?? null],
+    requiredIds: requiredCertificationIds,
+  });
   const hasRoleGate = eligibleRoleIds.length > 0;
   const hasCertificationGate = requiredCertificationIds.length > 0;
 
@@ -553,6 +575,7 @@ export function getAssignableShiftDisqualificationReasons(
     roleNames?: Map<number, string>;
     certificationNames?: Map<number, string>;
     orgRoles?: NamedItem[];
+    certifications?: NamedItem[];
   },
 ): string[] {
   const reasons: string[] = [];
@@ -571,7 +594,10 @@ export function getAssignableShiftDisqualificationReasons(
     }
 
     const roleNames = getRequirementNames(eligibleRoleIds, input.roleNames);
-    return eligibleRoleIds.some((roleId) => emp.roleIds.includes(roleId))
+    return satisfiesCertificationRequirement({
+      heldIds: emp.roleIds,
+      requiredIds: eligibleRoleIds,
+    })
       ? null
       : roleNames
         ? `the ${roleNames.join(" or ")} role`
@@ -581,19 +607,20 @@ export function getAssignableShiftDisqualificationReasons(
   const requiredCertificationIds = input.job?.requiredCertificationIds?.length
     ? input.job.requiredCertificationIds
     : (input.fallbackRequiredCertificationIds ?? []);
-  const certificationReason =
-    requiredCertificationIds.length > 0 &&
-    (emp.certificationId == null || !requiredCertificationIds.includes(emp.certificationId))
-      ? (() => {
-          const certificationNames = getRequirementNames(
-            requiredCertificationIds,
-            input.certificationNames,
-          );
-          return certificationNames
-            ? `${certificationNames.join(" or ")} certification`
-            : "a required certification";
-        })()
-      : null;
+  const certificationReason = !satisfiesCertificationRequirement({
+    heldIds: [emp.certificationId ?? null],
+    requiredIds: requiredCertificationIds,
+  })
+    ? (() => {
+        const certificationNames = getRequirementNames(
+          requiredCertificationIds,
+          input.certificationNames,
+        );
+        return certificationNames
+          ? `${certificationNames.join(" or ")} certification`
+          : "a required certification";
+      })()
+    : null;
 
   if (roleReason && certificationReason) {
     if (getJobEligibilityMode(input.job) === "or") {
@@ -620,6 +647,7 @@ export function isEmployeeQualifiedForAssignableShift(
     > | null;
     fallbackRequiredCertificationIds?: number[];
     orgRoles?: NamedItem[];
+    certifications?: NamedItem[];
   },
 ): boolean {
   const areaOk = !input.shift?.focusAreaId || emp.focusAreaIds.includes(input.shift.focusAreaId);
@@ -631,6 +659,7 @@ export function isEmployeeQualifiedForAssignableShift(
       input.job,
       input.fallbackRequiredCertificationIds ?? [],
       input.orgRoles,
+      input.certifications,
     )
   );
 }
@@ -767,6 +796,17 @@ export function formatAssignableShiftOptionLabel(
     : option.primaryLabel;
 }
 
+/**
+ * Resolves assignment ids through a display-label map, for surfaces that only
+ * have ids (not the richer segments `joinShiftJobSegmentNames` prefers).
+ * Returns "" when any id is missing from the map, so callers can fall through
+ * to their next-best label.
+ */
+export function joinAssignmentNames(ids: number[], nameMap: Map<number, string>): string {
+  const names = ids.map((id) => nameMap.get(id)).filter((name): name is string => Boolean(name));
+  return names.length === ids.length ? names.join(" / ") : "";
+}
+
 export function buildAssignableShiftDisplayMap(
   input: Omit<BuildAssignableShiftOptionsInput, "employee">,
 ): Map<number, string> {
@@ -800,6 +840,7 @@ export function isEmployeeQualifiedForAssignmentDefinition(
     shiftCategories: ShiftCategory[];
     jobs: JobDefinition[];
     orgRoles?: NamedItem[];
+    certifications?: NamedItem[];
   },
 ): boolean {
   const shiftId = input.assignment.shiftId ?? input.assignment.categoryId ?? null;
@@ -817,6 +858,7 @@ export function isEmployeeQualifiedForAssignmentDefinition(
     job,
     fallbackRequiredCertificationIds: input.assignment.requiredCertificationIds ?? [],
     orgRoles: input.orgRoles,
+    certifications: input.certifications,
   });
 }
 
@@ -827,6 +869,7 @@ export function getAssignmentDefinitionDisqualificationReasons(
     shiftCategories: ShiftCategory[];
     jobs: JobDefinition[];
     orgRoles?: NamedItem[];
+    certifications?: NamedItem[];
     focusAreaNames?: Map<number, string>;
     roleNames?: Map<number, string>;
     certificationNames?: Map<number, string>;
@@ -848,6 +891,7 @@ export function getAssignmentDefinitionDisqualificationReasons(
     fallbackRequiredCertificationIds: input.assignment.requiredCertificationIds ?? [],
     focusAreaNames: input.focusAreaNames,
     orgRoles: input.orgRoles,
+    certifications: input.certifications,
     roleNames: input.roleNames,
     certificationNames: input.certificationNames,
   });

@@ -1204,28 +1204,35 @@ export async function updateMobileEmployeeDetailsRow(
     roleIds: number[];
     departmentIds: number[];
     employmentType?: DbEmployee["employment_type"];
+    audit?: {
+      actorEmail: string | null;
+      actorId: string;
+      details?: Record<string, unknown>;
+      ipAddress: string | null;
+      userAgent: string | null;
+    };
   },
 ): Promise<DbEmployee | null> {
-  const { data, error } = await serviceClient
-    .from("employees")
-    .update({
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone: input.phone,
-      email: input.email,
-      contact_notes: input.contactNotes,
-      certification_id: input.certificationId,
-      focus_area_ids: input.focusAreaIds,
-      role_ids: input.roleIds,
-      department_ids: input.departmentIds,
-      ...(input.employmentType ? { employment_type: input.employmentType } : {}),
-      version: input.expectedVersion + 1,
-    })
-    .eq("id", input.employeeId)
-    .eq("org_id", input.orgId)
-    .eq("version", input.expectedVersion)
-    .select(EMPLOYEE_COLS)
-    .maybeSingle();
+  const { data, error } = await serviceClient.rpc("update_mobile_employee_with_audit", {
+    p_actor_email: input.audit?.actorEmail ?? null,
+    p_actor_id: input.audit?.actorId ?? null,
+    p_audit_details: input.audit?.details ?? null,
+    p_certification_id: input.certificationId,
+    p_contact_notes: input.contactNotes,
+    p_department_ids: input.departmentIds,
+    p_email: input.email,
+    p_employee_id: input.employeeId,
+    p_employment_type: input.employmentType ?? null,
+    p_expected_version: input.expectedVersion,
+    p_first_name: input.firstName,
+    p_focus_area_ids: input.focusAreaIds,
+    p_ip_address: input.audit?.ipAddress ?? null,
+    p_last_name: input.lastName,
+    p_org_id: input.orgId,
+    p_phone: input.phone,
+    p_role_ids: input.roleIds,
+    p_user_agent: input.audit?.userAgent ?? null,
+  });
 
   if (error) {
     throw error;
@@ -1529,7 +1536,15 @@ export async function insertMobileAuditLogEntry(
   const { error } = await serviceClient.from("audit_log").insert(input);
 
   if (error) {
-    throw error;
+    // The mutation has already committed by the time this best-effort activity
+    // write runs. Do not report a failed employee/schedule update after it has
+    // succeeded merely because its non-critical audit entry could not be saved.
+    console.error("Mobile activity-log write failed", {
+      action: input.action,
+      orgId: input.org_id,
+      resourceType: input.resource_type,
+      error,
+    });
   }
 }
 

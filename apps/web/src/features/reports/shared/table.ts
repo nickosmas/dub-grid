@@ -80,8 +80,8 @@ export function formatReportCellForDisplay(value: OperationsReportCell): string 
   return formatKnownReportValue(value);
 }
 
-function formatListValue(value: string, emptyLabel: string): string {
-  return value.trim() ? value : emptyLabel;
+function formatListValue(value: string | null | undefined, emptyLabel: string): string {
+  return value?.trim() ? value : emptyLabel;
 }
 
 function formatContactValue(value: string, emptyLabel: string): string {
@@ -155,6 +155,8 @@ export function buildOperationsReportPreviewTable(
           { label: "Scheduled hours" },
           { label: "Shifts worked" },
           { label: "Days worked" },
+          { label: "Shift breakdown" },
+          { label: "Job breakdown" },
           { label: "Absence days" },
           { label: "Overtime hours" },
         ],
@@ -165,10 +167,85 @@ export function buildOperationsReportPreviewTable(
             row.scheduledHours,
             row.shiftCount,
             row.workedDays,
+            formatListValue(row.shiftBreakdown, "No categorized shifts"),
+            formatListValue(row.jobBreakdown, "No jobs"),
             row.absenceCount,
             row.overtimeHours,
           ]),
         emptyText: "No published schedule for this range.",
+      };
+    case "staff-activity":
+      return {
+        title: "Staff activity",
+        columns: [
+          { label: "Staff member" },
+          { label: "Scheduled hours" },
+          { label: "Shift assignments" },
+          { label: "Work days" },
+          { label: "Shift breakdown" },
+          { label: "Job breakdown" },
+          { label: "Published off days" },
+          { label: "Unscheduled days" },
+          { label: "Approved impact" },
+          { label: "All request activity" },
+          { label: "Request breakdown" },
+        ],
+        rows: payload.reports.staffActivity.summaries.map((row) => [
+          row.employeeName,
+          row.scheduledHours,
+          row.shiftCount,
+          row.workedDays,
+          formatListValue(row.shiftBreakdown, "No categorized shifts"),
+          formatListValue(row.jobBreakdown, "No jobs"),
+          row.publishedAbsenceDays,
+          row.unscheduledDays,
+          row.approvedImpactCount,
+          row.allRequestCount,
+          formatListValue(row.requestBreakdown, "No request activity"),
+        ]),
+        emptyText: "No staff activity for this range.",
+      };
+    case "mentoring-hours":
+      return {
+        title: "Mentoring hours",
+        columns: [
+          { label: "Staff member" },
+          { label: "Mentoring hours" },
+          { label: "Mentored assignments" },
+          { label: "Mentored days" },
+        ],
+        rows: payload.reports.mentoringHours.map((row) => [
+          row.employeeName,
+          row.mentoringHours,
+          row.mentoredAssignmentCount,
+          row.mentoredDays,
+        ]),
+        emptyText: "No published mentored assignments for this range.",
+      };
+    case "mentoring-detail":
+      return {
+        title: "Mentoring detail",
+        columns: [
+          { label: "Staff member" },
+          { label: "Date" },
+          { label: "Focus area" },
+          { label: "Shift" },
+          { label: "Job" },
+          { label: "Start time" },
+          { label: "End time" },
+          { label: "Mentoring hours" },
+        ],
+        rows: payload.reports.mentoringDetail.map((row) => [
+          row.employeeName,
+          formatReportDateForDisplay(row.date),
+          row.focusArea,
+          row.shift,
+          row.job,
+          formatListValue(row.startTime, "Not set"),
+          formatListValue(row.endTime, "Not set"),
+          row.mentoringHours,
+        ]),
+        emptyText: "No published mentored assignments for this range.",
       };
     case "coverage":
       return {
@@ -369,6 +446,37 @@ export function buildOperationsReportMetrics(
         { label: "Shifts", value: String(summary.totalShifts) },
         { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
       ];
+    case "staff-activity": {
+      const summaries = payload.reports.staffActivity.summaries;
+      return [
+        { label: "Staff", value: String(summaries.length) },
+        {
+          label: "Scheduled hours",
+          value: String(summaries.reduce((sum, row) => sum + row.scheduledHours, 0)),
+        },
+        {
+          label: "Approved impact",
+          value: String(summaries.reduce((sum, row) => sum + row.approvedImpactCount, 0)),
+        },
+        {
+          label: "All request activity",
+          value: String(summaries.reduce((sum, row) => sum + row.allRequestCount, 0)),
+        },
+      ];
+    }
+    case "mentoring-hours":
+    case "mentoring-detail": {
+      const totalMentoringHours = payload.reports.mentoringHours.reduce(
+        (sum, row) => sum + row.mentoringHours,
+        0,
+      );
+      const mentoredAssignmentCount = payload.reports.mentoringDetail.length;
+      return [
+        { label: "Mentoring hours", value: String(totalMentoringHours) },
+        { label: "Staff mentored", value: String(payload.reports.mentoringHours.length) },
+        { label: "Mentored assignments", value: String(mentoredAssignmentCount) },
+      ];
+    }
     case "coverage":
       return [
         {

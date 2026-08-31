@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPageContent from "./DashboardPageContent";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
@@ -62,6 +63,17 @@ const organizationData = {
   loadError: null,
 };
 
+function renderDashboard() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DashboardPageContent />
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(usePermissions).mockReturnValue({ ...basePermissions } as ReturnType<
@@ -84,7 +96,7 @@ describe("DashboardPageContent", () => {
       isManagementUser: true,
     } as ReturnType<typeof usePermissions>);
 
-    render(<DashboardPageContent />);
+    renderDashboard();
 
     expect(mockReplace).toHaveBeenCalledWith("/schedule");
     expect(screen.queryByTestId("dashboard-view")).not.toBeInTheDocument();
@@ -97,7 +109,7 @@ describe("DashboardPageContent", () => {
       isManagementUser: true,
     } as ReturnType<typeof usePermissions>);
 
-    render(<DashboardPageContent />);
+    renderDashboard();
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
@@ -111,7 +123,7 @@ describe("DashboardPageContent", () => {
       isManagementUser: true,
     } as ReturnType<typeof usePermissions>);
 
-    render(<DashboardPageContent />);
+    renderDashboard();
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();

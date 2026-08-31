@@ -41,6 +41,7 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
 }
 
 const baseProps = {
+  contactEmail: null,
   departments,
   departmentLabel: "Departments",
   canManageScheduleEmployees: false,

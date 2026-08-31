@@ -48,6 +48,8 @@ export interface CoverageStatus {
 export interface CoverageShortageDetail {
   assignmentId: number;
   assignmentLabel: string;
+  /** Full (never abbreviated) name, for surfaces outside the grid. */
+  assignmentFullName: string;
   required: number;
   actual: number;
   shortage: number;
@@ -64,6 +66,8 @@ export interface CoverageGap {
   assignmentId: number;
   ruleLabel: string;
   assignmentLabel: string;
+  /** Full (never abbreviated) name, for surfaces outside the grid. */
+  assignmentFullName: string;
   eligibleAssignmentDefinitionIds: number[];
   preferredOpenAssignmentDefinitionId: number;
   shiftCategoryId: number;
@@ -312,6 +316,8 @@ export interface CoverageComputationInput {
   assignmentIdsForKey: (empId: string, date: Date) => number[];
   assignmentIdsByFocusArea: Map<number, Set<number>>;
   assignmentLabelMap?: Map<number, string>;
+  /** Name-mode label map for `assignmentFullName`; falls back to `assignmentLabelMap` when omitted. */
+  assignmentNameMap?: Map<number, string>;
   coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
 }
 
@@ -328,6 +334,7 @@ export function computeCoverageCategorySnapshots(
     assignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    assignmentNameMap,
     coverageCreditForKey,
   } = input;
   const snapshots: CoverageCategorySnapshot[] = [];
@@ -413,6 +420,10 @@ export function computeCoverageCategorySnapshots(
             shortageDetails.push({
               assignmentId: assignmentId,
               assignmentLabel: getAssignmentDisplayLabel(assignment, assignmentLabelMap),
+              assignmentFullName: getAssignmentDisplayLabel(
+                assignment,
+                assignmentNameMap ?? assignmentLabelMap,
+              ),
               required: requirement.minStaff,
               actual: exactStatus.actual,
               shortage,
@@ -512,6 +523,10 @@ export function computeCoverageCategorySnapshots(
         });
         const shortage = Math.max(resolvedRequirement.minStaff - status.actual, 0);
         const displayLabel = getAssignmentDisplayLabel(assignment, assignmentLabelMap);
+        const displayFullName = getAssignmentDisplayLabel(
+          assignment,
+          assignmentNameMap ?? assignmentLabelMap,
+        );
 
         snapshots.push({
           focusAreaId: focusArea.id,
@@ -530,6 +545,7 @@ export function computeCoverageCategorySnapshots(
                   {
                     assignmentId: assignment.id,
                     assignmentLabel: displayLabel,
+                    assignmentFullName: displayFullName,
                     required: resolvedRequirement.minStaff,
                     actual: status.actual,
                     shortage,
@@ -545,10 +561,12 @@ export function computeCoverageCategorySnapshots(
 }
 
 /**
- * Computes all category-level coverage gaps across all focus areas and dates.
+ * Turns unmet coverage snapshots into gap records. Extracted from
+ * `computeCoverageGaps` so callers that already have snapshots (e.g.
+ * `assembleDashboardCoverage`) can derive gaps without recomputing them.
  */
-export function computeCoverageGaps(input: CoverageComputationInput): CoverageGap[] {
-  return computeCoverageCategorySnapshots(input)
+export function snapshotsToGaps(snapshots: ReadonlyArray<CoverageCategorySnapshot>): CoverageGap[] {
+  return snapshots
     .filter((snapshot) => snapshot.status.hasRequirement && !snapshot.status.isMet)
     .map((snapshot) => ({
       focusAreaId: snapshot.focusAreaId,
@@ -557,6 +575,8 @@ export function computeCoverageGaps(input: CoverageComputationInput): CoverageGa
       assignmentId: snapshot.preferredOpenAssignmentDefinitionId,
       ruleLabel: snapshot.shortageDetails[0]?.assignmentLabel ?? snapshot.shiftCategoryName,
       assignmentLabel: snapshot.shortageDetails[0]?.assignmentLabel ?? snapshot.shiftCategoryName,
+      assignmentFullName:
+        snapshot.shortageDetails[0]?.assignmentFullName ?? snapshot.shiftCategoryName,
       eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
       preferredOpenAssignmentDefinitionId: snapshot.preferredOpenAssignmentDefinitionId,
       shiftCategoryId: snapshot.shiftCategoryId,
@@ -565,6 +585,13 @@ export function computeCoverageGaps(input: CoverageComputationInput): CoverageGa
       status: snapshot.status,
       shortageDetails: snapshot.shortageDetails,
     }));
+}
+
+/**
+ * Computes all category-level coverage gaps across all focus areas and dates.
+ */
+export function computeCoverageGaps(input: CoverageComputationInput): CoverageGap[] {
+  return snapshotsToGaps(computeCoverageCategorySnapshots(input));
 }
 
 // ── Aggregation helpers ─────────────────────────────────────────────────────

@@ -5,10 +5,7 @@ import { Organization } from "@/types";
 import { Button } from "@/components/Button";
 import { DEFAULT_OPEN_SHIFT_VISIBILITY, type OpenShiftVisibilityMode } from "@dubgrid/domain";
 import { toast } from "sonner";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
@@ -78,42 +75,43 @@ export default function ScheduleRules({
 
     setSaving(true);
     try {
-      const updated = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        enforceConflictPrevention,
-        payPeriodStartDate: payPeriodStartDate || null,
-        coverageRuleConfig: {
-          ...(organization.coverageRuleConfig ?? {}),
-          mentoredCoverageCreditPercent,
-        },
-        openShiftVisibility: {
-          coverageGap: coverageGapVisibility,
-          calloff: calloffVisibility,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          enforceConflictPrevention,
+          payPeriodStartDate: payPeriodStartDate || null,
+          coverageRuleConfig: {
+            ...(organization.coverageRuleConfig ?? {}),
+            mentoredCoverageCreditPercent,
+          },
+          openShiftVisibility: {
+            coverageGap: coverageGapVisibility,
+            calloff: calloffVisibility,
+          },
         },
       });
-      onOrganizationSave(updated);
-      toast.success("Schedule rules saved");
-    } catch (err) {
-      if (err instanceof OrganizationSettingsConflictError) {
-        onOrganizationSave(err.latestOrganization);
-        setEnforceConflictPrevention(err.latestOrganization.enforceConflictPrevention);
-        setPayPeriodStartDate(err.latestOrganization.payPeriodStartDate ?? "");
+      onOrganizationSave(result.organization);
+      if (result.status === "changed_elsewhere") {
+        setEnforceConflictPrevention(result.organization.enforceConflictPrevention);
+        setPayPeriodStartDate(result.organization.payPeriodStartDate ?? "");
         setMentoredCoverageCreditPercent(
-          err.latestOrganization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100,
+          result.organization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100,
         );
         setCoverageGapVisibility(
-          err.latestOrganization.openShiftVisibility?.coverageGap ??
+          result.organization.openShiftVisibility?.coverageGap ??
             DEFAULT_OPEN_SHIFT_VISIBILITY.coverageGap,
         );
         setCalloffVisibility(
-          err.latestOrganization.openShiftVisibility?.calloff ??
-            DEFAULT_OPEN_SHIFT_VISIBILITY.calloff,
+          result.organization.openShiftVisibility?.calloff ?? DEFAULT_OPEN_SHIFT_VISIBILITY.calloff,
         );
-        toast.error("Schedule rules changed elsewhere. Review the latest values and try again.");
+        toast.info("Schedule rules were refreshed to the latest saved values.");
       } else {
-        toast.error("We couldn't save that setting. Try again.");
+        toast.success("Schedule rules saved");
       }
+    } catch (err) {
+      toast.error("We couldn't save that setting. Try again.");
     } finally {
       setSaving(false);
       setConfirmOpen(false);

@@ -60,7 +60,6 @@ export function CoverageBySectionCard({
   return (
     <Card
       title={title}
-      icon="stats-chart-outline"
       headerAccessory={
         totalOpenSlots > 0 ? (
           <CountBadge label={`${totalOpenSlots} open`} tone="warning" />

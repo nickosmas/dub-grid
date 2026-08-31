@@ -1,24 +1,17 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/Button";
 import { Badge } from "@/components/ui/badge";
+import type { ReactNode } from "react";
 import type { Employee } from "@/types";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 
 interface StaffDetailHeaderProps {
   employee: Employee;
-  canEditDetails: boolean;
-  showManagementPanel: boolean;
-  onToggleEditDetails: () => void;
+  actions?: ReactNode;
 }
 
-export function StaffDetailHeader({
-  employee,
-  canEditDetails,
-  showManagementPanel,
-  onToggleEditDetails,
-}: StaffDetailHeaderProps) {
+export function StaffDetailHeader({ employee, actions }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
 
@@ -50,60 +43,46 @@ export function StaffDetailHeader({
   }[employee.status];
 
   return (
-    <div className="dg-card">
-      <div className="p-4 md:p-5">
-        <div className="flex flex-col gap-4 sm:gap-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-16 w-16 shrink-0 ring-1 ring-[var(--dg-color-border)]">
-                <AvatarFallback className="bg-[var(--dg-color-bg-secondary)] text-xl font-bold text-[var(--dg-color-text-secondary)]">
-                  {getInitials(displayName)}
-                </AvatarFallback>
-              </Avatar>
+    <header className="pb-2">
+      <div className="flex flex-col gap-4 sm:gap-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <Avatar className="h-16 w-16 shrink-0 ring-1 ring-[var(--dg-color-border)]">
+              <AvatarFallback className="bg-[var(--dg-color-bg-secondary)] text-xl font-bold text-[var(--dg-color-text-secondary)]">
+                {getInitials(displayName)}
+              </AvatarFallback>
+            </Avatar>
 
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="px-2 font-semibold"
-                    style={statusConfig.style}
-                  >
-                    {statusConfig.label}
-                  </Badge>
-                  <span
-                    className="font-mono text-[13px] font-medium text-[var(--dg-color-text-faint)]"
-                    aria-label="Employee ID"
-                  >
-                    #{employee.employeeNumber}
-                  </span>
-                </div>
-
-                <h1 className="mt-3 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
-                  {displayName}
-                </h1>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="px-2 font-semibold" style={statusConfig.style}>
+                  {statusConfig.label}
+                </Badge>
+                <span
+                  className="font-mono text-[13px] font-medium text-[var(--dg-color-text-faint)]"
+                  aria-label="Employee ID"
+                >
+                  #{employee.employeeNumber}
+                </span>
               </div>
+
+              <h1 className="mt-3 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+                {displayName}
+              </h1>
             </div>
-
-            {canEditDetails ? (
-              <Button
-                type="button"
-                onClick={onToggleEditDetails}
-                className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-              >
-                {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
-              </Button>
-            ) : null}
           </div>
 
-          <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
-            <BioField label="Email" value={employee.email || "—"} />
-            <BioField label="Phone" value={employee.phone || "—"} />
-            <BioField label="Employment" value={employmentLabel} />
-            <BioField label="Employee ID" value={`#${employee.employeeNumber}`} />
-          </div>
+          <div className="flex items-center gap-2 self-start">{actions}</div>
+        </div>
+
+        <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
+          <BioField label="Email" value={employee.email || "—"} />
+          <BioField label="Phone" value={employee.phone || "—"} />
+          <BioField label="Employment" value={employmentLabel} />
+          <BioField label="Employee ID" value={`#${employee.employeeNumber}`} />
         </div>
       </div>
-    </div>
+    </header>
   );
 }
 

@@ -4,12 +4,10 @@ import {
   SkeletonCardSurface,
   SkeletonCircle,
   SkeletonGroup,
-  SkeletonIcon,
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
-import { CARD_ICON_FRAME_SIZE } from "../../../shared/components/Screen";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -84,10 +82,10 @@ function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
 }
 
 /**
- * One dashboard card: the 32pt icon frame, its title, and N rows.
+ * One dashboard card: the title above the surface, then N rows inside it.
  *
- * Mirrors the shared `Card` header, whose copy column carries the icon's
- * min-height so a one-line title sits optically centred against it.
+ * Mirrors the shared `Card`, whose header now sits above the white surface
+ * rather than inside it.
  */
 function DashboardCardSkeleton({
   rows,
@@ -102,19 +100,20 @@ function DashboardCardSkeleton({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <SkeletonCardSurface>
+    <View style={styles.cardGroup}>
       <View style={styles.cardHeader}>
-        <SkeletonIcon size={CARD_ICON_FRAME_SIZE} />
         <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="sectionTitle" width={titleWidth} />
+          <SkeletonLine variant="screenTitle" width={titleWidth} />
         </View>
       </View>
-      <View style={styles.cardList}>
-        {skeletonRows(rows, (index) => (
-          <DashboardRow key={`dashboard-row-${index}`} variant={variant} />
-        ))}
-      </View>
-    </SkeletonCardSurface>
+      <SkeletonCardSurface>
+        <View style={styles.cardList}>
+          {skeletonRows(rows, (index) => (
+            <DashboardRow key={`dashboard-row-${index}`} variant={variant} />
+          ))}
+        </View>
+      </SkeletonCardSurface>
+    </View>
   );
 }
 
@@ -125,13 +124,9 @@ function DashboardHeroSkeleton() {
 
   return (
     <View style={styles.heroCard}>
-      <View style={styles.heroHeader}>
-        <View style={styles.heroCopy}>
-          <SkeletonPill height={22} width={92} />
-          <SkeletonLine variant="sectionTitle" width={180} />
-        </View>
-        {/* PeriodToggle is a SegmentedControl at size="sm" — 30pt, pill. */}
-        <SkeletonPill height={30} width={164} />
+      <View style={styles.heroCopy}>
+        <SkeletonPill height={22} width={92} />
+        <SkeletonLine variant="sectionTitle" width={180} />
       </View>
       <View style={styles.tileRow}>
         {skeletonRows(3, (index) => (
@@ -155,24 +150,25 @@ function MyScheduleSkeleton() {
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <SkeletonCardSurface>
+    <View style={styles.cardGroup}>
       <View style={styles.cardHeader}>
-        <SkeletonIcon size={CARD_ICON_FRAME_SIZE} />
         <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="sectionTitle" width="42%" />
+          <SkeletonLine variant="screenTitle" width="42%" />
         </View>
         {/* ExpandButton: iconOnly Button at size="sm" — 36pt circle. */}
         <SkeletonCircle size={36} />
       </View>
-      <View style={styles.dayStrip}>
-        {skeletonRows(3, (index) => (
-          <View key={`schedule-day-${index}`} style={styles.dayCard}>
-            <SkeletonLine variant="label" width="70%" />
-            <View style={styles.shiftPill} />
-          </View>
-        ))}
-      </View>
-    </SkeletonCardSurface>
+      <SkeletonCardSurface>
+        <View style={styles.dayStrip}>
+          {skeletonRows(3, (index) => (
+            <View key={`schedule-day-${index}`} style={styles.dayCard}>
+              <SkeletonLine variant="label" width="70%" />
+              <View style={styles.shiftPill} />
+            </View>
+          ))}
+        </View>
+      </SkeletonCardSurface>
+    </View>
   );
 }
 
@@ -195,6 +191,8 @@ export function DashboardSkeleton({
 
   return (
     <SkeletonGroup style={styles.page}>
+      {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
+      <SkeletonPill height={36} width={180} />
       <DashboardHeroSkeleton />
       {showActionQueue ? <DashboardCardSkeleton rows={2} variant="badgeLead" /> : null}
       {showMySchedule ? <MyScheduleSkeleton /> : null}
@@ -268,14 +266,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.lg,
       padding: mobileSpace.xl,
     },
-    heroHeader: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: mobileSpace.md,
-      justifyContent: "space-between",
-    },
     heroCopy: {
-      flexShrink: 1,
       gap: 6,
     },
     tileRow: {
@@ -305,15 +296,17 @@ const createStyles = (mobileColors: MobileColors) =>
       marginRight: -4,
       marginTop: -4,
     },
+    cardGroup: {
+      gap: mobileSpace.md,
+    },
     cardHeader: {
-      alignItems: "flex-start",
+      alignItems: "center",
       flexDirection: "row",
       gap: mobileSpace.md,
     },
     cardHeaderCopy: {
       flex: 1,
       justifyContent: "center",
-      minHeight: CARD_ICON_FRAME_SIZE,
     },
     cardList: {
       gap: 10,

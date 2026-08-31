@@ -14,6 +14,7 @@ import { toastToneTokens } from "@dubgrid/design-tokens";
 import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
+import { useNetworkRecovery } from "./NetworkRecoveryProvider";
 import { useMobileColors } from "./ThemeModeProvider";
 import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
 
@@ -97,6 +98,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
   const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
   const { isOffline } = useNetworkStatus();
+  const { isNetworkRecoveryActive } = useNetworkRecovery();
   const idRef = useRef(0);
   const swipeStartYRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
@@ -257,7 +259,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {isOffline && !isOfflineBannerDismissed ? (
+      {isOffline && !isNetworkRecoveryActive && !isOfflineBannerDismissed ? (
         <View pointerEvents="box-none" style={styles.host}>
           <View
             testID="offline-toast"

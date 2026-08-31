@@ -1,8 +1,27 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
+const useAccessToken = vi.fn();
+const useBootstrap = vi.fn();
+
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
+vi.mock("expo-router", () => ({
+  router: { push: vi.fn() },
+}));
+
+vi.mock("../../auth/hooks/useAccessToken", () => ({
+  useAccessToken,
+}));
+
+vi.mock("../../auth/hooks/useBootstrap", () => ({
+  useBootstrap,
+}));
 
 let DashboardHeader: (typeof import("./DashboardHeader"))["DashboardHeader"];
 
@@ -11,6 +30,11 @@ beforeAll(async () => {
 });
 
 describe("DashboardHeader", () => {
+  beforeEach(() => {
+    useAccessToken.mockReturnValue("token-123");
+    useBootstrap.mockReturnValue({ data: { unreadNotificationCount: 0 } });
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -78,7 +102,7 @@ describe("DashboardHeader", () => {
     expect(screen.getByText(/Acme Care/)).toBeInTheDocument();
   });
 
-  it("shows the period date range separated from the time by a |", () => {
+  it("shows the period date range separated from the org name by a |", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
     render(
@@ -90,7 +114,7 @@ describe("DashboardHeader", () => {
       />,
     );
 
-    expect(screen.getByText(/Acme Care · .* \| Jul 5–11, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Acme Care \| Jul 5–11, 2026/)).toBeInTheDocument();
   });
 
   it("omits the | separator entirely when no period label is given", () => {
@@ -101,5 +125,15 @@ describe("DashboardHeader", () => {
     );
 
     expect(screen.queryByText(/\|/)).not.toBeInTheDocument();
+  });
+
+  it("shows the alerts bell button", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    render(
+      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open alerts" })).toBeInTheDocument();
   });
 });

@@ -41,26 +41,37 @@ type RefreshedInvitation = {
  * blocks a retry. Instead of erroring, refresh that pending row (rotate its token, extend
  * expiry) and return it so the caller re-sends the email. Idempotent: the partial unique
  * index guarantees at most one pending row per (org_id, email), so this updates it in place.
- * Returns null if no pending row is actually found (let the original error surface).
+ *
+ * Scoped to `employeeId` (or explicitly no employee, for management-only invites) so this
+ * only ever "refreshes" a genuine retry of the SAME invite. Without that check, inviting a
+ * different employee with an email that already has a live pending row for someone else
+ * would silently rotate and hand back that other employee's invitation as if it were a
+ * fresh one — the caller believes it just invited person A, but the row (and whoever
+ * accepts it) is actually still person B. Returns null if no matching pending row is found
+ * (let the original "already exists" error surface instead).
  */
 async function refreshPendingInvitation(
   serviceClient: ReturnType<typeof getServiceClient>,
   orgId: string,
   email: string,
+  employeeId: string | null,
 ): Promise<RefreshedInvitation | null> {
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await serviceClient
+  const baseQuery = serviceClient
     .from("invitations")
     .update({ token, expires_at: expiresAt, revoked_at: null })
     .eq("org_id", orgId)
     .ilike("email", email)
     .is("accepted_at", null)
     .is("revoked_at", null)
-    .gte("expires_at", new Date().toISOString())
-    .select("id, token, expires_at")
-    .maybeSingle();
+    .gte("expires_at", new Date().toISOString());
+  const scopedQuery = employeeId
+    ? baseQuery.eq("employee_id", employeeId)
+    : baseQuery.is("employee_id", null);
+
+  const { data, error } = await scopedQuery.select("id, token, expires_at").maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
@@ -208,6 +219,7 @@ export async function POST(req: NextRequest) {
           serviceClient,
           orgId,
           normalizeRequiredStaffEmail(email),
+          employeeId ?? null,
         );
         if (refreshed) {
           return NextResponse.json({ ...refreshed, resent: true });

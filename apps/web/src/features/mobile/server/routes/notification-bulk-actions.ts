@@ -4,7 +4,7 @@ import {
   mobileNotificationBulkBodySchema,
   mobileNotificationBulkResponseSchema,
 } from "@dubgrid/contracts";
-import { bulkMutateMobileNotifications, MobileApiRefreshError } from "@dubgrid/mobile-api-core";
+import { bulkMutateMobileNotifications } from "@dubgrid/mobile-api-core";
 import { requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
@@ -28,15 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await bulkMutateMobileNotifications(auth, parsed.data);
     return NextResponse.json(mobileNotificationBulkResponseSchema.parse(payload));
-  } catch (error) {
-    if (error instanceof MobileApiRefreshError) {
-      return NextResponse.json(
-        {
-          error: "We updated those notifications, but couldn't refresh your unread count.",
-        },
-        { status: 500 },
-      );
-    }
+  } catch {
     return NextResponse.json({ error: "We couldn't update those notifications." }, { status: 400 });
   }
 }

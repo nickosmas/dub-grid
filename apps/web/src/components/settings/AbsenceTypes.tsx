@@ -91,6 +91,7 @@ function AbsenceTypeRow({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
+  const editorId = React.useId();
 
   // Only resync from props when the editor is closed. Preserves the user's
   // in-progress edits across parent re-renders that pass a new `absenceType`
@@ -249,8 +250,11 @@ function AbsenceTypeRow({
         borderBottom: expanded || isLast ? "none" : "1px solid var(--dg-color-border-light)",
       }}
     >
-      <div
+      <Button
+        type="button"
         className="dg-hover-row"
+        aria-expanded={expanded}
+        aria-controls={editorId}
         style={{
           display: "flex",
           alignItems: "center",
@@ -259,44 +263,58 @@ function AbsenceTypeRow({
           borderRadius: 8,
           cursor: "pointer",
           transition: "background 0.15s",
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
         }}
         onClick={toggleExpanded}
       >
-        {!isNameMode &&
-          (() => {
-            const badge = resolveShiftPillColors(
-              { color: form.color, text: form.text, border: form.border },
-              isDarkTheme,
-            );
-            return (
-              <span
-                style={{
-                  display: "inline-block",
-                  minWidth: 44,
-                  padding: "3px 8px",
-                  background: badge.color,
-                  border: `1px solid ${borderColor(badge.text)}`,
-                  color: badge.text,
-                  borderRadius: 8,
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 700,
-                  textAlign: "center",
-                }}
-              >
-                {form.label || "…"}
-              </span>
-            );
-          })()}
-        <span
-          style={{
-            flex: 1,
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 700,
-            color: "var(--dg-color-text-primary)",
-          }}
-        >
-          {form.name || "Untitled absence type"}
-        </span>
+        {(() => {
+          const badge = resolveShiftPillColors(
+            { color: form.color, text: form.text, border: form.border },
+            isDarkTheme,
+          );
+          const previewLabel = isNameMode ? form.name : form.label;
+          return (
+            <span
+              data-absence-type-preview={isNameMode ? "name" : "code"}
+              style={{
+                display: "inline-block",
+                minWidth: 44,
+                maxWidth: isNameMode ? 168 : undefined,
+                marginRight: isNameMode ? "auto" : undefined,
+                overflow: "hidden",
+                padding: "3px 8px",
+                background: badge.color,
+                border: `1px solid ${borderColor(badge.text)}`,
+                color: badge.text,
+                borderRadius: 8,
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 700,
+                lineHeight: 1.2,
+                overflowWrap: isNameMode ? "break-word" : undefined,
+                textAlign: "center",
+                textOverflow: isNameMode ? undefined : "ellipsis",
+                whiteSpace: isNameMode ? "normal" : "nowrap",
+              }}
+            >
+              {previewLabel || "…"}
+            </span>
+          );
+        })()}
+        {!isNameMode && (
+          <span
+            style={{
+              flex: 1,
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+              color: "var(--dg-color-text-primary)",
+            }}
+          >
+            {form.name || "Untitled absence type"}
+          </span>
+        )}
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
@@ -307,10 +325,11 @@ function AbsenceTypeRow({
         >
           ▾
         </span>
-      </div>
+      </Button>
 
       {expanded && (
         <div
+          id={editorId}
           style={{
             background: "var(--dg-color-bg-secondary)",
             borderRadius: "var(--dg-radius-lg)",

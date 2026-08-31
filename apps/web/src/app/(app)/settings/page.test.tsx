@@ -191,6 +191,21 @@ describe("SettingsRoute", () => {
     });
   });
 
+  it("keeps the settings landmark visible while organization data loads", () => {
+    vi.mocked(useOrganizationData).mockReturnValue({
+      ...organizationData,
+      loading: true,
+    } as unknown as ReturnType<typeof useOrganizationData>);
+
+    renderSettingsRoute();
+
+    expect(screen.getByRole("main", { name: "Loading settings" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(screen.queryByText("Settings content")).not.toBeInTheDocument();
+  });
+
   it("renders normal billing inside settings when billing is not locked", async () => {
     mockSection = "org-billing";
     vi.mocked(usePermissions).mockReturnValue({

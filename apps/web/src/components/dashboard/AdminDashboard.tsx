@@ -15,6 +15,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
     sectionCoverage,
     openShifts,
     publishedWindowState,
+    publishHistory,
     activityItems,
     currentHours,
     activeEmployees,
@@ -23,6 +24,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
     currentEmpId,
     currentPeriodShifts,
     assignmentById,
+    assignmentNameMap,
     absenceTypeById,
     jobs,
     shiftCategories,
@@ -47,6 +49,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
         draftTotal,
         currentEmpId,
         onResolve: permissions.canApproveShiftRequests ? shiftRequests.resolve : undefined,
+        assignmentNameMap,
       }),
     [
       currentEmpId,
@@ -55,6 +58,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
       permissions.canApproveShiftRequests,
       shiftRequests.pendingApproval,
       shiftRequests.resolve,
+      assignmentNameMap,
     ],
   );
   const actionableCoverageSections = useMemo(
@@ -113,6 +117,8 @@ export default function AdminDashboard(props: DashboardContentProps) {
             hasRequirements={coverageRequirements.length > 0}
             canManageCoverageRequirements={permissions.canManageCoverageRequirements}
             publishedWindowState={publishedWindowState}
+            publishHistory={publishHistory}
+            orgTimeZone={org.timezone}
             periodLabel={periodLabel}
             onExpand={() => onExpandPanel("coverage")}
           />
@@ -120,6 +126,8 @@ export default function AdminDashboard(props: DashboardContentProps) {
         <OpenShiftsCard
           openShifts={openShifts}
           publishedWindowState={publishedWindowState}
+          publishHistory={publishHistory}
+          orgTimeZone={org.timezone}
           maxVisible={5}
           periodLabel={periodLabel}
           onExpand={() => onExpandPanel("openShifts")}

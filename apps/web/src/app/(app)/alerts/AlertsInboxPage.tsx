@@ -262,7 +262,7 @@ export function InboxView() {
   const [facets, setFacets] = useState<NotificationFacets | null>(null);
   const [cursor, setCursor] = useState<NotificationCursor | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [loadingPage, setLoadingPage] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -808,7 +808,7 @@ function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
         position: "sticky",
         // Park below the sticky app header instead of scrolling under it,
         // which would hide the top status links.
-        top: "calc(var(--header-height) + 16px)",
+        top: "calc(var(--dg-app-shell-header-height) + 16px)",
         display: "flex",
         flexDirection: "column",
         gap: 2,

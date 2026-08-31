@@ -49,6 +49,12 @@ export interface NamedItem {
    * span departments, e.g. an RN covering both Nursing and Emergency.
    */
   departmentIds?: number[];
+  /**
+   * Roles only: certifications that qualify someone for this role. Empty means
+   * no requirement, so the role stays assignable to anyone. An employee holds
+   * one certification, so satisfying this is a membership test.
+   */
+  requiredCertificationIds?: number[];
   /** Non-null when the item has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
@@ -1254,6 +1260,8 @@ export interface GridOpenShift {
   preferredOpenAssignmentDefinitionId?: number;
   ruleLabel?: string;
   assignmentLabel: string;
+  /** Full (never abbreviated) name, for modals and confirmation dialogs outside the grid. */
+  assignmentFullName?: string;
   customStartTime: string | null;
   customEndTime: string | null;
   calledOffBy?: string;

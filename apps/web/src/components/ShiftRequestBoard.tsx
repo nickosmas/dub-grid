@@ -12,6 +12,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
+import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { resolveShiftPillColors, SHIFT_REQUEST_STATUS_COLORS } from "@/lib/colors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ interface ShiftRequestBoardProps {
   onCancel: (requestId: string) => void | Promise<unknown>;
   onClose: () => void;
   absenceTypeMap?: Map<number, AbsenceType>;
+  assignmentNameMap: Map<number, string>;
 }
 
 type Tab = "available" | "mine" | "approval";
@@ -83,6 +85,7 @@ export default function ShiftRequestBoard({
   onCancel,
   onClose,
   absenceTypeMap,
+  assignmentNameMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
   const { resolvedTheme } = useTheme();
@@ -214,11 +217,17 @@ export default function ShiftRequestBoard({
           isDarkTheme,
         )
       : null;
-    // Segments only carry names once the server resolved them; fall back to the
-    // abbreviated label whenever the join comes back empty.
+    // Segments only carry names once the server resolved them; fall back to
+    // resolving the assignment ids through the full-name map, and only then
+    // to the (possibly abbreviated) server-baked label.
     const requesterLabel =
-      joinShiftJobSegmentNames(req.requesterSegments ?? []) || req.requesterShiftLabel;
-    const targetLabel = joinShiftJobSegmentNames(req.targetSegments ?? []) || req.targetShiftLabel;
+      joinShiftJobSegmentNames(req.requesterSegments ?? []) ||
+      joinAssignmentNames(req.requesterAssignmentDefinitionIds, assignmentNameMap) ||
+      req.requesterShiftLabel;
+    const targetLabel =
+      joinShiftJobSegmentNames(req.targetSegments ?? []) ||
+      joinAssignmentNames(req.targetAssignmentDefinitionIds ?? [], assignmentNameMap) ||
+      req.targetShiftLabel;
 
     return (
       <div
@@ -354,7 +363,11 @@ export default function ShiftRequestBoard({
 
   function renderActions(req: ShiftRequest, isOwnRequest: boolean, isTarget: boolean) {
     const actions: React.ReactNode[] = [];
-    const requestLabel = `${req.requesterShiftLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
+    const requesterFullLabel =
+      joinShiftJobSegmentNames(req.requesterSegments ?? []) ||
+      joinAssignmentNames(req.requesterAssignmentDefinitionIds, assignmentNameMap) ||
+      req.requesterShiftLabel;
+    const requestLabel = `${requesterFullLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
 
     // Claim button: open pickup that isn't mine
     if (
@@ -375,7 +388,7 @@ export default function ShiftRequestBoard({
               key: `claim:${req.id}`,
               message: (
                 <>
-                  Claim <strong>{req.requesterShiftLabel}</strong> on{" "}
+                  Claim <strong>{requesterFullLabel}</strong> on{" "}
                   <strong>{formatShiftDate(req.requesterShiftDate)}</strong>? This will be sent for
                   manager approval.
                 </>

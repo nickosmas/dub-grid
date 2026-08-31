@@ -19,6 +19,7 @@ export interface DbOrganization {
   department_label: string | null;
   shift_display_mode: string | null;
   show_shift_detail_hover_cards?: boolean | null;
+  use_compact_role_certification_labels?: boolean | null;
   timezone: string | null;
   pay_period_start_date: string | null;
   archived_at: string | null;

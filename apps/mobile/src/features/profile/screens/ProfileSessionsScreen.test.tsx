@@ -229,6 +229,17 @@ describe("ProfileSessionsScreen", () => {
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
   });
 
+  it("disables signing out other devices when this is the only active session", () => {
+    mockSessions({ active: [currentSession], stale: [] });
+
+    render(<ProfileSessionsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Signing out devices" }));
+
+    expect(screen.getByRole("button", { name: "Sign out other devices" })).toBeDisabled();
+    expect(screen.getByText("No other active devices are signed in.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out everywhere" })).not.toBeDisabled();
+  });
+
   it("collapses stale sessions behind a disclosure instead of listing them", () => {
     mockSessions({ active: [currentSession], stale: [staleSession] });
 

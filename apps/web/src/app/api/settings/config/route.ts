@@ -112,6 +112,162 @@ function chunkNumberIds(ids: number[]): number[][] {
   return chunks;
 }
 
+function sameNumberSet(left: number[] | undefined, right: number[] | undefined): boolean {
+  const a = [...(left ?? [])].sort((x, y) => x - y);
+  const b = [...(right ?? [])].sort((x, y) => x - y);
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function namedItemChanged(
+  existing: NamedItem,
+  next: NamedItem,
+  sortOrder: number,
+  includeScheduleRole: boolean,
+): boolean {
+  return (
+    existing.name !== next.name ||
+    existing.abbr !== next.abbr ||
+    existing.sortOrder !== sortOrder ||
+    !sameNumberSet(existing.departmentIds, next.departmentIds) ||
+    !sameNumberSet(existing.requiredCertificationIds, next.requiredCertificationIds) ||
+    (includeScheduleRole && (existing.isScheduleRole ?? true) !== (next.isScheduleRole ?? true))
+  );
+}
+
+function departmentChanged(
+  existing: Pick<Department, "name" | "abbr" | "type" | "sortOrder"> & {
+    permissions?: unknown;
+  },
+  next: {
+    name: string;
+    abbr: string;
+    type: Department["type"];
+    sortOrder: number;
+    permissions?: unknown;
+  },
+  sortOrder: number,
+): boolean {
+  return (
+    existing.name !== next.name ||
+    existing.abbr !== next.abbr ||
+    existing.type !== next.type ||
+    existing.sortOrder !== sortOrder ||
+    JSON.stringify(existing.permissions ?? null) !== JSON.stringify(next.permissions ?? null)
+  );
+}
+
+type CollectionAuditChange = {
+  field: string;
+  label: string;
+  from?: string | number | boolean;
+  to?: string | number | boolean;
+};
+
+function namedCollectionAuditChanges(
+  existingItems: NamedItem[],
+  items: NamedItem[],
+  noun: string,
+  includeScheduleRole: boolean,
+): CollectionAuditChange[] {
+  const existingById = new Map(existingItems.map((item) => [item.id, item]));
+  const changes: CollectionAuditChange[] = [];
+
+  items.forEach((item, sortOrder) => {
+    const existing = existingById.get(item.id);
+    if (!existing) {
+      changes.push({ field: "name", label: noun, to: item.name });
+      return;
+    }
+    if (existing.name !== item.name) {
+      changes.push({ field: "name", label: `${noun} name`, from: existing.name, to: item.name });
+    }
+    if (existing.abbr !== item.abbr) {
+      changes.push({
+        field: "abbr",
+        label: `${item.name} short code`,
+        from: existing.abbr,
+        to: item.abbr,
+      });
+    }
+    if (existing.sortOrder !== sortOrder) {
+      changes.push({
+        field: "sortOrder",
+        label: `${item.name} position`,
+        from: existing.sortOrder + 1,
+        to: sortOrder + 1,
+      });
+    }
+    if (
+      includeScheduleRole &&
+      (existing.isScheduleRole ?? true) !== (item.isScheduleRole ?? true)
+    ) {
+      changes.push({
+        field: "isScheduleRole",
+        label: `${item.name} schedule eligibility`,
+        from: existing.isScheduleRole ?? true,
+        to: item.isScheduleRole ?? true,
+      });
+    }
+  });
+
+  const retainedIds = new Set(items.filter((item) => item.id > 0).map((item) => item.id));
+  for (const item of existingItems) {
+    if (!retainedIds.has(item.id)) {
+      changes.push({ field: "name", label: noun, from: item.name });
+    }
+  }
+  return changes;
+}
+
+function departmentCollectionAuditChanges(
+  existingItems: Array<Pick<Department, "id" | "name" | "abbr" | "type" | "sortOrder">>,
+  items: Array<Pick<Department, "id" | "name" | "abbr" | "type" | "sortOrder">>,
+): CollectionAuditChange[] {
+  const existingById = new Map(existingItems.map((item) => [item.id, item]));
+  const changes: CollectionAuditChange[] = [];
+  items.forEach((item, sortOrder) => {
+    const existing = existingById.get(item.id);
+    if (!existing) {
+      changes.push({ field: "name", label: "Department", to: item.name });
+      return;
+    }
+    if (existing.name !== item.name) {
+      changes.push({ field: "name", label: "Department name", from: existing.name, to: item.name });
+    }
+    if (existing.abbr !== item.abbr) {
+      changes.push({
+        field: "abbr",
+        label: `${item.name} short code`,
+        from: existing.abbr,
+        to: item.abbr,
+      });
+    }
+    if (existing.type !== item.type) {
+      changes.push({
+        field: "type",
+        label: `${item.name} type`,
+        from: existing.type,
+        to: item.type,
+      });
+    }
+    if (existing.sortOrder !== sortOrder) {
+      changes.push({
+        field: "sortOrder",
+        label: `${item.name} position`,
+        from: existing.sortOrder + 1,
+        to: sortOrder + 1,
+      });
+    }
+  });
+  const retainedIds = new Set(items.filter((item) => item.id > 0).map((item) => item.id));
+  for (const item of existingItems) {
+    if (!retainedIds.has(item.id)) {
+      changes.push({ field: "name", label: "Department", from: item.name });
+    }
+  }
+  return changes;
+}
+
 async function archiveSettingsRowsByIds(
   serviceClient: SettingsServiceClient,
   table: ArchivableSettingsTable,
@@ -1507,6 +1663,9 @@ export async function POST(req: NextRequest) {
           orgId: data.orgId,
           items: validatedItems.items,
           existingIds,
+          existingItems: validatedExisting.items,
+          shouldUpdate: (existing, next, sortOrder) =>
+            namedItemChanged(existing, next, sortOrder, false),
           toRow: (item, sortOrder) => ({
             name: item.name,
             abbr: item.abbr,
@@ -1526,6 +1685,12 @@ export async function POST(req: NextRequest) {
             updated,
             archived: toArchive.length,
             deleted: toHardDelete.length,
+            changes: namedCollectionAuditChanges(
+              validatedExisting.items,
+              validatedItems.items,
+              "Certification",
+              false,
+            ),
           },
           orgId: data.orgId,
         });
@@ -1603,11 +1768,15 @@ export async function POST(req: NextRequest) {
           orgId: data.orgId,
           items: validatedItems.items,
           existingIds,
+          existingItems: validatedExisting.items,
+          shouldUpdate: (existing, next, sortOrder) =>
+            namedItemChanged(existing, next, sortOrder, true),
           toRow: (item, sortOrder) => ({
             name: item.name,
             abbr: item.abbr,
             is_schedule_role: item.isScheduleRole ?? true,
             department_ids: item.departmentIds ?? [],
+            required_certification_ids: item.requiredCertificationIds ?? [],
             sort_order: sortOrder,
           }),
         });
@@ -1623,6 +1792,12 @@ export async function POST(req: NextRequest) {
             updated,
             archived: toArchive.length,
             deleted: toHardDelete.length,
+            changes: namedCollectionAuditChanges(
+              validatedExisting.items,
+              validatedItems.items,
+              "Role",
+              true,
+            ),
           },
           orgId: data.orgId,
         });
@@ -1707,6 +1882,8 @@ export async function POST(req: NextRequest) {
           orgId: data.orgId,
           items: validatedItems.items,
           existingIds,
+          existingItems: validatedExisting.items,
+          shouldUpdate: (existing, next, sortOrder) => departmentChanged(existing, next, sortOrder),
           toRow: (item, sortOrder) => ({
             name: item.name,
             abbr: item.abbr || "",
@@ -1732,6 +1909,10 @@ export async function POST(req: NextRequest) {
             archived: toArchive.length,
             deleted: toHardDelete.length,
             cascadedFocusAreas: cascadeFocusAreaIds.length,
+            changes: departmentCollectionAuditChanges(
+              validatedExisting.items,
+              validatedItems.items,
+            ),
           },
           orgId: data.orgId,
         });

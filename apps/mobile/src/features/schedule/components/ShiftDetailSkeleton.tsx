@@ -8,7 +8,7 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpacing, type MobileColors } from "../../../shared/theme/tokens";
 import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailScreenStyles";
 
@@ -27,7 +27,11 @@ export function ShiftDetailSkeleton({
   shiftmates?: number;
 }) {
   const mobileColors = useMobileColors();
-  const detailStyles = useMemo(() => createShiftDetailStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const detailStyles = useMemo(
+    () => createShiftDetailStyles(mobileColors, isDark),
+    [mobileColors, isDark],
+  );
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (

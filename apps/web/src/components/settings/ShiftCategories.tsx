@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { ShiftCategory, FocusArea } from "@/types";
+import { ShiftCategory, FocusArea, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
 import {
   checkShiftCategoryDependencies,
@@ -69,12 +69,14 @@ function ShiftCategoriesSettings({
   orgId,
   onChange,
   canManageScheduleDefinitions,
+  shiftDisplayMode = "code",
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
   orgId: string;
   onChange: (categories: ShiftCategory[]) => void;
   canManageScheduleDefinitions: boolean;
+  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -266,13 +268,15 @@ function ShiftCategoriesSettings({
       required: true,
       disallowUrl: true,
     });
-    const abbrError = cat.abbr?.trim()
-      ? getCodeError(cat.abbr, {
-          label: "Shift code",
-          maxLength: SHIFT_ABBR_MAX_LENGTH,
-          uppercase: true,
-        })
-      : null;
+    const isNameMode = shiftDisplayMode === "name";
+    const abbrError =
+      !isNameMode && cat.abbr?.trim()
+        ? getCodeError(cat.abbr, {
+            label: "Shift code",
+            maxLength: SHIFT_ABBR_MAX_LENGTH,
+            uppercase: true,
+          })
+        : null;
     if (nameError || abbrError) return;
     setSaving(cat.id);
     try {
@@ -349,6 +353,7 @@ function ShiftCategoriesSettings({
     const isSavingThis = saving === cat.id;
     const isDeletingThis = deleting === cat.id;
     const isDirty = isCategoryDirty(cat);
+    const isNameMode = shiftDisplayMode === "name";
     const nameError =
       cat.name.trim().length > 0
         ? getLineTextError(cat.name, {
@@ -358,13 +363,14 @@ function ShiftCategoriesSettings({
             disallowUrl: true,
           })
         : null;
-    const abbrError = cat.abbr?.trim()
-      ? getCodeError(cat.abbr, {
-          label: "Shift code",
-          maxLength: SHIFT_ABBR_MAX_LENGTH,
-          uppercase: true,
-        })
-      : null;
+    const abbrError =
+      !isNameMode && cat.abbr?.trim()
+        ? getCodeError(cat.abbr, {
+            label: "Shift code",
+            maxLength: SHIFT_ABBR_MAX_LENGTH,
+            uppercase: true,
+          })
+        : null;
     // Name uniqueness is scoped per focus area to match the DB's partial unique
     // indexes (shift_categories_area_name_unique / shift_categories_global_name_unique).
     // Archived shifts are excluded since the DB indexes filter on archived_at IS NULL.
@@ -381,6 +387,7 @@ function ShiftCategoriesSettings({
     // to a focus area, per org for area-less shifts. Archived shifts excluded.
     const normalizedCode = normalizeShiftAbbreviation(cat.abbr, cat.name);
     const duplicateCode =
+      !isNameMode &&
       Boolean(normalizedCode) &&
       local.some(
         (candidate) =>
@@ -394,13 +401,15 @@ function ShiftCategoriesSettings({
     const previewPreset = getPresetByBg(previewColor);
     const previewDisplay = isDarkTheme ? toDarkPillColors(previewPreset.bg) : previewPreset;
     const rawPreviewLabel = normalizedCode ?? "";
-    const previewLabel = (rawPreviewLabel || "S").toUpperCase();
+    const previewLabel = isNameMode
+      ? cat.name || "Untitled shift"
+      : (rawPreviewLabel || "S").toUpperCase();
 
     if (!isEditing) {
       return (
         <div
           key={cat.id}
-          className="dg-hover-row"
+          className="dg-list-row"
           style={{
             display: "flex",
             alignItems: "center",
@@ -409,21 +418,21 @@ function ShiftCategoriesSettings({
             padding: "10px 8px",
             borderRadius: "var(--dg-radius-md)",
             transition: "background 0.15s",
-            cursor: canManageScheduleDefinitions ? "pointer" : undefined,
           }}
-          onClick={canManageScheduleDefinitions ? () => attemptOpenCategory(cat.id) : undefined}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <span
               aria-hidden="true"
+              data-shift-category-preview={isNameMode ? "name" : "code"}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flex: "0 0 auto",
-                minWidth: 34,
-                height: 30,
-                padding: "0 8px",
+                minWidth: isNameMode ? 88 : 34,
+                maxWidth: isNameMode ? 172 : undefined,
+                minHeight: 30,
+                padding: isNameMode ? "5px 8px" : "0 8px",
                 borderRadius: "var(--dg-radius-sm)",
                 background: previewDisplay.bg,
                 border: `1px solid ${borderColor(previewDisplay.text)}`,
@@ -431,31 +440,35 @@ function ShiftCategoriesSettings({
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 800,
                 lineHeight: 1,
+                overflowWrap: isNameMode ? "break-word" : undefined,
+                textAlign: "center",
               }}
             >
               {previewLabel}
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                    color: "var(--dg-color-text-primary)",
-                  }}
-                >
-                  {cat.name || (
-                    <span
-                      style={{
-                        color: "var(--dg-color-text-muted)",
-                        fontStyle: "italic",
-                        fontWeight: 400,
-                      }}
-                    >
-                      Untitled
-                    </span>
-                  )}
-                </span>
+                {!isNameMode && (
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 700,
+                      color: "var(--dg-color-text-primary)",
+                    }}
+                  >
+                    {cat.name || (
+                      <span
+                        style={{
+                          color: "var(--dg-color-text-muted)",
+                          fontStyle: "italic",
+                          fontWeight: 400,
+                        }}
+                      >
+                        Untitled
+                      </span>
+                    )}
+                  </span>
+                )}
                 {(cat.startTime || cat.endTime) && (
                   <span
                     style={{
@@ -520,7 +533,7 @@ function ShiftCategoriesSettings({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gridTemplateColumns: isNameMode ? "1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12,
             marginBottom: 12,
           }}
@@ -552,33 +565,35 @@ function ShiftCategoriesSettings({
               </p>
             ) : null}
           </div>
-          <div>
-            <label style={labelStyle}>CODE</label>
-            <input
-              value={cat.abbr ?? ""}
-              onChange={(e) => handleAbbrChange(cat.id, e.target.value)}
-              placeholder={deriveShiftAbbreviation(cat.name) || "D"}
-              maxLength={SHIFT_ABBR_MAX_LENGTH}
-              style={{
-                ...inputStyle,
-                textTransform: "uppercase",
-                ...(abbrError || duplicateCode ? { borderColor: "var(--dg-color-danger)" } : {}),
-              }}
-              disabled={!canManageScheduleDefinitions}
-            />
-            {abbrError || duplicateCode ? (
-              <p
-                role="alert"
+          {!isNameMode && (
+            <div>
+              <label style={labelStyle}>CODE</label>
+              <input
+                value={cat.abbr ?? ""}
+                onChange={(e) => handleAbbrChange(cat.id, e.target.value)}
+                placeholder={deriveShiftAbbreviation(cat.name) || "D"}
+                maxLength={SHIFT_ABBR_MAX_LENGTH}
                 style={{
-                  margin: "4px 0 0",
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--dg-color-danger)",
+                  ...inputStyle,
+                  textTransform: "uppercase",
+                  ...(abbrError || duplicateCode ? { borderColor: "var(--dg-color-danger)" } : {}),
                 }}
-              >
-                {abbrError ?? "Another shift in this focus area already uses that code."}
-              </p>
-            ) : null}
-          </div>
+                disabled={!canManageScheduleDefinitions}
+              />
+              {abbrError || duplicateCode ? (
+                <p
+                  role="alert"
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-danger)",
+                  }}
+                >
+                  {abbrError ?? "Another shift in this focus area already uses that code."}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>COLOR</label>
@@ -590,19 +605,23 @@ function ShiftCategoriesSettings({
             />
             <span
               aria-hidden="true"
+              data-shift-category-preview={isNameMode ? "name" : "code"}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minWidth: 48,
-                height: 34,
-                padding: "0 12px",
+                minWidth: isNameMode ? 96 : 48,
+                maxWidth: isNameMode ? 172 : undefined,
+                minHeight: 34,
+                padding: isNameMode ? "6px 12px" : "0 12px",
                 borderRadius: "var(--dg-radius-sm)",
                 background: previewDisplay.bg,
                 border: `1px solid ${borderColor(previewDisplay.text)}`,
                 color: previewDisplay.text,
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 800,
+                overflowWrap: isNameMode ? "break-word" : undefined,
+                textAlign: "center",
               }}
             >
               {previewLabel}

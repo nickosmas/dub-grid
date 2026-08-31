@@ -107,6 +107,17 @@ function PasswordVisibilityToggle({
   );
 }
 
+function InlineError({ message }: { message: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  return (
+    <View style={styles.errorRow}>
+      <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
 /**
  * Password change, as a pushed screen rather than an editor that unfolds inside
  * the security hub.
@@ -125,9 +136,9 @@ export default function ProfilePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [focusedPasswordField, setFocusedPasswordField] = useState<PasswordField | null>(null);
   const [visiblePasswordFields, setVisiblePasswordFields] = useState<
     Record<PasswordField, boolean>
@@ -170,7 +181,6 @@ export default function ProfilePasswordScreen() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordError(null);
     },
   });
   useNavigationDiscardGuard(guard);
@@ -182,37 +192,41 @@ export default function ProfilePasswordScreen() {
     }));
   }
 
+  function showPasswordError(message: string) {
+    pushToast({ tone: "error", title: "Could not change password", message });
+  }
+
   function requestPasswordChange() {
     if (passwordSaving) {
       return;
     }
 
-    setPasswordError(null);
     if (!accountEmail) {
-      setPasswordError(
+      showPasswordError(
         "This account does not have an email address available for password verification.",
       );
       return;
     }
     if (!currentPassword) {
-      setPasswordError("Enter your current password.");
+      showPasswordError("Enter your current password.");
       return;
     }
     if (!isPasswordAcceptable(newPassword)) {
       // Same wording as the reset flow: the strength hints above the field
       // already name the specific rule that is still unmet.
-      setPasswordError("Choose a stronger password.");
+      showPasswordError("Choose a stronger password.");
       return;
     }
     if (!passwordsMatch(newPassword, confirmPassword)) {
-      setPasswordError(PASSWORD_MISMATCH_MESSAGE);
+      showPasswordError(PASSWORD_MISMATCH_MESSAGE);
       return;
     }
     if (newPassword === currentPassword) {
-      setPasswordError("New password must be different from your current password.");
+      showPasswordError("New password must be different from your current password.");
       return;
     }
 
+    setConfirmError(null);
     setIsConfirming(true);
   }
 
@@ -225,21 +239,29 @@ export default function ProfilePasswordScreen() {
       return;
     }
 
-    setPasswordError(null);
     setPasswordSaving(true);
+    setConfirmError(null);
     let isRedirecting = false;
+    // Null when a failure's message already went to a toast (the network
+    // case getInlineErrorMessageOrToast handles itself) — the dialog can
+    // close then, the toast is the whole story. Any other string means the
+    // dialog needs to stay open and show it.
+    let inlineError: string | null = null;
+    let failed = false;
+
+    function fail(error: unknown, fallbackMessage: string) {
+      failed = true;
+      inlineError = getInlineErrorMessageOrToast(pushToast, { error, fallbackMessage });
+      setConfirmError(inlineError);
+    }
+
     try {
       const verifyResult = await getSupabaseClient().auth.signInWithPassword({
         email: accountEmail,
         password: currentPassword,
       });
       if (verifyResult.error) {
-        setPasswordError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error: verifyResult.error,
-            fallbackMessage: "That password did not match this account.",
-          }),
-        );
+        fail(verifyResult.error, "That password did not match this account.");
         return;
       }
 
@@ -247,12 +269,7 @@ export default function ProfilePasswordScreen() {
         password: newPassword,
       });
       if (updateResult.error) {
-        setPasswordError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error: updateResult.error,
-            fallbackMessage: "We couldn't update your password right now.",
-          }),
-        );
+        fail(updateResult.error, "We couldn't update your password right now.");
         return;
       }
 
@@ -263,12 +280,7 @@ export default function ProfilePasswordScreen() {
         scope: "global",
       });
       if (signOutResult.error) {
-        setPasswordError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error: signOutResult.error,
-            fallbackMessage: "Your password changed, but we couldn't sign out every session.",
-          }),
-        );
+        fail(signOutResult.error, "Your password changed, but we couldn't sign out every session.");
         return;
       }
 
@@ -276,16 +288,15 @@ export default function ProfilePasswordScreen() {
       await handleExpiredMobileSession({ skipSignOut: true });
     } catch (error) {
       isRedirecting = false;
-      setPasswordError(
-        getInlineErrorMessageOrToast(pushToast, {
-          error,
-          fallbackMessage: "We couldn't update your password right now.",
-        }),
-      );
+      fail(error, "We couldn't update your password right now.");
     } finally {
-      if (!isRedirecting) {
+      setPasswordSaving(false);
+      // Stays open when there's an inline message to show, next to "Update
+      // and sign out" for an immediate retry — closing unconditionally (as a
+      // plain `finally` once did) meant a toast was the only trace of what
+      // happened, easy to miss and gone once dismissed.
+      if (!isRedirecting && !(failed && inlineError)) {
         setIsConfirming(false);
-        setPasswordSaving(false);
       }
     }
   }
@@ -300,16 +311,15 @@ export default function ProfilePasswordScreen() {
         <StatusBanner
           actionLabel="Try Again"
           body={contentState.message}
+          fillScreen
           title="Could not load your account"
+          variant="centered"
           onAction={() => {
             void profileQuery.refetch();
           }}
         />
       ) : (
         <ProfileSection description="Choose a password you don't use anywhere else. You'll be signed out everywhere once it changes.">
-          {passwordError ? (
-            <StatusBanner body={passwordError} title="Could not change password" />
-          ) : null}
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Current password"
@@ -386,11 +396,21 @@ export default function ProfilePasswordScreen() {
         confirmLabel="Update and sign out"
         confirmTone="danger"
         loading={passwordSaving}
-        onCancel={() => setIsConfirming(false)}
+        onCancel={() => {
+          setIsConfirming(false);
+          setConfirmError(null);
+        }}
         onConfirm={() => void saveNewPassword()}
         title="Update password?"
         visible={isConfirming}
-      />
+      >
+        {confirmError ? (
+          <View style={styles.confirmErrorBlock}>
+            <Text style={styles.confirmErrorTitle}>Could not change password</Text>
+            <InlineError message={confirmError} />
+          </View>
+        ) : null}
+      </ConfirmationModal>
       <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
@@ -462,5 +482,23 @@ const createStyles = (mobileColors: MobileColors) =>
     signOutNotice: {
       ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.danger,
+    },
+    errorRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      paddingHorizontal: 4,
+    },
+    errorText: {
+      ...mobileText.meta,
+      color: mobileColors.dangerText,
+      flex: 1,
+    },
+    confirmErrorBlock: {
+      gap: 4,
+    },
+    confirmErrorTitle: {
+      ...mobileTextWeighted("body", "semibold"),
+      color: mobileColors.dangerText,
     },
   });

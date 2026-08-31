@@ -319,37 +319,52 @@ export async function proxy(req: NextRequest) {
     const userId = session.user.id;
 
     try {
-      // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
-      const profile = await timer.time("mw_profile", () =>
-        cacheThrough(CacheKey.mwProfile(userId), TTL.MIDDLEWARE, async () => {
-          const { data } = await supabase
-            .from("profiles")
-            .select("platform_role, org_id")
-            .eq("id", userId)
-            .maybeSingle();
-          return data;
-        }),
-      );
+      // 1 & 2 are independent — membership doesn't depend on profile's result,
+      // it only overrides the fallback default profile provides below — so
+      // fetch both Redis-cached lookups concurrently instead of serially.
+      const membershipSubdomain = subdomain && subdomain !== "gridmaster" ? subdomain : null;
 
-      // 2. Resolve the user's organization role on the requested subdomain.
+      const [profile, membership] = await Promise.all([
+        timer.time("mw_profile", () =>
+          cacheThrough(CacheKey.mwProfile(userId), TTL.MIDDLEWARE, async () => {
+            const { data } = await supabase
+              .from("profiles")
+              .select("platform_role, org_id")
+              .eq("id", userId)
+              .maybeSingle();
+            return data;
+          }),
+        ),
+        membershipSubdomain
+          ? timer.time("mw_membership", () =>
+              cacheThrough(
+                CacheKey.mwMembership(userId, membershipSubdomain),
+                TTL.MIDDLEWARE,
+                async () => {
+                  const { data } = await supabase
+                    .from("organization_memberships")
+                    .select("org_role, org_id, organizations!inner(slug)")
+                    .eq("user_id", userId)
+                    .is("archived_at", null)
+                    .eq("organizations.slug", membershipSubdomain)
+                    .maybeSingle<{
+                      org_role: string;
+                      org_id: string;
+                      organizations: { slug: string };
+                    }>();
+                  return data;
+                },
+              ),
+            )
+          : Promise.resolve(null),
+      ]);
+
+      // Resolve the user's organization role on the requested subdomain.
       let resolvedOrgRole = "user";
       let resolvedOrgId = profile?.org_id;
       let resolvedOrgSlug: string | undefined = undefined;
 
-      if (subdomain && subdomain !== "gridmaster") {
-        const membership = await timer.time("mw_membership", () =>
-          cacheThrough(CacheKey.mwMembership(userId, subdomain), TTL.MIDDLEWARE, async () => {
-            const { data } = await supabase
-              .from("organization_memberships")
-              .select("org_role, org_id, organizations!inner(slug)")
-              .eq("user_id", userId)
-              .is("archived_at", null)
-              .eq("organizations.slug", subdomain)
-              .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
-            return data;
-          }),
-        );
-
+      if (membershipSubdomain) {
         if (membership) {
           resolvedOrgRole = membership.org_role;
           resolvedOrgId = membership.org_id;

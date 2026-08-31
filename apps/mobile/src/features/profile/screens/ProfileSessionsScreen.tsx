@@ -97,6 +97,7 @@ export default function ProfileSessionsScreen() {
 
   const active = sessionsQuery.data?.active ?? [];
   const stale = sessionsQuery.data?.stale ?? [];
+  const hasOtherActiveSession = active.some((session) => !session.isCurrent);
 
   async function handleSessionAction(scope: SignOutScope) {
     if (sessionScopeLoading) {
@@ -181,7 +182,9 @@ export default function ProfileSessionsScreen() {
         <StatusBanner
           actionLabel="Try Again"
           body={contentState.message}
+          fillScreen
           title="Could not load sessions"
+          variant="centered"
           onAction={() => {
             void sessionsQuery.refetch();
           }}
@@ -262,6 +265,7 @@ export default function ProfileSessionsScreen() {
         onRevoke={(session) => setPendingConfirmation({ kind: "revoke", session })}
       />
       <SignOutScopeSheet
+        hasOtherSessions={hasOtherActiveSession}
         visible={isScopeSheetVisible}
         onDismiss={() => setScopeSheetVisible(false)}
         onSelect={(scope) => setPendingConfirmation({ kind: "scope", scope })}

@@ -86,11 +86,6 @@ export default function OrganizationBootstrapRecovery({
   }, [automaticRetryCount, retry]);
 
   return (
-    <AuthTransitionScreen
-      phase="organization"
-      offline={!online}
-      onRetry={retry}
-      retrying={retrying}
-    />
+    <AuthTransitionScreen phase="workspace" offline={!online} onRetry={retry} retrying={retrying} />
   );
 }

@@ -38,7 +38,7 @@ describe("ui/popover", () => {
     expect(screen.getByText("Popover body")).toBeInTheDocument();
     expect(
       screen.getByText("Popover body").closest('[data-slot="popover-content"]')?.parentElement,
-    ).toHaveStyle({ zIndex: "10002" });
+    ).toHaveStyle({ zIndex: "10020" });
     const arrow = document.body.querySelector('[data-slot="popover-arrow"]');
     expect(arrow).not.toBeNull();
     expect(arrow?.tagName).toBe("svg");

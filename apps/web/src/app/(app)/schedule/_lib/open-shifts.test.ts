@@ -142,6 +142,7 @@ function buildCoverageGap(overrides: Partial<CoverageGap> = {}): CoverageGap {
     assignmentId: 21,
     ruleLabel: "Day Shift",
     assignmentLabel: "Day Shift",
+    assignmentFullName: "Day Shift",
     eligibleAssignmentDefinitionIds: [21],
     preferredOpenAssignmentDefinitionId: 21,
     shiftCategoryId: 5,

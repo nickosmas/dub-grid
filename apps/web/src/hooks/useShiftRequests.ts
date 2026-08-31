@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getIsoDateInTimeZone, hasShiftRequestStarted } from "@dubgrid/schedule-core";
+import { getIsoDateInTimeZone, resolveActiveShiftRequests } from "@dubgrid/schedule-core";
 import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -89,6 +89,12 @@ export function useShiftRequests(
   currentEmpId: string | null,
   canApprove: boolean,
   timeZone?: string | null,
+  // Optional — omit for the org-wide/unbounded fetch the schedule page needs
+  // (a scheduler reviewing requests shouldn't have older ones disappear).
+  // The dashboard passes its selected period so Pending Approvals matches
+  // mobile's period-scoped behavior instead of showing every open-ended
+  // request in the org regardless of the period toggle.
+  dateRange?: { startDate: string; endDate: string } | null,
 ): ShiftRequestsData {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +113,8 @@ export function useShiftRequests(
   );
   const assignmentLabelMapRef = useRef(assignmentLabelMap);
   assignmentLabelMapRef.current = assignmentLabelMap;
+  const dateRangeStart = dateRange?.startDate ?? null;
+  const dateRangeEnd = dateRange?.endDate ?? null;
 
   const fetchRequests = useCallback(async () => {
     if (!orgId) {
@@ -118,6 +126,9 @@ export function useShiftRequests(
       setError(null);
       const data = await fetchShiftRequests(orgId, assignmentLabelMapRef.current, {
         status: ["open", "pending_approval"] as ShiftRequestStatus[],
+        ...(dateRangeStart && dateRangeEnd
+          ? { startDate: dateRangeStart, endDate: dateRangeEnd }
+          : {}),
       });
       if (orgIdRef.current === orgId) {
         setRequests(data);
@@ -132,8 +143,7 @@ export function useShiftRequests(
       setLoading(false);
     }
     // assignmentLabelMapKey is intentional: stabilization proxy for Map reference (read via assignmentLabelMapRef.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, assignmentLabelMapKey]);
+  }, [orgId, assignmentLabelMapKey, dateRangeStart, dateRangeEnd]);
 
   // Initial fetch
   useEffect(() => {
@@ -223,16 +233,10 @@ export function useShiftRequests(
 
   // Filter expired at read time: must be a non-terminal status AND not past expiry.
   // Memoized so consumers get a stable array reference when the underlying data hasn't changed.
-  const activeRequests = useMemo(() => {
-    const nowDate = new Date(now);
-    const nowIso = nowDate.toISOString();
-    return requests.filter(
-      (r) =>
-        !["expired", "cancelled", "approved", "rejected"].includes(r.status) &&
-        r.expiresAt > nowIso &&
-        !hasShiftRequestStarted(r, nowDate, timeZone),
-    );
-  }, [requests, now, timeZone]);
+  const activeRequests = useMemo(
+    () => resolveActiveShiftRequests(requests, new Date(now), timeZone),
+    [requests, now, timeZone],
+  );
 
   const refetchAfterMutation = useCallback(async () => {
     try {

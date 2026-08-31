@@ -62,8 +62,13 @@ const fieldStyle: React.CSSProperties = {
 const DragHandle = ({
   label,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { label: string }) => (
-  <div {...props} role="button" aria-label={label} className="dg-settings-reorder-handle">
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) => (
+  <button
+    type="button"
+    {...props}
+    aria-label={`${label}. Use Arrow Up or Arrow Down to move.`}
+    className="dg-settings-reorder-handle"
+  >
     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
       <rect x="3" y="2" width="2" height="2" rx="1" />
       <rect x="9" y="2" width="2" height="2" rx="1" />
@@ -72,7 +77,7 @@ const DragHandle = ({
       <rect x="3" y="10" width="2" height="2" rx="1" />
       <rect x="9" y="10" width="2" height="2" rx="1" />
     </svg>
-  </div>
+  </button>
 );
 
 const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
@@ -836,6 +841,7 @@ function DepartmentSection({
   );
 
   // ── Action buttons ────────────────────────────────────────────────────────
+  const showReadOnlyEditAction = !isWizardMode && !isEditing && canEdit && displayList.length > 0;
   const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={
@@ -853,15 +859,6 @@ function DepartmentSection({
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
           <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
-        </Button>
-      }
-      style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
-    />
-  ) : canEdit && displayList.length > 0 ? (
-    <EditorActionRow
-      primaryAction={
-        <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
-          Edit
         </Button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
@@ -902,6 +899,11 @@ function DepartmentSection({
             {description}
           </p>
         </div>
+        {showReadOnlyEditAction ? (
+          <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
+            Edit
+          </Button>
+        ) : null}
       </div>
 
       {/* Content */}

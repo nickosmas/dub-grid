@@ -37,15 +37,15 @@ export const landingScreenshots = {
     alt: "Calm Haven's scheduling dashboard with coverage and shift summaries",
     light: {
       src: "/landing/screenshots/dashboard-latest.png",
-      width: 4112,
-      height: 2402,
-      aspectRatioClass: "aspect-[4112/2402]",
+      width: 2598,
+      height: 2168,
+      aspectRatioClass: "aspect-[2598/2168]",
     },
     dark: {
-      src: "/landing/screenshots/dashboard-dark.png",
-      width: 4112,
-      height: 2398,
-      aspectRatioClass: "aspect-[4112/2398]",
+      src: "/landing/screenshots/dashboard-dark.png?v=2",
+      width: 2598,
+      height: 2168,
+      aspectRatioClass: "aspect-[2598/2168]",
     },
   },
   team: {

@@ -57,6 +57,7 @@ export default function ExpandedStats({
   focusAreas,
   assignments,
   assignmentById,
+  shiftCategories,
   coverageRequirements,
   categoryById,
   showOT,
@@ -87,6 +88,7 @@ export default function ExpandedStats({
         pDates,
         activeEmployees,
         periodShifts,
+        shiftCategories,
         coverageRuleConfig,
       );
 
@@ -115,6 +117,7 @@ export default function ExpandedStats({
     focusAreas,
     assignments,
     assignmentById,
+    shiftCategories,
     coverageRequirements,
     categoryById,
     overtimeThreshold,
