@@ -41,6 +41,15 @@
 
 ## Roadmap
 
-- [ ] 17. **TODO (confirm)** - next feature not yet specified; replace
-      this placeholder with the real next item(s) when ready. Ad-hoc bugs
-      and small changes don't need a line here - use `/fix` directly.
+- [ ] 17. **Mobile release catch-up** - close the remaining release-delta
+      gaps while preserving the intentional web-only schedule authoring and
+      organization-settings boundaries.
+  - [ ] 17a. **Mobile role certification eligibility** - expose role
+        certification requirements to mobile and prevent incompatible new role
+        selections before save.
+  - [ ] 17b. **Canonical mobile dashboard model** - make web and mobile consume
+        one dashboard calculation model and extend the authenticated mobile
+        payload with canonical metrics, coverage, drafts, and trends.
+  - [ ] 17c. **Canonical mobile dashboard experience** - present the canonical
+        dashboard data in native mobile cards and read-only detail screens,
+        without adding schedule editing or publishing.

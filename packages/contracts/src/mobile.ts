@@ -193,6 +193,10 @@ export const mobileNamedItemSchema = z.object({
   abbr: z.string(),
 });
 
+export const mobileBootstrapRoleSchema = mobileNamedItemSchema.extend({
+  requiredCertificationIds: z.array(z.number().int()).default([]),
+});
+
 export const mobileDepartmentSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -209,7 +213,7 @@ export const mobileBootstrapResponseSchema = z.object({
   linkedEmployee: mobileLinkedEmployeeSchema,
   absenceTypes: z.array(mobileAbsenceTypeSchema),
   focusAreas: z.array(mobileFocusAreaSchema),
-  roles: z.array(mobileNamedItemSchema).default([]),
+  roles: z.array(mobileBootstrapRoleSchema).default([]),
   certifications: z.array(mobileNamedItemSchema).default([]),
   departments: z.array(mobileDepartmentSchema).default([]),
   unreadNotificationCount: z.number().int().nonnegative(),
@@ -1128,6 +1132,7 @@ export type MobileAuthLoginBody = z.infer<typeof mobileAuthLoginBodySchema>;
 export type MobileAbsenceType = z.infer<typeof mobileAbsenceTypeSchema>;
 export type MobileFocusArea = z.infer<typeof mobileFocusAreaSchema>;
 export type MobileNamedItem = z.infer<typeof mobileNamedItemSchema>;
+export type MobileBootstrapRole = z.infer<typeof mobileBootstrapRoleSchema>;
 export type MobileDepartment = z.infer<typeof mobileDepartmentSchema>;
 export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>["range"];
 export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;

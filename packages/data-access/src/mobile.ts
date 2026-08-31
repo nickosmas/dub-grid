@@ -75,6 +75,10 @@ export interface MobileFocusAreaRow extends Pick<DbFocusArea, "id" | "name" | "d
 
 export interface MobileNamedItemRow extends Pick<DbNamedItem, "id" | "name" | "abbr"> {}
 
+export interface MobileRoleRow extends MobileNamedItemRow {
+  required_certification_ids: number[] | null;
+}
+
 export interface MobileDepartmentRow extends Pick<DbDepartment, "id" | "name" | "abbr" | "type"> {}
 
 export interface MobileJobNameRow extends Pick<DbJobDefinition, "id" | "name"> {}
@@ -739,17 +743,17 @@ export async function fetchMobileFocusAreaRows(
 export async function fetchMobileRoleRows(
   serviceClient: SupabaseClient,
   orgId: string,
-): Promise<MobileNamedItemRow[]> {
+): Promise<MobileRoleRow[]> {
   const { data, error } = await serviceClient
     .from("organization_roles")
-    .select("id, name, abbr")
+    .select("id, name, abbr, required_certification_ids")
     .eq("org_id", orgId)
     .is("archived_at", null)
     .order("sort_order");
 
   if (error) throw error;
 
-  return (data ?? []) as MobileNamedItemRow[];
+  return (data ?? []) as MobileRoleRow[];
 }
 
 export async function fetchMobileCertificationRows(

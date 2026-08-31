@@ -4,6 +4,7 @@ import type {
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
+  MobileBootstrapRole,
   MobileNotification,
   MobileNotificationPriority,
   MobileNotificationsCursor,
@@ -145,6 +146,11 @@ type FetchMobileNamedItems = (
   orgId: string,
 ) => Promise<MobileNamedItem[]>;
 
+type FetchMobileRoles = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileBootstrapRole[]>;
+
 type FetchMobileDepartments = (
   serviceClient: SupabaseClient,
   orgId: string,
@@ -234,7 +240,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileUnreadNotificationCount: FetchMobileUnreadNotificationCount;
     fetchMobileAbsenceTypes: FetchMobileAbsenceTypes;
     fetchMobileFocusAreas: FetchMobileFocusAreas;
-    fetchMobileRoles: FetchMobileNamedItems;
+    fetchMobileRoles: FetchMobileRoles;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
     fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;

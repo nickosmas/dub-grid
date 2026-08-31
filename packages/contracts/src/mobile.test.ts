@@ -453,6 +453,7 @@ describe("mobile contracts", () => {
           name: "ICU",
         },
       ],
+      roles: [{ id: 3, name: "Registered Nurse", abbr: "RN", requiredCertificationIds: [8] }],
       unreadNotificationCount: 3,
     });
 
@@ -464,6 +465,9 @@ describe("mobile contracts", () => {
       borderColor: "#FCA5A5",
       textColor: "#991B1B",
     });
+    expect(result.data.roles).toEqual([
+      { id: 3, name: "Registered Nurse", abbr: "RN", requiredCertificationIds: [8] },
+    ]);
   });
 
   it("accepts a valid bootstrap response without a linked employee", () => {

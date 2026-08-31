@@ -66,6 +66,7 @@ import type {
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
+  MobileBootstrapRole,
   MobileOpenShift,
   MobilePerson,
   MobileScheduleEntry,
@@ -345,12 +346,13 @@ export async function fetchMobileFocusAreas(
 export async function fetchMobileRoles(
   serviceClient: SupabaseClient,
   orgId: string,
-): Promise<MobileNamedItem[]> {
+): Promise<MobileBootstrapRole[]> {
   const rows = await fetchMobileRoleRowsData(serviceClient, orgId);
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     abbr: row.abbr,
+    requiredCertificationIds: row.required_certification_ids ?? [],
   }));
 }
 

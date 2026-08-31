@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   fetchMobilePeopleRows,
+  fetchMobileRoleRows,
   insertMobileAuditLogEntry,
   type MobilePeopleQueryRow,
 } from "./mobile";
@@ -80,6 +81,28 @@ describe("fetchMobilePeopleRows", () => {
     await expect(fetchMobilePeopleRows(client, "org-1", 5)).rejects.toEqual({
       message: "boom",
     });
+  });
+});
+
+describe("fetchMobileRoleRows", () => {
+  it("selects role certification requirements for the mobile bootstrap", async () => {
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      is: vi.fn(() => chain),
+      order: vi.fn(() =>
+        Promise.resolve({
+          data: [{ id: 4, name: "Nurse", abbr: "RN", required_certification_ids: [9] }],
+          error: null,
+        }),
+      ),
+    };
+    const client = { from: vi.fn(() => chain) } as unknown as SupabaseClient;
+
+    await expect(fetchMobileRoleRows(client, "org-1")).resolves.toEqual([
+      { id: 4, name: "Nurse", abbr: "RN", required_certification_ids: [9] },
+    ]);
+    expect(chain.select).toHaveBeenCalledWith("id, name, abbr, required_certification_ids");
   });
 });
 
