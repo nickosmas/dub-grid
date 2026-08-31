@@ -216,7 +216,7 @@ interface RenderGridOptions {
   segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
   publishedSegmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
   getShiftStyle?: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  today?: Date;
+  todayKey?: string;
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   focusAreas?: FocusArea[];
@@ -283,6 +283,7 @@ interface RenderGridOptions {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: "code" | "name";
+  useCompactRoleCertificationLabels?: boolean;
   showShiftDetailHoverCards?: boolean;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: Array<Record<string, unknown>>;
@@ -310,7 +311,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     week1: options.week1 ?? week1,
     week2: options.week2 ?? week2,
     spanWeeks: options.spanWeeks ?? 2,
-    today: options.today ?? week1[0],
+    todayKey: options.todayKey ?? formatDateKey(week1[0]),
     focusAreas: options.focusAreas ?? focusAreas,
     departments: options.departments ?? departments,
     assignments: resolvedAssignmentDefinitions,
@@ -331,6 +332,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     isCellInteractive: options.isCellInteractive ?? true,
     canDragShifts: options.canDragShifts,
     shiftDisplayMode: options.shiftDisplayMode ?? "code",
+    useCompactRoleCertificationLabels: options.useCompactRoleCertificationLabels ?? false,
     showShiftDetailHoverCards: options.showShiftDetailHoverCards,
     showPublishDiffOverlay: options.showPublishDiffOverlay,
     showAudit: options.showAudit,
@@ -2799,6 +2801,31 @@ describe("ScheduleGrid", () => {
     const visibleShiftLabel = within(firstCell).getByText("Day");
     fireEvent.mouseEnter(visibleShiftLabel);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("shows full qualifications when hovering a staff role or certification", async () => {
+    renderGrid({
+      filteredEmployees: [{ ...employees[0], certificationId: 7, roleIds: [8] }],
+      allEmployees: [{ ...employees[0], certificationId: 7, roleIds: [8] }],
+      certifications: [
+        { id: 7, orgId: "org-1", name: "Registered Nurse", abbr: "RN", sortOrder: 0 },
+      ],
+      orgRoles: [{ id: 8, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 }],
+    });
+
+    fireEvent.mouseEnter(screen.getByText("CN").parentElement as HTMLElement);
+
+    await waitFor(() => {
+      expect(document.querySelector("[data-employee-detail-card]")).toBeInTheDocument();
+    });
+    const card = document.querySelector("[data-employee-detail-card]") as HTMLElement;
+    expect(card.querySelector("[data-employee-detail-header]")).toHaveStyle({
+      margin: "2px 2px 0px",
+      borderRadius: "var(--dg-radius-sm)",
+      border: "",
+    });
+    expect(within(card).getByText("Registered Nurse")).toBeInTheDocument();
+    expect(within(card).getByText("Charge Nurse")).toBeInTheDocument();
   });
 
   it("shows the general shift name before its type label in the hover card", async () => {

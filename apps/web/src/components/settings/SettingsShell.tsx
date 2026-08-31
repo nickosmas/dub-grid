@@ -121,7 +121,7 @@ export function SettingsShell<TId extends string = string>({
         style={{
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
-          height: "calc(100dvh - var(--header-height))",
+          height: "calc(100dvh - var(--dg-app-shell-header-height))",
           width: "100%",
           overflow: "hidden",
           position: "relative",
@@ -133,8 +133,8 @@ export function SettingsShell<TId extends string = string>({
             collapsible="icon"
             className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
             style={{
-              top: "var(--header-height)",
-              height: "calc(100dvh - var(--header-height))",
+              top: "var(--dg-app-shell-header-height)",
+              height: "calc(100dvh - var(--dg-app-shell-header-height))",
             }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
@@ -180,6 +180,9 @@ export function SettingsShell<TId extends string = string>({
               )}
               {footerGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
+                  <SidebarGroupLabel className="px-3 pt-2 pb-0 text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)]">
+                    {group.label}
+                  </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {group.items.map((item) => {

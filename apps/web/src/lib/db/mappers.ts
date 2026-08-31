@@ -74,6 +74,7 @@ export function rowToNamedItem(row: DbNamedItem): NamedItem {
     abbr: row.abbr,
     isScheduleRole: row.is_schedule_role ?? true,
     departmentIds: row.department_ids ?? [],
+    requiredCertificationIds: row.required_certification_ids ?? [],
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
   };
@@ -127,6 +128,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     departmentLabel: row.department_label ?? "Scheduled Departments",
     shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? "code",
     showShiftDetailHoverCards: row.show_shift_detail_hover_cards ?? true,
+    useCompactRoleCertificationLabels: row.use_compact_role_certification_labels ?? false,
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,
     archivedAt: row.archived_at ?? null,

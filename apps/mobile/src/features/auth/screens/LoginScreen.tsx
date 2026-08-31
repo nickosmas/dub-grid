@@ -456,7 +456,7 @@ export default function LoginScreen() {
               <Text accessibilityLiveRegion="polite" style={styles.progressText}>
                 {slowSubmission
                   ? "This is taking longer than usual. We’re still checking your Organization."
-                  : "Preparing your Organization…"}
+                  : "Checking your workspace…"}
               </Text>
             ) : null}
 
@@ -563,11 +563,9 @@ export default function LoginScreen() {
               loading={submitting}
               onPress={() => handleLogin()}
             />
-            {submitting ? (
+            {submitting && slowSubmission ? (
               <Text accessibilityLiveRegion="polite" style={styles.progressText}>
-                {slowSubmission
-                  ? "Signing in is taking longer than usual. We’re still working in the background."
-                  : "Signing you in…"}
+                Signing in is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}
 
@@ -640,11 +638,9 @@ export default function LoginScreen() {
               loading={submitting}
               onPress={() => handleMfaVerify()}
             />
-            {submitting ? (
+            {submitting && slowSubmission ? (
               <Text accessibilityLiveRegion="polite" style={styles.progressText}>
-                {slowSubmission
-                  ? "Verification is taking longer than usual. We’re still working in the background."
-                  : "Verifying your sign-in…"}
+                Verification is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}
 
@@ -732,6 +728,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       textAlign: "center",
       fontSize: 26,
+      lineHeight: 32,
       letterSpacing: 10,
       fontWeight: "600",
     },

@@ -153,6 +153,9 @@ const createStyles = (mobileColors: MobileColors) =>
       fontSize: 16,
       lineHeight: 22,
       fontWeight: "400",
+      // Explicit rather than left to the platform default, so this field
+      // can't inherit stray tracking from a native fallback font.
+      letterSpacing: 0,
       color: mobileColors.textPrimary,
       flex: 1,
       paddingVertical: 12,

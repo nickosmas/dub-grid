@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
@@ -78,6 +79,40 @@ function AppHeader() {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isGridmaster, isLoading, orgId } = usePermissions();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Banners are conditional, so a fixed 56px offset is wrong whenever one is
+  // visible. Measure the sticky shell itself and publish its real height for
+  // page-level toolbars and section bars that stick beneath it. Set on this
+  // component's own wrapper rather than the root `<html>` element — page
+  // content sits inside that wrapper too, so the property still inherits
+  // down to every consumer without reaching outside application markup.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    const shell = shellRef.current;
+    if (!header || !shell) return;
+
+    const setHeaderHeight = () => {
+      shell.style.setProperty(
+        "--dg-app-shell-header-height",
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+
+    setHeaderHeight();
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        shell.style.removeProperty("--dg-app-shell-header-height");
+      };
+    }
+    const observer = new ResizeObserver(setHeaderHeight);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      shell.style.removeProperty("--dg-app-shell-header-height");
+    };
+  }, []);
 
   // Subscribe to the bootstrap query so we can detect sandbox-mode org
   // switches without forcing an extra fetch — the query is already
@@ -109,8 +144,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     !isLoading && isAppRoute(pathname) && !(isGridmaster && pathname === "/dashboard");
 
   return (
-    <>
-      <div className="dg-app-shell-header no-print">
+    <div ref={shellRef} className="contents">
+      <div ref={headerRef} className="dg-app-shell-header no-print">
         {isAppRoute(pathname) && (
           <>
             <ImpersonationBanner />
@@ -126,6 +161,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       {!isGridmaster && <TrialWelcomeModal />}
       <InactivityGuard />
-    </>
+    </div>
   );
 }

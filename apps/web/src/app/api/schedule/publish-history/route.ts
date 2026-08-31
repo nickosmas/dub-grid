@@ -9,6 +9,12 @@ const querySchema = z.object({
   orgId: z.string().uuid(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
+  // Optional: scopes to publish events whose [start_date, end_date] range
+  // overlaps this window, matching mobile's fetchMobilePublishHistoryRows
+  // (packages/data-access/src/mobile.ts). Omit for the unbounded, most-recent
+  // pagination existing callers (PublishHistoryPanel) already rely on.
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -39,7 +45,7 @@ export async function GET(req: NextRequest) {
   try {
     const limit = parsed.data.limit ?? 20;
     const offset = parsed.data.offset ?? 0;
-    const { data, error } = await auth.serviceClient
+    let query = auth.serviceClient
       .from("publish_history")
       .select(
         "id, published_by, start_date, end_date, change_count, published_at, schedule_publish_changes(emp_id, date, kind, from_state, to_state, from_absence_type_id, to_absence_type_id, updated_by, from_custom_start, from_custom_end, to_custom_start, to_custom_end)",
@@ -47,6 +53,13 @@ export async function GET(req: NextRequest) {
       .eq("org_id", auth.orgId)
       .order("published_at", { ascending: false })
       .range(offset, offset + limit - 1);
+    if (parsed.data.startDate) {
+      query = query.gte("end_date", parsed.data.startDate);
+    }
+    if (parsed.data.endDate) {
+      query = query.lte("start_date", parsed.data.endDate);
+    }
+    const { data, error } = await query;
     if (error) {
       throw error;
     }

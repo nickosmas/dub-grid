@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 // @/features/account/client is imported dynamically inside the session effect —
@@ -8,12 +9,12 @@ import Link from "next/link";
 // the landing page's initial bundle for visitors who are not signed in.
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { Button } from "@/components/Button";
+import ButtonSpinner from "@/components/ButtonSpinner";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
 import { LandingScreenshot, landingScreenshots } from "@/components/landing/LandingScreenshot";
-import MobileAppMockup from "@/components/landing/MobileAppMockup";
 import {
   BellRing,
   CalendarDays,
@@ -32,6 +33,19 @@ import {
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
+
+// One phone renders at 278x588 (see SCALE in MobileAppMockup); the placeholder
+// holds that height so the in-flow mockup below the fold does not shift the
+// page when it arrives.
+const MOCKUP_RESERVED_HEIGHT = 588;
+
+// ~1,800 lines of purely decorative phone mockups. The hero pair is absolutely
+// positioned and `display: none` below 1280px, and the in-flow one sits well
+// below the fold, so none of it belongs in the landing page's first load.
+const MobileAppMockup = dynamic(() => import("@/components/landing/MobileAppMockup"), {
+  ssr: false,
+  loading: () => <div aria-hidden="true" style={{ height: MOCKUP_RESERVED_HEIGHT }} />,
+});
 
 /* ─── Data ────────────────────────────────────────────── */
 
@@ -277,16 +291,7 @@ export default function RootPage() {
           background: "var(--dg-color-bg)",
         }}
       >
-        <div
-          className="dg-spinner"
-          style={{
-            width: 32,
-            height: 32,
-            border: "3px solid var(--dg-color-border)",
-            borderTopColor: "var(--dg-color-brand)",
-            borderRadius: "50%",
-          }}
-        />
+        <ButtonSpinner color="var(--dg-color-brand)" size={32} />
       </div>
     );
   }
@@ -414,7 +419,7 @@ export default function RootPage() {
               return (
                 <div
                   key={feature.title}
-                  className="landing-feature-card group rounded-2xl border border-[var(--dg-color-border-light)] p-6 lg:p-8 hover:border-[var(--dg-color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
+                  className="landing-feature-card group rounded-2xl border border-[var(--dg-color-border-light)] p-6 lg:p-8 hover:border-[var(--dg-color-border)] hover:-translate-y-0.5 transition-all duration-150"
                 >
                   <div className="w-10 h-10 rounded-xl bg-[var(--dg-color-bg-secondary)] flex items-center justify-center mb-4 group-hover:bg-[var(--dg-color-border-light)] transition-colors duration-150">
                     <Icon
@@ -437,7 +442,7 @@ export default function RootPage() {
 
       {/* ── Dashboard Mockup ── */}
       <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
-        <div className="max-w-5xl mx-auto px-6">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               The full picture
@@ -446,10 +451,53 @@ export default function RootPage() {
               Coverage, hours, and open shifts on one screen. Catch a gap before it catches you.
             </p>
           </div>
-          <LandingScreenshot
-            asset={landingScreenshots.dashboard}
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1024px"
-          />
+          <div className="grid items-center gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)_minmax(0,1fr)]">
+            <div className="space-y-6 text-center xl:text-left">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                  See coverage at a glance
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
+                  Spot understaffed days, overloaded team members, and empty slots before they
+                  become a scramble.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                  Plan with real numbers
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
+                  Compare scheduled hours with your coverage needs while you build the week, not
+                  after it is published.
+                </p>
+              </div>
+            </div>
+
+            <LandingScreenshot
+              asset={landingScreenshots.dashboard}
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1024px"
+            />
+
+            <div className="space-y-6 text-center xl:text-left">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                  Resolve gaps faster
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
+                  Open shifts stay visible, so you can match the right person before coverage slips.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                  Follow changes as they happen
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
+                  Published schedules, shift changes, requests, and team updates are collected in
+                  one activity feed.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </RevealSection>
 

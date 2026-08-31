@@ -497,6 +497,7 @@ export interface RecurringScheduleSectionProps {
   absenceTypes?: AbsenceType[];
   shiftDisplayMode?: ShiftDisplayMode;
   defaultShiftEnabled?: boolean;
+  useCompactRoleCertificationLabels?: boolean;
 }
 
 export function RecurringScheduleSection({
@@ -514,6 +515,7 @@ export function RecurringScheduleSection({
   absenceTypes = [],
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
+  useCompactRoleCertificationLabels = false,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -1182,7 +1184,11 @@ export function RecurringScheduleSection({
             const rowBg = isCurrentUser ? "var(--dg-color-today-bg)" : "var(--dg-color-surface)";
             const certAbbr =
               employee.certificationId != null
-                ? getCertAbbr(employee.certificationId, certifications)
+                ? getCertAbbr(
+                    employee.certificationId,
+                    certifications,
+                    useCompactRoleCertificationLabels,
+                  )
                 : null;
             const designationColors = certAbbr
               ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR)

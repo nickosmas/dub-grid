@@ -155,6 +155,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
               />
             </TabIconPill>
             <Text
+              maxFontSizeMultiplier={1.3}
               numberOfLines={1}
               style={[styles.label, focused ? styles.labelActive : styles.labelInactive]}
             >

@@ -1,5 +1,51 @@
 import { describe, it, expect } from "vitest";
-import { getWeekStart } from "@/lib/utils";
+import { getCertAbbr, getCompactNamedItemLabel, getRoleAbbrs, getWeekStart } from "@/lib/utils";
+import type { NamedItem } from "@/types";
+
+describe("getCompactNamedItemLabel", () => {
+  it("uses a saved short label and derives one when a legacy value repeats the full name", () => {
+    expect(getCompactNamedItemLabel({ name: "Charge Nurse", abbr: "CN" })).toBe("CN");
+    expect(
+      getCompactNamedItemLabel({
+        name: "Journal Listed Christian Science Nurse",
+        abbr: "Journal Listed Christian Science Nurse",
+      }),
+    ).toBe("JLCSN");
+  });
+
+  it("keeps Roman-numeral levels as a spaced suffix", () => {
+    expect(
+      getCompactNamedItemLabel({
+        name: "Christian Science Nurse III",
+        abbr: "Christian Science Nurse III",
+      }),
+    ).toBe("CSN III");
+  });
+
+  it("keeps short one-word labels whole and shortens longer ones", () => {
+    expect(getCompactNamedItemLabel({ name: "Staff", abbr: "" })).toBe("Staff");
+    expect(getCompactNamedItemLabel({ name: "Supervisor", abbr: "" })).toBe("SUP");
+  });
+});
+
+describe("role and certification display labels", () => {
+  const certifications: NamedItem[] = [
+    { id: 1, orgId: "org-1", name: "Christian Science Nurse III", abbr: "CSN III", sortOrder: 0 },
+  ];
+  const roles: NamedItem[] = [
+    { id: 2, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 },
+  ];
+
+  it("uses the saved compact labels when the organization enables them", () => {
+    expect(getCertAbbr(1, certifications, true)).toBe("CSN III");
+    expect(getRoleAbbrs([2], roles, true)).toEqual(["CN"]);
+  });
+
+  it("uses full names when the organization disables compact labels", () => {
+    expect(getCertAbbr(1, certifications, false)).toBe("Christian Science Nurse III");
+    expect(getRoleAbbrs([2], roles, false)).toEqual(["Charge Nurse"]);
+  });
+});
 
 describe("getWeekStart", () => {
   it("returns the same day at midnight when given a Sunday", () => {

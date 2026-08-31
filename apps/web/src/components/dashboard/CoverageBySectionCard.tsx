@@ -1,7 +1,9 @@
 import React from "react";
 import Link from "next/link";
+import { formatPublishedAt, formatPublishedSummary } from "@dubgrid/schedule-core";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
+import type { PublishHistoryEntryWithName } from "@/types";
 import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -25,6 +27,9 @@ interface CoverageBySectionCardProps {
   hasRequirements: boolean;
   canManageCoverageRequirements?: boolean;
   publishedWindowState?: PublishedWindowState;
+  /** Most recent publish for the current period — who and when. */
+  publishHistory?: PublishHistoryEntryWithName | null;
+  orgTimeZone?: string | null;
   periodLabel?: string;
   onExpand?: () => void;
 }
@@ -36,6 +41,8 @@ export default function CoverageBySectionCard({
   hasRequirements,
   canManageCoverageRequirements = false,
   publishedWindowState = "published",
+  publishHistory,
+  orgTimeZone,
   periodLabel = "this week",
   onExpand,
 }: CoverageBySectionCardProps) {
@@ -48,6 +55,13 @@ export default function CoverageBySectionCard({
       : isPartial
         ? "Published dates only · required vs scheduled"
         : `${periodLabel} · required vs scheduled`;
+  const publishSummary =
+    hasRequirements && !isUnpublished && publishHistory
+      ? formatPublishedSummary(
+          publishHistory.publishedByName,
+          formatPublishedAt(publishHistory.publishedAt, orgTimeZone),
+        )
+      : null;
 
   if (sections.length === 0) {
     return (
@@ -56,6 +70,11 @@ export default function CoverageBySectionCard({
           <div>
             <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
             <div className="dg-card-subtitle">{subtitle}</div>
+            {publishSummary && (
+              <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+                {publishSummary}
+              </div>
+            )}
           </div>
         </div>
         <div className="dg-card-body">
@@ -102,6 +121,11 @@ export default function CoverageBySectionCard({
         <div>
           <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
           <div className="dg-card-subtitle">{subtitle}</div>
+          {publishSummary && (
+            <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+              {publishSummary}
+            </div>
+          )}
         </div>
         {onExpand && <ExpandButton onClick={onExpand} label="Expand coverage" />}
       </div>

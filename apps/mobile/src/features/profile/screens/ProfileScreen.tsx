@@ -1,9 +1,16 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { AppText } from "../../../shared/components/AppText";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
@@ -24,11 +31,7 @@ import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
 } from "../../../shared/lib/auth-reset";
-import {
-  getInlineErrorMessageOrToast,
-  pushClientFriendlyErrorToast,
-} from "../../../shared/lib/errors";
-import { getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -38,6 +41,7 @@ import {
   mobileSpace,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useMotionPreference } from "../../../shared/motion/useMotionPreference";
@@ -105,11 +109,11 @@ export default function ProfileScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
   const [switchingOrg, setSwitchingOrg] = useState<OrganizationMembershipOption | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
   const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
+  const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -184,7 +188,6 @@ export default function ProfileScreen() {
 
   async function handleLogout() {
     setIsSigningOut(true);
-    setLogoutError(null);
 
     try {
       await disablePushForCurrentDevice();
@@ -193,23 +196,21 @@ export default function ProfileScreen() {
         scope: "local",
       });
       if (error) {
-        setLogoutError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error,
-            fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
-          }),
-        );
+        pushClientFriendlyErrorToast(pushToast, {
+          error,
+          title: "Could not sign out",
+          fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
+        });
         return;
       }
 
       await handleExpiredMobileSession({ skipSignOut: true });
     } catch (error) {
-      setLogoutError(
-        getInlineErrorMessageOrToast(pushToast, {
-          error,
-          fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
-        }),
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not sign out",
+        fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
+      });
     } finally {
       setIsSigningOut(false);
     }
@@ -323,11 +324,22 @@ export default function ProfileScreen() {
       : "You'll be signed out on this device.";
   const confirmationLabel = isSwitchConfirmation ? "Switch" : "Sign Out";
 
+  function handleProfileScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    // Keep the hero as the identity at rest. Once it begins to pass under the
+    // native bar, UIKit's scroll-edge effect takes over and the compact title
+    // gives the page a stable identity. A small threshold prevents the title
+    // flickering during the scroll view's elastic resting bounce.
+    const nextVisible = event.nativeEvent.contentOffset.y > 12;
+    setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
+  }
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      onScroll={handleProfileScroll}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEventThrottle={16}
       // Passed only while a switch is in flight: `renderOverlay` costs the
       // screen its native scroll root, which is what drives the iOS large
       // title, so this screen must not hold one open the rest of the time.
@@ -362,12 +374,6 @@ export default function ProfileScreen() {
               void profileQuery.refetch();
             }}
           />
-          {logoutError ? (
-            <StatusBanner
-              body={getQueryErrorMessage(logoutError, logoutError)}
-              title="Could not sign out"
-            />
-          ) : null}
           {accessToken ? (
             <Button
               label="Force Sign Out"
@@ -388,10 +394,24 @@ export default function ProfileScreen() {
         />
       ) : (
         <>
+          {/* The native inline header is deliberately the person, not the tab.
+              It stays compact and gets UIKit's scroll-edge blur from the route
+              while this hero scrolls beneath it. */}
+          <Stack.Screen
+            options={{
+              // Keep a real native title so UIKit never falls back to the tab
+              // label or renders an empty-title placeholder. Its colour alone
+              // changes when the hero passes beneath the scroll-edge bar.
+              title: displayName,
+              headerTitleStyle: {
+                color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
+                fontFamily: mobileTypography.fontFamily.bold,
+              },
+            }}
+          />
           {/* Centered, the same way both person pages are: this page's subject is
               a person, and a left-aligned 64pt avatar reads as a settings row
-              rather than as the heading it is. The route keeps its large
-              "Profile" title, which names the tab, not the person. */}
+              rather than as the heading it is. */}
           <ProfileHero
             align="center"
             avatarStyle={
@@ -529,12 +549,6 @@ export default function ProfileScreen() {
             </ProfileList>
           </ProfileSection>
 
-          {logoutError ? (
-            <StatusBanner
-              body={getQueryErrorMessage(logoutError, logoutError)}
-              title="Could not sign out"
-            />
-          ) : null}
           {/* Untitled: the button says "Sign Out", so a heading over it can only
               restate it more vaguely. Set apart from the settings list above it
               by more than the shared section gap, the same way the person

@@ -6,6 +6,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Toolbar from "@/components/Toolbar";
+import TimeZoneClocks from "@/components/TimeZoneClocks";
 import ScheduleGrid, {
   buildScheduleGridModel,
   type ScheduleGridHandlers,
@@ -55,7 +56,11 @@ import {
   getEmployeeDisplayName,
   iterateDateRange,
 } from "@/lib/utils";
-import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
+import {
+  getIsoDateInTimeZone,
+  hasShiftStartedAtTimeRanges,
+  parseLocalDateKey,
+} from "@dubgrid/schedule-core";
 import {
   filterAndSortEmployees,
   hasVisibleGridShiftEntry,
@@ -176,6 +181,8 @@ import {
   type ScheduleOperation,
 } from "./_lib/operations";
 import { useQueryClient } from "@tanstack/react-query";
+import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+import { queryKeys } from "@/lib/query-keys";
 import { buildScheduleNoteMap, scheduleNoteKey } from "./_lib/schedule-window";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
@@ -276,6 +283,7 @@ function SchedulerContent() {
     certifications,
     orgRoles,
     assignmentLabelMap: assignmentLabelMap,
+    assignmentNameMap,
     absenceTypes,
     allAbsenceTypes,
     absenceTypeMap,
@@ -283,6 +291,7 @@ function SchedulerContent() {
     departments,
     loading: orgLoading,
     loadError,
+    bootstrapRetryable,
   } = useOrganizationData();
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
@@ -317,14 +326,31 @@ function SchedulerContent() {
   const [currentTimeTick, setCurrentTimeTick] = useState(() => Date.now());
   const payPeriodStartDate = org?.payPeriodStartDate ?? null;
 
-  // Refresh `today` if the app stays open past midnight
+  // "Today" is evaluated in the organization's timezone, not the viewer's
+  // browser timezone, so the grid highlights the right day for staff and
+  // managers viewing the schedule from elsewhere (e.g. a manager traveling
+  // ahead of or behind the facility's local day).
+  const orgTimeZone = org?.timezone ?? null;
+  const todayKey = useMemo(() => getIsoDateInTimeZone(today, orgTimeZone), [today, orgTimeZone]);
+
+  // A local-midnight Date standing in for "today" that's already resolved to
+  // the org's calendar day, safe to feed into the local-getter week/month/
+  // pay-period math below without re-introducing the device-timezone skew.
+  const todayAnchor = useMemo(() => parseLocalDateKey(todayKey), [todayKey]);
+
+  // Refresh `today` when the organization's local calendar day changes.
+  // Polls rather than scheduling a single device-midnight timeout, since the
+  // org's midnight can fall at any point in the viewer's day depending on
+  // their offset from the org's timezone.
   useEffect(() => {
-    const now = new Date();
-    const msUntilMidnight =
-      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
-    const timer = setTimeout(() => setToday(new Date()), msUntilMidnight + 500);
-    return () => clearTimeout(timer);
-  }, [today]);
+    const interval = window.setInterval(() => {
+      const now = new Date();
+      if (getIsoDateInTimeZone(now, orgTimeZone) !== getIsoDateInTimeZone(today, orgTimeZone)) {
+        setToday(now);
+      }
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [today, orgTimeZone]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCurrentTimeTick(Date.now()), 30_000);
@@ -340,6 +366,9 @@ function SchedulerContent() {
 
   // Holds the schedule window snapshot across navigations — see _lib/schedule-cache.
   const queryClient = useQueryClient();
+  const retryOrganizationBootstrap = useCallback(async () => {
+    await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
+  }, [queryClient]);
 
   // The currently-loaded shift/notes window. Starts at the ±90-day default,
   // then widens (or recenters, for a far jump) to follow wherever the user
@@ -353,7 +382,7 @@ function SchedulerContent() {
   const shiftFetchStart = loadedShiftWindow.start;
   const shiftFetchEnd = loadedShiftWindow.end;
 
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(todayAnchor));
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   // Ref always points to the latest shifts — used in setShift to read fresh version
@@ -2422,6 +2451,7 @@ function SchedulerContent() {
       assignmentIdsForKey,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
+      assignmentNameMap,
       coverageCreditForKey,
     });
   }, [
@@ -2434,6 +2464,7 @@ function SchedulerContent() {
     assignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    assignmentNameMap,
     coverageCreditForKey,
   ]);
 
@@ -2452,6 +2483,7 @@ function SchedulerContent() {
       assignmentIdsForKey,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
+      assignmentNameMap,
       coverageCreditForKey,
     }).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
   }, [
@@ -2464,6 +2496,7 @@ function SchedulerContent() {
     assignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    assignmentNameMap,
     coverageCreditForKey,
     getActionableCoverageGapAssignmentIds,
   ]);
@@ -2532,6 +2565,7 @@ function SchedulerContent() {
         preferredOpenAssignmentDefinitionId: representativeAssignmentId,
         ruleLabel: gap.ruleLabel,
         assignmentLabel: gap.assignmentLabel,
+        assignmentFullName: gap.assignmentFullName,
         customStartTime: sc?.defaultStartTime ?? null,
         customEndTime: sc?.defaultEndTime ?? null,
         needed: remainingNeeded,
@@ -4091,7 +4125,21 @@ function SchedulerContent() {
             certificationNames: certificationNameMap,
             orgRoles,
           });
-          const displayLabel = assignmentLabelMapRef.current.get(codeId) ?? code.label;
+          const codeShiftId = code.shiftId ?? code.categoryId ?? null;
+          const codeShift =
+            codeShiftId != null
+              ? (shiftCategories.find((item) => item.id === codeShiftId) ?? null)
+              : null;
+          const codeJob =
+            code.jobId != null ? (jobs.find((item) => item.id === code.jobId) ?? null) : null;
+          const displayLabel = formatAssignableShiftOptionLabel(
+            buildShiftDisplayParts({
+              shift: codeShift,
+              job: codeJob,
+              assignment: code,
+              shiftDisplayMode: "name",
+            }),
+          );
           return formatShiftAssignmentDisqualificationMessage({
             employeeName: getEmployeeDisplayName(emp),
             assignmentLabel: displayLabel,
@@ -4660,18 +4708,18 @@ function SchedulerContent() {
 
   const handleToday = useCallback(() => {
     if (spanWeeks === "month") {
-      setWeekStart(new Date(today.getFullYear(), today.getMonth(), 1));
+      setWeekStart(new Date(todayAnchor.getFullYear(), todayAnchor.getMonth(), 1));
       return;
     }
 
     setWeekStart(
       getScheduleStartForSpan({
-        date: today,
+        date: todayAnchor,
         span: spanWeeks,
         payPeriodStartDate,
       }),
     );
-  }, [payPeriodStartDate, spanWeeks, today]);
+  }, [payPeriodStartDate, spanWeeks, todayAnchor]);
 
   const handleSpanChange = useCallback(
     (next: 1 | 2 | "month") => {
@@ -5031,7 +5079,7 @@ function SchedulerContent() {
         week1,
         week2,
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
-        today,
+        todayKey,
         focusAreas,
         departments,
         assignments,
@@ -5041,6 +5089,7 @@ function SchedulerContent() {
         indicatorTypes,
         certifications,
         orgRoles,
+        useCompactRoleCertificationLabels: org?.useCompactRoleCertificationLabels ?? false,
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
         cellLocks: lockedCells,
@@ -5081,7 +5130,7 @@ function SchedulerContent() {
       week1,
       week2,
       spanWeeks,
-      today,
+      todayKey,
       focusAreas,
       departments,
       assignments,
@@ -5463,123 +5512,10 @@ function SchedulerContent() {
   }
   if (loadError && !org) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "100vh",
-          flexDirection: "column",
-          gap: 24,
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-          background:
-            "linear-gradient(180deg, var(--dg-color-bg-secondary) 0%, var(--dg-color-surface) 100%)",
-          padding: 24,
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "var(--dg-color-danger-bg)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 8,
-          }}
-        >
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-danger)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-
-        <div style={{ maxWidth: 400 }}>
-          <h1
-            style={{
-              fontSize: "var(--dg-fs-section-title)",
-              fontWeight: 800,
-              color: "var(--dg-color-text-primary)",
-              marginBottom: 12,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Organization Setup Required
-          </h1>
-          <p
-            style={{
-              fontSize: "var(--dg-fs-title)",
-              color: "var(--dg-color-text-secondary)",
-              lineHeight: 1.6,
-              marginBottom: 32,
-            }}
-          >
-            Your account is active, but it looks like your organization hasn&apos;t been initialized
-            yet. Once your administrator completes the setup, you&apos;ll be able to access the
-            schedule.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: "12px 24px",
-                background: "var(--dg-color-brand)",
-                color: "var(--dg-color-surface)",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "opacity 150ms ease",
-              }}
-            >
-              Check Again
-            </Button>
-            <Button
-              onClick={() => {
-                window.location.href = "mailto:support@dubgrid.com";
-              }}
-              style={{
-                padding: "12px 24px",
-                background: "var(--dg-color-bg-secondary)",
-                color: "var(--dg-color-text-secondary)",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Contact Support
-            </Button>
-          </div>
-        </div>
-
-        {/* Technical details accessible only via hover/inspect for developers */}
-        <div
-          style={{
-            marginTop: 40,
-            opacity: 0.1,
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-faint)",
-          }}
-        >
-          System status: {loadError}
-        </div>
-      </div>
+      <OrganizationBootstrapRecovery
+        automaticallyRetry={bootstrapRetryable}
+        onRetry={retryOrganizationBootstrap}
+      />
     );
   }
 
@@ -5600,7 +5536,7 @@ function SchedulerContent() {
             className="no-print"
             style={{
               position: "sticky",
-              top: "var(--header-height)",
+              top: "var(--dg-app-shell-header-height)",
               display: "flow-root",
               zIndex: 99,
               background: "var(--dg-color-bg)",
@@ -6025,7 +5961,7 @@ function SchedulerContent() {
                 onPrintOpen={featureFlags.printing ? () => setShowPrintOptions(true) : undefined}
                 onExportCSV={
                   dates.length > 0 && filteredEmployees.length > 0
-                    ? () => exportScheduleCSV(filteredEmployees, dates, shiftForKey)
+                    ? () => exportScheduleCSV(filteredEmployees, dates, shiftNameForKey)
                     : undefined
                 }
                 presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
@@ -6050,6 +5986,12 @@ function SchedulerContent() {
                 hasVisibleScheduleEntries={hasVisibleScheduleEntries}
                 hasRemovableVisibleEntries={visibleBulkDeleteTargets.length > 0}
               />
+              <div
+                data-tour="schedule-timezone-clocks"
+                style={{ padding: "2px 0 8px", justifyContent: "flex-end", display: "flex" }}
+              >
+                <TimeZoneClocks now={new Date(currentTimeTick)} orgTimezone={orgTimeZone} compact />
+              </div>
             </div>
           </div>
 
@@ -6071,7 +6013,7 @@ function SchedulerContent() {
                 assignmentIdsForKey={assignmentIdsForKey}
                 getShiftStyle={getShiftStyle}
                 handleCellClick={handleCellClick}
-                today={today}
+                todayKey={todayKey}
                 focusAreas={focusAreas}
                 assignments={assignments}
                 shiftCategories={shiftCategories}
@@ -6229,7 +6171,8 @@ function SchedulerContent() {
                     }}
                   >
                     <strong>
-                      {coverageGapSelection.openShift.ruleLabel ??
+                      {coverageGapSelection.openShift.assignmentFullName ??
+                        coverageGapSelection.openShift.ruleLabel ??
                         coverageGapSelection.openShift.assignmentLabel}
                     </strong>{" "}
                     on <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more
@@ -6324,6 +6267,8 @@ function SchedulerContent() {
                         setCoverageGapSelection(null);
                         setPendingCoverageGapVolunteer({
                           assignmentLabel:
+                            spellOutAssignment(selectedAssignmentDefinition.id) ??
+                            coverageGapSelection.openShift.assignmentFullName ??
                             selectedAssignmentDefinition.label ??
                             coverageGapSelection.openShift.assignmentLabel,
                           date: coverageGapSelection.openShift.date,
@@ -6509,7 +6454,7 @@ function SchedulerContent() {
                 assignmentIdsForKey={assignmentIdsForKey}
                 isAbsenceForKey={isAbsenceForKey}
                 getShiftStyle={getShiftStyle}
-                today={today}
+                todayKey={todayKey}
                 focusAreas={focusAreas}
                 assignments={assignments}
                 shiftCategories={shiftCategories}
@@ -6727,6 +6672,7 @@ function SchedulerContent() {
               }}
               onClose={() => setShowRequestBoard(false)}
               absenceTypeMap={absenceTypeObjectMap}
+              assignmentNameMap={assignmentNameMap}
             />
           )}
 

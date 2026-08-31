@@ -27,7 +27,7 @@ describe("ButtonLoading", () => {
       </button>,
     );
 
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
     // The spinner replaces the leading icon, but the action label stays stable.
     expect(screen.getByRole("button")).toHaveTextContent("Save");
     expect(screen.queryByText("Saving")).not.toBeInTheDocument();

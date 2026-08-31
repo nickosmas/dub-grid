@@ -77,7 +77,7 @@ describe("reports operations API", () => {
       generatedAt: "2026-05-05T00:00:00.000Z",
       range: { startDate: "2026-05-03", endDate: "2026-05-09" },
       payPeriodStartDate: null,
-      filters: { employeeIds: [], focusAreaIds: [], dates: [] },
+      filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
       filterOptions: { employees: [], focusAreas: [], dates: [] },
       metrics: [],
       reports: {
@@ -161,7 +161,13 @@ describe("reports operations API", () => {
     expect(loadOperationsReport).toHaveBeenCalledWith(expect.any(Object), {
       orgId: ORG_ID,
       range: { startDate: "2026-05-03", endDate: "2026-05-09" },
-      filters: { employeeIds: [], focusAreaIds: [], dates: [] },
+      filters: {
+        employeeIds: [],
+        focusAreaIds: [],
+        dates: [],
+        jobIds: [],
+        shiftCategoryIds: [],
+      },
     });
   });
 
@@ -180,6 +186,8 @@ describe("reports operations API", () => {
         employeeIds: ["22222222-2222-4222-8222-222222222222"],
         focusAreaIds: [10, 11],
         dates: ["2026-05-03", "2026-05-06"],
+        jobIds: [],
+        shiftCategoryIds: [],
       },
     });
   });
@@ -225,7 +233,7 @@ describe("reports operations API", () => {
         type: "reports.operations",
         report: "staff-hours",
         format: "csv",
-        filters: { employeeIds: [], focusAreaIds: [], dates: [] },
+        filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
         startDate: "2026-05-03",
         endDate: "2026-05-09",
       },
@@ -258,7 +266,7 @@ describe("reports operations API", () => {
         type: "reports.operations",
         report: "staff-hours",
         format: "pdf",
-        filters: { employeeIds: [], focusAreaIds: [], dates: [] },
+        filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
         startDate: "2026-05-03",
         endDate: "2026-05-09",
       },

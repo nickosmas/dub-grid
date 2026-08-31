@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import ShiftCategoriesSettings from "@/components/settings/ShiftCategories";
 import JobsSettings from "@/components/settings/Jobs";
 import { useOrganizationData } from "@/hooks";
-import { updateOrganizationSettings } from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import type { ShiftDisplayMode } from "@/types";
@@ -49,12 +49,20 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
       if (!org.updatedAt) {
         throw new Error("Organization settings are out of date. Refresh and try again.");
       }
-      const saved = await updateOrganizationSettings({
-        orgId: org.id,
-        expectedUpdatedAt: org.updatedAt,
-        shiftDisplayMode: selectedMode,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: org,
+        input: {
+          orgId: org.id,
+          expectedUpdatedAt: org.updatedAt,
+          shiftDisplayMode: selectedMode,
+        },
       });
-      setOrg({ ...org, shiftDisplayMode: selectedMode, updatedAt: saved.updatedAt });
+      setOrg(result.organization);
+      if (result.status === "changed_elsewhere") {
+        setSelectedMode(result.organization.shiftDisplayMode);
+        toast.info("Display settings were refreshed to the latest saved value.");
+        return false;
+      }
       return true;
     } catch (err) {
       Sentry.captureException(err);

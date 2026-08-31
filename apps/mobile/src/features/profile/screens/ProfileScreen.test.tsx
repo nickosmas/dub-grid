@@ -23,7 +23,10 @@ const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 // Every options object the screen hands the native header, in render order.
-const stackScreenOptions: { title?: string }[] = [];
+const stackScreenOptions: {
+  headerTitleStyle?: { color?: string; fontFamily?: string };
+  title?: string;
+}[] = [];
 
 vi.mock("expo-router", () => ({
   router: {
@@ -31,7 +34,9 @@ vi.mock("expo-router", () => ({
     replace: routerReplace,
   },
   Stack: Object.assign(() => null, {
-    Screen: (props: { options?: { title?: string } }) => {
+    Screen: (props: {
+      options?: { headerTitleStyle?: { color?: string; fontFamily?: string }; title?: string };
+    }) => {
       stackScreenOptions.push(props.options ?? {});
       return null;
     },
@@ -319,10 +324,22 @@ describe("ProfileScreen", () => {
   it("shows organization-scoped data on the profile hub", () => {
     render(<ProfileScreen />);
 
-    // The large title names the page — "Profile", from the route — so the
-    // screen tells the header nothing, and the hero is free to carry the
-    // account's own identity: avatar, then name, then role badge.
-    expect(stackScreenOptions).toEqual([]);
+    // The native header has the person's real title from the start, but keeps
+    // it invisible while the profile hero is at rest.
+    expect(stackScreenOptions).toHaveLength(1);
+    expect(stackScreenOptions[0]).toMatchObject({
+      headerTitleStyle: { color: "transparent" },
+      title: "Mina Diaz",
+    });
+    const scrollRoot = screen.getByTestId("screen-scroll");
+    scrollRoot.dataset.scrollY = "24";
+    fireEvent.scroll(scrollRoot);
+    // Once the hero starts moving under the native bar, it identifies the
+    // person rather than the tab.
+    expect(stackScreenOptions.at(-1)).toEqual({
+      headerTitleStyle: expect.objectContaining({ color: "#0F172A" }),
+      title: "Mina Diaz",
+    });
     expect(screen.getAllByText("Mina Diaz").length).toBeGreaterThan(0);
     expect(screen.getByText("MD")).toBeInTheDocument();
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);

@@ -496,6 +496,7 @@ export function createScreenModule(React: ReactModule) {
       stickyHeader,
       renderOverlay,
       scrollViewRef,
+      onScroll,
       children,
     }: {
       title?: string;
@@ -503,6 +504,7 @@ export function createScreenModule(React: ReactModule) {
       stickyHeader?: ReactType.ReactNode;
       renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactType.ReactNode;
       scrollViewRef?: { current: unknown } | null;
+      onScroll?: (event: unknown) => void;
       children: ReactType.ReactNode;
     }) => {
       if (scrollViewRef) {
@@ -513,7 +515,17 @@ export function createScreenModule(React: ReactModule) {
 
       return React.createElement(
         "section",
-        {},
+        {
+          "data-testid": "screen-scroll",
+          onScroll: onScroll
+            ? (event: ReactType.UIEvent<HTMLElement>) =>
+                onScroll({
+                  nativeEvent: {
+                    contentOffset: { y: Number(event.currentTarget.dataset.scrollY ?? 0) },
+                  },
+                })
+            : undefined,
+        },
         title ? React.createElement("h1", {}, title) : null,
         subtitle ? React.createElement("p", {}, subtitle) : null,
         stickyHeader ?? null,

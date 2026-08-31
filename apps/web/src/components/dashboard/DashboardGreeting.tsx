@@ -1,34 +1,29 @@
 import { useState } from "react";
 
-import { getBrowserTimezone } from "@/lib/timezones";
+import TimeZoneClocks from "@/components/TimeZoneClocks";
 
 type Bucket = "morning" | "afternoon" | "evening";
 
-// General greetings — always safe to show, regardless of work state. Mix of
-// plain hellos and open-ended CTAs that don't assume in-progress work.
+// General greetings — always safe to show, regardless of work state. Kept
+// short: a hello or an open-ended CTA, never a compound sentence.
 const NAMED_POOLS: Record<Bucket, ReadonlyArray<(name: string) => string>> = {
   morning: [
     (n) => `Good morning, ${n}!`,
     (n) => `Morning, ${n}!`,
     (n) => `Rise and shine, ${n}!`,
-    (n) => `Top of the morning, ${n}!`,
     (n) => `What's first today, ${n}?`,
-    (n) => `Where should we start, ${n}?`,
     (n) => `Ready when you are, ${n}.`,
   ],
   afternoon: [
     (n) => `Good afternoon, ${n}!`,
     (n) => `Afternoon, ${n}!`,
     (n) => `Good to see you, ${n}!`,
-    (n) => `Hope your day's going well, ${n}!`,
     (n) => `What's next, ${n}?`,
-    (n) => `Where to next, ${n}?`,
     (n) => `Ready when you are, ${n}.`,
   ],
   evening: [
     (n) => `Good evening, ${n}!`,
     (n) => `Evening, ${n}!`,
-    (n) => `Hope you had a good one, ${n}!`,
     (n) => `Winding down, ${n}!`,
     (n) => `What's left to do, ${n}?`,
     (n) => `Ready when you are, ${n}.`,
@@ -40,26 +35,11 @@ const ANON_POOLS: Record<Bucket, ReadonlyArray<string>> = {
     "Good morning!",
     "Morning!",
     "Rise and shine!",
-    "Bright and early!",
     "What's first today?",
-    "Where should we start?",
     "Ready when you are.",
   ],
-  afternoon: [
-    "Good afternoon!",
-    "Afternoon!",
-    "Hope your day's going well!",
-    "What's next?",
-    "Where to next?",
-    "Ready when you are.",
-  ],
-  evening: [
-    "Good evening!",
-    "Evening!",
-    "Hope you had a good one!",
-    "Winding down!",
-    "What's left to do?",
-  ],
+  afternoon: ["Good afternoon!", "Afternoon!", "What's next?", "Ready when you are."],
+  evening: ["Good evening!", "Evening!", "Winding down!", "What's left to do?"],
 };
 
 // Continuation greetings — only mixed in when `hasIncompleteWork` is true
@@ -79,14 +59,12 @@ const CONTINUATION_ANON: ReadonlyArray<string> = [
   "You've got work waiting!",
 ];
 
+// Base first-visit welcomes — safe for anyone, no assumption about setup state.
 const NAMED_WELCOMES: ReadonlyArray<(name: string) => string> = [
   (n) => `Welcome, ${n}!`,
   (n) => `Welcome aboard, ${n}!`,
   (n) => `Glad you're here, ${n}!`,
   (n) => `Welcome to DubGrid, ${n}!`,
-  (n) => `Hi ${n}, welcome in!`,
-  (n) => `Welcome, ${n}! Let's get you set up.`,
-  (n) => `Welcome aboard, ${n}! Take a look around.`,
 ];
 
 const ANON_WELCOMES: ReadonlyArray<string> = [
@@ -94,7 +72,20 @@ const ANON_WELCOMES: ReadonlyArray<string> = [
   "Welcome aboard!",
   "Glad you're here!",
   "Welcome to DubGrid!",
+];
+
+// First-visit welcomes for admins whose org setup checklist is still
+// incomplete (see `needsSetup`). Never shown to a user with nothing left to
+// configure, or to a non-admin who couldn't act on it anyway.
+const NAMED_WELCOMES_SETUP: ReadonlyArray<(name: string) => string> = [
+  (n) => `Welcome, ${n}! Let's get you set up.`,
+  (n) => `Welcome aboard, ${n}! Let's get set up.`,
+  (n) => `Glad you're here, ${n} — let's get set up.`,
+];
+
+const ANON_WELCOMES_SETUP: ReadonlyArray<string> = [
   "Welcome! Let's get you set up.",
+  "Welcome aboard! Let's get set up.",
 ];
 
 function getBucket(hour: number): Bucket {
@@ -111,28 +102,33 @@ function isoDate(now: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function indexAt<T>(pool: ReadonlyArray<T>, factor: number): T {
-  return pool[Math.floor(factor * pool.length)];
+function resolveNamed(pool: ReadonlyArray<(name: string) => string>, name: string): string[] {
+  return pool.map((render) => render(name));
+}
+
+// Picks by `factor` (0..1), but steps to the next pool entry when that pick
+// would repeat the immediately preceding headline, so two consecutive
+// mounts never show the exact same text.
+function pickFromPool(pool: ReadonlyArray<string>, factor: number, avoid: string | null): string {
+  if (pool.length === 0) return "";
+  const start = Math.floor(factor * pool.length);
+  if (avoid === null || pool.length === 1) return pool[start];
+  for (let i = 0; i < pool.length; i++) {
+    const candidate = pool[(start + i) % pool.length];
+    if (candidate !== avoid) return candidate;
+  }
+  return pool[start];
 }
 
 const GREETED_PREFIX = "dg-greeted-";
-// Picked headline cached in sessionStorage for the lifetime of the tab. Two
-// reasons:
-//   - React StrictMode + Turbopack dev mode mount the component, unmount it,
-//     then remount it; each mount runs useState's lazy initializer with a
-//     fresh Math.random(), so without a cache the first paint and the second
-//     paint would show different greetings.
-//   - Re-navigating to /dashboard within the same session should keep the
-//     same greeting rather than reshuffling on every mount.
-// Cleared on sign-out via clearDubgridSessionState (it's a dg_* key), so the
-// next sign-in always picks a fresh greeting.
-const GREETING_CACHE_KEY = "dg_dashboard_greeting";
 
 function pickHeadline(
   name: string | null,
   userId: string | null,
   now: Date,
   hasIncompleteWork: boolean,
+  needsSetup: boolean,
+  avoid: string | null,
 ): string {
   let isFirstVisit = false;
   if (userId) {
@@ -150,19 +146,24 @@ function pickHeadline(
   }
   const factor = Math.random();
   if (isFirstVisit) {
-    return name ? indexAt(NAMED_WELCOMES, factor)(name) : indexAt(ANON_WELCOMES, factor);
+    if (name) {
+      const pool = resolveNamed(needsSetup ? NAMED_WELCOMES_SETUP : NAMED_WELCOMES, name);
+      return pickFromPool(pool, factor, avoid);
+    }
+    return pickFromPool(needsSetup ? ANON_WELCOMES_SETUP : ANON_WELCOMES, factor, avoid);
   }
   const bucket = getBucket(now.getHours());
   if (name) {
-    const pool = hasIncompleteWork
-      ? [...NAMED_POOLS[bucket], ...CONTINUATION_NAMED]
-      : NAMED_POOLS[bucket];
-    return indexAt(pool, factor)(name);
+    const pool = resolveNamed(
+      hasIncompleteWork ? [...NAMED_POOLS[bucket], ...CONTINUATION_NAMED] : NAMED_POOLS[bucket],
+      name,
+    );
+    return pickFromPool(pool, factor, avoid);
   }
   const pool = hasIncompleteWork
     ? [...ANON_POOLS[bucket], ...CONTINUATION_ANON]
     : ANON_POOLS[bucket];
-  return indexAt(pool, factor);
+  return pickFromPool(pool, factor, avoid);
 }
 
 interface DashboardGreetingProps {
@@ -173,41 +174,27 @@ interface DashboardGreetingProps {
   // still has incomplete steps. Unlocks "pick up where you left off"-style
   // continuation greetings, which would feel off on a fully-built org.
   hasIncompleteWork?: boolean;
+  // True only when THIS user can act on an incomplete org setup checklist
+  // (admin capability + at least one core list still empty). Narrower than
+  // `hasIncompleteWork`: gates the "let's get you set up" first-visit
+  // welcome specifically, so it never shows to someone with nothing to set up.
+  needsSetup?: boolean;
   // Organization-configured timezone (organizations.timezone). Used for the
   // "Org" clock annotation. Defaults to UTC when null.
   orgTimezone?: string | null;
 }
 
-function formatTimeInZone(now: Date, tz: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: tz,
-      timeZoneName: "short",
-    }).format(now);
-  } catch {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(now);
-  }
-}
+// Guards against React StrictMode / Turbopack dev mode mounting a component,
+// unmounting it, then remounting it: each mount runs useState's lazy
+// initializer fresh, so without this the first paint and the second paint
+// could show different random picks. A real navigation away and back always
+// takes far longer than this window, so it still gets a fresh pick — only
+// the synchronous dev double-mount gets deduped.
+const REMOUNT_DEDUPE_MS = 50;
+let lastMount: { key: string; headline: string; ts: number } | null = null;
 
-function formatDateInZone(now: Date, tz: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      timeZone: tz,
-    }).format(now);
-  } catch {
-    return "";
-  }
+export function __resetDashboardGreetingMountCacheForTests(): void {
+  lastMount = null;
 }
 
 export default function DashboardGreeting({
@@ -215,95 +202,37 @@ export default function DashboardGreeting({
   now,
   userId,
   hasIncompleteWork = false,
+  needsSetup = false,
   orgTimezone = null,
 }: DashboardGreetingProps) {
-  const userTz = getBrowserTimezone() ?? orgTimezone ?? "UTC";
-  const effectiveOrgTz = orgTimezone ?? "UTC";
-  const sameZone = userTz === effectiveOrgTz;
-  const userDate = formatDateInZone(now, userTz);
-  const orgDate = sameZone ? userDate : formatDateInZone(now, effectiveOrgTz);
-  const userClock = formatTimeInZone(now, userTz);
-  const orgClock = formatTimeInZone(now, effectiveOrgTz);
-
-  // Pick once per tab session, scoped to bucket + date + userId. Cached in
-  // sessionStorage so:
-  //   - StrictMode / Turbopack dev double-mount doesn't reshuffle the headline
-  //     between the first and second paint;
-  //   - Re-navigating to /dashboard mid-session keeps the same greeting.
-  // The cache is wiped by clearDubgridSessionState on sign-out, so the next
-  // sign-in produces a fresh pick. We also invalidate on bucket/date drift so
-  // a tab left open overnight doesn't surface yesterday-evening's "Good
-  // evening" at 10am, AND on userId drift — impersonation, sandbox/org
-  // switching, or any other same-tab identity change without a full sign-out
-  // must not reuse a previous identity's cached (and name-baked-in) headline.
-  // DashboardGreeting is always rendered inside ProtectedRoute (which returns
-  // null SSR-side), so this runs client-only and storage access is safe.
+  // Picks a fresh headline on every real mount (login, or navigating to the
+  // dashboard from elsewhere), so greetings don't repeat across visits. The
+  // dedupe window above only protects against the synchronous dev
+  // double-mount; it does not persist across an actual navigation.
   const [headline] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     const bucket = getBucket(now.getHours());
     const date = isoDate(now);
-    try {
-      const raw = window.sessionStorage.getItem(GREETING_CACHE_KEY);
-      if (raw) {
-        const cached = JSON.parse(raw) as {
-          bucket?: Bucket;
-          date?: string;
-          userId?: string | null;
-          headline?: string;
-        };
-        if (
-          cached.bucket === bucket &&
-          cached.date === date &&
-          cached.userId === userId &&
-          typeof cached.headline === "string"
-        ) {
-          return cached.headline;
-        }
-      }
-    } catch {
-      // sessionStorage unavailable or stale JSON — fall through to a fresh
-      // pick that just won't survive a re-mount. Harmless in production
-      // (no StrictMode).
+    const key = `${bucket}|${date}|${userId ?? ""}`;
+    const nowTs = Date.now();
+    if (lastMount && lastMount.key === key && nowTs - lastMount.ts < REMOUNT_DEDUPE_MS) {
+      return lastMount.headline;
     }
-    const picked = pickHeadline(name, userId, now, hasIncompleteWork);
-    try {
-      window.sessionStorage.setItem(
-        GREETING_CACHE_KEY,
-        JSON.stringify({ bucket, date, userId, headline: picked }),
-      );
-    } catch {
-      // Same as above — non-fatal.
-    }
+    const picked = pickHeadline(
+      name,
+      userId,
+      now,
+      hasIncompleteWork,
+      needsSetup,
+      lastMount?.headline ?? null,
+    );
+    lastMount = { key, headline: picked, ts: nowTs };
     return picked;
   });
 
   return (
     <div style={{ display: "grid", gap: 4 }}>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "2px 14px",
-          fontSize: "var(--dg-fs-body-sm, 14px)",
-          color: "var(--dg-color-text-muted)",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {sameZone ? (
-          <span>
-            {userDate} · {userClock}
-          </span>
-        ) : (
-          <>
-            <span>
-              <span style={{ opacity: 0.7 }}>Local time</span> · {userDate} · {userClock}
-            </span>
-            <span>
-              <span style={{ opacity: 0.7 }}>Organization time</span> · {orgDate} · {orgClock}
-            </span>
-          </>
-        )}
-      </div>
+      <TimeZoneClocks now={now} orgTimezone={orgTimezone} />
       <h1
         style={{
           margin: 0,

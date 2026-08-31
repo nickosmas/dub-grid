@@ -4,6 +4,10 @@ import type {
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 import {
+  formatPublishedAt as formatPublishedAtShared,
+  formatPublishedSummary as formatPublishedSummaryShared,
+} from "@dubgrid/schedule-core";
+import {
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryCategoryKey,
@@ -121,39 +125,10 @@ export function formatWeekRangeLabel(startDate: string): string {
   return `${formatRangeDate(startDate)} - ${formatRangeDate(addDaysIso(startDate, 6))}`;
 }
 
-export function formatPublishedAt(value: string | null, timeZone?: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: timeZone ?? "UTC",
-  }).format(new Date(value));
-}
-
-export function formatPublishedSummary(
-  publishedByName: string | null,
-  publishedAtLabel: string | null,
-): string | null {
-  if (publishedByName && publishedAtLabel) {
-    return `Published ${publishedAtLabel} by ${publishedByName}`;
-  }
-
-  if (publishedAtLabel) {
-    return `Published ${publishedAtLabel}`;
-  }
-
-  if (publishedByName) {
-    return `Published by ${publishedByName}`;
-  }
-
-  return null;
-}
+// Delegates to @dubgrid/schedule-core's canonical formatter — web's
+// dashboard "schedule published" info now uses the exact same one.
+export const formatPublishedAt = formatPublishedAtShared;
+export const formatPublishedSummary = formatPublishedSummaryShared;
 
 export function getSegmentSortTime(segment: MobileScheduleEntrySegment): string {
   return segment.startTime ?? segment.shiftStartTime ?? "99:99:99";

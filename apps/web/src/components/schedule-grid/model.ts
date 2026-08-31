@@ -93,7 +93,6 @@ export interface ScheduleGridDepartmentModel {
 export interface ScheduleGridModel {
   spanWeeks: 1 | 2;
   activeFocusArea: number | null;
-  today: Date;
   todayKey: string;
   columns: GridColumnMeta[];
   week1: Date[];
@@ -111,6 +110,7 @@ export interface ScheduleGridModel {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  useCompactRoleCertificationLabels: boolean;
   openShifts: GridOpenShift[];
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
@@ -171,7 +171,11 @@ export interface BuildScheduleGridModelInput {
   week1: Date[];
   week2: Date[];
   spanWeeks: 1 | 2;
-  today: Date;
+  /** Calendar-day key ("YYYY-MM-DD") for "today", already resolved in the
+   * organization's timezone by the caller — never derive it from a raw Date
+   * here, since a device-local Date passed through UTC formatting can land
+   * on the wrong side of midnight (see schedule-core's dates.ts comment). */
+  todayKey: string;
   focusAreas: FocusArea[];
   departments: Department[];
   assignments: AssignmentDefinition[];
@@ -193,6 +197,7 @@ export interface BuildScheduleGridModelInput {
   canDragShifts?: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
   showShiftDetailHoverCards?: boolean;
+  useCompactRoleCertificationLabels?: boolean;
   showPublishDiffOverlay?: boolean;
   showAudit?: boolean;
   accessors: ScheduleGridAccessors;
@@ -210,7 +215,7 @@ export function buildScheduleGridModel({
   week1,
   week2,
   spanWeeks,
-  today,
+  todayKey,
   focusAreas,
   departments,
   assignments,
@@ -232,12 +237,12 @@ export function buildScheduleGridModel({
   canDragShifts = isCellInteractive,
   shiftDisplayMode = "code",
   showShiftDetailHoverCards = true,
+  useCompactRoleCertificationLabels = false,
   showPublishDiffOverlay,
   showAudit = false,
   accessors,
 }: BuildScheduleGridModelInput): ScheduleGridModel {
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
-  const todayKey = formatDateKey(today);
   const columns = allDates.map((date, columnIndex): GridColumnMeta => ({
     columnIndex,
     date,
@@ -405,7 +410,6 @@ export function buildScheduleGridModel({
   return {
     spanWeeks,
     activeFocusArea,
-    today,
     todayKey,
     columns,
     week1,
@@ -423,6 +427,7 @@ export function buildScheduleGridModel({
     indicatorTypes,
     certifications,
     orgRoles,
+    useCompactRoleCertificationLabels,
     openShifts,
     coverageRequirements,
     absenceTypeMap,

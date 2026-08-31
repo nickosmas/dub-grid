@@ -32,7 +32,10 @@ import {
   fetchPublishedMobileScheduleRows as fetchPublishedMobileScheduleRowsData,
 } from "@dubgrid/data-access";
 import type { DbShiftRequest } from "@dubgrid/db-types";
-import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
+import {
+  buildShiftJobPairKey,
+  createAssignmentDefinitionIdByPairMap,
+} from "@/lib/shift-job-segments";
 import type {
   AssignmentDefinition,
   FocusArea,
@@ -44,6 +47,7 @@ import type {
 import type { Organization } from "@dubgrid/domain";
 import { DEFAULT_OPEN_SHIFT_VISIBILITY } from "@dubgrid/domain";
 import {
+  buildAssignableShiftDisplayMap,
   buildScheduleAssignmentOptions,
   buildShiftDisplayParts,
   formatAssignableShiftOptionLabel,
@@ -70,21 +74,17 @@ import type {
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  assembleDashboardCoverage,
   classifyOpenShiftUrgency,
+  formatLocalDateKey,
   hasShiftStartedAtTimeRanges,
-  summarizeCoverageByFocusArea,
-  summarizeCoverageTotals,
+  parseLocalDateKey,
   type CoverageByFocusAreaEntry,
+  type CoverageGap,
   type CoverageTotals,
+  type SegmentsForEmployeeDate,
 } from "@dubgrid/schedule-core";
-import {
-  buildAssignmentDefinitionIdsByFocusArea,
-  computeCoverageCategorySnapshots,
-  computeCoverageGaps,
-  normalizeCoverageRuleConfig,
-  timesOverlap,
-  type TimeRange,
-} from "@/lib/schedule-logic";
+import { normalizeCoverageRuleConfig, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 
 type EmbeddedEmployee = {
   id: string;
@@ -883,13 +883,14 @@ export async function fetchMobileScheduleEntries(
   return entries;
 }
 
-function parseMobileIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00`);
-}
-
-function formatMobileIsoDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
+// Delegates to @dubgrid/schedule-core's canonical local-date-key pair —
+// do not reintroduce a local parse/format pair here. A prior local copy of
+// this pair parsed as local midnight but formatted back via `.toISOString()`
+// (UTC), which silently shifted every date key back one day on any server
+// ahead of UTC — the exact bug that caused mobile's coverage totals to drop
+// the first day of a published week (see parseLocalDateKey's doc comment).
+const parseMobileIsoDate = parseLocalDateKey;
+const formatMobileIsoDate = formatLocalDateKey;
 
 function buildOpenShiftVolunteerSegmentKey({
   assignment,
@@ -934,7 +935,7 @@ function getPublishedMobileDates(
   });
 }
 
-async function fetchMobileOpenShiftContext(serviceClient: SupabaseClient, orgId: string) {
+export async function fetchMobileOpenShiftContext(serviceClient: SupabaseClient, orgId: string) {
   const contextRows = await fetchMobileOpenShiftContextRowsData(serviceClient, orgId);
   const focusAreas = contextRows.focusAreaRows.map(rowToFocusArea);
   const shiftCategories = contextRows.shiftCategoryRows.map(rowToShiftCategory);
@@ -953,9 +954,25 @@ async function fetchMobileOpenShiftContext(serviceClient: SupabaseClient, orgId:
     shiftCategories,
     jobs,
   });
+  // Coverage-gap labels (open-shift lists, not the mobile grid) are always
+  // spelled out in full, regardless of the org's shiftDisplayMode setting.
+  const assignmentNameMap = buildAssignableShiftDisplayMap({
+    assignments,
+    shiftCategories,
+    jobs,
+    focusAreas,
+    shiftDisplayMode: "name",
+  });
+  // For resolving a schedule segment's (shiftId, jobId) pair to the
+  // assignment definition that carries its default hours/duration —
+  // packages/mobile-api-core's staff-hours computation needs this the same
+  // way the coverage engine already does.
+  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(assignments);
 
   return {
     assignments,
+    assignmentIdByPair,
+    assignmentNameMap,
     coverageRequirements,
     coverageRuleConfig,
     employees,
@@ -976,9 +993,8 @@ type MobileOpenShiftInput = {
 };
 
 /**
- * Fetches + assembles every input the coverage engine
- * (computeCoverageCategorySnapshots/computeCoverageGaps) needs for a given
- * org/date range. Shared by fetchMobileOpenShifts and
+ * Fetches + assembles every input `assembleDashboardCoverage` needs for a
+ * given org/date range. Shared by fetchMobileOpenShifts and
  * fetchMobileCoverageSummary so the dashboard's coverage totals and the
  * open-shifts list are always computed from the exact same one DB round-trip
  * — not two independently-fetched (and potentially inconsistent) snapshots.
@@ -1091,33 +1107,12 @@ async function buildMobileCoverageEngineInputs(
       }
     }
   }
-  const employeesByFocusArea = new Map<number, Employee[]>();
-  for (const focusArea of context.focusAreas) {
-    employeesByFocusArea.set(
-      focusArea.id,
-      context.employees.filter((employee) => employee.focusAreaIds.includes(focusArea.id)),
-    );
-  }
   const rowByEmployeeDate = new Map(scheduleRows.map((row) => [`${row.emp_id}_${row.date}`, row]));
-  const mentoredCoverageCredit = context.coverageRuleConfig.mentoredCoverageCreditPercent / 100;
-  const coverageCreditForKey = (empId: string, date: Date, assignmentId: number) => {
-    const row = rowByEmployeeDate.get(`${empId}_${formatMobileIsoDate(date)}`);
-    if (!row || row.state.kind !== "worked") {
-      return 0;
-    }
-
-    let credit = 0;
-    for (const segment of row.state.segments) {
-      const segmentAssignmentId = assignmentIdByPair.get(
-        buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
-      );
-      if (segmentAssignmentId === assignmentId) {
-        credit = Math.max(credit, segment.isMentored ? mentoredCoverageCredit : 1);
-      }
-    }
-    return credit;
-  };
-  const assignmentIdsForKey = (empId: string, date: Date): number[] => {
+  // The one platform-specific adapter: reads an employee's resolved shift
+  // segments for a date out of mobile's row shape. Everything downstream
+  // (credit resolution, gap/total math) is the shared @dubgrid/schedule-core
+  // engine — see assembleDashboardCoverage in coverage-assembly.ts.
+  const segmentsForKey: SegmentsForEmployeeDate = (empId, date) => {
     const row = rowByEmployeeDate.get(`${empId}_${formatMobileIsoDate(date)}`);
     if (!row || row.state.kind !== "worked") {
       return [];
@@ -1127,14 +1122,12 @@ async function buildMobileCoverageEngineInputs(
       const assignmentId = assignmentIdByPair.get(
         buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
       );
-      return assignmentId == null ? [] : [assignmentId];
+      return assignmentId == null
+        ? []
+        : [{ assignmentId, isMentored: Boolean(segment.isMentored) }];
     });
   };
   const jobNameMap = new Map(context.jobs.map((job) => [job.id, job.name]));
-  const assignmentIdsByFocusArea = buildAssignmentDefinitionIdsByFocusArea(
-    context.focusAreas,
-    context.assignments,
-  );
 
   return {
     dates,
@@ -1144,10 +1137,7 @@ async function buildMobileCoverageEngineInputs(
     focusAreaNameMap,
     jobNameMap,
     assignmentById,
-    assignmentIdsByFocusArea,
-    employeesByFocusArea,
-    coverageCreditForKey,
-    assignmentIdsForKey,
+    segmentsForKey,
     pendingVolunteerRequestIdsByAssignmentKey,
     ownPendingVolunteerAssignmentKeys,
     rowByEmployeeDate,
@@ -1158,7 +1148,7 @@ type MobileCoverageEngineInputs = Awaited<ReturnType<typeof buildMobileCoverageE
 
 /** Transforms coverage gaps into the volunteer-eligibility-annotated MobileOpenShift feed shape. */
 function buildMobileOpenShiftsFromGaps(
-  gaps: ReturnType<typeof computeCoverageGaps>,
+  gaps: CoverageGap[],
   inputs: MobileCoverageEngineInputs,
   input: MobileOpenShiftInput,
 ): MobileOpenShift[] {
@@ -1334,7 +1324,7 @@ function buildMobileOpenShiftsFromGaps(
     const segments = buildMobileShiftRequestSegments({
       customStartTime: null,
       customEndTime: null,
-      fallbackShiftName: gap.assignmentLabel,
+      fallbackShiftName: gap.assignmentFullName,
       focusAreaId: gap.focusAreaId,
       focusAreaNameMap,
       jobIds,
@@ -1374,7 +1364,7 @@ function buildMobileOpenShiftsFromGaps(
             segments
               .map((segment) => segment.label ?? segment.shiftName)
               .filter(Boolean)
-              .join(" / ") || gap.assignmentLabel,
+              .join(" / ") || gap.assignmentFullName,
           focusAreaId: gap.focusAreaId,
           focusAreaName: gap.focusAreaName,
           displayFocusAreaName: segments[0]?.displayFocusAreaName ?? null,
@@ -1398,16 +1388,16 @@ export async function fetchMobileOpenShifts(
     return [];
   }
 
-  const gaps = computeCoverageGaps({
+  const { gaps } = assembleDashboardCoverage({
     focusAreas: inputs.context.focusAreas,
     shiftCategories: inputs.context.shiftCategories,
     assignments: inputs.context.assignments,
     requirements: inputs.context.coverageRequirements,
+    employees: inputs.context.employees,
     dates: inputs.dates,
-    employeesByFocusArea: inputs.employeesByFocusArea,
-    assignmentIdsForKey: inputs.assignmentIdsForKey,
-    assignmentIdsByFocusArea: inputs.assignmentIdsByFocusArea,
-    coverageCreditForKey: inputs.coverageCreditForKey,
+    segmentsForKey: inputs.segmentsForKey,
+    coverageRuleConfig: inputs.context.coverageRuleConfig,
+    assignmentNameMap: inputs.context.assignmentNameMap,
   });
 
   return buildMobileOpenShiftsFromGaps(gaps, inputs, input);
@@ -1426,9 +1416,9 @@ export interface MobileCoverageSummary {
  * count, and per-focus-area filled/required numbers. Built from the exact
  * same coverage-engine inputs (one DB round-trip) as fetchMobileOpenShifts,
  * so the dashboard's totals and its open-shifts list can never disagree with
- * each other — and because both platforms' totals now flow through
- * @dubgrid/schedule-core's summarizeCoverageTotals/summarizeCoverageByFocusArea,
- * they can't silently diverge from web's dashboard numbers either.
+ * each other — and because both platforms' totals now flow through the same
+ * @dubgrid/schedule-core assembleDashboardCoverage input-assembly layer, not
+ * just the same math, they can't silently diverge from web's numbers either.
  */
 export async function fetchMobileCoverageSummary(
   serviceClient: SupabaseClient,
@@ -1447,24 +1437,22 @@ export async function fetchMobileCoverageSummary(
     };
   }
 
-  const coverageInput = {
+  const { gaps, totals, byFocusArea } = assembleDashboardCoverage({
     focusAreas: inputs.context.focusAreas,
     shiftCategories: inputs.context.shiftCategories,
     assignments: inputs.context.assignments,
     requirements: inputs.context.coverageRequirements,
+    employees: inputs.context.employees,
     dates: inputs.dates,
-    employeesByFocusArea: inputs.employeesByFocusArea,
-    assignmentIdsForKey: inputs.assignmentIdsForKey,
-    assignmentIdsByFocusArea: inputs.assignmentIdsByFocusArea,
-    coverageCreditForKey: inputs.coverageCreditForKey,
-  };
-  const snapshots = computeCoverageCategorySnapshots(coverageInput);
-  const gaps = computeCoverageGaps(coverageInput);
+    segmentsForKey: inputs.segmentsForKey,
+    coverageRuleConfig: inputs.context.coverageRuleConfig,
+    assignmentNameMap: inputs.context.assignmentNameMap,
+  });
 
   return {
     openShifts: buildMobileOpenShiftsFromGaps(gaps, inputs, input),
-    totals: summarizeCoverageTotals(snapshots),
-    byFocusArea: summarizeCoverageByFocusArea(snapshots, inputs.context.focusAreas),
+    totals,
+    byFocusArea,
     hasCoverageRequirements,
     scheduleRows: inputs.scheduleRows,
   };
@@ -1718,6 +1706,7 @@ export function mapOrganizationToMobileConfig(org: Organization) {
     timezone: org.timezone,
     payPeriodStartDate: org.payPeriodStartDate,
     shiftDisplayMode: org.shiftDisplayMode,
+    useCompactRoleCertificationLabels: org.useCompactRoleCertificationLabels ?? false,
     labels: {
       focusArea: org.focusAreaLabel,
       certification: org.certificationLabel,

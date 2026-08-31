@@ -285,6 +285,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     allShifts: makeShiftMap(todayKey),
     assignmentById,
     assignmentLabelMap: new Map([[assignment.id, assignment.label]]),
+    assignmentNameMap: new Map([[assignment.id, assignment.name]]),
     assignments: [assignment],
     coverageRequirements: [],
     currentEmpId: employee.id,

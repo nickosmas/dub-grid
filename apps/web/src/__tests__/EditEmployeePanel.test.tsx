@@ -1,9 +1,21 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { Employee, FocusArea, NamedItem } from "@/types";
+import { checkEmployeeEmailConflict } from "@/features/employees/client";
+import { Employee, FocusArea, Invitation, NamedItem } from "@/types";
+
+vi.mock("@/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks")>()),
+  useIsInSandbox: () => false,
+}));
+
+vi.mock("@/features/employees/client", () => ({
+  checkEmployeeEmailConflict: vi.fn(),
+}));
+
+const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
@@ -82,10 +94,34 @@ const employee: Employee = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+const pendingInvitation: Invitation = {
+  id: "inv-1",
+  orgId: "org-1",
+  invitedBy: null,
+  email: "alice@example.com",
+  roleToAssign: "user",
+  expiresAt: "2099-01-01T00:00:00.000Z",
+  acceptedAt: null,
+  revokedAt: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  employeeId: "emp-42",
+  firstName: "Alice",
+  lastName: "Smith",
+  phone: null,
+  departmentIds: [10],
+  deptAdminIds: [],
+};
+
 function renderPanel(
   overrides: Partial<{
     onSave: (e: Employee) => void;
     onCancel: () => void;
+    isManagementUser: boolean;
+    pendingInvitation: Invitation;
+    onSaveWithReinvite: (updated: Employee, oldInvitation: Invitation) => void | Promise<void>;
+    orgId: string;
+    onEmailConflictChange: (hasConflict: boolean) => void;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
@@ -94,11 +130,16 @@ function renderPanel(
   render(
     <EditEmployeePanel
       employee={employee}
+      orgId={overrides.orgId}
       focusAreas={focusAreas}
       certifications={[...DESIGNATIONS]}
       roles={[...ROLES]}
+      isManagementUser={overrides.isManagementUser}
       onSave={onSave}
       onCancel={onCancel}
+      pendingInvitation={overrides.pendingInvitation}
+      onSaveWithReinvite={overrides.onSaveWithReinvite}
+      onEmailConflictChange={overrides.onEmailConflictChange}
     />,
   );
 
@@ -206,6 +247,45 @@ describe("EditEmployeePanel", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Remove from Schedule (management users)
+  // -------------------------------------------------------------------------
+  describe("Remove from Schedule (management users)", () => {
+    it("does not render a Remove from Schedule button for a non-management user", () => {
+      renderPanel();
+      expect(
+        screen.queryByRole("button", { name: "Remove from Schedule" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("allows a management user to clear all focus areas and save with an empty list", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, isManagementUser: true });
+
+      await user.click(screen.getByRole("button", { name: "Remove from Schedule" }));
+
+      expect(screen.getByText(/removes them from the schedule/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ focusAreaIds: [] }));
+    });
+
+    it("Save is not disabled when all focus areas are deselected for a management user", async () => {
+      const user = userEvent.setup();
+      renderPanel({ isManagementUser: true });
+      // Modify name so isModified is true
+      const nameInput = screen.getByDisplayValue("Alice");
+      await user.clear(nameInput);
+      await user.type(nameInput, "Bob");
+      // Deselect the only assigned focus area (North)
+      await user.click(screen.getByRole("button", { name: "North" }));
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Save action
   // -------------------------------------------------------------------------
   describe("Save action", () => {
@@ -258,6 +338,249 @@ describe("EditEmployeePanel", () => {
       expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
       expect(onSave).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Real-time duplicate-email check
+  // -------------------------------------------------------------------------
+  describe("Real-time duplicate-email check", () => {
+    beforeEach(() => {
+      // mockReset (not mockClear) also drops any queued mockResolvedValueOnce
+      // implementation. A prior test's debounced check can still be pending
+      // when that test's own assertions finish (its 400ms timer hasn't fired
+      // yet) — RTL's cleanup() cancels it via the effect's own cleanup, but a
+      // queued *Once* value that call would have consumed is left sitting in
+      // the queue and gets consumed by the next test's first call instead.
+      checkEmployeeEmailConflictMock.mockReset();
+    });
+
+    it("flags an email already used by another employee and blocks saving", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      checkEmployeeEmailConflictMock.mockResolvedValue({
+        conflict: true,
+        conflictingEmployeeId: "other-emp",
+      });
+      renderPanel({ onSave, orgId: "org-1" });
+
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      await user.clear(emailInput);
+      await user.type(emailInput, "taken@example.com");
+
+      await screen.findByText(/already used by another person on your team/i);
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("does not flag or check when the email is unchanged", async () => {
+      const user = userEvent.setup();
+      checkEmployeeEmailConflictMock.mockResolvedValue({
+        conflict: false,
+        conflictingEmployeeId: null,
+      });
+      renderPanel({ orgId: "org-1" });
+
+      // Modify an unrelated field so Save becomes enabled without touching email.
+      const firstNameInput = screen.getByDisplayValue("Alice");
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, "Bob");
+
+      expect(checkEmployeeEmailConflictMock).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+    });
+
+    it("does not check when orgId is not provided", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave });
+
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      await user.clear(emailInput);
+      await user.type(emailInput, "new.address@example.com");
+
+      expect(checkEmployeeEmailConflictMock).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+      );
+    });
+
+    it("clears the conflict and allows saving once the email is fixed", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      checkEmployeeEmailConflictMock.mockResolvedValueOnce({
+        conflict: true,
+        conflictingEmployeeId: "other-emp",
+      });
+      renderPanel({ onSave, orgId: "org-1" });
+
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      await user.clear(emailInput);
+      await user.type(emailInput, "taken@example.com");
+      await screen.findByText(/already used by another person on your team/i);
+
+      checkEmployeeEmailConflictMock.mockResolvedValueOnce({
+        conflict: false,
+        conflictingEmployeeId: null,
+      });
+      await user.clear(emailInput);
+      await user.type(emailInput, "free@example.com");
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/already used by another person on your team/i),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ email: "free@example.com" }));
+    });
+
+    // Regression guard: a host embedding this panel with `hideActions` (the
+    // staff slide-over) renders its own Save button and has no visibility
+    // into internal field validation beyond `onDirtyChange` — without this
+    // callback, that button stayed enabled while a conflict was showing, and
+    // clicking it silently no-op'd instead of visibly disabling. Confirmed
+    // live in the browser before this callback was added.
+    it("notifies the host via onEmailConflictChange as the conflict appears and clears", async () => {
+      checkEmployeeEmailConflictMock.mockResolvedValue({
+        conflict: true,
+        conflictingEmployeeId: "other-emp",
+      });
+      const onEmailConflictChange = vi.fn();
+      renderPanel({ orgId: "org-1", onEmailConflictChange });
+
+      expect(onEmailConflictChange).toHaveBeenCalledWith(false);
+
+      // A single fireEvent.change (rather than user.type's per-keystroke
+      // updates) keeps this deterministic regardless of how the 400ms
+      // debounce lands relative to typing speed.
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      fireEvent.change(emailInput, { target: { value: "taken@example.com" } });
+      await screen.findByText(/already used by another person on your team/i);
+
+      expect(onEmailConflictChange).toHaveBeenLastCalledWith(true);
+
+      checkEmployeeEmailConflictMock.mockResolvedValue({
+        conflict: false,
+        conflictingEmployeeId: null,
+      });
+      fireEvent.change(emailInput, { target: { value: "free@example.com" } });
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/already used by another person on your team/i),
+        ).not.toBeInTheDocument(),
+      );
+
+      expect(onEmailConflictChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Changing the email with a pending invitation present
+  // -------------------------------------------------------------------------
+  describe("Changing the email with a pending invitation present", () => {
+    async function changeEmail(user: ReturnType<typeof userEvent.setup>) {
+      const emailInput = screen.getByDisplayValue("alice@example.com");
+      await user.clear(emailInput);
+      await user.type(emailInput, "new.address@example.com");
+    }
+
+    it("shows a confirm dialog instead of saving immediately, and does not call onSave", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite: vi.fn() });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(
+        screen.getByText(/changing the email will revoke the pending invitation/i),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save & Send" })).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("Cancel closes the dialog without saving anything", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      const onSaveWithReinvite = vi.fn();
+      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(
+        screen.queryByText(/changing the email will revoke the pending invitation/i),
+      ).not.toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onSaveWithReinvite).not.toHaveBeenCalled();
+      // The edit is not discarded — the admin can still adjust and retry.
+      expect(screen.getByDisplayValue("new.address@example.com")).toBeInTheDocument();
+    });
+
+    it("Save & Send calls onSaveWithReinvite with the updated employee and the old invitation, not onSave", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      const onSaveWithReinvite = vi.fn().mockResolvedValue(undefined);
+      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Save & Send" }));
+
+      expect(onSaveWithReinvite).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+        pendingInvitation,
+      );
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("does not gate the save when there is no pending invitation", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, onSaveWithReinvite: vi.fn() });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+      );
+      expect(
+        screen.queryByText(/changing the email will revoke the pending invitation/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("falls back to a plain save when onSaveWithReinvite is not provided", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, pendingInvitation });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+      );
+    });
+
+    it("does not gate the save when the email is unchanged", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite: vi.fn() });
+
+      const firstNameInput = screen.getByDisplayValue("Alice");
+      await user.clear(firstNameInput);
+      await user.type(firstNameInput, "Bob");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ firstName: "Bob" }));
     });
   });
 

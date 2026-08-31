@@ -61,6 +61,7 @@ CREATE TABLE public.organizations (
   shift_display_mode   TEXT DEFAULT 'code'
     CONSTRAINT shift_display_mode_check CHECK (shift_display_mode IN ('code', 'name')),
   show_shift_detail_hover_cards BOOLEAN NOT NULL DEFAULT true,
+  use_compact_role_certification_labels BOOLEAN NOT NULL DEFAULT false,
   timezone             TEXT NOT NULL DEFAULT 'UTC',
   pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,
@@ -197,6 +198,10 @@ CREATE TABLE public.organization_roles (
   name          TEXT NOT NULL,
   abbr          TEXT NOT NULL,
   is_schedule_role BOOLEAN NOT NULL DEFAULT true,
+  -- Certifications that qualify someone for this role. Empty = no requirement,
+  -- so the role stays assignable to anyone. An employee holds exactly one
+  -- certification, so satisfying this is a membership test, never an AND.
+  required_certification_ids BIGINT[] NOT NULL DEFAULT '{}',
   sort_order    INTEGER NOT NULL DEFAULT 0,
   archived_at   TIMESTAMPTZ
 );
@@ -1260,6 +1265,7 @@ CREATE UNIQUE INDEX organization_roles_org_name_active_unique ON public.organiza
 CREATE INDEX idx_organization_roles_active ON public.organization_roles(org_id) WHERE archived_at IS NULL;
 CREATE INDEX idx_organization_roles_schedule_active ON public.organization_roles(org_id) WHERE archived_at IS NULL AND is_schedule_role = true;
 CREATE INDEX idx_organization_roles_department_ids ON public.organization_roles USING GIN (department_ids);
+CREATE INDEX idx_organization_roles_required_cert_ids ON public.organization_roles USING GIN (required_certification_ids);
 
 -- focus_areas
 CREATE INDEX idx_focus_areas_org_id ON public.focus_areas(org_id);

@@ -29,7 +29,7 @@ interface MonthViewProps {
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   isAbsenceForKey?: (empId: string, date: Date) => boolean;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  today: Date;
+  todayKey: string;
   focusAreas: FocusArea[];
   assignments?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
@@ -276,7 +276,7 @@ export default function MonthView({
   assignmentIdsForKey,
   isAbsenceForKey,
   getShiftStyle,
-  today,
+  todayKey,
   focusAreas,
   assignments = [],
   shiftCategories,
@@ -285,7 +285,6 @@ export default function MonthView({
   shiftDisplayMode = "code",
 }: MonthViewProps) {
   const isNameMode = shiftDisplayMode === "name";
-  const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
   const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);

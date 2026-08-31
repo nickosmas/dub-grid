@@ -4,19 +4,29 @@ import type {
   MobileScheduleRange,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
-import type { CoverageByFocusAreaEntry, CoverageTotals } from "@dubgrid/schedule-core";
+import {
+  buildShiftJobPairKey,
+  computeShiftSegmentHours,
+  formatLocalDateKey,
+  parseLocalDateKey,
+  resolveActiveShiftRequests,
+  type CoverageByFocusAreaEntry,
+  type CoverageTotals,
+} from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
 const OVERTIME_THRESHOLD_HOURS = 40;
-// Server-side caps are intentionally higher than each card's default
-// collapsed view on mobile (3 rows) — the client's ExpandableList component
-// reveals the rest of this same payload on "Show more" rather than paginating.
-const MAX_COVERAGE_SECTIONS = 10;
-const MAX_OPEN_SHIFTS = 10;
-const MAX_ACTIVITY_ITEMS = 10;
-const MAX_STAFF_HOURS_ENTRIES = 10;
-const MAX_ACTION_QUEUE_ITEMS = 10;
+// Coverage sections, open shifts, staff-hours entries, and the action queue
+// are all naturally bounded by org size (focus areas, employees, coverage
+// gaps) — not unbounded historical data — so they're returned in full; the
+// client's ExpandableList component reveals the rest via "Show more" rather
+// than paginating. A 10-item server-side cap here previously truncated data
+// on any org with more than 10 of something, which "Show more" could never
+// actually reveal past that ceiling. Activity is genuinely append-only, so
+// it keeps a cap — matching web's buildActivityFeed(..., 100)
+// (apps/web/src/lib/dashboard-stats.ts).
+const MAX_ACTIVITY_ITEMS = 100;
 
 export type MobileDashboardContext = {
   currentOrg: { id: string; timezone?: string | null };
@@ -67,19 +77,32 @@ type FetchMobileShiftRequests = (
   },
 ) => Promise<MobileShiftRequest[]>;
 
-export type DashboardShiftCategoryRow = {
+// Mapped (camelCase) shapes matching @dubgrid/schedule-core's
+// HoursAssignmentLike/HoursShiftCategoryLike structurally, so the same
+// assignment/category rows the coverage engine already resolves (via web's
+// fetchMobileOpenShiftContext in apps/web/src/features/mobile/server/data.ts)
+// can also drive computeShiftSegmentHours below.
+export type DashboardAssignmentRow = {
   id: number;
-  start_time: string | null;
-  end_time: string | null;
-  break_minutes: number | null;
+  shiftId?: number | null;
+  jobId?: number | null;
+  categoryId?: number | null;
+  defaultStartTime?: string | null;
+  defaultEndTime?: string | null;
+  defaultDurationHours?: number | null;
+  defaultDurationMinutes?: number | null;
 };
 
-export type DashboardCoverageRequirementRow = {
-  focus_area_id: number;
-  job_id: number | null;
-  preferred_shift_id: number | null;
-  day_of_week: number | null;
-  min_staff: number;
+export type DashboardShiftCategoryRow = {
+  id: number;
+  startTime?: string | null;
+  endTime?: string | null;
+  breakMinutes?: number | null;
+  // Legacy data-access rows use database casing. Keeping this boundary tolerant
+  // lets a partially rolled-out mobile client keep calculating hours safely.
+  start_time?: string | null;
+  end_time?: string | null;
+  break_minutes?: number | null;
 };
 
 export type DashboardFocusAreaRow = {
@@ -91,9 +114,12 @@ type FetchMobileOpenShiftContext = (
   serviceClient: SupabaseClient,
   orgId: string,
 ) => Promise<{
-  shiftCategoryRows: DashboardShiftCategoryRow[];
-  coverageRequirementRows: DashboardCoverageRequirementRow[];
-  focusAreaRows: DashboardFocusAreaRow[];
+  assignments: DashboardAssignmentRow[];
+  /** Resolves a segment's (shiftId, jobId) pair to its assignment id — the
+   * same pair-key format as @dubgrid/schedule-core's coverage engine uses. */
+  assignmentIdByPair: Map<string, number>;
+  shiftCategories: DashboardShiftCategoryRow[];
+  focusAreas: DashboardFocusAreaRow[];
 }>;
 
 export type DashboardScheduleCellRow = {
@@ -102,7 +128,7 @@ export type DashboardScheduleCellRow = {
   focus_area_id: number | null;
   state: {
     kind: string;
-    segments: Array<{ shiftId: number | null }>;
+    segments: Array<{ shiftId: number | null; jobId: number }>;
     customStartTime: string | null;
     customEndTime: string | null;
   };
@@ -155,11 +181,6 @@ type FetchProfileNameRowsByIds = (
 
 // ── Pure helpers (independently testable) ───────────────────────────────
 
-function parseTimeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
 // Activity descriptions are pre-composed server-side text (unlike other
 // fields, which stay raw for the client to format), so the US date format
 // has to be baked in here too.
@@ -169,33 +190,32 @@ function formatUsDateForActivity(isoDate: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 }
 
-function durationHours(startTime: string, endTime: string): number {
-  const s = parseTimeToMinutes(startTime);
-  const e = parseTimeToMinutes(endTime);
-  const mins = e > s ? e - s : 1440 - s + e; // handles overnight shifts
-  return mins / 60;
-}
-
 function getDateKeysInRange(startDate: string, endDate: string): string[] {
   const keys: string[] = [];
-  const cursor = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
+  // parseLocalDateKey/formatLocalDateKey, not local-midnight-then-toISOString
+  // — that round-trip silently shifts every key back one day on a server
+  // ahead of UTC (see parseLocalDateKey's doc comment in @dubgrid/schedule-core).
+  const cursor = parseLocalDateKey(startDate);
+  const end = parseLocalDateKey(endDate);
   while (cursor <= end) {
-    keys.push(cursor.toISOString().slice(0, 10));
+    keys.push(formatLocalDateKey(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return keys;
 }
 
 export function buildHeroSummary(input: {
-  openGapCount: number;
+  urgentGapCount: number;
   pendingApprovalsCount: number;
   hasCoverageRequirements: boolean;
 }): MobileDashboardResponse["heroSummary"] {
-  if (input.openGapCount > 0) {
+  // Only high-urgency gaps escalate to the top-priority alert — matching
+  // web's hero headline (DashboardView.tsx), where a couple of low-urgency
+  // gaps alone don't read as "Attention" while everything else is fine.
+  if (input.urgentGapCount > 0) {
     return {
       statusLabel: "Attention",
-      title: `${input.openGapCount} coverage ${input.openGapCount === 1 ? "gap" : "gaps"}`,
+      title: `${input.urgentGapCount} urgent coverage ${input.urgentGapCount === 1 ? "gap" : "gaps"}`,
       description: "Resolve staffing gaps to keep your schedule fully covered.",
     };
   }
@@ -238,8 +258,7 @@ export function buildCoverageSectionsResponse(
       pct: entry.pct,
       openSlots: Math.max(0, entry.requiredTotal - entry.filledTotal),
     }))
-    .sort((a, b) => a.pct - b.pct || b.openSlots - a.openSlots)
-    .slice(0, MAX_COVERAGE_SECTIONS);
+    .sort((a, b) => a.pct - b.pct || b.openSlots - a.openSlots);
 }
 
 function getPrimaryFocusAreaId(hoursByFocusArea: Map<number, number>): number | null {
@@ -254,13 +273,32 @@ function getPrimaryFocusAreaId(hoursByFocusArea: Map<number, number>): number | 
   return best;
 }
 
+function normalizeShiftCategoryHours(
+  category: DashboardShiftCategoryRow,
+): DashboardShiftCategoryRow {
+  return {
+    ...category,
+    startTime: category.startTime ?? category.start_time ?? null,
+    endTime: category.endTime ?? category.end_time ?? null,
+    breakMinutes: category.breakMinutes ?? category.break_minutes ?? null,
+  };
+}
+
 export function computeStaffHoursForPeriod(
   scheduleRows: DashboardScheduleCellRow[],
   shiftCategoriesById: Map<number, DashboardShiftCategoryRow>,
   focusAreaNameById: Map<number, string>,
   range: MobileScheduleRange,
+  assignmentById = new Map<number, DashboardAssignmentRow>(),
+  assignmentIdByPair = new Map<string, number>(),
   otThreshold = OVERTIME_THRESHOLD_HOURS,
 ): MobileDashboardResponse["staffHours"] {
+  const normalizedShiftCategoriesById = new Map(
+    Array.from(shiftCategoriesById, ([id, category]) => [
+      id,
+      normalizeShiftCategoryHours(category),
+    ]),
+  );
   const byEmployee = new Map<
     string,
     { name: string; dailyHours: Map<string, number>; hoursByFocusArea: Map<number, number> }
@@ -269,26 +307,39 @@ export function computeStaffHoursForPeriod(
   for (const row of scheduleRows) {
     if (row.state.kind !== "worked") continue;
 
-    let hours = 0;
-    if (row.state.customStartTime && row.state.customEndTime) {
-      // Break is deducted from the first segment's category only — matches
-      // web's computeShiftDurationHours (apps/web/src/lib/dashboard-stats.ts).
-      const firstCategory =
-        row.state.segments[0]?.shiftId != null
-          ? shiftCategoriesById.get(row.state.segments[0].shiftId)
-          : undefined;
-      const raw = durationHours(row.state.customStartTime, row.state.customEndTime);
-      hours = Math.max(0, raw - (firstCategory?.break_minutes ?? 0) / 60);
-    } else {
-      for (const segment of row.state.segments) {
-        if (segment.shiftId == null) continue;
-        const category = shiftCategoriesById.get(segment.shiftId);
-        if (category?.start_time && category?.end_time) {
-          const raw = durationHours(category.start_time, category.end_time);
-          hours += Math.max(0, raw - (category.break_minutes ?? 0) / 60);
+    let assignmentIds = row.state.segments
+      .map((segment) =>
+        assignmentIdByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)),
+      )
+      .filter((id): id is number => id != null);
+    let hoursAssignmentById = assignmentById;
+    if (assignmentIds.length === 0) {
+      // Historical cells can predate an assignment definition or omit a job
+      // id. Their category still supplies the canonical default hours, so
+      // retain that information instead of turning real worked time into zero.
+      hoursAssignmentById = new Map(assignmentById);
+      assignmentIds = row.state.segments.flatMap((segment) => {
+        if (segment.shiftId == null) return [];
+        const id = -segment.shiftId;
+        if (!hoursAssignmentById.has(id)) {
+          hoursAssignmentById.set(id, { id, categoryId: segment.shiftId });
         }
-      }
+        return [id];
+      });
     }
+    // Canonical @dubgrid/schedule-core algorithm — assignment-level override
+    // time, then shift-category default time, then duration-only fields,
+    // with pipe-delimited per-segment custom-time parsing. The previous
+    // local version only ever read shift-category times directly, so it
+    // undercounted (or zeroed) hours for any org using assignment overrides
+    // or duration-only shift codes, silently missing real overtime.
+    const hours = computeShiftSegmentHours(
+      assignmentIds,
+      hoursAssignmentById,
+      row.state.customStartTime,
+      row.state.customEndTime,
+      normalizedShiftCategoriesById,
+    );
     if (hours <= 0) continue;
 
     const name = `${row.employees.first_name} ${row.employees.last_name}`.trim();
@@ -343,9 +394,7 @@ export function computeStaffHoursForPeriod(
     }
   }
 
-  return results
-    .sort((a, b) => b.overtimeHours - a.overtimeHours)
-    .slice(0, MAX_STAFF_HOURS_ENTRIES);
+  return results.sort((a, b) => b.overtimeHours - a.overtimeHours);
 }
 
 const SHIFT_CHANGE_DESCRIPTION: Record<DashboardPublishChange["kind"], string> = {
@@ -488,11 +537,22 @@ export async function loadMobileDashboardPayload(
     }),
   ]);
 
-  const shiftCategoriesById = new Map(
-    openShiftContext.shiftCategoryRows.map((row) => [row.id, row]),
-  );
-  const focusAreaNameById = new Map(
-    openShiftContext.focusAreaRows.map((row) => [row.id, row.name]),
+  const legacyOpenShiftContext = openShiftContext as typeof openShiftContext & {
+    assignmentIdByPair?: Map<string, number>;
+    assignments?: DashboardAssignmentRow[];
+    focusAreaRows?: DashboardFocusAreaRow[];
+    shiftCategories?: DashboardShiftCategoryRow[];
+    shiftCategoryRows?: DashboardShiftCategoryRow[];
+  };
+  const shiftCategories =
+    legacyOpenShiftContext.shiftCategories ?? legacyOpenShiftContext.shiftCategoryRows ?? [];
+  const focusAreas =
+    legacyOpenShiftContext.focusAreas ?? legacyOpenShiftContext.focusAreaRows ?? [];
+  const assignmentIdByPair = legacyOpenShiftContext.assignmentIdByPair ?? new Map<string, number>();
+  const shiftCategoriesById = new Map(shiftCategories.map((row) => [row.id, row]));
+  const focusAreaNameById = new Map(focusAreas.map((row) => [row.id, row.name]));
+  const assignmentById = new Map(
+    (legacyOpenShiftContext.assignments ?? []).map((row) => [row.id, row]),
   );
 
   const publisherIds = Array.from(
@@ -511,19 +571,32 @@ export async function loadMobileDashboardPayload(
     ]),
   );
 
-  const pendingApprovalRequests = shiftRequests.filter(
+  // Applies the same expiry/"already started" checks web's useShiftRequests
+  // hook has always applied client-side — mobile previously trusted the raw
+  // DB status column alone, so an expired-but-not-yet-cron-flipped or
+  // already-started request could count here when web would exclude it.
+  const activeShiftRequests = resolveActiveShiftRequests(
+    shiftRequests,
+    new Date(),
+    auth.currentOrg.timezone ?? null,
+  );
+  const pendingApprovalRequests = activeShiftRequests.filter(
     (request) => request.status === "pending_approval",
   );
   const { openShifts, totals, byFocusArea, hasCoverageRequirements, scheduleRows } =
     coverageSummary;
   const openGapCount = openShifts.reduce((sum, shift) => sum + shift.needed, 0);
+  const urgentGapCount = openShifts.reduce(
+    (sum, shift) => sum + (shift.urgency === "high" ? shift.needed : 0),
+    0,
+  );
   const coveragePct = hasCoverageRequirements ? totals.pct : null;
 
   return {
     range,
     overtimeThresholdHours: OVERTIME_THRESHOLD_HOURS,
     heroSummary: buildHeroSummary({
-      openGapCount,
+      urgentGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
       hasCoverageRequirements,
     }),
@@ -533,10 +606,7 @@ export async function loadMobileDashboardPayload(
       pendingApprovalsCount: pendingApprovalRequests.length,
     },
     coverageBySection: buildCoverageSectionsResponse(byFocusArea),
-    openShifts: openShifts
-      .slice()
-      .sort((a, b) => (a.date < b.date ? -1 : 1))
-      .slice(0, MAX_OPEN_SHIFTS),
+    openShifts: openShifts.slice().sort((a, b) => (a.date < b.date ? -1 : 1)),
     activity: buildActivityFeed(
       publishHistoryRows,
       shiftRequests,
@@ -548,7 +618,9 @@ export async function loadMobileDashboardPayload(
       shiftCategoriesById,
       focusAreaNameById,
       range,
+      assignmentById,
+      assignmentIdByPair,
     ),
-    actionQueue: isAdmin ? pendingApprovalRequests.slice(0, MAX_ACTION_QUEUE_ITEMS) : [],
+    actionQueue: isAdmin ? pendingApprovalRequests : [],
   };
 }

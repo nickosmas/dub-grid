@@ -25,10 +25,12 @@ export type SignOutScope = "others" | "global";
  * difference between them.
  */
 export function SignOutScopeSheet({
+  hasOtherSessions,
   visible,
   onDismiss,
   onSelect,
 }: {
+  hasOtherSessions: boolean;
   visible: boolean;
   onDismiss: () => void;
   onSelect: (scope: SignOutScope) => void;
@@ -44,7 +46,12 @@ export function SignOutScopeSheet({
     >
       <View style={styles.options}>
         <ScopeOption
-          description="Every other device is signed out. You stay signed in here."
+          description={
+            hasOtherSessions
+              ? "Every other device is signed out. You stay signed in here."
+              : "No other active devices are signed in."
+          }
+          disabled={!hasOtherSessions}
           divider
           iconName="phone-portrait-outline"
           label="Sign out other devices"
@@ -64,6 +71,7 @@ export function SignOutScopeSheet({
 
 function ScopeOption({
   description,
+  disabled = false,
   divider = false,
   iconName,
   label,
@@ -71,6 +79,7 @@ function ScopeOption({
   onPress,
 }: {
   description: string;
+  disabled?: boolean;
   divider?: boolean;
   iconName: ComponentProps<typeof Ionicons>["name"];
   label: string;
@@ -83,6 +92,7 @@ function ScopeOption({
   return (
     <PressableRow
       accessibilityLabel={label}
+      disabled={disabled}
       style={[styles.option, divider && styles.optionDivider]}
       onPress={onPress}
     >

@@ -2253,7 +2253,9 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text style={styles.meHeroCollaboratorOverflowText}>+{overflowCount}</Text>
+              <Text maxFontSizeMultiplier={1.5} style={styles.meHeroCollaboratorOverflowText}>
+                +{overflowCount}
+              </Text>
             </View>
           </View>
         ) : null}
@@ -2691,8 +2693,18 @@ function OpenShiftsSection({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const { pushToast } = useToast();
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (requestsError) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error: requestsError,
+        title: "Could not load open shifts",
+        fallbackMessage: "We couldn't load open shifts right now.",
+      });
+    }
+  }, [requestsError, pushToast]);
   const availableOpenShiftFeed = useMemo(
     () =>
       buildAvailableOpenShiftFeed({
@@ -2944,7 +2956,7 @@ function OpenShiftsSection({
     );
   };
 
-  if (!requestsError && availableOpenShiftFeed.totalCount === 0) {
+  if (requestsError || availableOpenShiftFeed.totalCount === 0) {
     return null;
   }
 
@@ -2952,112 +2964,105 @@ function OpenShiftsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
 
-      {requestsError ? (
-        <StatusBanner
-          body="We couldn't load open shifts right now."
-          title="Could not load open shifts"
-        />
-      ) : (
-        <ScrollView
-          accessibilityLabel="Open shifts carousel"
-          horizontal
-          style={styles.openShiftCarousel}
-          contentContainerStyle={styles.openShiftCarouselContent}
-          showsHorizontalScrollIndicator={false}
-        >
-          {dateGroups.map((group) => {
-            const dateLabel = formatCompactScheduleDate(group.date);
-            const isExpandedDay = expandedDates[group.date] === true;
-            const isExpandableDay = group.items.length > 1;
-            const visibleItems = isExpandedDay
-              ? group.items
-              : group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
-            const isCollapsedStack = !isExpandedDay && visibleItems.length > 1;
-            const hiddenStackCount = isCollapsedStack ? visibleItems.length - 1 : 0;
-            const stackedDeckHeight =
-              hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT + OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
-            const stackCardHeight = stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
-            const cardToggleLabel = isExpandedDay
-              ? `Collapse open shifts for ${dateLabel}`
-              : `Expand open shifts for ${dateLabel}`;
+      <ScrollView
+        accessibilityLabel="Open shifts carousel"
+        horizontal
+        style={styles.openShiftCarousel}
+        contentContainerStyle={styles.openShiftCarouselContent}
+        showsHorizontalScrollIndicator={false}
+      >
+        {dateGroups.map((group) => {
+          const dateLabel = formatCompactScheduleDate(group.date);
+          const isExpandedDay = expandedDates[group.date] === true;
+          const isExpandableDay = group.items.length > 1;
+          const visibleItems = isExpandedDay
+            ? group.items
+            : group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
+          const isCollapsedStack = !isExpandedDay && visibleItems.length > 1;
+          const hiddenStackCount = isCollapsedStack ? visibleItems.length - 1 : 0;
+          const stackedDeckHeight =
+            hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT + OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
+          const stackCardHeight = stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
+          const cardToggleLabel = isExpandedDay
+            ? `Collapse open shifts for ${dateLabel}`
+            : `Expand open shifts for ${dateLabel}`;
 
-            return (
-              <View key={group.date} style={styles.openShiftDateCard}>
-                <View style={styles.openShiftDateHeader}>
-                  <Text style={styles.scheduleRowDate}>{dateLabel}</Text>
-                  <View
-                    accessibilityLabel={formatOpenShiftCardCountLabel(group.itemCount)}
-                    style={styles.openShiftCountBadge}
-                  >
-                    <Text style={styles.openShiftCountBadgeText}>{group.itemCount}</Text>
-                  </View>
-                </View>
+          return (
+            <View key={group.date} style={styles.openShiftDateCard}>
+              <View style={styles.openShiftDateHeader}>
+                <Text style={styles.scheduleRowDate}>{dateLabel}</Text>
                 <View
-                  style={[
-                    styles.openShiftDateCardItems,
-                    isCollapsedStack && styles.openShiftDateCardItemsStacked,
-                    isCollapsedStack && {
-                      minHeight: stackCardHeight,
-                      paddingBottom: stackedDeckHeight,
-                    },
-                  ]}
+                  accessibilityLabel={formatOpenShiftCardCountLabel(group.itemCount)}
+                  style={styles.openShiftCountBadge}
                 >
-                  {isCollapsedStack ? (
-                    <>
-                      {visibleItems.slice(1).map((item, index) => {
-                        const stackIndex = index + 1;
-                        const top = stackIndex * OPEN_SHIFT_STACK_PEEK_HEIGHT;
-                        const inset = stackIndex * OPEN_SHIFT_STACK_SIDE_INSET;
-
-                        return (
-                          <View
-                            key={`${item.key}-stacked`}
-                            pointerEvents="none"
-                            style={[
-                              styles.openShiftCard,
-                              styles.openShiftCardStacked,
-                              {
-                                height: stackCardHeight,
-                                left: inset,
-                                right: inset,
-                                top,
-                                zIndex: visibleItems.length - stackIndex,
-                              },
-                            ]}
-                          />
-                        );
-                      })}
-                      <View
-                        onLayout={(event) => {
-                          noteStackCardHeight(group.date, event.nativeEvent.layout.height);
-                        }}
-                        style={styles.openShiftCardLead}
-                      >
-                        {renderFeedCard(visibleItems[0] as AvailableShiftFeedItem, {
-                          accessibilityLabel: cardToggleLabel,
-                          onToggle: () => toggleExpandedDate(group.date),
-                        })}
-                      </View>
-                    </>
-                  ) : (
-                    visibleItems.map((item, index) =>
-                      renderFeedCard(
-                        item,
-                        isExpandableDay && index === 0
-                          ? {
-                              accessibilityLabel: cardToggleLabel,
-                              onToggle: () => toggleExpandedDate(group.date),
-                            }
-                          : undefined,
-                      ),
-                    )
-                  )}
+                  <Text style={styles.openShiftCountBadgeText}>{group.itemCount}</Text>
                 </View>
               </View>
-            );
-          })}
-        </ScrollView>
-      )}
+              <View
+                style={[
+                  styles.openShiftDateCardItems,
+                  isCollapsedStack && styles.openShiftDateCardItemsStacked,
+                  isCollapsedStack && {
+                    minHeight: stackCardHeight,
+                    paddingBottom: stackedDeckHeight,
+                  },
+                ]}
+              >
+                {isCollapsedStack ? (
+                  <>
+                    {visibleItems.slice(1).map((item, index) => {
+                      const stackIndex = index + 1;
+                      const top = stackIndex * OPEN_SHIFT_STACK_PEEK_HEIGHT;
+                      const inset = stackIndex * OPEN_SHIFT_STACK_SIDE_INSET;
+
+                      return (
+                        <View
+                          key={`${item.key}-stacked`}
+                          pointerEvents="none"
+                          style={[
+                            styles.openShiftCard,
+                            styles.openShiftCardStacked,
+                            {
+                              height: stackCardHeight,
+                              left: inset,
+                              right: inset,
+                              top,
+                              zIndex: visibleItems.length - stackIndex,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                    <View
+                      onLayout={(event) => {
+                        noteStackCardHeight(group.date, event.nativeEvent.layout.height);
+                      }}
+                      style={styles.openShiftCardLead}
+                    >
+                      {renderFeedCard(visibleItems[0] as AvailableShiftFeedItem, {
+                        accessibilityLabel: cardToggleLabel,
+                        onToggle: () => toggleExpandedDate(group.date),
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  visibleItems.map((item, index) =>
+                    renderFeedCard(
+                      item,
+                      isExpandableDay && index === 0
+                        ? {
+                            accessibilityLabel: cardToggleLabel,
+                            onToggle: () => toggleExpandedDate(group.date),
+                          }
+                        : undefined,
+                    ),
+                  )
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -3079,8 +3084,18 @@ function ShiftCoverRequestsSection({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
+  const { pushToast } = useToast();
+  useEffect(() => {
+    if (requestsError) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error: requestsError,
+        title: "Could not load requests",
+        fallbackMessage: "We couldn't load cover requests right now.",
+      });
+    }
+  }, [requestsError, pushToast]);
 
-  if (!requestsError && requests.length === 0) {
+  if (requestsError || requests.length === 0) {
     return null;
   }
 
@@ -3088,102 +3103,98 @@ function ShiftCoverRequestsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader title="Needs Your Response" />
 
-      {requestsError ? (
-        <StatusBanner
-          body="We couldn't load cover requests right now."
-          title="Could not load requests"
-        />
-      ) : (
-        <View style={styles.requestList}>
-          {requests.map((request) => {
-            const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
-            const jobChip = getRequestJobChip(
-              mobileColors,
-              resolvedTheme === "dark",
-              request,
-              "requester",
-            );
-            const shiftName = getRequestShiftName(request, "requester");
-            const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
-            const focusAreaName = getRequestFocusAreaName(request, "requester");
-            const isMentored = hasMentoredSegments(getRequestSegments(request, "requester"));
-            const timeRange = getRequestTimeRange(request, "requester");
-            const acceptBody: RequestActionBody | null = linkedEmployeeId
-              ? { action: "respond", empId: linkedEmployeeId, accept: true }
-              : null;
-            const declineBody: RequestActionBody | null = linkedEmployeeId
-              ? { action: "respond", empId: linkedEmployeeId, accept: false }
-              : null;
-            const isAcceptLoading =
-              acceptBody != null &&
-              pendingAction?.key === getMobileRequestActionKey(request.id, acceptBody);
-            const isDeclineLoading =
-              declineBody != null &&
-              pendingAction?.key === getMobileRequestActionKey(request.id, declineBody);
+      <View style={styles.requestList}>
+        {requests.map((request) => {
+          const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
+          const jobChip = getRequestJobChip(
+            mobileColors,
+            resolvedTheme === "dark",
+            request,
+            "requester",
+          );
+          const shiftName = getRequestShiftName(request, "requester");
+          const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
+          const focusAreaName = getRequestFocusAreaName(request, "requester");
+          const isMentored = hasMentoredSegments(getRequestSegments(request, "requester"));
+          const timeRange = getRequestTimeRange(request, "requester");
+          const acceptBody: RequestActionBody | null = linkedEmployeeId
+            ? { action: "respond", empId: linkedEmployeeId, accept: true }
+            : null;
+          const declineBody: RequestActionBody | null = linkedEmployeeId
+            ? { action: "respond", empId: linkedEmployeeId, accept: false }
+            : null;
+          const isAcceptLoading =
+            acceptBody != null &&
+            pendingAction?.key === getMobileRequestActionKey(request.id, acceptBody);
+          const isDeclineLoading =
+            declineBody != null &&
+            pendingAction?.key === getMobileRequestActionKey(request.id, declineBody);
 
-            return (
-              <View key={request.id} style={styles.requestCard}>
-                <View style={styles.requestHeaderRow}>
-                  <View style={styles.requestHeaderCopy}>
-                    <View
-                      style={[
-                        styles.requestAvatar,
-                        {
-                          backgroundColor: avatarTone.backgroundColor,
-                          borderColor: avatarTone.borderColor,
-                        },
-                      ]}
+          return (
+            <View key={request.id} style={styles.requestCard}>
+              <View style={styles.requestHeaderRow}>
+                <View style={styles.requestHeaderCopy}>
+                  <View
+                    style={[
+                      styles.requestAvatar,
+                      {
+                        backgroundColor: avatarTone.backgroundColor,
+                        borderColor: avatarTone.borderColor,
+                      },
+                    ]}
+                  >
+                    <Text
+                      maxFontSizeMultiplier={1.5}
+                      style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
-                      <Text style={[styles.requestAvatarText, { color: avatarTone.textColor }]}>
-                        {getInitials(request.requesterName)}
-                      </Text>
-                    </View>
-                    <View style={styles.requestHeaderTextStack}>
-                      <Text style={styles.requestHeaderText}>{request.requesterName}</Text>
-                      <Text style={styles.requestHeaderSubtext}>Needs shift coverage</Text>
-                    </View>
+                      {getInitials(request.requesterName)}
+                    </Text>
                   </View>
-                  <Text style={styles.requestDateText}>{getRequestDateLabel(request)}</Text>
+                  <View style={styles.requestHeaderTextStack}>
+                    <Text style={styles.requestHeaderText}>{request.requesterName}</Text>
+                    <Text style={styles.requestHeaderSubtext}>Needs shift coverage</Text>
+                  </View>
                 </View>
-
-                {shouldShowShiftName ? (
-                  <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
-                ) : null}
-                {jobChip || focusAreaName || isMentored ? (
-                  <View style={styles.scheduleRowContext}>
-                    <MeTypePill chip={jobChip} compact isMentored={isMentored} />
-                    {focusAreaName ? (
-                      <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
-                    ) : null}
-                  </View>
-                ) : null}
-                {timeRange ? (
-                  <View style={styles.scheduleRowTime}>
-                    <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
-                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.requestActions}>
-                  <Button
-                    disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label="Accept"
-                    loading={isAcceptLoading}
-                    onPress={() => onRespond(request.id, true)}
-                  />
-                  <Button
-                    disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label="Decline"
-                    loading={isDeclineLoading}
-                    onPress={() => onRespond(request.id, false)}
-                    tone="neutral"
-                  />
-                </View>
+                <Text style={styles.requestDateText}>{getRequestDateLabel(request)}</Text>
               </View>
-            );
-          })}
-        </View>
-      )}
+
+              {shouldShowShiftName ? (
+                <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+              ) : null}
+              {jobChip || focusAreaName || isMentored ? (
+                <View style={styles.scheduleRowContext}>
+                  <MeTypePill chip={jobChip} compact isMentored={isMentored} />
+                  {focusAreaName ? (
+                    <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+              {timeRange ? (
+                <View style={styles.scheduleRowTime}>
+                  <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
+                  <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.requestActions}>
+                <Button
+                  disabled={Boolean(pendingAction) || !linkedEmployeeId}
+                  label="Accept"
+                  loading={isAcceptLoading}
+                  onPress={() => onRespond(request.id, true)}
+                />
+                <Button
+                  disabled={Boolean(pendingAction) || !linkedEmployeeId}
+                  label="Decline"
+                  loading={isDeclineLoading}
+                  onPress={() => onRespond(request.id, false)}
+                  tone="neutral"
+                />
+              </View>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -3230,7 +3241,10 @@ function TeamShiftMemberRow({
           },
         ]}
       >
-        <Text style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
+        <Text
+          maxFontSizeMultiplier={1.5}
+          style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
+        >
           {getInitials(entry.employeeName)}
         </Text>
       </View>

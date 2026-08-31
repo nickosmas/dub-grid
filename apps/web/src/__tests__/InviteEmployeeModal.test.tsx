@@ -3,7 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import type { Department, Employee } from "@/types";
-import { createOrganizationInvitation } from "@/features/organization/client";
+import {
+  checkUserExistsByEmail,
+  createOrganizationInvitation,
+} from "@/features/organization/client";
+import {
+  checkEmployeeEmailConflict,
+  checkEmployeePhoneConflict,
+  updateEmployeeIdentity,
+} from "@/features/employees/client";
 import { useIsInSandbox } from "@/hooks/useIsInSandbox";
 
 vi.mock("@/hooks/useIsInSandbox", () => ({
@@ -21,6 +29,24 @@ vi.mock("@/features/organization/client", () => ({
   }),
 }));
 
+vi.mock("@/features/employees/client", () => {
+  class MockEmployeeContactConflictError extends Error {
+    constructor(
+      message: string,
+      public readonly field: "email" | "phone",
+    ) {
+      super(message);
+      this.name = "EmployeeContactConflictError";
+    }
+  }
+  return {
+    updateEmployeeIdentity: vi.fn(),
+    checkEmployeeEmailConflict: vi.fn(),
+    checkEmployeePhoneConflict: vi.fn(),
+    EmployeeContactConflictError: MockEmployeeContactConflictError,
+  };
+});
+
 vi.mock("@/features/permissions/client", () => ({
   usePermissions: () => ({
     isSuperAdmin: false,
@@ -36,6 +62,10 @@ vi.mock("sonner", () => ({
 }));
 
 const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
+const checkUserExistsByEmailMock = vi.mocked(checkUserExistsByEmail);
+const updateEmployeeIdentityMock = vi.mocked(updateEmployeeIdentity);
+const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
+const checkEmployeePhoneConflictMock = vi.mocked(checkEmployeePhoneConflict);
 const useIsInSandboxMock = vi.mocked(useIsInSandbox);
 
 const employee: Employee = {
@@ -87,6 +117,14 @@ describe("InviteEmployeeModal", () => {
       invitationId: "invite-1",
       token: "invite-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
+    });
+    checkEmployeeEmailConflictMock.mockResolvedValue({
+      conflict: false,
+      conflictingEmployeeId: null,
+    });
+    checkEmployeePhoneConflictMock.mockResolvedValue({
+      conflict: false,
+      conflictingEmployeeId: null,
     });
     vi.stubGlobal(
       "fetch",
@@ -284,6 +322,185 @@ describe("InviteEmployeeModal", () => {
 
     expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
+  });
+
+  it("seeds the email field from a pending invitation when the employee has none on file", async () => {
+    render(
+      <InviteEmployeeModal
+        employee={{ ...employee, email: "" }}
+        orgId="org-1"
+        orgName="Test Org"
+        pendingInvitation={{
+          id: "inv-1",
+          orgId: "org-1",
+          invitedBy: "user-2",
+          email: "already.invited@example.com",
+          roleToAssign: "user",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          acceptedAt: null,
+          revokedAt: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          employeeId: "emp-1",
+        }}
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByDisplayValue("already.invited@example.com")).toBeInTheDocument();
+  });
+
+  it("backfills a blank employee email before creating the invitation", async () => {
+    const user = userEvent.setup();
+    const onInvited = vi.fn();
+    updateEmployeeIdentityMock.mockResolvedValue({
+      success: true,
+      employee: { ...employee, email: "new.hire@example.com" },
+    });
+
+    render(
+      <InviteEmployeeModal
+        employee={{ ...employee, email: "" }}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={onInvited}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("employee@example.com"), "new.hire@example.com");
+    await user.click(await screen.findByRole("button", { name: /send invitation/i }));
+
+    await waitFor(() => {
+      expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
+        expect.objectContaining({ employeeId: "emp-1", email: "new.hire@example.com" }),
+      );
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.hire@example.com" }),
+      );
+      expect(onInvited).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.hire@example.com" }),
+      );
+    });
+    expect(updateEmployeeIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(
+      createOrganizationInvitationMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not backfill when the employee already has a contact email", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <InviteEmployeeModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /send invitation/i }));
+
+    await waitFor(() => {
+      expect(createOrganizationInvitationMock).toHaveBeenCalled();
+    });
+    expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it("locks the email field to the existing contact email and hides the duplicate-account lookup UI", async () => {
+    render(
+      <InviteEmployeeModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    const emailInput = await screen.findByPlaceholderText("employee@example.com");
+    expect(emailInput).toHaveValue(employee.email);
+    expect(emailInput).toBeDisabled();
+    expect(screen.getByText(/this is their contact email from staff details/i)).toBeInTheDocument();
+    expect(checkUserExistsByEmailMock).not.toHaveBeenCalled();
+    expect(checkEmployeeEmailConflictMock).not.toHaveBeenCalled();
+  });
+
+  it("does not backfill for a management-only invite (no employee record yet)", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <InviteEmployeeModal
+        employee={null}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
+    await user.type(screen.getByPlaceholderText("Smith"), "Lee");
+    await user.type(screen.getByPlaceholderText("employee@example.com"), "manager@example.com");
+    await user.click(screen.getByRole("button", { name: /send invitation/i }));
+
+    await waitFor(() => {
+      expect(createOrganizationInvitationMock).toHaveBeenCalled();
+    });
+    expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it("flags an email already used by another employee in realtime and blocks sending", async () => {
+    const user = userEvent.setup();
+    checkEmployeeEmailConflictMock.mockResolvedValue({
+      conflict: true,
+      conflictingEmployeeId: "other-emp",
+    });
+
+    render(
+      <InviteEmployeeModal
+        employee={{ ...employee, email: "" }}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("employee@example.com"), "taken@example.com");
+
+    await screen.findByText(/already used by another person on your team/i);
+    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
+    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it("flags a phone number already used by another employee in realtime for management invites", async () => {
+    const user = userEvent.setup();
+    checkEmployeePhoneConflictMock.mockResolvedValue({
+      conflict: true,
+      conflictingEmployeeId: "other-emp",
+    });
+
+    render(
+      <InviteEmployeeModal
+        employee={null}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
+    await user.type(screen.getByPlaceholderText("Smith"), "Lee");
+    await user.type(screen.getByPlaceholderText("employee@example.com"), "manager@example.com");
+    await user.type(screen.getByPlaceholderText("+1 555-123-4567"), "(415) 555-0100");
+
+    await screen.findByText(/already used by another person on your team/i);
+    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
+    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
 
   it("keeps employee invite mode sendable without separate name fields", async () => {

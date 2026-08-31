@@ -17,6 +17,10 @@ type SelectableTagProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "childre
   selectedBorderColor?: string;
   unselectedTextColor?: string;
   selectedTextColor?: string;
+  disabledBackground?: string;
+  disabledBorderColor?: string;
+  disabledTextColor?: string;
+  disabledOpacity?: number;
   labelStyle?: CSSProperties;
 };
 
@@ -37,12 +41,32 @@ export function SelectableTag({
   selectedBorderColor = "var(--dg-color-brand)",
   unselectedTextColor = "var(--dg-color-text-secondary)",
   selectedTextColor = "var(--dg-color-text-inverse)",
+  disabledBackground,
+  disabledBorderColor,
+  disabledTextColor,
+  disabledOpacity = 0.65,
   labelStyle,
   style,
   ...buttonProps
 }: SelectableTagProps) {
-  const borderColor = selected ? selectedBorderColor : unselectedBorderColor;
-  const textColor = selected ? selectedTextColor : unselectedTextColor;
+  const borderColor =
+    disabled && disabledBorderColor
+      ? disabledBorderColor
+      : selected
+        ? selectedBorderColor
+        : unselectedBorderColor;
+  const background =
+    disabled && disabledBackground
+      ? disabledBackground
+      : selected
+        ? selectedBackground
+        : unselectedBackground;
+  const textColor =
+    disabled && disabledTextColor
+      ? disabledTextColor
+      : selected
+        ? selectedTextColor
+        : unselectedTextColor;
 
   return (
     <button
@@ -57,7 +81,7 @@ export function SelectableTag({
         padding,
         borderRadius,
         border: `1.5px solid ${borderColor}`,
-        background: selected ? selectedBackground : unselectedBackground,
+        background,
         color: textColor,
         fontSize,
         fontWeight: selected ? selectedFontWeight : fontWeight,
@@ -66,7 +90,7 @@ export function SelectableTag({
         fontFamily: "inherit",
         lineHeight: 1.2,
         textAlign: "left",
-        opacity: disabled ? 0.65 : 1,
+        opacity: disabled ? disabledOpacity : 1,
         ...style,
       }}
     >

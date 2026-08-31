@@ -138,7 +138,9 @@ export default function ProfileSecurityScreen() {
         <StatusBanner
           actionLabel="Try Again"
           body={contentState.message}
+          fillScreen
           title="Could not load security"
+          variant="centered"
           onAction={() => {
             void profileQuery.refetch();
             void sessionsQuery.refetch();

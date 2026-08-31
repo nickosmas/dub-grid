@@ -200,15 +200,22 @@ checks do not make the Blueprint unusable.
 
 ## Commands
 
-<!-- blueprint:onboarding-required -->
+Current DubGrid commands (root, npm workspaces + Turborepo):
 
-Current DubGrid commands:
-
-- Dev server: `npm run dev` (http://localhost:3000)
+- Dev server (web): `npm run dev` (http://localhost:3000)
+- Dev server (mobile): `npm run dev:mobile`
 - Build: `npm run build`
 - Production server: `npm run start`
 - Lint: `npm run lint`
+- Type check: `npm run type-check`
+- Test (unit/integration, all workspaces): `npm run test`
+- Test (web only): `npm run test:web`
+- Test (mobile + shared packages): `npm run test:mobile`
+- Test (E2E, Playwright): `npm run test:e2e`
 
-Testing is opt-in. If this project does not already have a unit test runner, run
-`/tests` or `$tests` to add one and update this section with the real test
-commands.
+Testing is already configured (Vitest + Testing Library, Playwright for E2E),
+so the testing gate described in `coding-standards.md` is on. GitHub Actions
+already run CI (`ci.yml`, `e2e.yml`, `dependency-audit.yml`,
+`cron-expire-requests.yml`). No single documented `Verify` command exists yet;
+run `/ci` or `$ci` if you want one combined command and a matching workflow
+instead of running type-check/test/build separately.

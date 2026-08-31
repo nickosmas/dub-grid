@@ -19,6 +19,7 @@ export type OrganizationSettingsKey =
   | "departmentLabel"
   | "shiftDisplayMode"
   | "showShiftDetailHoverCards"
+  | "useCompactRoleCertificationLabels"
   | "enforceConflictPrevention"
   | "defaultShiftEnabled"
   | "coverageRuleConfig"
@@ -99,6 +100,11 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     sensitive: false,
     format: (value) => (value ? "Enabled" : "Disabled"),
   },
+  useCompactRoleCertificationLabels: {
+    label: "Compact Role and Certification Labels",
+    sensitive: false,
+    format: (value) => (value ? "Enabled" : "Disabled"),
+  },
   payPeriodStartDate: {
     label: "Pay Period Start Date",
     sensitive: true,
@@ -160,6 +166,7 @@ export function pickOrganizationSettings(organization: Organization): Organizati
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
     showShiftDetailHoverCards: organization.showShiftDetailHoverCards ?? true,
+    useCompactRoleCertificationLabels: organization.useCompactRoleCertificationLabels ?? false,
     enforceConflictPrevention: organization.enforceConflictPrevention,
     defaultShiftEnabled: organization.defaultShiftEnabled,
     coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },

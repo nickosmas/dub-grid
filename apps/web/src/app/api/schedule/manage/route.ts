@@ -1479,6 +1479,8 @@ export async function POST(req: NextRequest) {
           absenceTypeId?: number;
         }> = [];
 
+        const writeJobs: Array<() => Promise<void>> = [];
+
         for (const { dateKey, dayOfWeek } of iterateDateRange(
           new Date(`${data.startDate}T00:00:00`),
           new Date(`${data.endDate}T00:00:00`),
@@ -1505,38 +1507,49 @@ export async function POST(req: NextRequest) {
               fromRecurring: true,
             });
 
-            await writeShiftSnapshot(auth.userClient, {
-              orgId: data.orgId,
-              employeeId: template.emp_id,
-              date: dateKey,
-              state: normalizedInput,
-              expectedVersion: existingCell?.version,
-            });
+            writeJobs.push(async () => {
+              await writeShiftSnapshot(auth.userClient, {
+                orgId: data.orgId,
+                employeeId: template.emp_id,
+                date: dateKey,
+                state: normalizedInput,
+                expectedVersion: existingCell?.version,
+              });
 
-            if (normalizedInput.kind === "absence") {
-              const absenceTypeId = normalizedInput.absenceTypeId ?? null;
-              if (absenceTypeId != null) {
+              if (normalizedInput.kind === "absence") {
+                const absenceTypeId = normalizedInput.absenceTypeId ?? null;
+                if (absenceTypeId != null) {
+                  generated.push({
+                    empId: template.emp_id,
+                    date: dateKey,
+                    label: absenceTypeLabelMap.get(absenceTypeId) ?? "?",
+                    absenceTypeId,
+                  });
+                }
+              } else if (normalizedInput.kind === "worked") {
+                const assignmentIds = normalizedInput.segments
+                  .map(
+                    (segment) =>
+                      assignmentIdByPair.get(`${segment.shiftId ?? "null"}:${segment.jobId}`) ??
+                      null,
+                  )
+                  .filter((value): value is number => value != null);
                 generated.push({
                   empId: template.emp_id,
                   date: dateKey,
-                  label: absenceTypeLabelMap.get(absenceTypeId) ?? "?",
-                  absenceTypeId,
+                  label: assignmentIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/"),
                 });
               }
-            } else if (normalizedInput.kind === "worked") {
-              const assignmentIds = normalizedInput.segments
-                .map(
-                  (segment) =>
-                    assignmentIdByPair.get(`${segment.shiftId ?? "null"}:${segment.jobId}`) ?? null,
-                )
-                .filter((value): value is number => value != null);
-              generated.push({
-                empId: template.emp_id,
-                date: dateKey,
-                label: assignmentIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/"),
-              });
-            }
+            });
           }
+        }
+
+        // Independent per (employee, date) cell — write in bounded concurrent
+        // batches instead of one round trip at a time, which serialized what
+        // can be hundreds of writes for a large org or date range.
+        const WRITE_CONCURRENCY = 8;
+        for (let i = 0; i < writeJobs.length; i += WRITE_CONCURRENCY) {
+          await Promise.all(writeJobs.slice(i, i + WRITE_CONCURRENCY).map((job) => job()));
         }
 
         if (generated.length > 0) {

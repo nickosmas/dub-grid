@@ -17,6 +17,7 @@ import {
   type DetailItem,
   formatDateRange,
   formatScalar,
+  formatValue,
   friendlyLabel,
   pluralize,
   titleCase,
@@ -199,15 +200,24 @@ function summarizeSaveCounts(d: AuditDetails, noun: string): string {
 
 /** The `{ from, to }` record pair written by the settings + identity routes. */
 function fieldDiffRows(d: AuditDetails): DetailItem[] {
-  const changedFields = d.list("changedFields");
+  // These are lookup keys for `from`/`to`, so they must remain raw (for
+  // example `focusAreas`) until after the corresponding values are read.
+  const rawChangedFields = d.rawValue("changedFields");
+  const changedFields = Array.isArray(rawChangedFields)
+    ? rawChangedFields.filter(
+        (field): field is string => typeof field === "string" && field.trim().length > 0,
+      )
+    : [];
   if (changedFields.length === 0) return [];
 
   const from = d.record("from") ?? {};
   const to = d.record("to") ?? {};
 
   return changedFields.map((field) => {
-    const before = formatScalar(field, from[field]);
-    const after = formatScalar(field, to[field]);
+    // Employee reference fields are deliberately stored as readable lists
+    // (roles, departments, focus areas), not scalar ids.
+    const before = formatValue(field, from[field]);
+    const after = formatValue(field, to[field]);
     const label = friendlyLabel(field);
     if (before && after) return { label, value: `${before} → ${after}` };
     if (after) return { label, value: `Set to ${after}` };
@@ -600,7 +610,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "setup",
     severity: "update",
     headline: (d) => summarizeSaveCounts(d, "departments"),
-    suppressKeys: ["created", "updated", "archived"],
+    details: (d) => changeRows(d),
   },
   "department.restored": {
     category: "setup",
@@ -611,7 +621,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "setup",
     severity: "update",
     headline: (d) => summarizeSaveCounts(d, "certifications"),
-    suppressKeys: ["created", "updated", "archived"],
+    details: (d) => changeRows(d),
   },
   "certification.restored": {
     category: "setup",
@@ -622,7 +632,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "setup",
     severity: "update",
     headline: (d) => summarizeSaveCounts(d, "roles"),
-    suppressKeys: ["created", "updated", "archived"],
+    details: (d) => changeRows(d),
   },
   "org_role.restored": {
     category: "setup",

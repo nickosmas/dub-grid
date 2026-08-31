@@ -188,7 +188,7 @@ export function StaffFilterPopover({
                 active={filterCertification === certification.id}
                 onClick={() => onFilterCertificationChange(certification.id)}
               >
-                {certification.abbr}
+                {certification.name}
               </FilterChip>
             ))}
           </FilterGroup>
@@ -205,7 +205,7 @@ export function StaffFilterPopover({
                 active={filterRole === role.id}
                 onClick={() => onFilterRoleChange(role.id)}
               >
-                {role.abbr}
+                {role.name}
               </FilterChip>
             ))}
           </FilterGroup>

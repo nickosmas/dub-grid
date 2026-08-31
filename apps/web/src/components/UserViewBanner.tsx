@@ -14,8 +14,8 @@ export default function UserViewBanner() {
     <div
       style={{
         height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-        color: "#fff",
+        background: "linear-gradient(135deg, var(--dg-color-brand-light), var(--dg-color-brand))",
+        color: "var(--dg-color-text-inverse)",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
@@ -46,7 +46,7 @@ export default function UserViewBanner() {
         onClick={() => setUserViewActive(false)}
         style={{
           background: "rgba(255,255,255,0.2)",
-          color: "#fff",
+          color: "var(--dg-color-text-inverse)",
           border: "1px solid rgba(255,255,255,0.4)",
           borderRadius: 6,
           padding: "3px 10px",

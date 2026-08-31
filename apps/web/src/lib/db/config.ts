@@ -430,6 +430,7 @@ export async function saveOrganizationRoles(
       abbr: item.abbr,
       is_schedule_role: item.isScheduleRole ?? true,
       department_ids: item.departmentIds ?? [],
+      required_certification_ids: item.requiredCertificationIds ?? [],
       sort_order: sortOrder,
     }),
   });

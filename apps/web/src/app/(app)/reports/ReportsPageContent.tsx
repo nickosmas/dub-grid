@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  FileText,
   FileUp,
   RefreshCw,
   Upload,
@@ -17,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
@@ -43,7 +45,7 @@ import {
 } from "@/features/reports/shared/table";
 
 type QuickRange = "current-week" | "pay-period" | "custom";
-type ReportTargetControl = "people" | "focusAreas";
+type ReportTargetControl = "people" | "focusAreas" | "shiftCategories" | "jobs" | "dates";
 type ReportUiMetadata = {
   usesDateRange: boolean;
   targetControls: ReportTargetControl[];
@@ -74,7 +76,19 @@ const REPORT_UI_METADATA: Record<OperationsReportType, ReportUiMetadata> = {
   },
   "staff-hours": {
     usesDateRange: true,
-    targetControls: ["people", "focusAreas"],
+    targetControls: ["people", "focusAreas", "shiftCategories", "jobs"],
+  },
+  "staff-activity": {
+    usesDateRange: true,
+    targetControls: ["people", "focusAreas", "shiftCategories", "jobs"],
+  },
+  "mentoring-hours": {
+    usesDateRange: true,
+    targetControls: ["people", "focusAreas", "dates"],
+  },
+  "mentoring-detail": {
+    usesDateRange: true,
+    targetControls: ["people", "focusAreas", "dates"],
   },
   coverage: {
     usesDateRange: true,
@@ -255,6 +269,8 @@ function serializeFilters(filters: OperationsReportFilters): string {
   return JSON.stringify({
     employeeIds: [...(filters.employeeIds ?? [])].sort(),
     focusAreaIds: [...(filters.focusAreaIds ?? [])].sort((left, right) => left - right),
+    shiftCategoryIds: [...(filters.shiftCategoryIds ?? [])].sort((left, right) => left - right),
+    jobIds: [...(filters.jobIds ?? [])].sort((left, right) => left - right),
     dates: [...(filters.dates ?? [])].sort(),
   });
 }
@@ -524,6 +540,79 @@ function TargetDropdown({
   );
 }
 
+function ExportMenu({
+  disabled,
+  exportingFormat,
+  onExport,
+}: {
+  disabled: boolean;
+  exportingFormat: "csv" | "pdf" | null;
+  onExport: (format: "csv" | "pdf") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+
+  const selectFormat = (format: "csv" | "pdf") => {
+    setOpen(false);
+    onExport(format);
+  };
+
+  return (
+    <>
+      <Button
+        ref={anchorRef}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Export"
+        className="dg-btn dg-btn-primary"
+        disabled={disabled}
+        icon={<Upload size={16} />}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        Export
+        <ChevronDown size={16} />
+      </Button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverContent
+          anchor={anchorRef}
+          align="end"
+          className="dg-menu"
+          collisionPadding={12}
+          positionMethod="fixed"
+          side="bottom"
+          sideOffset={6}
+          role="menu"
+          style={{ minWidth: "var(--anchor-width)" }}
+        >
+          <Button
+            className="dg-menu-item"
+            disabled={exportingFormat != null}
+            icon={<FileUp size={16} />}
+            loading={exportingFormat === "pdf"}
+            onClick={() => selectFormat("pdf")}
+            role="menuitem"
+            type="button"
+          >
+            Export PDF
+          </Button>
+          <Button
+            className="dg-menu-item"
+            disabled={exportingFormat != null}
+            icon={<Upload size={16} />}
+            loading={exportingFormat === "csv"}
+            onClick={() => selectFormat("csv")}
+            role="menuitem"
+            type="button"
+          >
+            Export CSV
+          </Button>
+        </PopoverContent>
+      </Popover>
+    </>
+  );
+}
+
 function ReportsContent() {
   const router = useRouter();
   const permissions = usePermissions();
@@ -542,6 +631,9 @@ function ReportsContent() {
   const [customRangeSelected, setCustomRangeSelected] = useState(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<number[]>([]);
+  const [selectedShiftCategoryIds, setSelectedShiftCategoryIds] = useState<number[]>([]);
+  const [selectedJobIds, setSelectedJobIds] = useState<number[]>([]);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [appliedRequest, setAppliedRequest] = useState<{
     range: OperationsReportRange;
     filters: OperationsReportFilters;
@@ -551,13 +643,32 @@ function ReportsContent() {
   const reportMetadata = REPORT_UI_METADATA[report];
   const showsPeopleTarget = reportMetadata.targetControls.includes("people");
   const showsFocusAreaTarget = reportMetadata.targetControls.includes("focusAreas");
+  const showsShiftCategoryTarget = reportMetadata.targetControls.includes("shiftCategories");
+  const showsJobTarget = reportMetadata.targetControls.includes("jobs");
+  const showsDatesTarget = reportMetadata.targetControls.includes("dates");
   const reportFilters = useMemo<OperationsReportFilters>(
     () => ({
       employeeIds: showsPeopleTarget ? selectedEmployeeIds : [],
       focusAreaIds: showsFocusAreaTarget ? selectedFocusAreaIds : [],
-      dates: [],
+      shiftCategoryIds:
+        showsShiftCategoryTarget && selectedShiftCategoryIds.length > 0
+          ? selectedShiftCategoryIds
+          : undefined,
+      jobIds: showsJobTarget && selectedJobIds.length > 0 ? selectedJobIds : undefined,
+      dates: showsDatesTarget ? selectedDates : [],
     }),
-    [selectedEmployeeIds, selectedFocusAreaIds, showsFocusAreaTarget, showsPeopleTarget],
+    [
+      selectedDates,
+      selectedEmployeeIds,
+      selectedFocusAreaIds,
+      selectedJobIds,
+      selectedShiftCategoryIds,
+      showsDatesTarget,
+      showsFocusAreaTarget,
+      showsJobTarget,
+      showsPeopleTarget,
+      showsShiftCategoryTarget,
+    ],
   );
   const filtersKey = useMemo(() => serializeFilters(reportFilters), [reportFilters]);
   const emptyFiltersKey = useMemo(() => serializeFilters(EMPTY_REPORT_FILTERS), []);
@@ -584,6 +695,7 @@ function ReportsContent() {
 
   const updateRange = (nextRange: OperationsReportRange) => {
     setRange(nextRange);
+    setSelectedDates([]);
     resetAppliedReport();
   };
 
@@ -617,6 +729,15 @@ function ReportsContent() {
     }
     if (!nextMetadata.targetControls.includes("focusAreas")) {
       setSelectedFocusAreaIds([]);
+    }
+    if (!nextMetadata.targetControls.includes("shiftCategories")) {
+      setSelectedShiftCategoryIds([]);
+    }
+    if (!nextMetadata.targetControls.includes("jobs")) {
+      setSelectedJobIds([]);
+    }
+    if (!nextMetadata.targetControls.includes("dates")) {
+      setSelectedDates([]);
     }
     resetAppliedReport();
   };
@@ -665,12 +786,16 @@ function ReportsContent() {
     [appliedRequest, report, reportsQuery.data],
   );
   const visibleRows = preview?.rows ?? [];
+  const hasVisibleRows = preview != null && visibleRows.length > 0;
   const hasExportableRows = visibleRows.length > 0;
   const isLoading =
     permissions.isLoading || orgLoading || reportsQuery.isLoading || targetOptionsQuery.isLoading;
   const optionsPayload = targetOptionsQuery.data ?? reportsQuery.data;
   const employeeOptions = optionsPayload?.filterOptions.employees ?? [];
   const focusAreaOptions = optionsPayload?.filterOptions.focusAreas ?? [];
+  const shiftCategoryOptions = optionsPayload?.filterOptions.shiftCategories ?? [];
+  const jobOptions = optionsPayload?.filterOptions.jobs ?? [];
+  const dateOptions = optionsPayload?.filterOptions.dates ?? [];
   const visibleEmployeeOptions = useMemo(
     () =>
       employeeOptions.filter((employee) =>
@@ -684,6 +809,14 @@ function ReportsContent() {
       : `${selectedFocusAreaIds.length} selected`;
   const peopleSummary =
     selectedEmployeeIds.length === 0 ? "All people" : `${selectedEmployeeIds.length} selected`;
+  const datesSummary =
+    selectedDates.length === 0 ? "All dates" : `${selectedDates.length} selected`;
+  const shiftCategorySummary =
+    selectedShiftCategoryIds.length === 0
+      ? "All shift categories"
+      : `${selectedShiftCategoryIds.length} selected`;
+  const jobsSummary =
+    selectedJobIds.length === 0 ? "All jobs" : `${selectedJobIds.length} selected`;
 
   if (permissions.isLoading || !canAccessReports) {
     return <ProgressBar loading />;
@@ -741,10 +874,10 @@ function ReportsContent() {
   return (
     <main
       style={{
-        minHeight: "calc(100vh - var(--header-height))",
+        minHeight: "calc(100vh - var(--dg-app-shell-header-height))",
         background: "var(--dg-color-bg)",
         color: "var(--dg-color-text-primary)",
-        padding: "28px var(--dg-page-gutter)",
+        padding: "clamp(16px, 3vw, 32px) var(--dg-page-gutter)",
       }}
     >
       <ProgressBar loading={isLoading || reportsQuery.isFetching} />
@@ -780,180 +913,279 @@ function ReportsContent() {
               justifyContent: "flex-end",
             }}
           >
-            <Button
-              className="dg-btn dg-btn-secondary"
+            <div data-testid="reports-run-actions" style={reportsRunActionsStyle}>
+              <Button
+                className="dg-btn dg-btn-secondary"
+                disabled={!appliedRequest}
+                onClick={() => reportsQuery.refetch()}
+                type="button"
+              >
+                <RefreshCw size={16} />
+                Refresh
+              </Button>
+              <Button
+                className="dg-btn dg-btn-secondary"
+                disabled={!appliedRequest}
+                onClick={resetAppliedReport}
+                type="button"
+              >
+                <X size={16} />
+                Close
+              </Button>
+              <Button
+                className="dg-btn dg-btn-primary"
+                icon={<FileText size={16} />}
+                onClick={handleGenerateReport}
+                type="button"
+              >
+                Generate report
+              </Button>
+            </div>
+            <ExportMenu
               disabled={
                 !appliedRequest ||
                 !reportsQuery.data ||
                 !hasExportableRows ||
                 exportingFormat != null
               }
-              onClick={() => handleExport("pdf")}
-              type="button"
-              loading={exportingFormat === "pdf"}
-              icon={<FileUp size={16} />}
-            >
-              Export PDF
-            </Button>
-            <Button
-              className="dg-btn dg-btn-primary"
-              disabled={
-                !appliedRequest ||
-                !reportsQuery.data ||
-                !hasExportableRows ||
-                exportingFormat != null
-              }
-              onClick={() => handleExport("csv")}
-              type="button"
-              loading={exportingFormat === "csv"}
-              icon={<Upload size={16} />}
-            >
-              Export CSV
-            </Button>
+              exportingFormat={exportingFormat}
+              onExport={handleExport}
+            />
           </div>
         </div>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
-            gap: 12,
-            marginBottom: 18,
-          }}
-        >
-          <label style={controlLabelStyle}>
-            Report
-            <CustomSelect
-              ariaLabel="Report"
-              height={40}
-              onChange={handleReportChange}
-              options={reportOptions}
-              style={fullWidthControlStyle}
-              value={report}
-            />
-          </label>
-          {reportMetadata.usesDateRange ? (
+        <section data-testid="reports-settings" style={reportsSettingsStyle}>
+          <div style={reportsSettingsHeaderStyle}>
+            <div>
+              <p style={reportsSettingsDescriptionStyle}>
+                Choose the report, period, and optional filters before generating a preview.
+              </p>
+            </div>
+          </div>
+          <div data-testid="reports-filter-controls" style={reportsFilterControlsStyle}>
             <label style={controlLabelStyle}>
-              Range
+              Report
               <CustomSelect
-                ariaLabel="Range"
+                ariaLabel="Report"
                 height={40}
-                onChange={updateQuickRange}
-                options={quickRangeOptions}
+                onChange={handleReportChange}
+                options={reportOptions}
                 style={fullWidthControlStyle}
-                value={quickRange}
+                value={report}
               />
             </label>
-          ) : null}
-          {reportMetadata.usesDateRange && quickRange === "custom" ? (
-            <ReportRangePicker label="Date range" onChange={updateCustomRange} value={range} />
-          ) : null}
-          {showsFocusAreaTarget ? (
-            <TargetDropdown
-              clearDisabled={selectedFocusAreaIds.length === 0}
-              onClear={() => {
-                updateSelectedFocusAreas([]);
-              }}
-              summary={focusAreaSummary}
-              title="Focus areas"
-            >
-              <div style={targetListStyle}>
-                {focusAreaOptions.length === 0 ? (
-                  <div style={targetEmptyStyle}>No focus areas</div>
-                ) : (
-                  focusAreaOptions.map((option) => {
-                    const id = Number(option.id);
-                    return (
+            {reportMetadata.usesDateRange ? (
+              <label style={controlLabelStyle}>
+                Range
+                <CustomSelect
+                  ariaLabel="Range"
+                  height={40}
+                  onChange={updateQuickRange}
+                  options={quickRangeOptions}
+                  style={fullWidthControlStyle}
+                  value={quickRange}
+                />
+              </label>
+            ) : null}
+            {reportMetadata.usesDateRange && quickRange === "custom" ? (
+              <ReportRangePicker label="Date range" onChange={updateCustomRange} value={range} />
+            ) : null}
+            {showsFocusAreaTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedFocusAreaIds.length === 0}
+                onClear={() => {
+                  updateSelectedFocusAreas([]);
+                }}
+                summary={focusAreaSummary}
+                title="Focus areas"
+              >
+                <div style={targetListStyle}>
+                  {focusAreaOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>No focus areas</div>
+                  ) : (
+                    focusAreaOptions.map((option) => {
+                      const id = Number(option.id);
+                      return (
+                        <label key={option.id} style={targetCheckStyle}>
+                          <input
+                            checked={selectedFocusAreaIds.includes(id)}
+                            onChange={(event) => {
+                              const nextFocusAreaIds = event.target.checked
+                                ? [...selectedFocusAreaIds, id]
+                                : selectedFocusAreaIds.filter((value) => value !== id);
+                              updateSelectedFocusAreas(nextFocusAreaIds);
+                            }}
+                            type="checkbox"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
+            {showsPeopleTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedEmployeeIds.length === 0}
+                onClear={() => {
+                  setSelectedEmployeeIds([]);
+                  resetAppliedReport();
+                }}
+                summary={peopleSummary}
+                title="People"
+              >
+                <div style={targetListStyle}>
+                  {visibleEmployeeOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>
+                      {selectedFocusAreaIds.length === 0
+                        ? "No staff records"
+                        : "No people in selected focus areas"}
+                    </div>
+                  ) : (
+                    visibleEmployeeOptions.map((option) => (
                       <label key={option.id} style={targetCheckStyle}>
                         <input
-                          checked={selectedFocusAreaIds.includes(id)}
+                          checked={selectedEmployeeIds.includes(option.id)}
                           onChange={(event) => {
-                            const nextFocusAreaIds = event.target.checked
-                              ? [...selectedFocusAreaIds, id]
-                              : selectedFocusAreaIds.filter((value) => value !== id);
-                            updateSelectedFocusAreas(nextFocusAreaIds);
+                            resetAppliedReport();
+                            setSelectedEmployeeIds((current) =>
+                              event.target.checked
+                                ? [...current, option.id]
+                                : current.filter((value) => value !== option.id),
+                            );
                           }}
                           type="checkbox"
                         />
                         {option.label}
                       </label>
-                    );
-                  })
-                )}
-              </div>
-            </TargetDropdown>
-          ) : null}
-          {showsPeopleTarget ? (
-            <TargetDropdown
-              clearDisabled={selectedEmployeeIds.length === 0}
-              onClear={() => {
-                setSelectedEmployeeIds([]);
-                resetAppliedReport();
-              }}
-              summary={peopleSummary}
-              title="People"
-            >
-              <div style={targetListStyle}>
-                {visibleEmployeeOptions.length === 0 ? (
-                  <div style={targetEmptyStyle}>
-                    {selectedFocusAreaIds.length === 0
-                      ? "No staff records"
-                      : "No people in selected focus areas"}
-                  </div>
-                ) : (
-                  visibleEmployeeOptions.map((option) => (
-                    <label key={option.id} style={targetCheckStyle}>
-                      <input
-                        checked={selectedEmployeeIds.includes(option.id)}
-                        onChange={(event) => {
-                          resetAppliedReport();
-                          setSelectedEmployeeIds((current) =>
-                            event.target.checked
-                              ? [...current, option.id]
-                              : current.filter((value) => value !== option.id),
-                          );
-                        }}
-                        type="checkbox"
-                      />
-                      {option.label}
-                    </label>
-                  ))
-                )}
-              </div>
-            </TargetDropdown>
-          ) : null}
-          <div data-testid="reports-run-actions" style={reportsRunActionsStyle}>
-            <Button
-              className="dg-btn dg-btn-secondary"
-              disabled={!appliedRequest}
-              onClick={() => reportsQuery.refetch()}
-              type="button"
-            >
-              <RefreshCw size={16} />
-              Refresh
-            </Button>
-            <Button
-              className="dg-btn dg-btn-secondary"
-              disabled={!appliedRequest}
-              onClick={resetAppliedReport}
-              type="button"
-            >
-              <X size={16} />
-              Close
-            </Button>
-            <Button className="dg-btn dg-btn-primary" onClick={handleGenerateReport} type="button">
-              Generate report
-            </Button>
+                    ))
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
+            {showsShiftCategoryTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedShiftCategoryIds.length === 0}
+                onClear={() => {
+                  setSelectedShiftCategoryIds([]);
+                  resetAppliedReport();
+                }}
+                summary={shiftCategorySummary}
+                title="Shift categories"
+              >
+                <div style={targetListStyle}>
+                  {shiftCategoryOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>No shift categories</div>
+                  ) : (
+                    shiftCategoryOptions.map((option) => {
+                      const id = Number(option.id);
+                      return (
+                        <label key={option.id} style={targetCheckStyle}>
+                          <input
+                            checked={selectedShiftCategoryIds.includes(id)}
+                            onChange={(event) => {
+                              resetAppliedReport();
+                              setSelectedShiftCategoryIds((current) =>
+                                event.target.checked
+                                  ? [...current, id]
+                                  : current.filter((value) => value !== id),
+                              );
+                            }}
+                            type="checkbox"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
+            {showsJobTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedJobIds.length === 0}
+                onClear={() => {
+                  setSelectedJobIds([]);
+                  resetAppliedReport();
+                }}
+                summary={jobsSummary}
+                title="Jobs"
+              >
+                <div style={targetListStyle}>
+                  {jobOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>No jobs</div>
+                  ) : (
+                    jobOptions.map((option) => {
+                      const id = Number(option.id);
+                      return (
+                        <label key={option.id} style={targetCheckStyle}>
+                          <input
+                            checked={selectedJobIds.includes(id)}
+                            onChange={(event) => {
+                              resetAppliedReport();
+                              setSelectedJobIds((current) =>
+                                event.target.checked
+                                  ? [...current, id]
+                                  : current.filter((value) => value !== id),
+                              );
+                            }}
+                            type="checkbox"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
+            {showsDatesTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedDates.length === 0}
+                onClear={() => {
+                  setSelectedDates([]);
+                  resetAppliedReport();
+                }}
+                summary={datesSummary}
+                title="Dates"
+              >
+                <div style={targetListStyle}>
+                  {dateOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>No dates in this range</div>
+                  ) : (
+                    dateOptions.map((date) => (
+                      <label key={date} style={targetCheckStyle}>
+                        <input
+                          checked={selectedDates.includes(date)}
+                          onChange={(event) => {
+                            resetAppliedReport();
+                            setSelectedDates((current) =>
+                              event.target.checked
+                                ? [...current, date]
+                                : current.filter((value) => value !== date),
+                            );
+                          }}
+                          type="checkbox"
+                        />
+                        {formatDateLabel(date)}
+                      </label>
+                    ))
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
           </div>
         </section>
 
         {appliedRequest && reportsQuery.error ? (
-          <div style={emptyStateStyle}>
-            {formatClientErrorMessage(reportsQuery.error, "Failed to load reports")}
-          </div>
+          <EmptyState
+            description="Refresh the report or adjust the selected filters and try again."
+            heading={formatClientErrorMessage(reportsQuery.error, "Failed to load reports")}
+          />
         ) : null}
 
-        {appliedRequest && reportsQuery.data ? (
+        {appliedRequest && reportsQuery.data && hasVisibleRows ? (
           <section
             style={{
               display: "grid",
@@ -972,8 +1204,8 @@ function ReportsContent() {
         ) : null}
 
         {appliedRequest ? (
-          <section style={tableShellStyle}>
-            {preview && visibleRows.length > 0 ? (
+          <section style={hasVisibleRows ? tableShellStyle : undefined}>
+            {hasVisibleRows ? (
               <div style={{ overflowX: "auto" }}>
                 <table style={tableStyle}>
                   <thead>
@@ -999,7 +1231,12 @@ function ReportsContent() {
                 </table>
               </div>
             ) : (
-              <div style={emptyStateStyle}>{preview?.emptyText ?? "Loading reports"}</div>
+              <EmptyState
+                data-testid="reports-empty-state"
+                description="Try a different date range or adjust the selected filters."
+                heading={preview?.emptyText ?? "Loading reports"}
+                icon={<FileText size={28} />}
+              />
             )}
           </section>
         ) : null}
@@ -1024,13 +1261,33 @@ const reportsContentStyle: CSSProperties = {
 };
 
 const reportsRunActionsStyle: CSSProperties = {
-  alignItems: "end",
+  alignItems: "center",
   display: "flex",
   flexWrap: "wrap",
   gap: 8,
-  justifyContent: "flex-start",
-  justifySelf: "start",
+  justifyContent: "flex-end",
   minWidth: 0,
+};
+
+const reportsSettingsStyle: CSSProperties = {
+  marginBottom: 18,
+};
+
+const reportsSettingsHeaderStyle: CSSProperties = {
+  marginBottom: 16,
+};
+
+const reportsSettingsDescriptionStyle: CSSProperties = {
+  color: "var(--dg-color-text-muted)",
+  fontSize: "var(--dg-fs-body)",
+  lineHeight: 1.45,
+  margin: "4px 0 0",
+};
+
+const reportsFilterControlsStyle: CSSProperties = {
+  display: "grid",
+  gap: 12,
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
 };
 
 const fullWidthControlStyle: CSSProperties = {
@@ -1284,15 +1541,6 @@ const tdStyle: CSSProperties = {
 
 const stripedRowStyle: CSSProperties = {
   background: "var(--dg-color-bg-secondary)",
-};
-
-const emptyStateStyle: CSSProperties = {
-  minHeight: 180,
-  display: "grid",
-  placeItems: "center",
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-body)",
-  padding: 24,
 };
 
 export function ReportsPageContent() {

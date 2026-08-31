@@ -131,7 +131,7 @@ function BillingMetric({
       ? { bg: "var(--dg-color-danger-bg)", color: "var(--dg-color-danger)" }
       : tone === "warning"
         ? { bg: "var(--dg-color-warning-bg)", color: "var(--dg-color-warning)" }
-        : { bg: "#EFF6FF", color: "#2563EB" };
+        : { bg: "var(--dg-color-info-bg)", color: "var(--dg-color-info)" };
 
   return (
     <div
@@ -233,23 +233,12 @@ function BillingOperations({ operations }: { operations: BillingOperationSummary
                     <th style={thStyle}>Activity</th>
                     <th style={thStyle}>Source</th>
                     <th style={thStyle}>When</th>
+                    <th style={thStyle} aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
                   {operations.map((operation) => (
-                    <tr
-                      key={operation.id}
-                      tabIndex={0}
-                      aria-label={`${operation.label} billing activity details`}
-                      onClick={() => openOperation(operation)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openOperation(operation);
-                        }
-                      }}
-                      style={{ cursor: "pointer" }}
-                    >
+                    <tr key={operation.id}>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{operation.label}</td>
                       <td style={tdStyle}>{operation.actorLabel}</td>
                       <td
@@ -260,6 +249,15 @@ function BillingOperations({ operations }: { operations: BillingOperationSummary
                         }}
                       >
                         {formatRelativeTime(operation.createdAt)}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <Button
+                          type="button"
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                          onClick={() => openOperation(operation)}
+                        >
+                          View details
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -901,7 +899,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   style={{
                     display: "flex",
                     alignItems: "flex-end",
-                    minWidth: 220,
                   }}
                 >
                   <MaybeHint

@@ -167,13 +167,22 @@ export default function ProfileWorkScreen() {
   const focusAreas = bootstrapQuery.data?.focusAreas ?? profile?.focusAreas ?? [];
   const roles = bootstrapQuery.data?.roles ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
+  const useCompactRoleCertificationLabels =
+    bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const focusAreaNames =
     linkedEmployee?.focusAreaIds
       .map((id) => focusAreas.find((focusArea) => focusArea.id === id)?.name)
       .filter((value): value is string => Boolean(value)) ?? [];
   const roleNames =
     linkedEmployee?.roleIds
-      .map((id) => roles.find((role) => role.id === id)?.name)
+      .map((id) => {
+        const role = roles.find((item) => item.id === id);
+        return role
+          ? useCompactRoleCertificationLabels
+            ? role.abbr || role.name
+            : role.name
+          : undefined;
+      })
       .filter((value): value is string => Boolean(value)) ?? [];
   const employmentLabel =
     linkedEmployee?.employmentType === "part_time" ? "Part-time" : "Full-time";
@@ -189,8 +198,16 @@ export default function ProfileWorkScreen() {
   const certificationName = linkedEmployee
     ? linkedEmployee.certificationId == null
       ? "None"
-      : (certifications.find((item) => item.id === linkedEmployee.certificationId)?.name ??
-        "Not set")
+      : (() => {
+          const certification = certifications.find(
+            (item) => item.id === linkedEmployee.certificationId,
+          );
+          return certification
+            ? useCompactRoleCertificationLabels
+              ? certification.abbr || certification.name
+              : certification.name
+            : "Not set";
+        })()
     : "Not set";
 
   useEffect(() => {
@@ -426,6 +443,7 @@ export default function ProfileWorkScreen() {
               }}
               roleLabel={profile.currentOrg.labels.role}
               roles={roles}
+              useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               saving={saveMutation.isPending}
             />
           ) : (
@@ -578,6 +596,7 @@ function EditPanel({
   onSave,
   roleLabel,
   roles,
+  useCompactRoleCertificationLabels,
   saving,
 }: {
   canEditProfileDirectly: boolean;
@@ -595,6 +614,7 @@ function EditPanel({
   onSave: () => void;
   roleLabel: string;
   roles: MobileNamedItem[];
+  useCompactRoleCertificationLabels: boolean;
   saving: boolean;
 }) {
   const [focusedField, setFocusedField] = useState<
@@ -712,8 +732,7 @@ function EditPanel({
                   { id: -1, name: "None" },
                   ...certifications.map((item) => ({
                     id: item.id,
-                    name: item.name,
-                    abbr: item.abbr || item.name,
+                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
                   })),
                 ]}
                 label={certificationLabel}
@@ -738,8 +757,7 @@ function EditPanel({
               <ProfileChoiceGroup
                 items={roles.map((item) => ({
                   id: item.id,
-                  name: item.name,
-                  abbr: item.abbr || item.name,
+                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
                 }))}
                 label={roleLabel}
                 selectedIds={draft.roleIds}

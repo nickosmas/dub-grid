@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButton";
+import { TimeZoneClocks } from "../../../shared/components/TimeZoneClocks";
+import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
-
-const CLOCK_TICK_MS = 60_000;
 
 type GreetingBucket = "morning" | "afternoon" | "evening";
 
@@ -58,24 +59,6 @@ function pickGreeting(bucket: GreetingBucket, name: string | null): string {
   return templates[Math.floor(Math.random() * templates.length)];
 }
 
-function formatOrgTime(timezone: string | null): string {
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZoneName: "short",
-      timeZone: timezone ?? "UTC",
-    }).format(new Date());
-  } catch {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
-  }
-}
-
 export function DashboardHeader({
   firstName,
   orgName,
@@ -89,34 +72,39 @@ export function DashboardHeader({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
-    return () => clearInterval(interval);
-  }, []);
+  const now = useRealtimeNow();
 
   const bucket = getBucket(now.getHours());
   const name = firstName?.trim() ?? null;
   // Recomputed only when the bucket (or name) changes, so the picked variant
   // stays stable across the 60s clock ticks instead of reshuffling every tick.
   const greeting = useMemo(() => pickGreeting(bucket, name), [bucket, name]);
-  const orgTime = formatOrgTime(timezone);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.greeting}>{greeting}</Text>
-      <Text style={styles.meta}>
-        {orgName} · {orgTime}
-        {periodLabel ? ` | ${periodLabel}` : ""}
-      </Text>
+    <View style={styles.row}>
+      <View style={styles.copy}>
+        <Text style={styles.greeting}>{greeting}</Text>
+        <Text style={styles.meta}>
+          {orgName}
+          {periodLabel ? ` | ${periodLabel}` : ""}
+        </Text>
+        <TimeZoneClocks now={now} orgTimezone={timezone} style={styles.timeZoneClock} />
+      </View>
+      <AlertsHeaderButton />
     </View>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    container: {
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    copy: {
+      flex: 1,
       gap: 4,
     },
     greeting: {
@@ -126,5 +114,9 @@ const createStyles = (mobileColors: MobileColors) =>
     meta: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
+    },
+    timeZoneClock: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
     },
   });

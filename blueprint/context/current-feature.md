@@ -1,26 +1,9 @@
-# Stabilize full web test suite
+# Current Feature
 
-**Type:** Fix
+> **Generated file.** Holds the one feature, fix, or rollback being built right now. Run
+> `/feature <number-or-name>` to spec a build-plan feature, or `/fix "<bug>"` for
+> an ad-hoc fix. Use `/rollback <completed-feature>` to plan a safe reversal.
+> Build one thing at a time; `/complete` archives it under
+> `blueprint/history/` and resets this file.
 
-**Status:** not started
-
-## Problem
-
-The full web Vitest suite times out resource-heavy tests even though they pass in
-isolation, blocking the pre-push hook.
-
-## Fix
-
-Run the web suite with a bounded worker count so local Supabase integration tests
-and property-based UI tests do not contend with the rest of the suite.
-
-## Build steps
-
-1. [ ] Configure the web Vitest runner for reliable worker scheduling and verify the
-       full suite passes.
-
-   Done when: `npm --prefix apps/web test` completes with no test failures.
-
-## Verify
-
-- Run `npm --prefix apps/web test`.
+_Nothing in progress. Run `/feature`, `/fix`, or `/rollback` to start._

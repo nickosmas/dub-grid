@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReportsPageContent from "./ReportsPageContent";
 
@@ -76,9 +76,10 @@ vi.mock("lucide-react", () => ({
   ChevronDown: () => <span data-testid="chevron-down-icon" />,
   ChevronLeft: () => <span data-testid="chevron-left-icon" />,
   ChevronRight: () => <span data-testid="chevron-right-icon" />,
+  FileText: () => <span data-testid="file-text-icon" />,
   FileUp: () => <span data-testid="file-up-icon" />,
   // The export buttons now render <ButtonLoading>, whose spinner is this icon.
-  LoaderIcon: () => <span data-testid="loader-icon" />,
+  Loader: () => <span data-testid="loader-icon" />,
   RefreshCw: () => <span data-testid="refresh-icon" />,
   Upload: () => <span data-testid="upload-icon" />,
   X: () => <span data-testid="x-icon" />,
@@ -92,6 +93,9 @@ vi.mock("@/features/reports/client/api", () => ({
   REPORT_OPTIONS: [
     { value: "employee-directory", label: "Employee directory" },
     { value: "staff-hours", label: "Staff hours" },
+    { value: "staff-activity", label: "Staff activity" },
+    { value: "mentoring-hours", label: "Mentoring hours" },
+    { value: "mentoring-detail", label: "Mentoring detail" },
     { value: "coverage", label: "Coverage" },
     { value: "certification-role-matrix", label: "Certifications and roles" },
     { value: "account-access", label: "Account access" },
@@ -124,6 +128,8 @@ const payload = {
       { id: "10", label: "North" },
       { id: "11", label: "South" },
     ],
+    shiftCategories: [{ id: "60", label: "Day" }],
+    jobs: [{ id: "70", label: "Caregiver" }],
     dates: [
       "2026-05-03",
       "2026-05-04",
@@ -162,6 +168,7 @@ const payload = {
         absenceCount: 0,
         overtimeHours: 0,
         overtime: false,
+        shiftBreakdown: "Day (1, 8h)",
       },
       {
         employeeId: "emp-2",
@@ -174,6 +181,29 @@ const payload = {
         absenceCount: 0,
         overtimeHours: 0,
         overtime: false,
+        shiftBreakdown: "Evening (1, 6h)",
+      },
+    ],
+    mentoringHours: [
+      {
+        employeeId: "emp-1",
+        employeeName: "Avery Ng",
+        mentoringHours: 8,
+        mentoredAssignmentCount: 1,
+        mentoredDays: 1,
+      },
+    ],
+    mentoringDetail: [
+      {
+        employeeId: "emp-1",
+        employeeName: "Avery Ng",
+        date: "2026-05-03",
+        focusArea: "North",
+        shift: "Day",
+        job: "Caregiver",
+        startTime: "07:00",
+        endTime: "15:00",
+        mentoringHours: 8,
       },
     ],
     coverage: [],
@@ -240,6 +270,16 @@ async function chooseCustomSelect(label: string, option: string | RegExp) {
   fireEvent.click(await screen.findByRole("option", { name: option }));
 }
 
+async function selectExportFormat(format: "CSV" | "PDF") {
+  fireEvent.click(screen.getByRole("button", { name: "Export" }));
+  const menuItem = await screen.findByRole("menuitem", { name: `Export ${format}` });
+  // The export handler settles its own loading state after awaiting the
+  // download, so let those updates flush inside act.
+  await act(async () => {
+    fireEvent.click(menuItem);
+  });
+}
+
 describe("ReportsPageContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -282,6 +322,7 @@ describe("ReportsPageContent", () => {
       fontSize: "var(--dg-fs-page-title)",
       fontWeight: "800",
     });
+    expect(screen.queryByRole("heading", { name: "Configure report" })).not.toBeInTheDocument();
     expect(screen.queryByText("Acme")).not.toBeInTheDocument();
     expect(screen.queryByText("2026-05-03 to 2026-05-09")).not.toBeInTheDocument();
     expect(screen.getByTestId("reports-content")).toHaveStyle({
@@ -290,8 +331,10 @@ describe("ReportsPageContent", () => {
     });
     const runActions = screen.getByTestId("reports-run-actions");
     expect(runActions).toHaveStyle({
-      justifyContent: "flex-start",
-      justifySelf: "start",
+      justifyContent: "flex-end",
+    });
+    expect(screen.getByTestId("reports-filter-controls")).toHaveStyle({
+      display: "grid",
     });
     expect(
       Array.from(runActions.querySelectorAll("button")).map((button) => button.textContent?.trim()),
@@ -333,9 +376,10 @@ describe("ReportsPageContent", () => {
     expect(await screen.findByText("Staff status")).toBeInTheDocument();
     expect(screen.getByText("Full-time")).toBeInTheDocument();
     expect(screen.queryByText("full_time")).not.toBeInTheDocument();
-    const csvButton = screen.getByRole("button", { name: /Export CSV/i });
-    await waitFor(() => expect(csvButton).not.toBeDisabled());
-    fireEvent.click(csvButton);
+    const exportButton = screen.getByRole("button", { name: "Export" });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    expect(exportButton).toHaveAttribute("aria-haspopup", "menu");
+    await selectExportFormat("CSV");
 
     await waitFor(() => {
       expect(exportOperationsReportCsv).toHaveBeenCalledWith({
@@ -347,7 +391,7 @@ describe("ReportsPageContent", () => {
     });
     expect(toastSuccess).toHaveBeenCalledWith("CSV report exported");
 
-    fireEvent.click(screen.getByRole("button", { name: /Export PDF/i }));
+    await selectExportFormat("PDF");
 
     await waitFor(() => {
       expect(exportOperationsReportPdf).toHaveBeenCalledWith({
@@ -360,6 +404,33 @@ describe("ReportsPageContent", () => {
     expect(toastSuccess).toHaveBeenCalledWith("PDF report exported");
   });
 
+  it("shows and exports mentoring summary and detail reports", async () => {
+    renderReports();
+
+    await chooseCustomSelect("Report", "Mentoring hours");
+    expect(screen.getByRole("button", { name: "Dates" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dates" }));
+    fireEvent.click(await screen.findByLabelText("May 3, 2026"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+    expect((await screen.findAllByText("Mentored assignments")).length).toBeGreaterThan(1);
+    expect(screen.getByText("Staff mentored")).toBeInTheDocument();
+
+    await chooseCustomSelect("Report", "Mentoring detail");
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+    expect(await screen.findByText("Focus area")).toBeInTheDocument();
+    expect(screen.getByText("Caregiver")).toBeInTheDocument();
+
+    await selectExportFormat("CSV");
+    await waitFor(() => {
+      expect(exportOperationsReportCsv).toHaveBeenCalledWith(
+        expect.objectContaining({
+          report: "mentoring-detail",
+          filters: { employeeIds: [], focusAreaIds: [], dates: ["2026-05-03"] },
+        }),
+      );
+    });
+  });
+
   it("disables exports when a generated report has no rows", async () => {
     renderReports();
 
@@ -370,8 +441,36 @@ describe("ReportsPageContent", () => {
       expect(screen.getByText("No matching requests for this range.")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Export PDF/i })).toBeDisabled();
+    expect(screen.getByTestId("reports-empty-state").style.border).toContain("dashed");
+    expect(screen.queryByText("Requests")).not.toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
+  });
+
+  it("scopes staff reports to selected people, shift categories, and jobs", async () => {
+    renderReports();
+
+    fireEvent.click(screen.getByRole("button", { name: "People" }));
+    fireEvent.click(await screen.findByLabelText("Avery Ng"));
+    fireEvent.click(screen.getByRole("button", { name: "Shift categories" }));
+    fireEvent.click(await screen.findByLabelText("Day"));
+    fireEvent.click(screen.getByRole("button", { name: "Jobs" }));
+    fireEvent.click(await screen.findByLabelText("Caregiver"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+
+    await waitFor(() => {
+      expect(fetchOperationsReport).toHaveBeenLastCalledWith({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        range: expect.any(Object),
+        filters: {
+          employeeIds: [EMPLOYEE_ID],
+          focusAreaIds: [],
+          shiftCategoryIds: [60],
+          jobIds: [70],
+          dates: [],
+        },
+      });
+    });
   });
 
   it("hides range controls for employee directory reports", async () => {
@@ -475,9 +574,9 @@ describe("ReportsPageContent", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Export CSV/i })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "Export" })).not.toBeDisabled();
     });
-    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+    await selectExportFormat("CSV");
 
     await waitFor(() => {
       expect(exportOperationsReportCsv).toHaveBeenCalledWith({
@@ -535,7 +634,7 @@ describe("ReportsPageContent", () => {
 
     expect(screen.queryByText("Scheduled hours")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Range")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
   });
 
   it("blocks non-admin users before rendering report data", async () => {

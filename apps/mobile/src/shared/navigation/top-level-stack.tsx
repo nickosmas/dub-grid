@@ -86,6 +86,21 @@ const PLAIN_TITLE_HEADER = {
   headerLargeTitleEnabled: false,
 } as const satisfies NativeStackNavigationOptions;
 
+/**
+ * A compact, native iOS bar that participates in UIKit's scroll-edge effect.
+ *
+ * `headerTransparent` lets the first descendant ScrollView reach the system
+ * navigation bar. On iOS 26, native-stack's default `scrollEdgeEffects` is
+ * `automatic`, so UIKit supplies the progressive blur as content passes below
+ * the inline title — without a large title or a JS blur overlay. Keep
+ * `headerBlurEffect` unset: the two native effects overlap when both are set.
+ */
+const SCROLL_EDGE_PLAIN_TITLE_HEADER = {
+  ...PLAIN_TITLE_HEADER,
+  headerStyle: undefined,
+  headerTransparent: true,
+} as const satisfies NativeStackNavigationOptions;
+
 export function createTopLevelStackOptions(
   mobileColors: MobileColors,
   title: string,
@@ -104,17 +119,21 @@ export function createDetailStackOptions(
    * `largeTitle` for a pushed screen that should read as a place of its own
    * rather than a leaf. iOS uses large titles well below the root of a stack —
    * Settings does it at every level — and the People and Profile sections are
-   * built that way throughout, so a person, an invite form and each profile
-   * panel all get one. Modals and one-off detail screens keep the inline title.
+   * built that way throughout. A screen can instead keep its compact title
+   * while opting into the native iOS scroll-edge treatment.
    */
-  { largeTitle = false }: { largeTitle?: boolean } = {},
+  { largeTitle = false, scrollEdge = false }: { largeTitle?: boolean; scrollEdge?: boolean } = {},
 ): NativeStackNavigationOptions {
   return {
     ...createCommonStackOptions(mobileColors),
     title,
-    ...(isIOS && largeTitle ? LARGE_TITLE_HEADER : PLAIN_TITLE_HEADER),
-    // Full-width back swipe on iOS: a detail screen is a dead end, so the whole
-    // surface should dismiss it rather than just the left edge.
-    fullScreenGestureEnabled: isIOS,
+    ...(isIOS && largeTitle
+      ? LARGE_TITLE_HEADER
+      : isIOS && scrollEdge
+        ? SCROLL_EDGE_PLAIN_TITLE_HEADER
+        : PLAIN_TITLE_HEADER),
+    // Leave the back gesture to UIKit's standard left-edge interaction. The
+    // full-screen variant can capture a diagonal vertical scroll and flash the
+    // native navigation controller behind the header during an interrupted pop.
   };
 }

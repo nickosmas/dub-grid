@@ -186,6 +186,127 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(res.status).toBe(409);
   });
 
+  // Tracks whether the update chain was scoped to a specific employee_id (or
+  // explicitly "no employee"), and only "finds" a row when that scope
+  // matches — models the real partial-unique-index behavior where a pending
+  // row belongs to exactly one employee_id (or none).
+  function makeEmployeeScopedRefreshChain(
+    rowsByEmployeeKey: Record<string, { id: string; token: string; expires_at: string }>,
+  ) {
+    let scopeKey: string | null = null;
+    const chain: Record<string, unknown> = {
+      update: () => chain,
+      ilike: () => chain,
+      gte: () => chain,
+      select: () => chain,
+      eq: (column: string, value: unknown) => {
+        if (column === "employee_id") scopeKey = String(value);
+        return chain;
+      },
+      is: (column: string, value: unknown) => {
+        if (column === "employee_id" && value === null) scopeKey = "null";
+        return chain;
+      },
+    };
+    chain.maybeSingle = async () => ({
+      data: scopeKey !== null ? (rowsByEmployeeKey[scopeKey] ?? null) : null,
+      error: null,
+    });
+    return chain;
+  }
+
+  it("does not hijack a different employee's pending invitation for the same email", async () => {
+    const EMPLOYEE_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const EMPLOYEE_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    // A live pending row exists for employee A only.
+    const from = vi.fn(() =>
+      makeEmployeeScopedRefreshChain({
+        [EMPLOYEE_A]: { id: "inv-a", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+      }),
+    );
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    // Inviting employee B with the SAME email must NOT silently refresh and
+    // return employee A's invitation — it must fail with the normal
+    // already-pending error instead.
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "shared@test.com",
+        role: "admin",
+        employeeId: EMPLOYEE_B,
+      }),
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/already been sent/i);
+  });
+
+  it("refreshes correctly when the same employee retries after a failed send", async () => {
+    const EMPLOYEE_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    const from = vi.fn(() =>
+      makeEmployeeScopedRefreshChain({
+        [EMPLOYEE_A]: { id: "inv-a", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+      }),
+    );
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "shared@test.com",
+        role: "admin",
+        employeeId: EMPLOYEE_A,
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      invitationId: "inv-a",
+      token: "fresh-tok",
+      expiresAt: "2026-02-02T00:00:00Z",
+      resent: true,
+    });
+  });
+
+  it("does not refresh a management-only pending invite when the new request is employee-linked", async () => {
+    const EMPLOYEE_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    // A live pending row exists with no employee_id (a management-only invite).
+    const from = vi.fn(() =>
+      makeEmployeeScopedRefreshChain({
+        null: { id: "inv-mgmt", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+      }),
+    );
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "shared@test.com",
+        role: "admin",
+        employeeId: EMPLOYEE_B,
+      }),
+    );
+
+    expect(res.status).toBe(409);
+  });
+
   it("maps a genuine already-a-member RPC error to 409 without refreshing", async () => {
     const rpc = vi.fn(async () => ({
       data: null,

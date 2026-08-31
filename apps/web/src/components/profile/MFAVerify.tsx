@@ -13,8 +13,9 @@ import { ShieldCheck } from "lucide-react";
 import { listBrowserMfaFactors, verifyBrowserTotpEnrollment } from "@/features/account/client";
 
 interface MFAVerifyProps {
-  /** Called after successful MFA verification */
-  onVerified: () => void;
+  /** Called after successful MFA verification. Awaited so the button stays
+   * in its loading state until any post-verification navigation happens. */
+  onVerified: () => void | Promise<void>;
   /** Called when user wants to go back to login */
   onCancel: () => void;
   /** Optional: organization slug shown in the UI */
@@ -65,12 +66,14 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
         code,
       });
       if (verifyError) throw verifyError;
-      onVerified();
+      // Stay in the loading state through the caller's post-verification
+      // work (org switch, navigation) so the button doesn't flash idle
+      // before the page transitions.
+      await onVerified();
     } catch {
       setError("Invalid verification code. Please try again.");
       setCode("");
       inputRef.current?.focus();
-    } finally {
       setLoading(false);
     }
   }

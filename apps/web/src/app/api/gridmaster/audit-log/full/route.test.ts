@@ -5,6 +5,7 @@ const requireGridmasterSession = vi.fn();
 const requireOrgPermissions = vi.fn();
 const platformFrom = vi.fn();
 const orgFrom = vi.fn();
+const fetchFilteredAuditRows = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
@@ -22,6 +23,10 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: platformFrom,
   }),
+}));
+
+vi.mock("@/lib/audit/server-query", () => ({
+  fetchFilteredAuditRows: (...args: unknown[]) => fetchFilteredAuditRows(...args),
 }));
 
 import { GET } from "./route";
@@ -117,6 +122,7 @@ describe("GET /api/gridmaster/audit-log/full", () => {
 
     platformFrom.mockImplementation(makeAuditClientFrom());
     orgFrom.mockImplementation(makeAuditClientFrom());
+    fetchFilteredAuditRows.mockResolvedValue([makeAuditRow()]);
 
     requireGridmasterSession.mockResolvedValue({
       session: { access_token: "token" },
@@ -181,7 +187,10 @@ describe("GET /api/gridmaster/audit-log/full", () => {
       expect.any(Function),
     );
     expect(requireGridmasterSession).not.toHaveBeenCalled();
-    expect(orgFrom).toHaveBeenCalledWith("audit_log");
+    expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orgId: ORG_ID, actionPrefix: "employee." }),
+    );
   });
 
   it("keeps unscoped full audit log access platform-gridmaster only", async () => {
@@ -192,7 +201,10 @@ describe("GET /api/gridmaster/audit-log/full", () => {
     expect(response.status).toBe(200);
     expect(requireGridmasterSession).toHaveBeenCalledTimes(1);
     expect(requireOrgPermissions).not.toHaveBeenCalled();
-    expect(platformFrom).toHaveBeenCalledWith("audit_log");
+    expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: 25 }),
+    );
   });
 
   it("rejects org-scoped activity requests when org permissions are insufficient", async () => {

@@ -84,10 +84,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meWeekNavigator: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "space-between",
       gap: 14,
-      paddingVertical: 2,
     },
     meWeekNavigatorCopy: {
       flex: 1,
@@ -586,7 +585,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     upcomingDateTile: {
       width: 60,
-      height: 68,
+      minHeight: 68,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
@@ -599,6 +598,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.micro,
       color: mobileColors.textSubtle,
       fontSize: 11,
+      lineHeight: 14,
     },
     upcomingDateDay: {
       ...mobileText.sectionTitle,
@@ -661,6 +661,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     upcomingShiftTimeText: {
       ...mobileText.caption,
       fontSize: 13,
+      lineHeight: 18,
       color: mobileColors.textSubtle,
     },
     upcomingShiftAction: {
@@ -681,6 +682,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meSectionTitle: {
       ...mobileText.sectionTitle,
       fontSize: 18,
+      lineHeight: 24,
       color: mobileColors.textPrimary,
     },
     meSectionLink: {
@@ -938,6 +940,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillTextCompact: {
       fontSize: 12,
+      lineHeight: 16,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
@@ -1210,10 +1213,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     alertBadge: {
       position: "absolute",
-      top: 3,
+      // Centers the badge on the button's own ring at the top-right 45°
+      // point (button radius 22, badge half-size 8: 22 - 22*sin(45°) - 8 ≈
+      // -2 on both axes) rather than tucking it inside the circle.
+      top: -2,
       right: -2,
       minWidth: 16,
-      height: 16,
+      minHeight: 16,
       borderRadius: 999,
       paddingHorizontal: 4,
       alignItems: "center",
@@ -1221,9 +1227,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.danger,
     },
     alertBadgeText: {
+      ...mobileText.micro,
       color: mobileColors.textInverse,
-      fontFamily: mobileTypography.fontFamily.bold,
-      fontSize: 10,
     },
     groupsList: {
       gap: mobileSpacing.sectionGap,

@@ -11,7 +11,6 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
-import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
@@ -62,6 +61,8 @@ export default function AddPersonScreen() {
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
+  const useCompactRoleCertificationLabels =
+    bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
 
   const fieldErrors = {
     firstName: firstName.trim().length > 0 ? getStaffNameError(firstName, "First name") : null,
@@ -233,8 +234,7 @@ export default function AddPersonScreen() {
               { id: -1, name: "None" },
               ...certifications.map((item) => ({
                 id: item.id,
-                name: item.name,
-                abbr: item.abbr || item.name,
+                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
               })),
             ]}
             label={certificationLabel}
@@ -255,10 +255,6 @@ export default function AddPersonScreen() {
           />
         </ProfilePanel>
       </ProfileSection>
-
-      {createMutation.isError ? (
-        <StatusBanner body="We couldn't add that person right now." title="Could not add person" />
-      ) : null}
 
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Button

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useLocalSearchParams } from "expo-router";
@@ -21,6 +21,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen } from "../../../shared/components/Screen";
+import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
@@ -336,8 +337,8 @@ function MentoredPill() {
 
 export default function ShiftDetailScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const params = useLocalSearchParams<{
     employeeId?: string;
     date?: string;
@@ -436,6 +437,15 @@ export default function ShiftDetailScreen() {
     queryFn: () => getOrgSchedule(accessToken!, teamScheduleRange),
     enabled: canLoadTeamSchedule,
   });
+  useEffect(() => {
+    if (teamScheduleQuery.error) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error: teamScheduleQuery.error,
+        title: "Could not load working-with list",
+        fallbackMessage: "We couldn't load who is working with you right now.",
+      });
+    }
+  }, [teamScheduleQuery.error, pushToast]);
   const swapOptionsQuery = useQuery({
     queryKey: [
       "mobile",
@@ -566,6 +576,15 @@ export default function ShiftDetailScreen() {
           "We couldn't verify existing requests for this shift.",
         )
       : null;
+  useEffect(() => {
+    if (shouldCheckExistingRequests && requestsQuery.error) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error: requestsQuery.error,
+        title: "Could not verify existing requests",
+        fallbackMessage: "We couldn't verify existing requests for this shift.",
+      });
+    }
+  }, [shouldCheckExistingRequests, requestsQuery.error, pushToast]);
   const shiftmates = useMemo(() => {
     if (!shiftEntry) {
       return [];
@@ -876,10 +895,11 @@ export default function ShiftDetailScreen() {
     !isGeneralDetailEntry(shiftEntry),
   );
   // No `isLoading` term: the screen's own gate now waits on the team schedule,
-  // so by the time this renders the list is either populated or errored.
+  // so by the time this renders the list is either populated or the load
+  // failure has already been toasted (see the effect near `teamScheduleQuery`)
+  // and there is nothing left for this section to show.
   const shouldRenderShiftmatesSection = Boolean(
-    shouldShowShiftmates &&
-    (teamScheduleQuery.error || shiftmates.length > 0 || hasGroupedShiftmates),
+    shouldShowShiftmates && (shiftmates.length > 0 || hasGroupedShiftmates),
   );
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
@@ -1142,7 +1162,8 @@ export default function ShiftDetailScreen() {
               {!hasMultipleSegments && focusAreaName ? (
                 <DetailInfoRow
                   iconBackgroundColor={mobileColors.successSoft}
-                  iconColor="#059669"
+                  iconBorderColor={mobileColors.successBorder}
+                  iconColor={mobileColors.successText}
                   iconName="location-outline"
                   label="Focus area"
                   value={focusAreaName}
@@ -1151,6 +1172,7 @@ export default function ShiftDetailScreen() {
               {!hasMultipleSegments && timeRange ? (
                 <DetailInfoRow
                   iconBackgroundColor={mobileColors.brandSoft}
+                  iconBorderColor={mobileColors.brandBorder}
                   iconColor={mobileColors.brand}
                   iconName="time-outline"
                   label="Shift time"
@@ -1161,22 +1183,32 @@ export default function ShiftDetailScreen() {
 
             {canCreateRequestsForShift ? (
               <View style={styles.detailActionsRow}>
-                <DetailActionButton
-                  disabled={createRequestMutation.isPending}
-                  iconName="exit-outline"
-                  label="Drop shift"
-                  onPress={() => resetRequestMode("coverage")}
-                  tone="neutral"
-                />
                 {canCreateSwapForShift ? (
-                  <DetailActionButton
-                    disabled={createRequestMutation.isPending}
-                    iconName="swap-horizontal-outline"
-                    label="Swap"
-                    onPress={() => resetRequestMode("swap")}
-                    tone="secondary"
-                  />
+                  <View style={styles.detailActionButtonWrap}>
+                    <Button
+                      disabled={createRequestMutation.isPending}
+                      fullWidth
+                      icon="swap-horizontal-outline"
+                      label="Swap"
+                      onPress={() => resetRequestMode("swap")}
+                      shape="squircle"
+                      size="lg"
+                      tone="primary"
+                    />
+                  </View>
                 ) : null}
+                <View style={styles.detailActionButtonWrap}>
+                  <Button
+                    disabled={createRequestMutation.isPending}
+                    fullWidth
+                    icon="exit-outline"
+                    label="Drop shift"
+                    onPress={() => resetRequestMode("coverage")}
+                    shape="squircle"
+                    size="lg"
+                    tone="neutral"
+                  />
+                </View>
               </View>
             ) : null}
 
@@ -1192,46 +1224,33 @@ export default function ShiftDetailScreen() {
           {shouldRenderShiftmatesSection ? (
             <View style={styles.sectionBlock}>
               <Text style={styles.sectionTitle}>Working with</Text>
-              {teamScheduleQuery.error ? (
-                <StatusBanner
-                  body={getQueryErrorMessage(
-                    teamScheduleQuery.error,
-                    "We couldn't load who is working with you right now.",
-                  )}
-                  title="Could not load working-with list"
+              {hasSplitShift ? (
+                <ShiftmateSegmentGroups
+                  groups={shiftmateSegmentGroups}
+                  linkedEmployeeId={linkedEmployeeId}
                 />
               ) : (
-                <>
-                  {hasSplitShift ? (
-                    <ShiftmateSegmentGroups
-                      groups={shiftmateSegmentGroups}
+                <View style={styles.shiftmatesList}>
+                  {shiftmates.map((entry, index) => (
+                    <ShiftmateRow
+                      key={`${entry.employeeId}-${entry.date}`}
+                      entry={entry}
+                      groupFocusAreaName={focusAreaName}
+                      groupTimeRange={timeRange}
+                      isFirst={index === 0}
                       linkedEmployeeId={linkedEmployeeId}
                     />
-                  ) : (
-                    <View style={styles.shiftmatesList}>
-                      {shiftmates.map((entry, index) => (
-                        <ShiftmateRow
-                          key={`${entry.employeeId}-${entry.date}`}
-                          entry={entry}
-                          groupFocusAreaName={focusAreaName}
-                          groupTimeRange={timeRange}
-                          isFirst={index === 0}
-                          linkedEmployeeId={linkedEmployeeId}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </>
+                  ))}
+                </View>
               )}
             </View>
           ) : null}
 
           {isCheckingExistingRequests ? (
-            <StatusBanner
-              body="Making sure this shift does not already have a request in progress."
-              tone="info"
-              title="Checking existing requests"
-            />
+            <SkeletonCardSurface>
+              <SkeletonLine style={{ marginBottom: 6 }} variant="screenTitle" width="60%" />
+              <SkeletonLine variant="body" width="90%" />
+            </SkeletonCardSurface>
           ) : null}
           {activeShiftRequest ? (
             <Card
@@ -1244,16 +1263,6 @@ export default function ShiftDetailScreen() {
                   </Text>
                 ) : undefined
               }
-            />
-          ) : null}
-          {shiftRequestCheckError ? (
-            <StatusBanner
-              actionLabel="Refresh"
-              body={shiftRequestCheckError}
-              title="Could not verify existing requests"
-              onAction={() => {
-                void requestsQuery.refetch();
-              }}
             />
           ) : null}
         </>
@@ -1730,12 +1739,14 @@ function DetailHeaderJobPill({
 
 function DetailInfoRow({
   iconBackgroundColor,
+  iconBorderColor,
   iconColor,
   iconName,
   label,
   value,
 }: {
   iconBackgroundColor: string;
+  iconBorderColor: string;
   iconColor: string;
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -1746,54 +1757,19 @@ function DetailInfoRow({
 
   return (
     <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
-      <View style={[styles.detailInfoIconBox, { backgroundColor: iconBackgroundColor }]}>
-        <Ionicons color={iconColor} name={iconName} size={21} />
+      <View
+        style={[
+          styles.detailInfoIconBox,
+          { backgroundColor: iconBackgroundColor, borderColor: iconBorderColor },
+        ]}
+      >
+        <Ionicons color={iconColor} name={iconName} size={16} />
       </View>
       <View style={styles.detailInfoCopy}>
         <Text style={styles.detailInfoLabel}>{label}</Text>
         <Text style={styles.detailInfoValue}>{value}</Text>
       </View>
     </View>
-  );
-}
-
-function DetailActionButton({
-  disabled,
-  iconName,
-  label,
-  onPress,
-  tone,
-}: {
-  disabled?: boolean;
-  iconName?: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  tone: "neutral" | "secondary";
-}) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const isSecondary = tone === "secondary";
-  const contentColor = isSecondary ? mobileColors.brand : mobileColors.dangerText;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.detailActionButton,
-        isSecondary && styles.detailActionButtonSecondary,
-        pressed && !disabled && styles.detailActionButtonPressed,
-        disabled && styles.detailActionButtonDisabled,
-      ]}
-    >
-      <View style={styles.detailActionButtonContent}>
-        {iconName ? <Ionicons color={contentColor} name={iconName} size={21} /> : null}
-        <Text style={[styles.detailActionButtonText, { color: contentColor }]}>{label}</Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -2040,7 +2016,10 @@ function ShiftmateRow({
           },
         ]}
       >
-        <Text style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
+        <Text
+          maxFontSizeMultiplier={1.5}
+          style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
+        >
           {getInitials(entry.employeeName)}
         </Text>
       </View>

@@ -4,8 +4,9 @@ import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import { hapticSelection } from "../lib/haptics";
 import { useMotionPreference } from "../motion/useMotionPreference";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { useMobileColors, useThemeMode } from "../providers/ThemeModeProvider";
 import {
+  mobileElevation,
   mobileMotion,
   mobileRadii,
   mobileSpace,
@@ -28,8 +29,8 @@ export type SegmentedOption<Value extends string> = {
 };
 
 const SIZE = {
-  sm: { height: 30, paddingHorizontal: 10, labelVariant: "caption" },
-  md: { height: 36, paddingHorizontal: 14, labelVariant: "label" },
+  sm: { height: 36, paddingHorizontal: 12, labelVariant: "body" },
+  md: { height: 44, paddingHorizontal: 16, labelVariant: "bodyStrong" },
 } as const satisfies Record<
   SegmentedControlSize,
   { height: number; paddingHorizontal: number; labelVariant: keyof typeof mobileText }
@@ -39,7 +40,10 @@ const SIZE = {
 const TRACK_PADDING = 2;
 
 /**
- * A pill track with a single sliding thumb.
+ * A pill track with a single sliding thumb, styled after a native
+ * iOS/Android segmented control tinted with the app's accent color: a raised
+ * theme-blue thumb travels behind the selected label, with its own shadow so
+ * it reads as floating above the neutral track rather than as a flat fill.
  *
  * Replaces the two hand-rolled segmented controls (the dashboard period toggle
  * and the requests tab strip), which both drew a *per-segment* background. A
@@ -62,8 +66,10 @@ export function SegmentedControl<Value extends string>({
   accessibilityLabel?: string;
 }) {
   const mobileColors = useMobileColors();
+  const { resolvedTheme } = useThemeMode();
+  const isDark = resolvedTheme === "dark";
   const metrics = SIZE[size];
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { enabled: motionEnabled, d } = useMotionPreference();
 
   // Each segment reports its own position and width.
@@ -111,7 +117,7 @@ export function SegmentedControl<Value extends string>({
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="tablist"
-      style={[styles.track, { height: metrics.height }, disabled && styles.trackDisabled]}
+      style={[styles.track, { minHeight: metrics.height }, disabled && styles.trackDisabled]}
     >
       {/* Hidden via opacity until the selected segment has been measured, so it
           never flashes at zero width on first layout. */}
@@ -157,7 +163,7 @@ export function SegmentedControl<Value extends string>({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     track: {
       flexDirection: "row",
@@ -175,8 +181,12 @@ const createStyles = (mobileColors: MobileColors) =>
       position: "absolute",
       top: TRACK_PADDING,
       bottom: TRACK_PADDING,
+      // Theme blue, like a native segmented/tab control tinted with the app's
+      // accent color. The raised shadow still carries the "floating pill"
+      // read; the color on top of it is what says *this* segment is active.
       backgroundColor: mobileColors.brand,
       borderRadius: mobileRadii.pill,
+      ...mobileElevation("raised", isDark),
     },
     // No `flex`: the track is content-sized, so each segment sizes to its own
     // label. Adding flex here collapses every segment to zero width.
@@ -187,7 +197,7 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     labelIdle: {
-      color: mobileColors.textMuted,
+      color: mobileColors.textSecondary,
     },
     labelSelected: {
       color: mobileColors.onBrandText,
@@ -199,6 +209,8 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.surface,
     },
+    // Sits on the blue thumb, so it needs a translucent-on-color treatment
+    // rather than the idle badge's opaque surface fill.
     badgeSelected: {
       backgroundColor: "rgba(255, 255, 255, 0.22)",
     },

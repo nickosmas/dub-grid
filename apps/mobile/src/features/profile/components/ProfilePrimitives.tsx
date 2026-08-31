@@ -145,6 +145,7 @@ export function ProfileHero({
               <View style={styles.avatarFrame}>
                 <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                   <Text
+                    maxFontSizeMultiplier={1.5}
                     style={[
                       styles.avatarText,
                       isCentered && styles.avatarTextLarge,
@@ -428,7 +429,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
         {items.map((item) => (
           <Chip
             key={item.id}
-            label={item.abbr || item.name}
+            label={item.name}
             onPress={() => onToggle(item.id)}
             selected={selectedIds.includes(item.id)}
           />

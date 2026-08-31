@@ -4,7 +4,11 @@ import { formatDateKey, iterateDateRange } from "@/lib/utils";
 // Coverage engine now lives in @dubgrid/schedule-core so both web and mobile
 // call the exact same computation instead of maintaining two implementations
 // that can silently drift (see packages/schedule-core/src/coverage.ts).
-import { DEFAULT_COVERAGE_RULE_CONFIG, normalizeCoverageRuleConfig } from "@dubgrid/schedule-core";
+import {
+  DEFAULT_COVERAGE_RULE_CONFIG,
+  normalizeCoverageRuleConfig,
+  type SegmentsForEmployeeDate,
+} from "@dubgrid/schedule-core";
 
 export {
   DEFAULT_COVERAGE_RULE_CONFIG,
@@ -20,6 +24,13 @@ export {
 
 export type PublishedWindowState = "unpublished" | "partial" | "published";
 
+/**
+ * Still used by the schedule grid page (SchedulePageClient.tsx), which has
+ * its own first-match-wins coverage-credit display separate from the
+ * dashboard. The dashboard itself now uses the canonical
+ * `assembleDashboardCoverage`/`buildCoverageCreditResolver` (max-of-segments)
+ * from `@dubgrid/schedule-core` via `buildShiftMapSegmentsForKey` below.
+ */
 export function createCoverageCreditResolver(
   shifts: ShiftMap,
   config?: Partial<CoverageRuleConfig> | null,
@@ -34,6 +45,22 @@ export function createCoverageCreditResolver(
     if (segmentIndex === -1) return 0;
     const segment = entry.segments?.[segmentIndex];
     return segment?.isMentored ? mentoredCredit : 1;
+  };
+}
+
+/**
+ * The platform adapter for web: reads an employee's resolved shift segments
+ * for a date out of a `ShiftMap` entry, for use with
+ * `@dubgrid/schedule-core`'s `assembleDashboardCoverage`.
+ */
+export function buildShiftMapSegmentsForKey(shifts: ShiftMap): SegmentsForEmployeeDate {
+  return (empId, date) => {
+    const entry = shifts[`${empId}_${formatDateKey(date)}`];
+    if (!entry || entry.isDelete) return [];
+    return entry.assignmentIds.map((assignmentId, index) => ({
+      assignmentId,
+      isMentored: Boolean(entry.segments?.[index]?.isMentored),
+    }));
   };
 }
 

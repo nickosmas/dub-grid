@@ -81,6 +81,41 @@ const centeredChannelCellStyle: CSSProperties = {
   minHeight: 20,
 };
 
+function NotificationPreferencesSkeleton({ rowCount }: { rowCount: number }) {
+  return (
+    <div
+      aria-label="Loading notification preferences"
+      role="status"
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
+    >
+      <div className="dg-skeleton dg-skeleton--text" style={{ width: "46%" }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="dg-skeleton" style={{ height: 40, borderRadius: 4 }} />
+        {Array.from({ length: rowCount }, (_, index) => (
+          <div
+            key={index}
+            style={{
+              display: "grid",
+              gridTemplateColumns: preferenceGridTemplate,
+              gap: 8,
+              alignItems: "center",
+              minHeight: 56,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "42%" }} />
+              <div className="dg-skeleton dg-skeleton--text" style={{ width: "78%" }} />
+            </div>
+            <div className="dg-skeleton" style={{ width: 34, height: 20, borderRadius: 999 }} />
+            <div className="dg-skeleton" style={{ width: 34, height: 20, borderRadius: 999 }} />
+          </div>
+        ))}
+      </div>
+      <div className="dg-skeleton" style={{ width: 132, height: 36, borderRadius: 4 }} />
+    </div>
+  );
+}
+
 function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
   const merged = { ...DEFAULT_PREFS, ...nextPrefs };
   return Object.fromEntries(
@@ -171,7 +206,13 @@ export function NotificationPreferences({
     setPrefs(savedPrefs);
   }
 
-  if (!loaded) return null;
+  if (!loaded) {
+    return (
+      <NotificationPreferencesSkeleton
+        rowCount={visibleCategories?.length ?? Object.keys(CATEGORY_LABELS).length}
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

@@ -20,7 +20,10 @@ import {
   upsertJobDefinition,
   upsertShiftCategory,
 } from "@/features/settings/client";
-import { updateOrganizationSettings } from "@/features/organization/client";
+import {
+  saveOrganizationSettingsWithRecovery,
+  updateOrganizationSettings,
+} from "@/features/organization/client";
 import {
   makeCoverageRequirement,
   makeDepartment,
@@ -42,6 +45,7 @@ import type {
 
 vi.mock("@/features/organization/client", () => ({
   updateOrganizationSettings: vi.fn(),
+  saveOrganizationSettingsWithRecovery: vi.fn(),
   OrganizationSettingsConflictError: class OrganizationSettingsConflictError extends Error {
     latestOrganization: Organization;
 
@@ -83,6 +87,7 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -126,6 +131,10 @@ const baseOrganization: Organization = {
 describe("settings dirty save controls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(saveOrganizationSettingsWithRecovery).mockImplementation(async ({ input }) => ({
+      status: "saved",
+      organization: await vi.mocked(updateOrganizationSettings)(input),
+    }));
   });
 
   it("organization settings only show Discard while the draft is dirty", async () => {
@@ -258,6 +267,10 @@ describe("settings dirty save controls", () => {
     expect(codeSample?.querySelector('.dg-grid-slot[data-leading-divider="split"]')).not.toBeNull();
     expect(codeSample?.querySelector('.dg-grid-cell[data-top-divider="dark"]')).not.toBeNull();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /short codes/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     await user.click(screen.getByRole("button", { name: /full names/i }));
 
@@ -265,12 +278,48 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
     expect(saveButton).toBeEnabled();
     expect(cancelButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: /short codes/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: /full names/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     await user.click(cancelButton);
 
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+  });
+
+  it("saves the appwide compact role and certification label preference", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    vi.mocked(saveOrganizationSettingsWithRecovery).mockResolvedValue({
+      status: "saved",
+      organization: { ...baseOrganization, useCompactRoleCertificationLabels: true },
+    });
+
+    render(<DisplayMode organization={baseOrganization} onSave={onSave} />);
+
+    const compactLabelsSwitch = screen.getByRole("switch", {
+      name: /use compact role and certification labels/i,
+    });
+    expect(compactLabelsSwitch).toHaveAttribute("aria-checked", "false");
+
+    await user.click(compactLabelsSwitch);
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(saveOrganizationSettingsWithRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ useCompactRoleCertificationLabels: true }),
+      }),
+    );
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ useCompactRoleCertificationLabels: true }),
+    );
   });
 
   it("schedule rules only expose Save for a modified toggle", async () => {
@@ -1280,6 +1329,37 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText("Spruce Wing")).toBeInTheDocument();
   });
 
+  it("reorders departments from their keyboard handles", async () => {
+    const user = userEvent.setup();
+    const departments: Department[] = [
+      makeDepartment({ id: 1, orgId: "org-1", name: "North", sortOrder: 0 }),
+      makeDepartment({ id: 2, orgId: "org-1", name: "South", sortOrder: 1 }),
+    ];
+
+    render(
+      <DepartmentsSettings
+        departments={departments}
+        focusAreas={[]}
+        orgId="org-1"
+        focusAreaLabel="Focus Areas"
+        departmentLabel="Departments"
+        canManageFocusAreas
+        canManageOrgLabels={false}
+        onDepartmentsChange={vi.fn()}
+        onFocusAreasChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    const handle = screen.getByRole("button", { name: /reorder south/i });
+    handle.focus();
+    await user.keyboard("{ArrowUp}");
+
+    expect(
+      screen.getAllByDisplayValue(/North|South/).map((input) => input.getAttribute("value")),
+    ).toEqual(["South", "North"]);
+  });
+
   it("does not expose focus area color presets from the departments editor", async () => {
     const user = userEvent.setup();
     const departments: Department[] = [
@@ -1414,6 +1494,63 @@ describe("settings dirty save controls", () => {
         }),
       );
     });
+  });
+
+  it("uses a full-name shift preview without repeating its code in name mode", () => {
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+      color: "#E2E8F0",
+    });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[shiftCategory]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="name"
+      />,
+    );
+
+    expect(document.querySelector('[data-shift-category-preview="name"]')).toHaveTextContent(
+      "Day Shift",
+    );
+    expect(screen.getAllByText("Day Shift")).toHaveLength(1);
+    expect(screen.queryByText("D", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("hides the shift code editor in name mode", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+    });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[shiftCategory]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="name"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    expect(screen.queryByText(/^code$/i)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("D")).not.toBeInTheDocument();
   });
 
   it("shift category editors let admins customize the code abbreviation", async () => {
@@ -1724,6 +1861,46 @@ describe("settings dirty save controls", () => {
     // Editor closes, no draft row remains, and no save fired.
     expect(screen.queryByPlaceholderText("e.g. Supervisor")).not.toBeInTheDocument();
     expect(upsertJobDefinition).not.toHaveBeenCalled();
+  });
+
+  it("hides job abbreviations in name mode", async () => {
+    const user = userEvent.setup();
+    const department = makeDepartment({
+      id: 1,
+      orgId: "org-1",
+      name: "Nursing",
+      type: "scheduled",
+    });
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "North", departmentId: 1 });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+    });
+
+    render(
+      <JobsSettings
+        jobs={[]}
+        orgId="org-1"
+        orgRoles={[]}
+        certifications={[]}
+        departments={[department]}
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        roleLabel="Roles"
+        certificationLabel="Certifications"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        organization={{ ...baseOrganization, shiftDisplayMode: "name" }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+
+    expect(screen.queryByText("GRID ABBR")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. SUP")).not.toBeInTheDocument();
   });
 
   it("general jobs clear legacy duration values when fixed times are already set", async () => {

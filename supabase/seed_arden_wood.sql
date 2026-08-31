@@ -162,7 +162,9 @@ BEGIN
   WHERE source_cert.org_id = source_org
   ORDER BY source_cert.sort_order;
 
-  INSERT INTO public.organization_roles (org_id, department_ids, name, abbr, sort_order)
+  INSERT INTO public.organization_roles (
+    org_id, department_ids, name, abbr, sort_order, required_certification_ids
+  )
   SELECT
     target_org,
     COALESCE(
@@ -178,7 +180,21 @@ BEGIN
     ),
     source_role.name,
     source_role.abbr,
-    source_role.sort_order
+    source_role.sort_order,
+    -- Requirements point at certification ids, so they need remapping by name
+    -- the same way department_ids do; copying them verbatim would reference the
+    -- source org's rows and leave every gated role unassignable here.
+    COALESCE(
+      (
+        SELECT array_agg(target_cert.id ORDER BY target_cert.id)
+        FROM unnest(source_role.required_certification_ids) AS source_cert_id
+        JOIN public.certifications source_cert ON source_cert.id = source_cert_id
+        JOIN public.certifications target_cert
+          ON target_cert.org_id = target_org
+         AND target_cert.name = source_cert.name
+      ),
+      ARRAY[]::bigint[]
+    )
   FROM public.organization_roles source_role
   WHERE source_role.org_id = source_org
   ORDER BY source_role.sort_order;
@@ -222,7 +238,7 @@ BEGIN
   SELECT id INTO shift_ns_n FROM public.shift_categories WHERE org_id = target_org AND focus_area_id = fa_ns AND name = 'Night Shift';
   SELECT id INTO shift_vcsn_vn FROM public.shift_categories WHERE org_id = target_org AND focus_area_id = fa_vcsn AND name = 'Visiting Nursing';
   SELECT id INTO cert_jlcsn FROM public.certifications WHERE org_id = target_org AND name = 'Journal Listed Christian Science Nurse';
-  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = target_org AND name = 'Nurse';
+  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = target_org AND name = 'Staff';
   SELECT id INTO cert_csn4 FROM public.certifications WHERE org_id = target_org AND name = 'Christian Science Nurse IV';
   SELECT id INTO cert_csn3 FROM public.certifications WHERE org_id = target_org AND name = 'Christian Science Nurse III';
   SELECT id INTO role_supv FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Supv';

@@ -421,7 +421,8 @@ $$;
 -- 4. CASCADE TRIGGERS
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- Certification delete → remove from jobs.required_certification_ids
+-- Certification delete → remove from jobs.required_certification_ids and
+-- organization_roles.required_certification_ids
 CREATE OR REPLACE FUNCTION public.remove_certification_from_assignments()
 RETURNS TRIGGER
 LANGUAGE PLPGSQL
@@ -431,6 +432,12 @@ BEGIN
   SET required_certification_ids = array_remove(required_certification_ids, OLD.id)
   WHERE org_id = OLD.org_id
     AND OLD.id = ANY(required_certification_ids);
+
+  UPDATE public.organization_roles
+  SET required_certification_ids = array_remove(required_certification_ids, OLD.id)
+  WHERE org_id = OLD.org_id
+    AND OLD.id = ANY(required_certification_ids);
+
   RETURN OLD;
 END;
 $$;

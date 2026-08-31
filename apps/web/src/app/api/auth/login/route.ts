@@ -15,6 +15,7 @@ import { deleteSandboxForUser } from "@/features/test-sandbox/server";
 import type { User } from "@supabase/supabase-js";
 import { parseHost } from "@/lib/subdomain";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
+import { lookupOrgBySlug } from "@/lib/org-lookup";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { Timer } from "@/lib/server-timing";
@@ -90,14 +91,10 @@ async function switchSessionToHostOrganization(
   | { ok: true; session: SessionTokens; claims: ReturnType<typeof decodeJwt> }
   | { ok: false; status: number; code: string; error: string }
 > {
-  const { data: org } = await getServiceClient()
-    .from("organizations")
-    .select("id")
-    .eq("slug", hostSlug)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (!org?.id) {
+  // Reuses the same 24h Redis-cached lookup app/login/page.tsx already ran for
+  // this host moments earlier server-side, instead of a fresh DB round trip.
+  const orgLookup = await lookupOrgBySlug(hostSlug);
+  if (orgLookup.status !== "found") {
     return {
       ok: false,
       status: 403,
@@ -107,7 +104,9 @@ async function switchSessionToHostOrganization(
   }
 
   const client = createTokenScopedClient(session.access_token);
-  const { error: switchError } = await client.rpc("switch_org", { target_org_id: org.id });
+  const { error: switchError } = await client.rpc("switch_org", {
+    target_org_id: orgLookup.org.id,
+  });
   if (switchError) {
     return {
       ok: false,

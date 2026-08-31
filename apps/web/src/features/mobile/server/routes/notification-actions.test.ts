@@ -37,11 +37,7 @@ describe("mobile notification actions", () => {
 
   it("marks a single notification read and returns the unread count", async () => {
     const rpc = vi.fn(async (fn: string) => {
-      if (fn === "mark_notification_read") {
-        return { data: null, error: null };
-      }
-
-      if (fn === "get_unread_notification_count") {
+      if (fn === "mark_notification_read_with_unread_count") {
         return { data: 2, error: null };
       }
 
@@ -69,11 +65,7 @@ describe("mobile notification actions", () => {
 
   it("marks all notifications read", async () => {
     const rpc = vi.fn(async (fn: string) => {
-      if (fn === "mark_all_notifications_read") {
-        return { data: null, error: null };
-      }
-
-      if (fn === "get_unread_notification_count") {
+      if (fn === "mark_all_notifications_read_with_unread_count") {
         return { data: 0, error: null };
       }
 
@@ -95,13 +87,9 @@ describe("mobile notification actions", () => {
     });
   });
 
-  it("returns a friendly error when unread-count refresh fails after marking read", async () => {
+  it("returns an error only when the atomic mark-read operation itself fails", async () => {
     const rpc = vi.fn(async (fn: string) => {
-      if (fn === "mark_notification_read") {
-        return { data: null, error: null };
-      }
-
-      if (fn === "get_unread_notification_count") {
+      if (fn === "mark_notification_read_with_unread_count") {
         return {
           data: null,
           error: new Error("count unavailable"),
@@ -123,9 +111,9 @@ describe("mobile notification actions", () => {
       }),
     });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: "We updated that notification, but we couldn't refresh your mobile alerts right now.",
+      error: "We could not update that notification.",
     });
   });
 });

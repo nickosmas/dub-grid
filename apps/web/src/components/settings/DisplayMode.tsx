@@ -3,10 +3,7 @@
 import React, { useState, useCallback } from "react";
 import { JobDefinition, Organization, ShiftCategory, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -344,7 +341,7 @@ export const DISPLAY_MODES: {
       "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
     details: [
       "The schedule grid, monthly calendar, and recurring-pattern editor show short codes in each cell",
-      "Everywhere else in the app, shifts are always shown by their full name",
+      "Shift previews in Settings follow this choice too",
       "Compact display fits well in all views including 2-week",
     ],
   },
@@ -375,10 +372,14 @@ export default function DisplayMode({
   const [showShiftDetailHoverCards, setShowShiftDetailHoverCards] = useState(
     organization.showShiftDetailHoverCards ?? true,
   );
+  const [useCompactLabels, setUseCompactLabels] = useState(
+    organization.useCompactRoleCertificationLabels ?? false,
+  );
   const [saving, setSaving] = useState(false);
   const isModified =
     selected !== organization.shiftDisplayMode ||
-    showShiftDetailHoverCards !== (organization.showShiftDetailHoverCards ?? true);
+    showShiftDetailHoverCards !== (organization.showShiftDetailHoverCards ?? true) ||
+    useCompactLabels !== (organization.useCompactRoleCertificationLabels ?? false);
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -387,33 +388,42 @@ export default function DisplayMode({
     }
     setSaving(true);
     try {
-      const updated = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        shiftDisplayMode: selected,
-        showShiftDetailHoverCards,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          shiftDisplayMode: selected,
+          showShiftDetailHoverCards,
+          useCompactRoleCertificationLabels: useCompactLabels,
+        },
       });
-      onSave(updated);
-      toast.success("Display mode updated");
-    } catch (err) {
-      if (err instanceof OrganizationSettingsConflictError) {
-        onSave(err.latestOrganization);
-        setSelected(err.latestOrganization.shiftDisplayMode);
-        setShowShiftDetailHoverCards(err.latestOrganization.showShiftDetailHoverCards ?? true);
-        toast.error("Display mode changed elsewhere. Review the latest value and try again.");
+      onSave(result.organization);
+      if (result.status === "saved") {
+        toast.success("Display mode updated");
       } else {
-        Sentry.captureException(err);
-        toast.error("We couldn't save that display setting. Try again.");
+        setSelected(result.organization.shiftDisplayMode);
+        setShowShiftDetailHoverCards(result.organization.showShiftDetailHoverCards ?? true);
+        setUseCompactLabels(result.organization.useCompactRoleCertificationLabels ?? false);
+        toast.info("Display settings were refreshed to the latest saved value.");
       }
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("We couldn't save that display setting. Try again.");
     } finally {
       setSaving(false);
     }
-  }, [organization, selected, showShiftDetailHoverCards, onSave]);
+  }, [organization, selected, showShiftDetailHoverCards, useCompactLabels, onSave]);
 
   const handleCancel = useCallback(() => {
     setSelected(organization.shiftDisplayMode);
     setShowShiftDetailHoverCards(organization.showShiftDetailHoverCards ?? true);
-  }, [organization.shiftDisplayMode, organization.showShiftDetailHoverCards]);
+    setUseCompactLabels(organization.useCompactRoleCertificationLabels ?? false);
+  }, [
+    organization.shiftDisplayMode,
+    organization.showShiftDetailHoverCards,
+    organization.useCompactRoleCertificationLabels,
+  ]);
 
   const modes = DISPLAY_MODES;
 
@@ -452,8 +462,8 @@ export default function DisplayMode({
               lineHeight: 1.5,
             }}
           >
-            Select how shifts appear in the schedule grid, monthly calendar, and recurring-pattern
-            editor. Everywhere else, shifts are always shown by their full name.
+            Select how shifts appear in the schedule grid, monthly calendar, recurring-pattern
+            editor, and shift previews in Settings.
           </div>
         </div>
 
@@ -465,6 +475,7 @@ export default function DisplayMode({
                 <Button
                   key={mode.id}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setSelected(mode.id)}
                   style={{
                     display: "flex",
@@ -576,6 +587,46 @@ export default function DisplayMode({
             onChange={setShowShiftDetailHoverCards}
             disabled={saving}
             ariaLabel="Show shift detail hover cards"
+          />
+        </div>
+
+        <div
+          style={{
+            padding: "16px 18px",
+            borderTop: "1px solid var(--dg-color-border-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 18,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 700,
+                color: "var(--dg-color-text-primary)",
+              }}
+            >
+              Use compact role and certification labels
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                lineHeight: 1.5,
+              }}
+            >
+              Show saved abbreviations throughout DubGrid instead of full role and certification
+              names.
+            </div>
+          </div>
+          <Switch
+            checked={useCompactLabels}
+            onChange={setUseCompactLabels}
+            disabled={saving}
+            ariaLabel="Use compact role and certification labels"
           />
         </div>
 

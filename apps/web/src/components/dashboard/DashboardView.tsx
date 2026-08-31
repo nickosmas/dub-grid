@@ -19,7 +19,6 @@ import type {
   Employee,
   AbsenceType,
   ShiftMap,
-  PublishHistoryEntry,
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
@@ -40,7 +39,6 @@ import {
 } from "@/lib/schedule-logic";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import {
-  getWeekStart,
   getDatesInRange,
   addDays,
   filterShiftsByWeek,
@@ -51,7 +49,6 @@ import {
   computeCoveragePctAndSlots,
   computeWeeklyStats,
   computeCoverageBySection,
-  coverageFromSections,
   computeOpenShifts,
   computeShiftBreakdown,
   buildActivityFeed,
@@ -102,6 +99,7 @@ interface DashboardViewProps {
   jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
+  assignmentNameMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeMap: Map<number, string>;
   absenceTypes: AbsenceType[];
@@ -191,6 +189,7 @@ export default function DashboardView({
   jobs,
   coverageRequirements,
   assignmentLabelMap,
+  assignmentNameMap,
   assignmentById,
   absenceTypeMap,
   absenceTypes,
@@ -214,6 +213,17 @@ export default function DashboardView({
     (panel: string) => setExpandedPanel(panel as ExpandedPanel),
     [],
   );
+
+  // The expanded panels below render on sectionCoverage/shiftBreakdown/etc.,
+  // which are stubbed empty in user mode (see those useMemos). UserDashboard
+  // never opens one, but a panel left open from before a mid-session switch
+  // into user mode (e.g. an admin toggling "View as User") would otherwise
+  // keep rendering on that now-empty data instead of closing.
+  useEffect(() => {
+    if (isUserDashboardMode) {
+      setExpandedPanel(null);
+    }
+  }, [isUserDashboardMode]);
 
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -242,12 +252,17 @@ export default function DashboardView({
       if (mode === "2weeks") {
         return getScheduleStartForSpan({ date, span: 2, payPeriodStartDate });
       }
-      return getWeekStart(date);
+      // Same shared Sunday-week-start math "2 weeks" mode uses above (span 1
+      // always resolves to it regardless of payPeriodStartDate), instead of a
+      // second, independently-maintained local implementation.
+      return getScheduleStartForSpan({ date, span: 1, payPeriodStartDate });
     },
     [payPeriodStartDate],
   );
 
-  const [periodStart, setPeriodStart] = useState<Date>(() => getWeekStart(new Date()));
+  const [periodStart, setPeriodStart] = useState<Date>(() =>
+    getScheduleStartForSpan({ date: new Date(), span: 1, payPeriodStartDate: null }),
+  );
   const currentTime = useMinuteNow();
   // Day-granular "today" key: changes only at midnight, so it can drive the
   // fetch window / hero look-ahead without re-running every minute.
@@ -256,8 +271,19 @@ export default function DashboardView({
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       setViewMode(mode);
-      // Snap to the aligned start for the new mode (pay period for 2 weeks).
-      setPeriodStart((d) => alignPeriodStart(d, mode));
+      // Day mode has no "which day within the period" concept the way
+      // week/2weeks do — mobile's Day view has no period-navigation state at
+      // all and always resolves to today. Re-aligning the *current*
+      // periodStart (e.g. the currently-viewed week's Sunday) to day
+      // granularity would silently land on a different calendar day than
+      // mobile's Day view whenever that's not today, showing unrelated
+      // numbers for what looks like the same view. So switching into "day"
+      // always jumps to today, matching mobile and the "Today" button.
+      // Week/2weeks still re-align the current periodStart to the new
+      // granularity's boundary, preserving browsing context.
+      setPeriodStart((d) =>
+        mode === "day" ? alignPeriodStart(new Date(), "day") : alignPeriodStart(d, mode),
+      );
     },
     [alignPeriodStart],
   );
@@ -301,7 +327,7 @@ export default function DashboardView({
 
   // ─── Data fetching ──────────────────────────────────────
   const [allShifts, setAllShifts] = useState<ShiftMap>({});
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntryWithName | null>(null);
   const [activityPublishHistory, setActivityPublishHistory] = useState<
     PublishHistoryEntryWithName[]
   >([]);
@@ -351,9 +377,24 @@ export default function DashboardView({
         fetchStart,
         fetchEnd,
       ),
-      fetchPublishedDateRanges(orgId, periodStartKey, periodEndKey).catch(() => []),
-      fetchPublishHistory(orgId, 20, 0).catch(() => []),
-      fetchShiftRequests(orgId, assignmentLabelMapRef.current).catch(() => []),
+      // Widened to cover the previous period too, so the previous-period
+      // coverage % can apply the same published-date filter as the current
+      // period instead of comparing an unfiltered range against a filtered one.
+      fetchPublishedDateRanges(orgId, prevPeriodStartKey, periodEndKey).catch(() => []),
+      // Period-scoped (overlap with the selected window) to match mobile's
+      // Activity Feed, instead of "most recent 20 publishes regardless of
+      // what period they cover."
+      fetchPublishHistory(orgId, 100, 0, {
+        startDate: periodStartKey,
+        endDate: periodEndKey,
+      }).catch(() => []),
+      // Period-scoped for the Activity Feed, matching mobile's date-bounded
+      // request fetch — separate from the `shiftRequests` hook above, which
+      // is also now period-scoped but drives Pending Approvals, not the feed.
+      fetchShiftRequests(orgId, assignmentLabelMapRef.current, {
+        startDate: periodStartKey,
+        endDate: periodEndKey,
+      }).catch(() => []),
     ])
       .then(([shifts, publishedRanges, publishRows, requestRows]) => {
         if (cancelled) return;
@@ -399,6 +440,9 @@ export default function DashboardView({
     currentEmpId,
     permissions.canApproveShiftRequests,
     org.timezone ?? null,
+    // Period-scoped to match mobile's Pending Approvals/Activity Feed
+    // semantics instead of an org-wide, unbounded fetch.
+    { startDate: periodStartKey, endDate: periodEndKey },
   );
 
   // ─── Filter shifts by period ─────────────────────────────
@@ -425,6 +469,20 @@ export default function DashboardView({
         ? periodDates
         : filterPublishedDates(periodDates, publishedDateSet),
     [coverageRequirements.length, periodDates, publishedDateSet],
+  );
+  const prevPeriodDatesRange = useMemo(
+    () => getDatesInRange(prevPeriodStart, periodDays),
+    [prevPeriodStart, periodDays],
+  );
+  // Mirrors publishedPeriodDates above so the previous period's coverage %
+  // (used for the week-over-week delta) applies the same published-date
+  // filter as the current period instead of comparing filtered vs unfiltered.
+  const publishedPrevPeriodDates = useMemo(
+    () =>
+      coverageRequirements.length === 0
+        ? prevPeriodDatesRange
+        : filterPublishedDates(prevPeriodDatesRange, publishedDateSet),
+    [coverageRequirements.length, prevPeriodDatesRange, publishedDateSet],
   );
 
   // ─── Computations ───────────────────────────────────────
@@ -464,17 +522,22 @@ export default function DashboardView({
     ],
   );
 
+  // Admin/super-admin only (staff-hours expanded panel + weekly stat deltas);
+  // UserDashboard never opens either, so skip the per-employee pass entirely.
   const prevHours = useMemo(
     () =>
-      computeAllEmployeeHours(
-        activeEmployees,
-        prevPeriodDateKeys,
-        prevPeriodShifts,
-        assignmentById,
-        overtimeThreshold,
-        categoryById,
-      ),
+      isUserDashboardMode
+        ? []
+        : computeAllEmployeeHours(
+            activeEmployees,
+            prevPeriodDateKeys,
+            prevPeriodShifts,
+            assignmentById,
+            overtimeThreshold,
+            categoryById,
+          ),
     [
+      isUserDashboardMode,
       activeEmployees,
       prevPeriodDateKeys,
       prevPeriodShifts,
@@ -484,53 +547,65 @@ export default function DashboardView({
     ],
   );
 
-  // OT alerts
+  // OT alerts — admin/super-admin only (weekly stat card + expanded panels).
   const otAlerts = useMemo(
-    () => computeOTAlerts(currentHours, activeEmployees, focusAreas),
-    [currentHours, activeEmployees, focusAreas],
+    () => (isUserDashboardMode ? [] : computeOTAlerts(currentHours, activeEmployees, focusAreas)),
+    [isUserDashboardMode, currentHours, activeEmployees, focusAreas],
   );
 
   const prevOtCount = useMemo(
-    () => computeOTAlerts(prevHours, activeEmployees, focusAreas).length,
-    [prevHours, activeEmployees, focusAreas],
+    () =>
+      isUserDashboardMode ? 0 : computeOTAlerts(prevHours, activeEmployees, focusAreas).length,
+    [isUserDashboardMode, prevHours, activeEmployees, focusAreas],
   );
 
-  // Coverage by section
-  const sectionCoverage = useMemo(
+  // Coverage by section — admin/super-admin only (UserDashboard never renders
+  // DashboardHero, the coverage stat card, or the coverage expanded panel).
+  const coverageResult = useMemo(
     () =>
-      computeCoverageBySection(
-        focusAreas,
-        publishedPeriodDates,
-        currentPeriodShifts,
-        activeEmployees,
-        coverageRequirements,
-        assignments,
-        org.coverageRuleConfig,
-      ),
+      isUserDashboardMode
+        ? { sections: [], totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 } }
+        : computeCoverageBySection(
+            focusAreas,
+            publishedPeriodDates,
+            currentPeriodShifts,
+            activeEmployees,
+            coverageRequirements,
+            assignments,
+            shiftCategories,
+            org.coverageRuleConfig,
+          ),
     [
+      isUserDashboardMode,
       focusAreas,
       publishedPeriodDates,
       currentPeriodShifts,
       activeEmployees,
       coverageRequirements,
       assignments,
+      shiftCategories,
       org.coverageRuleConfig,
     ],
   );
+  const sectionCoverage = coverageResult.sections;
 
-  // Stat cards
+  // Stat cards — admin/super-admin only. coverageResult.totals is already the
+  // 100%-empty default in user mode, so currentCoverage falls out cheap; skip
+  // the second full coverage pass for the previous period too.
   const periodStats = useMemo(() => {
-    const currentCoverage = coverageFromSections(sectionCoverage);
-    const prevPeriodDates = getDatesInRange(prevPeriodStart, periodDays);
-    const prevCoverage = computeCoveragePctAndSlots(
-      focusAreas,
-      assignments,
-      coverageRequirements,
-      prevPeriodDates,
-      activeEmployees,
-      prevPeriodShifts,
-      org.coverageRuleConfig,
-    );
+    const currentCoverage = coverageResult.totals;
+    const prevCoverage = isUserDashboardMode
+      ? { pct: 100, openSlots: 0 }
+      : computeCoveragePctAndSlots(
+          focusAreas,
+          assignments,
+          coverageRequirements,
+          publishedPrevPeriodDates,
+          activeEmployees,
+          prevPeriodShifts,
+          shiftCategories,
+          org.coverageRuleConfig,
+        );
 
     return computeWeeklyStats(
       {
@@ -549,18 +624,19 @@ export default function DashboardView({
       activeEmployees.length,
     );
   }, [
-    sectionCoverage,
+    isUserDashboardMode,
+    coverageResult,
     currentPeriodShifts,
     prevPeriodShifts,
     assignmentById,
     focusAreas,
     assignments,
     coverageRequirements,
-    prevPeriodStart,
-    periodDays,
+    publishedPrevPeriodDates,
     activeEmployees,
     otAlerts.length,
     prevOtCount,
+    shiftCategories,
     org.coverageRuleConfig,
   ]);
 
@@ -582,7 +658,8 @@ export default function DashboardView({
       activeEmployees,
       currentPeriodShifts,
       assignmentById,
-      assignmentLabelMap,
+      assignmentNameMap,
+      shiftCategories,
       org.coverageRuleConfig,
       {
         now: currentTime,
@@ -621,53 +698,81 @@ export default function DashboardView({
     activeEmployees,
     currentPeriodShifts,
     assignmentById,
-    assignmentLabelMap,
+    assignmentNameMap,
+    shiftCategories,
     currentTime,
     org.coverageRuleConfig,
     org.timezone,
     shiftRequests.requests,
   ]);
 
-  // Shift breakdown
+  // Shift breakdown — admin/super-admin only (breakdown expanded panel).
   const shiftBreakdown = useMemo(
     () =>
-      computeShiftBreakdown(
-        currentPeriodShifts,
-        assignmentById,
-        shiftCategories,
-        focusAreas,
-        activeEmployees,
-        assignmentLabelMap,
-      ),
+      isUserDashboardMode
+        ? { byFocusArea: [], totalShifts: 0 }
+        : computeShiftBreakdown(
+            currentPeriodShifts,
+            assignmentById,
+            shiftCategories,
+            focusAreas,
+            activeEmployees,
+            assignmentNameMap,
+          ),
     [
+      isUserDashboardMode,
       currentPeriodShifts,
       assignmentById,
       shiftCategories,
       focusAreas,
       activeEmployees,
-      assignmentLabelMap,
+      assignmentNameMap,
     ],
   );
 
-  // Activity feed
-  const activityItems = useMemo(
-    () => buildActivityFeed(activityPublishHistory, activityRequests, invitations, 100),
-    [activityPublishHistory, activityRequests, invitations],
+  // Period-scoped for the Activity Feed, matching mobile's date-bounded
+  // accepted_at filter. `invitations` itself stays the full org-wide,
+  // unbounded fetch (react-query cache shared with People/Members pages,
+  // which need the complete list), so this only filters the feed's input.
+  const periodScopedInvitations = useMemo(
+    () =>
+      invitations.filter((invitation) => {
+        if (!invitation.acceptedAt) return false;
+        const acceptedDateKey = formatDateKey(new Date(invitation.acceptedAt));
+        return acceptedDateKey >= periodStartKey && acceptedDateKey <= periodEndKey;
+      }),
+    [invitations, periodStartKey, periodEndKey],
   );
 
+  // Activity feed — admin/super-admin only (activity expanded panel).
+  const activityItems = useMemo(
+    () =>
+      isUserDashboardMode
+        ? []
+        : buildActivityFeed(activityPublishHistory, activityRequests, periodScopedInvitations, 100),
+    [isUserDashboardMode, activityPublishHistory, activityRequests, periodScopedInvitations],
+  );
+
+  // Coverage trend — admin/super-admin only. Recomputes a full coverage
+  // snapshot for 5 historical periods, so skipping it in user mode avoids
+  // 5x the work of sectionCoverage above for a value UserDashboard never reads.
   const trendData = useMemo(
     () =>
-      computeCoverageTrendData(
-        focusAreas,
-        assignments,
-        coverageRequirements,
-        activeEmployees,
-        allShifts,
-        periodStart,
-        periodDays,
-        org.coverageRuleConfig,
-      ),
+      isUserDashboardMode
+        ? []
+        : computeCoverageTrendData(
+            focusAreas,
+            assignments,
+            coverageRequirements,
+            activeEmployees,
+            allShifts,
+            periodStart,
+            periodDays,
+            shiftCategories,
+            org.coverageRuleConfig,
+          ),
     [
+      isUserDashboardMode,
       focusAreas,
       assignments,
       coverageRequirements,
@@ -675,6 +780,7 @@ export default function DashboardView({
       allShifts,
       periodStart,
       periodDays,
+      shiftCategories,
       org.coverageRuleConfig,
     ],
   );
@@ -704,6 +810,17 @@ export default function DashboardView({
     .filter((s) => s.urgency === "high")
     .reduce((total, shift) => total + shift.needed, 0);
   const draftTotal = draftNewCount + draftModifiedCount + draftDeletedCount;
+  // Only true when this user can actually act on an incomplete org setup
+  // checklist — gates the DashboardGreeting "let's get you set up" copy so
+  // it never shows to a non-admin, or an admin with nothing left to set up.
+  const needsOrgSetup =
+    hasAdminCapability &&
+    (focusAreas.length === 0 ||
+      departments.length === 0 ||
+      orgRoles.length === 0 ||
+      certifications.length === 0 ||
+      assignments.length === 0 ||
+      employees.length === 0);
   const coveragePct = periodStats.coverage?.pct ?? 100;
   const isCoverageUnpublished = publishedWindowState === "unpublished";
   const isCoveragePartial = publishedWindowState === "partial";
@@ -901,6 +1018,8 @@ export default function DashboardView({
     onNext: handleNext,
     onToday: handleToday,
     onViewModeChange: handleViewModeChange,
+    // Admin/super-admin only — UserDashboard never computes trendData.
+    onViewTrends: isUserDashboardMode ? undefined : () => handleExpandPanel("stats"),
   };
 
   if (shiftsLoading) {
@@ -927,6 +1046,7 @@ export default function DashboardView({
     jobs,
     coverageRequirements,
     assignmentLabelMap,
+    assignmentNameMap,
     assignmentById,
     employees,
     activeEmployees,
@@ -980,7 +1100,7 @@ export default function DashboardView({
           ? {
               display: "flex",
               flexDirection: "column",
-              height: "calc(100vh - var(--header-height))",
+              height: "calc(100vh - var(--dg-app-shell-header-height))",
               overflow: "hidden",
             }
           : {}),
@@ -1007,16 +1127,8 @@ export default function DashboardView({
           now={currentTime}
           userId={authUser?.id ?? null}
           orgTimezone={org.timezone ?? null}
-          hasIncompleteWork={
-            draftTotal > 0 ||
-            (hasAdminCapability &&
-              (focusAreas.length === 0 ||
-                departments.length === 0 ||
-                orgRoles.length === 0 ||
-                certifications.length === 0 ||
-                assignments.length === 0 ||
-                employees.length === 0))
-          }
+          hasIncompleteWork={draftTotal > 0 || needsOrgSetup}
+          needsSetup={needsOrgSetup}
         />
 
         {!isUserDashboardMode && (
@@ -1147,7 +1259,7 @@ export default function DashboardView({
 
 const stickyBarStyle = {
   position: "sticky" as const,
-  top: "var(--header-height)",
+  top: "var(--dg-app-shell-header-height)",
   zIndex: 99,
   background: "var(--dg-color-bg)",
 };

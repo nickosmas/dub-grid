@@ -160,6 +160,8 @@ export async function POST(req: NextRequest) {
     const insertRecords: { index: number; record: Record<string, unknown> }[] = [];
 
     for (const { originalIndex, row } of parsedRows) {
+      const errorCountBeforeRow = errors.length;
+
       // Resolve focus area names to IDs
       const faIds: number[] = [];
       if (row.focusAreaNames) {
@@ -197,6 +199,12 @@ export async function POST(req: NextRequest) {
           else errors.push({ row: originalIndex + 1, error: `Unknown role: "${name}"` });
         }
       }
+
+      // An unresolved reference must reject this row instead of silently
+      // creating an employee without the requested focus area, certification,
+      // or role. The per-row error collected above is returned to the import
+      // results screen while the rest of the file can still be imported.
+      if (errors.length > errorCountBeforeRow) continue;
 
       insertRecords.push({
         index: originalIndex,

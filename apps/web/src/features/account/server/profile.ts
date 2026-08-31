@@ -46,6 +46,10 @@ export interface SelfProfileRecord {
 export interface SelfWorkProfileSnapshot {
   profile: SelfProfileRecord | null;
   employee: Employee | null;
+  /** Management department IDs from `organization_memberships.department_ids`.
+   *  Distinct from `employee.departmentIds`, which is the employee's
+   *  *scheduled* departments — see get_org_directory's aliasing. */
+  managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
   shiftRequests: ShiftRequest[];
@@ -163,19 +167,27 @@ async function fetchLinkedEmployeeByUserId(
   return rowToEmployee(data as DbEmployee);
 }
 
-async function ensureOrganizationMembership(userId: string, orgId: string): Promise<boolean> {
+async function fetchOwnMembership(
+  userId: string,
+  orgId: string,
+): Promise<{ departmentIds: number[] } | null> {
   const { data, error } = await getServiceClient()
     .from("organization_memberships")
-    .select("user_id")
+    .select("user_id, department_ids")
     .eq("user_id", userId)
     .eq("org_id", orgId)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  return !!data;
+  if (!data) {
+    return null;
+  }
+
+  return { departmentIds: (data.department_ids as number[] | null) ?? [] };
 }
 
 async function fetchAssignmentContext(orgId: string) {
@@ -310,6 +322,7 @@ export async function fetchSelfWorkProfileSnapshot(
     return {
       profile,
       employee: null,
+      managementDepartmentIds: [],
       shifts: {},
       recurringShifts: [],
       shiftRequests: [],
@@ -317,16 +330,18 @@ export async function fetchSelfWorkProfileSnapshot(
     };
   }
 
-  const hasMembership = await ensureOrganizationMembership(userId, orgId);
-  if (!hasMembership) {
+  const membership = await fetchOwnMembership(userId, orgId);
+  if (!membership) {
     throw new Error("Organization membership not found.");
   }
+  const managementDepartmentIds = membership.departmentIds;
 
   const employee = await fetchLinkedEmployeeByUserId(userId, orgId);
   if (!employee) {
     return {
       profile,
       employee: null,
+      managementDepartmentIds,
       shifts: {},
       recurringShifts: [],
       shiftRequests: [],
@@ -421,6 +436,7 @@ export async function fetchSelfWorkProfileSnapshot(
   return {
     profile,
     employee,
+    managementDepartmentIds,
     shifts,
     recurringShifts,
     shiftRequests,

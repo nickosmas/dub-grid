@@ -66,6 +66,16 @@ describe("NotificationPreferences", () => {
     });
   });
 
+  it("shows a layout skeleton while notification preferences load", () => {
+    mockFetchNotificationPreferences.mockReturnValue(new Promise(() => {}));
+
+    render(<NotificationPreferences />);
+
+    const skeleton = screen.getByRole("status", { name: /loading notification preferences/i });
+    expect(skeleton).toBeInTheDocument();
+    expect(skeleton.querySelectorAll(".dg-skeleton").length).toBeGreaterThan(0);
+  });
+
   it("centers the notification channel headers over the checkbox columns", async () => {
     render(<NotificationPreferences />);
 

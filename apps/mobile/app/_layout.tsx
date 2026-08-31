@@ -25,6 +25,7 @@ import { queryClient } from "../src/shared/lib/query-client";
 import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
 import { NetworkStateProvider } from "../src/shared/providers/NetworkStateProvider";
+import { NetworkRecoveryProvider } from "../src/shared/providers/NetworkRecoveryProvider";
 import {
   ThemeModeProvider,
   useMobileColors,
@@ -35,6 +36,7 @@ import {
   createCommonStackOptions,
   createDetailStackOptions,
 } from "../src/shared/navigation/top-level-stack";
+import { mobileTypography } from "../src/shared/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -69,10 +71,23 @@ function RootLayoutContent({
 }) {
   const mobileColors = useMobileColors();
   const { resolvedTheme } = useThemeMode();
-  const navigationTheme = useMemo(
-    () => getMobileNavigationTheme(resolvedTheme === "dark"),
-    [resolvedTheme],
-  );
+  const navigationTheme = useMemo(() => {
+    const baseTheme = getMobileNavigationTheme(resolvedTheme === "dark");
+
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        // Native large-title headers inherit React Navigation's `card`
+        // colour while an interactive pop is in progress. The design-token
+        // card is white in light mode, but mobile pages are slate, so it
+        // flashed white above the People list behind Staff Profile.
+        background: mobileColors.background,
+        card: mobileColors.background,
+        border: mobileColors.borderSubtle,
+      },
+    };
+  }, [mobileColors.background, mobileColors.borderSubtle, resolvedTheme]);
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
@@ -81,47 +96,83 @@ function RootLayoutContent({
         <ConfigurationScreen validation={envValidation} />
       ) : (
         <NetworkStateProvider>
-          <ToastProvider>
-            <QueryClientProvider client={queryClient}>
-              <AuthSessionProvider>
-                <AppLockProvider>
-                  <MobileRealtimeProvider>
-                    <ConsentGate>
-                      <TermsGate>
-                        <StartupSplashGate>
-                          <Stack screenOptions={createCommonStackOptions(mobileColors)}>
-                            <Stack.Screen name="index" options={{ headerShown: false }} />
-                            <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                            <Stack.Screen
-                              name="(auth)/forgot-password"
-                              options={{ headerShown: false }}
-                            />
-                            <Stack.Screen
-                              name="(auth)/reset-password"
-                              options={{ headerShown: false }}
-                            />
-                            <Stack.Screen
-                              name="(auth)/onboarding"
-                              options={{ headerShown: false, animation: "fade" }}
-                            />
-                            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                            <Stack.Screen name="alerts" options={{ headerShown: false }} />
-                            <Stack.Screen
-                              name="shift/[employeeId]/[date]"
-                              options={createDetailStackOptions(mobileColors, "Shift Detail")}
-                            />
-                          </Stack>
-                        </StartupSplashGate>
-                      </TermsGate>
-                    </ConsentGate>
-                  </MobileRealtimeProvider>
-                </AppLockProvider>
-              </AuthSessionProvider>
-            </QueryClientProvider>
-          </ToastProvider>
+          <NetworkRecoveryProvider>
+            <ToastProvider>
+              <QueryClientProvider client={queryClient}>
+                <AuthSessionProvider>
+                  <AppLockProvider>
+                    <MobileRealtimeProvider>
+                      <ConsentGate>
+                        <TermsGate>
+                          <StartupSplashGate>
+                            <Stack screenOptions={createCommonStackOptions(mobileColors)}>
+                              <Stack.Screen name="index" options={{ headerShown: false }} />
+                              <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+                              <Stack.Screen
+                                name="(auth)/forgot-password"
+                                options={{ headerShown: false }}
+                              />
+                              <Stack.Screen
+                                name="(auth)/reset-password"
+                                options={{ headerShown: false }}
+                              />
+                              <Stack.Screen
+                                name="(auth)/onboarding"
+                                options={{ headerShown: false, animation: "fade" }}
+                              />
+                              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                              <Stack.Screen name="alerts" options={{ headerShown: false }} />
+                              <Stack.Screen
+                                name="shift/[employeeId]/[date]"
+                                options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                              />
+                              <Stack.Screen
+                                name="person/[id]"
+                                options={{
+                                  ...createDetailStackOptions(mobileColors, "Staff Profile", {
+                                    scrollEdge: true,
+                                  }),
+                                  // PersonDetailScreen replaces this placeholder with
+                                  // the person's name once they scroll, the same way
+                                  // ProfileScreen does for the signed-in user's own name.
+                                  headerTitleStyle: {
+                                    color: "transparent",
+                                    fontFamily: mobileTypography.fontFamily.bold,
+                                  },
+                                }}
+                              />
+                            </Stack>
+                          </StartupSplashGate>
+                        </TermsGate>
+                      </ConsentGate>
+                    </MobileRealtimeProvider>
+                  </AppLockProvider>
+                </AuthSessionProvider>
+              </QueryClientProvider>
+            </ToastProvider>
+          </NetworkRecoveryProvider>
         </NetworkStateProvider>
       )}
     </NavigationThemeProvider>
+  );
+}
+
+/**
+ * Native stack headers are transparent while iOS performs an interactive back
+ * swipe. This fills the controller underneath with the same page colour, so a
+ * diagonal scroll or a partially completed swipe never reveals UIKit white.
+ */
+function RootLayoutSurface({
+  envValidation,
+}: {
+  envValidation: ReturnType<typeof validateMobileEnv>;
+}) {
+  const mobileColors = useMobileColors();
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: mobileColors.background }}>
+      <RootLayoutContent envValidation={envValidation} />
+    </GestureHandlerRootView>
   );
 }
 
@@ -144,11 +195,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeModeProvider>
-          <RootLayoutContent envValidation={envValidation} />
-        </ThemeModeProvider>
-      </GestureHandlerRootView>
+      <ThemeModeProvider>
+        <RootLayoutSurface envValidation={envValidation} />
+      </ThemeModeProvider>
     </SafeAreaProvider>
   );
 }

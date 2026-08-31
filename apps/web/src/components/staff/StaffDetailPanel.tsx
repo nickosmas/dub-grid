@@ -4,16 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
-import { createPortal } from "react-dom";
 import Link from "next/link";
-import {
-  Employee,
-  FocusArea,
-  NamedItem,
-  Invitation,
-  OrganizationRole,
-  AdminPermissions,
-} from "@/types";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
@@ -22,10 +15,8 @@ import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/E
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
-import { ButtonLoading } from "@/components/ButtonSpinner";
-import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import { MemberAccessControls } from "./MemberAccessControls";
+import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { getAvatarTone } from "@dubgrid/design-tokens";
@@ -51,6 +42,12 @@ interface StaffDetailPanelProps {
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onSave: (emp: Employee) => void;
+  /** Called instead of `onSave` when the admin confirms changing the email
+   *  while a pending invitation exists — see EditEmployeePanel. */
+  onSaveWithReinvite?: (
+    updatedEmployee: Employee,
+    oldInvitation: Invitation,
+  ) => void | Promise<void>;
   onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
@@ -61,10 +58,6 @@ interface StaffDetailPanelProps {
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
-  orgRole?: OrganizationRole | null;
-  adminPermissions?: AdminPermissions | null;
-  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
-  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
 }
 
 export function StaffDetailPanel({
@@ -81,6 +74,7 @@ export function StaffDetailPanel({
   orgId,
   pendingInviteByEmployeeId,
   onSave,
+  onSaveWithReinvite,
   onRemove,
   onDeactivate,
   onActivate,
@@ -91,10 +85,6 @@ export function StaffDetailPanel({
   hasPendingManagementInvite,
   onManageManagementAccess,
   onRevoke,
-  orgRole,
-  adminPermissions,
-  onRoleChange,
-  onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -103,12 +93,9 @@ export function StaffDetailPanel({
   const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
-  const [closing, setClosing] = useState(false);
+  const [open, setOpen] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [revokingInvite, setRevokingInvite] = useState(false);
-  const [pendingInvitationAction, setPendingInvitationAction] = useState<
-    "reinvite" | "revoke" | null
-  >(null);
+  const [hasEmailConflict, setHasEmailConflict] = useState(false);
   const onCloseRef = useLatestRef(onClose);
   const pendingInvitation = canManageEmployees
     ? pendingInviteByEmployeeId.get(employee.id)
@@ -131,11 +118,7 @@ export function StaffDetailPanel({
     canManageEmployees || isCurrentUsersEmployee(employee.userId, currentUser?.id ?? null);
 
   const closePanel = useCallback(() => {
-    setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      onCloseRef.current();
-    }, 200);
+    setOpen(false);
   }, []);
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
@@ -148,34 +131,16 @@ export function StaffDetailPanel({
     }
   }, [closePanel, requestClose]);
 
-  const handleConfirmInvitationAction = async () => {
-    if (!pendingInvitation || !pendingInvitationAction) return;
-
-    if (onRevoke) {
-      setRevokingInvite(true);
-      try {
-        const result = await onRevoke(pendingInvitation.id);
-        if (result === false) return;
-      } finally {
-        setRevokingInvite(false);
-      }
-    }
-
-    if (pendingInvitationAction === "reinvite" && onInvite) {
-      onInvite(employee);
-    }
-
-    setPendingInvitationAction(null);
-  };
-
-  // Escape key to close
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") handleRequestClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleRequestClose]);
+  const handleReinvite =
+    onInvite && pendingInvitation
+      ? async () => {
+          if (onRevoke) {
+            const result = await onRevoke(pendingInvitation.id);
+            if (result === false) return;
+          }
+          onInvite(employee);
+        }
+      : undefined;
 
   // Reset scroll when switching employees
   useEffect(() => {
@@ -185,25 +150,48 @@ export function StaffDetailPanel({
 
   useEffect(() => {
     setHasUnsavedChanges(false);
+    setHasEmailConflict(false);
+    setOpen(true);
   }, [employee.id]);
 
   const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
 
-  return createPortal(
-    <>
-      <div
-        className={`staff-detail-overlay${closing ? " closing" : ""}`}
-        onClick={handleRequestClose}
-      />
-      <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+  const handleFooterDismiss = useCallback(() => {
+    if (!canEditEmployee) {
+      handleRequestClose();
+      return;
+    }
+    if (hasUnsavedChanges) {
+      editorRef.current?.requestDismiss();
+    } else {
+      handleRequestClose();
+    }
+  }, [canEditEmployee, hasUnsavedChanges, handleRequestClose]);
+
+  const handleFooterSave = useCallback(() => {
+    editorRef.current?.save();
+  }, []);
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) handleRequestClose();
+      }}
+      onOpenChangeComplete={(next) => {
+        if (!next) onCloseRef.current();
+      }}
+    >
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="gap-0 overflow-hidden bg-[var(--dg-color-surface)] shadow-[var(--shadow-panel)] data-[side=right]:inset-y-auto data-[side=right]:top-3 data-[side=right]:right-3 data-[side=right]:bottom-3 data-[side=right]:h-auto data-[side=right]:w-[min(480px,calc(100vw-24px))] data-[side=right]:rounded-[var(--dg-radius-lg)] data-[side=right]:border data-[side=right]:border-[var(--dg-color-border)] data-[side=right]:sm:max-w-none max-[767px]:data-[side=right]:inset-0 max-[767px]:data-[side=right]:h-full max-[767px]:data-[side=right]:w-full max-[767px]:data-[side=right]:rounded-none max-[767px]:data-[side=right]:border-0 max-[767px]:data-[side=right]:shadow-none"
+      >
         {/* Panel header */}
         <div className="staff-detail-header">
-          <CloseButton
-            size="md"
-            className="self-end"
-            onClick={handleRequestClose}
-            aria-label="Close detail panel"
-          />
+          <div className="flex w-full items-center justify-end gap-2">
+            <CloseButton size="md" onClick={handleRequestClose} aria-label="Close detail panel" />
+          </div>
 
           {/* Profile card area */}
           <div
@@ -320,10 +308,11 @@ export function StaffDetailPanel({
           </div>
         </div>
 
-        {/* Edit form */}
+        {/* Editable body — nothing commits until the shared footer's Save is pressed. */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
           <InlineEditEmployee
             employee={employee}
+            orgId={orgId}
             focusAreas={focusAreas}
             certifications={certifications}
             roles={roles}
@@ -332,11 +321,15 @@ export function StaffDetailPanel({
             certificationLabel={certificationLabel}
             departments={departments}
             departmentLabel={departmentLabel}
+            isManagementUser={hasManagementAccess}
             ref={editorRef}
             hideActions
             onSave={onSave}
-            onCancel={closePanel}
+            onCancel={handleRequestClose}
             onDirtyChange={setHasUnsavedChanges}
+            onEmailConflictChange={setHasEmailConflict}
+            pendingInvitation={pendingInvitation}
+            onSaveWithReinvite={onSaveWithReinvite}
           />
           {showAccountAccessActions && (
             <div
@@ -347,125 +340,20 @@ export function StaffDetailPanel({
                 gap: 10,
               }}
             >
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Account access
-              </div>
-              {pendingInvitation ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    background: "var(--dg-color-warning-bg)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    borderRadius: "var(--dg-radius-lg)",
-                    padding: "10px 14px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      minWidth: 0,
-                    }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--dg-color-warning-text)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
-                          color: "var(--dg-color-warning-text)",
-                        }}
-                      >
-                        Invitation pending
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--dg-color-warning-text)",
-                          marginTop: 1,
-                        }}
-                      >
-                        Sent to {pendingInvitation.email}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    {onInvite && (
-                      <Button
-                        disabled={revokingInvite || isInSandbox}
-                        onClick={() => setPendingInvitationAction("reinvite")}
-                        className="dg-btn dg-btn-ghost dg-btn-xs"
-                        style={{
-                          color: "var(--dg-color-link)",
-                        }}
-                        title={
-                          isInSandbox
-                            ? "Sending invitations isn't available in sandbox mode."
-                            : undefined
-                        }
-                      >
-                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
-                          Reinvite
-                        </ButtonLoading>
-                      </Button>
-                    )}
-                    {onRevoke && (
-                      <Button
-                        disabled={revokingInvite || isInSandbox}
-                        onClick={() => setPendingInvitationAction("revoke")}
-                        className="dg-btn dg-btn-ghost dg-btn-xs"
-                        style={{
-                          color: "var(--dg-color-danger)",
-                        }}
-                        title={
-                          isInSandbox
-                            ? "Revoking invitations isn't available in sandbox mode."
-                            : undefined
-                        }
-                      >
-                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
-                          Revoke
-                        </ButtonLoading>
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              {pendingInvitation && onRevoke ? (
+                <PendingInvitationBanner
+                  pendingInvitation={pendingInvitation}
+                  onReinvite={handleReinvite}
+                  onRevoke={onRevoke}
+                  isInSandbox={isInSandbox}
+                />
               ) : (
                 showInviteActions &&
                 onInvite && (
                   <Button
                     onClick={() => onInvite(employee)}
                     disabled={isInSandbox}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      width: "100%",
-                      justifyContent: "center",
-                    }}
+                    className="dg-btn dg-btn-secondary dg-btn-sm self-start"
                     title={
                       isInSandbox
                         ? "Sending invitations isn't available in sandbox mode."
@@ -492,24 +380,16 @@ export function StaffDetailPanel({
               {showManagementAccessAction && onManageManagementAccess && (
                 <Button
                   onClick={() => onManageManagementAccess(employee)}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ width: "100%" }}
+                  className="dg-btn dg-btn-secondary dg-btn-sm self-start"
                 >
                   {hasManagementAccess || hasPendingManagementInvite
                     ? "Edit Management Access"
                     : "Add to Management"}
                 </Button>
               )}
-              <MemberAccessControls
-                orgRole={orgRole}
-                adminPermissions={adminPermissions}
-                onRoleChange={onRoleChange}
-                onPermissionsChange={onPermissionsChange}
-                isSelf={isSelf}
-              />
             </div>
           )}
-          {canManageEmployees && (
+          {canManageEmployees && !isSelf && (
             <div
               style={{
                 padding: "0 24px 24px",
@@ -518,21 +398,10 @@ export function StaffDetailPanel({
                 gap: 10,
               }}
             >
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Staff status
-              </div>
               <EmployeeStatusActions
                 employee={employee}
                 canEdit={canManageEmployees}
-                isSelf={isSelf}
+                isSelf={false}
                 onDeactivate={onDeactivate}
                 onActivate={onActivate}
                 onRemove={onRemove}
@@ -542,7 +411,6 @@ export function StaffDetailPanel({
           )}
         </div>
 
-        {/* Sticky bottom actions */}
         <div
           style={{
             flexShrink: 0,
@@ -550,60 +418,29 @@ export function StaffDetailPanel({
             borderTop: "1px solid var(--dg-color-border-light)",
           }}
         >
-          {canEditEmployee ? (
-            <EditorActionRow
-              secondaryAction={
+          <EditorActionRow
+            secondaryAction={
+              <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
+                {canEditEmployee
+                  ? getEditorDismissLabel({ hasUnsavedChanges })
+                  : EDITOR_ACTION_LABELS.close}
+              </Button>
+            }
+            primaryAction={
+              canEditEmployee ? (
                 <Button
-                  onClick={() => editorRef.current?.requestDismiss()}
-                  className="dg-btn dg-btn-secondary"
-                >
-                  {getEditorDismissLabel({ hasUnsavedChanges })}
-                </Button>
-              }
-              primaryAction={
-                <Button
-                  onClick={() => editorRef.current?.save()}
-                  disabled={!hasUnsavedChanges}
+                  onClick={handleFooterSave}
+                  disabled={!hasUnsavedChanges || hasEmailConflict}
                   className="dg-btn dg-btn-primary"
                 >
                   {EDITOR_ACTION_LABELS.save}
                 </Button>
-              }
-            />
-          ) : (
-            <EditorActionRow
-              secondaryAction={
-                <Button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
-                  {EDITOR_ACTION_LABELS.close}
-                </Button>
-              }
-            />
-          )}
+              ) : undefined
+            }
+          />
         </div>
-      </div>
+      </SheetContent>
       {unsavedChangesDialog}
-      {pendingInvitationAction && pendingInvitation && (
-        <ConfirmDialog
-          title={
-            pendingInvitationAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"
-          }
-          message={
-            pendingInvitationAction === "reinvite"
-              ? `Revoke the existing invitation for ${pendingInvitation.email} and create a new one?`
-              : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
-          }
-          confirmLabel={
-            pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
-          }
-          variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
-          isLoading={revokingInvite}
-          onConfirm={() => handleConfirmInvitationAction()}
-          onCancel={() => {
-            if (!revokingInvite) setPendingInvitationAction(null);
-          }}
-        />
-      )}
-    </>,
-    document.body,
+    </Sheet>
   );
 }

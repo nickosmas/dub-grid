@@ -1,9 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MembersSection, type MembersSectionProps } from "@/components/staff/MembersSection";
-import type { DirectoryPerson, Employee } from "@/types";
+import type { DirectoryPerson, Employee, Invitation } from "@/types";
+import {
+  fetchOrganizationInvitations,
+  updatePendingInvitation,
+} from "@/features/organization/client";
+import { updateEmployeeIdentity } from "@/features/employees/client";
+import { toast } from "sonner";
 
 let mockCurrentUser: { id: string } | null = { id: "viewer-1" };
 
@@ -100,22 +106,44 @@ vi.mock("@base-ui/react/popover", () => {
   };
 });
 
+let lastManagementStaffPanelSave:
+  | ((data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      managementDepartmentIds: number[];
+    }) => Promise<void>)
+  | null = null;
+
 vi.mock("@/components/staff/ManagementStaffPanel", () => ({
   ManagementStaffPanel: (props: {
     person: DirectoryPerson;
+    contactEmail: string | null;
     canManageManagementAccess: boolean;
     canManageScheduleEmployees: boolean;
-  }) => (
-    <div data-testid="management-staff-panel">
-      <span>{`${props.person.firstName} ${props.person.lastName}`}</span>
-      <span data-testid="can-manage-management-access">
-        {String(props.canManageManagementAccess)}
-      </span>
-      <span data-testid="can-manage-schedule-employees">
-        {String(props.canManageScheduleEmployees)}
-      </span>
-    </div>
-  ),
+    onSave: (data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      managementDepartmentIds: number[];
+    }) => Promise<void>;
+  }) => {
+    lastManagementStaffPanelSave = props.onSave;
+    return (
+      <div data-testid="management-staff-panel">
+        <span>{`${props.person.firstName} ${props.person.lastName}`}</span>
+        <span data-testid="can-manage-management-access">
+          {String(props.canManageManagementAccess)}
+        </span>
+        <span data-testid="can-manage-schedule-employees">
+          {String(props.canManageScheduleEmployees)}
+        </span>
+        <span data-testid="contact-email">{props.contactEmail ?? ""}</span>
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/staff/StaffDetailPanel", () => ({
@@ -127,7 +155,7 @@ vi.mock("@/components/staff/StaffReadOnlyDetailPanel", () => ({
 }));
 
 vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
-  EmployeeManagementAccessModal: () => <div data-testid="employee-management-access-modal" />,
+  EmployeeManagementAccessEditor: () => <div data-testid="employee-management-access-editor" />,
 }));
 
 vi.mock("@/components/staff/AddManagementUserToScheduleModal", () => ({
@@ -189,6 +217,7 @@ const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementU
   focusAreaLabel: "Focus Areas",
   certificationLabel: "Certifications",
   roleLabel: "Roles",
+  useCompactRoleCertificationLabels: true,
   orgId: "org-1",
   orgName: "Acme",
   isSuperAdmin: false,
@@ -280,6 +309,211 @@ describe("MembersSection — management-only view access", () => {
 
     expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^\+ Add$/ })).toBeInTheDocument();
+  });
+
+  it("opens the same StaffDetailPanel as the People table for an on-schedule management member, not ManagementStaffPanel", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        employeeId: "emp-1",
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [1],
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      employees: [makeEmployee({ id: "emp-1", firstName: "Jamie", lastName: "Rivera" })],
+    });
+
+    const toggle = screen.getByRole("button", { name: /On Schedule/i });
+    await user.click(toggle);
+    await user.click(screen.getByRole("option", { name: /Management/i }));
+
+    const row = screen.getByText("Jamie Rivera").closest("tr");
+    if (!row) throw new Error("Expected to find a table row for Jamie Rivera");
+    await user.click(row);
+
+    expect(screen.getByTestId("staff-detail-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("management-staff-panel")).not.toBeInTheDocument();
+  });
+
+  it("keeps a management-only member (not on the schedule) on ManagementStaffPanel", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [],
+      }),
+    ];
+
+    renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
+
+    const toggle = screen.getByRole("button", { name: /On Schedule/i });
+    await user.click(toggle);
+    await user.click(screen.getByRole("option", { name: /Management/i }));
+
+    const row = screen.getByText("Jamie Rivera").closest("tr");
+    if (!row) throw new Error("Expected to find a table row for Jamie Rivera");
+    await user.click(row);
+
+    expect(screen.getByTestId("management-staff-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("staff-detail-panel")).not.toBeInTheDocument();
+  });
+});
+
+describe("MembersSection — ManagementStaffPanel email/invitation wiring", () => {
+  const fetchOrganizationInvitationsMock = vi.mocked(fetchOrganizationInvitations);
+  const updatePendingInvitationMock = vi.mocked(updatePendingInvitation);
+  const updateEmployeeIdentityMock = vi.mocked(updateEmployeeIdentity);
+  const toastSuccessMock = vi.mocked(toast.success);
+
+  const PENDING_INVITATION: Invitation = {
+    id: "inv-1",
+    orgId: "org-1",
+    invitedBy: null,
+    email: "old.invite@example.com",
+    roleToAssign: "admin",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    acceptedAt: null,
+    revokedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    employeeId: "emp-1",
+    firstName: "Jamie",
+    lastName: "Rivera",
+    phone: null,
+    departmentIds: [10],
+    deptAdminIds: [],
+  };
+
+  async function openManagementOnlyPanel() {
+    const user = userEvent.setup();
+    const toggle = screen.getByRole("button", { name: /On Schedule/i });
+    await user.click(toggle);
+    await user.click(screen.getByRole("option", { name: /Management/i }));
+    const row = screen.getByText("Jamie Rivera").closest("tr");
+    if (!row) throw new Error("Expected to find a table row for Jamie Rivera");
+    await user.click(row);
+    await screen.findByTestId("management-staff-panel");
+  }
+
+  it("resolves contactEmail from the real employee record, not the coalesced directory display email", async () => {
+    fetchOrganizationInvitationsMock.mockResolvedValueOnce([]);
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        employeeId: "emp-1",
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [],
+        email: "coalesced-fallback@example.com",
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      employees: [makeEmployee({ id: "emp-1", email: "real.contact@example.com" })],
+    });
+
+    await openManagementOnlyPanel();
+
+    expect(screen.getByTestId("contact-email")).toHaveTextContent("real.contact@example.com");
+  });
+
+  it("does not patch a pending invitation's fields after backfilling the employee email revokes it, and shows a distinct toast", async () => {
+    fetchOrganizationInvitationsMock.mockResolvedValueOnce([PENDING_INVITATION]);
+    updateEmployeeIdentityMock.mockResolvedValueOnce({
+      success: true,
+      employee: makeEmployee({ id: "emp-1", email: "new.address@example.com" }),
+    });
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        employeeId: "emp-1",
+        userId: null,
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [],
+        managementDepartmentIds: [10],
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      orgId: "org-1",
+      employees: [makeEmployee({ id: "emp-1", email: "", version: 3 })],
+    });
+
+    await openManagementOnlyPanel();
+
+    if (!lastManagementStaffPanelSave) {
+      throw new Error("Expected ManagementStaffPanel to receive onSave");
+    }
+    await act(async () => {
+      await lastManagementStaffPanelSave!({
+        firstName: "Jamie",
+        lastName: "Rivera",
+        email: "new.address@example.com",
+        phone: "",
+        managementDepartmentIds: [10],
+      });
+    });
+
+    expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ employeeId: "emp-1", email: "new.address@example.com" }),
+    );
+    expect(updatePendingInvitationMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      expect.stringContaining("old.invite@example.com"),
+    );
+  });
+
+  it("shows an error toast instead of an unhandled rejection when the save sequence throws", async () => {
+    fetchOrganizationInvitationsMock.mockResolvedValueOnce([]);
+    updateEmployeeIdentityMock.mockRejectedValueOnce(new Error("boom"));
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        employeeId: "emp-1",
+        userId: null,
+        firstName: "Jamie",
+        lastName: "Rivera",
+        focusAreaIds: [],
+        managementDepartmentIds: [10],
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      orgId: "org-1",
+      employees: [makeEmployee({ id: "emp-1", email: "existing@example.com", version: 3 })],
+    });
+
+    await openManagementOnlyPanel();
+
+    if (!lastManagementStaffPanelSave) {
+      throw new Error("Expected ManagementStaffPanel to receive onSave");
+    }
+    await act(async () => {
+      await lastManagementStaffPanelSave!({
+        firstName: "Jamie",
+        lastName: "Rivera",
+        email: "existing@example.com",
+        phone: "555-0100",
+        managementDepartmentIds: [10],
+      });
+    });
+
+    expect(vi.mocked(toast.error)).toHaveBeenCalled();
   });
 });
 

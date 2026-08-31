@@ -11,8 +11,6 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import type { CardIconTone } from "../../../shared/components/Screen";
-import type { DashboardPeriodMode } from "../../../shared/lib/dates";
-import { PeriodToggle } from "./PeriodToggle";
 
 function createToneStyles(
   mobileColors: MobileColors,
@@ -88,15 +86,9 @@ const STATUS_TONE: Record<string, CardIconTone> = {
 export function DashboardHeroCard({
   summary,
   metrics,
-  periodMode,
-  onPeriodModeChange,
-  isFetching = false,
 }: {
   summary: MobileDashboardResponse["heroSummary"];
   metrics: MobileDashboardResponse["metrics"];
-  periodMode: DashboardPeriodMode;
-  onPeriodModeChange: (mode: DashboardPeriodMode) => void;
-  isFetching?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -106,21 +98,18 @@ export function DashboardHeroCard({
 
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerCopy}>
-          <View
-            style={[
-              styles.statusPill,
-              { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
-            ]}
-          >
-            <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>
-              {summary.statusLabel}
-            </Text>
-          </View>
-          <Text style={styles.title}>{summary.title}</Text>
+      <View style={styles.headerCopy}>
+        <View
+          style={[
+            styles.statusPill,
+            { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
+          ]}
+        >
+          <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>
+            {summary.statusLabel}
+          </Text>
         </View>
-        <PeriodToggle mode={periodMode} onChange={onPeriodModeChange} loading={isFetching} />
+        <Text style={styles.title}>{summary.title}</Text>
       </View>
       <View style={styles.tileRow}>
         <MetricTile
@@ -161,14 +150,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
-    headerRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      gap: 12,
-    },
     headerCopy: {
-      flexShrink: 1,
       gap: 6,
     },
     statusPill: {

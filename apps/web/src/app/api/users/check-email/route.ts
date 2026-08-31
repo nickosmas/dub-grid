@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,13 @@ const bodySchema = z.object({
  *                         this org" before the trigger / unique index fires.
  * - `existingEmployeeId`— the matched user's `employees.id` in this org
  *                         when they have one (so the UI can deep-link).
+ *
+ * A match on a Gridmaster account is reported as `exists: false` outright —
+ * Gridmaster is a platform-level role never surfaced to org users, and this
+ * endpoint's whole job is a friendly "they'll join your org" preview that
+ * would otherwise leak a platform admin's real name and account status to
+ * an org-level admin. The DB trigger still blocks the save itself with its
+ * own sanitized "That email address is reserved." message either way.
  *
  * Auth: must be an authenticated user with `canManageEmployees` on `orgId`.
  * Rate-limited per-user via the standard `apiLimiter`.
@@ -71,21 +78,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
   }
 
-  // Match by lowercased email against auth.users. Service-role required.
-  const { data: matchedUsers, error: authLookupErr } = await serviceClient
-    .schema("auth")
-    .from("users")
-    .select("id")
-    .ilike("email", normalized)
-    .limit(1);
-  if (authLookupErr) {
-    logger.error({ error: authLookupErr }, "check-email auth lookup failed");
-    return NextResponse.json(
-      { error: "We couldn't find that account. Try again." },
-      { status: 500 },
-    );
-  }
-  const matchedUserId = matchedUsers?.[0]?.id ?? null;
+  // Match by lowercased email against auth.users. auth.users isn't a schema
+  // PostgREST exposes (only public/graphql_public), so this goes through the
+  // GoTrue admin API via findAuthUserByEmail rather than
+  // serviceClient.schema("auth").from("users") — that call always fails
+  // with PGRST106.
+  const authUser = await findAuthUserByEmail(normalized);
+  const matchedUserId = authUser?.id ?? null;
   if (!matchedUserId) {
     return NextResponse.json({
       exists: false,
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
   const [profileResult, membershipResult, employeeResult] = await Promise.all([
     serviceClient
       .from("profiles")
-      .select("first_name, last_name")
+      .select("first_name, last_name, platform_role")
       .eq("id", matchedUserId)
       .maybeSingle(),
     serviceClient
@@ -118,6 +117,15 @@ export async function POST(req: NextRequest) {
   ]);
 
   const profile = profileResult.data;
+  if (profile?.platform_role === "gridmaster") {
+    return NextResponse.json({
+      exists: false,
+      displayName: null,
+      existsInThisOrg: false,
+      existingEmployeeId: null,
+    });
+  }
+
   const displayName = profile
     ? [profile.first_name, profile.last_name]
         .filter((piece): piece is string => !!piece && piece.trim().length > 0)

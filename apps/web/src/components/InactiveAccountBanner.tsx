@@ -13,8 +13,9 @@ export default function InactiveAccountBanner() {
     <div
       style={{
         height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, #f59e0b, #d97706)",
-        color: "#fff",
+        background:
+          "linear-gradient(135deg, var(--dg-color-warning), var(--dg-color-warning-dark))",
+        color: "var(--dg-color-text-inverse)",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",

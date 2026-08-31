@@ -8,6 +8,7 @@ const auditSelect = vi.fn();
 const auditOrder = vi.fn();
 const auditLimit = vi.fn();
 const auditInsert = vi.fn();
+const fetchFilteredAuditRows = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
@@ -29,6 +30,10 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+vi.mock("@/lib/audit/server-query", () => ({
+  fetchFilteredAuditRows: (...args: unknown[]) => fetchFilteredAuditRows(...args),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(body: unknown) {
@@ -46,33 +51,19 @@ describe("POST /api/gridmaster/audit-log/export", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
-    auditLimit.mockResolvedValue({
-      data: [
-        {
-          id: 1,
-          org_id: null,
-          actor_id: "gridmaster-user",
-          actor_email: "gm@example.com",
-          action: "user.force_logout",
-          resource_type: "user",
-          resource_id: "11111111-1111-4111-8111-111111111111",
-          details: { targetUserId: "11111111-1111-4111-8111-111111111111" },
-          created_at: "2026-05-02T00:00:00.000Z",
-        },
-        {
-          id: 2,
-          org_id: null,
-          actor_id: "gridmaster-user",
-          actor_email: "gm@example.com",
-          action: "employee.updated",
-          resource_type: "employee",
-          resource_id: "33333333-3333-4333-8333-333333333333",
-          details: {},
-          created_at: "2026-05-02T00:01:00.000Z",
-        },
-      ],
-      error: null,
-    });
+    fetchFilteredAuditRows.mockResolvedValue([
+      {
+        id: 1,
+        org_id: null,
+        actor_id: "gridmaster-user",
+        actor_email: "gm@example.com",
+        action: "user.force_logout",
+        resource_type: "user",
+        resource_id: "11111111-1111-4111-8111-111111111111",
+        details: { targetUserId: "11111111-1111-4111-8111-111111111111" },
+        created_at: "2026-05-02T00:00:00.000Z",
+      },
+    ]);
     auditOrder.mockReturnValue({ limit: auditLimit });
     auditSelect.mockReturnValue({ order: auditOrder });
     auditInsert.mockResolvedValue({ error: null });
@@ -112,6 +103,10 @@ describe("POST /api/gridmaster/audit-log/export", () => {
           rowCount: 1,
         }),
       }),
+    );
+    expect(fetchFilteredAuditRows).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ highRiskOnly: true, limit: 1000 }),
     );
   });
 });

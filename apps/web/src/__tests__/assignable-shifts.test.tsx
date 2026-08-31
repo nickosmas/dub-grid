@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import ShiftPicker from "@/components/ShiftPicker";
 import {
   buildAssignableShiftOptions,
+  buildAssignableShiftDisplayMap,
   buildScheduleAssignmentOptions,
   formatShiftAssignmentDisqualificationMessage,
   getQualificationSeniorityRank,
@@ -24,7 +25,7 @@ const focusAreas: FocusArea[] = [
   {
     id: 1,
     orgId: "org-1",
-    departmentId: null,
+    departmentId: 3,
     name: "North",
     sortOrder: 0,
   },
@@ -368,6 +369,9 @@ describe("assignable shift resolution", () => {
       name: "Default shift job",
       abbr: "SHIFT",
       showOnGrid: false,
+      departmentIds: [3],
+      focusAreaIds: [1],
+      applicableShiftIds: [10],
       eligibleRoleIds: [7],
       shiftColorOverrides: { "10": "#D9F99D" },
       systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
@@ -442,6 +446,47 @@ describe("assignable shift resolution", () => {
     expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
   });
 
+  it("does not offer shift-only assignments before the default shift job has a placement", () => {
+    const unconfiguredDefaultShiftJob: JobDefinition = {
+      ...jobs[0]!,
+      id: 104,
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      departmentIds: [],
+      focusAreaIds: [],
+      applicableShiftIds: [],
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+    };
+
+    const generatedAssignments = buildScheduleAssignmentOptions({
+      orgId: "org-1",
+      focusAreas,
+      shiftCategories,
+      jobs: [unconfiguredDefaultShiftJob],
+    });
+
+    expect(
+      buildAssignableShiftOptions({
+        assignments: generatedAssignments,
+        shiftCategories,
+        jobs: [unconfiguredDefaultShiftJob],
+        focusAreas,
+        shiftDisplayMode: "name",
+      }),
+    ).toEqual([]);
+
+    expect(
+      buildAssignableShiftDisplayMap({
+        assignments: generatedAssignments,
+        shiftCategories,
+        jobs: [unconfiguredDefaultShiftJob],
+        focusAreas,
+        shiftDisplayMode: "code",
+      }).get(generatedAssignments[0]!.id),
+    ).toBe("D");
+  });
+
   it("excludes shift-only default-shift-job options when defaultShiftEnabled is false", () => {
     const defaultShiftJob: JobDefinition = {
       ...jobs[0]!,
@@ -449,6 +494,9 @@ describe("assignable shift resolution", () => {
       name: "Default shift job",
       abbr: "SHIFT",
       showOnGrid: false,
+      departmentIds: [3],
+      focusAreaIds: [1],
+      applicableShiftIds: [10],
       eligibleRoleIds: [],
       systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
     };

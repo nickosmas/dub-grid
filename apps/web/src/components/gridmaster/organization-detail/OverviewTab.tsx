@@ -13,10 +13,7 @@ import {
   unsuspendGridmasterOrganization,
   type TenantStats,
 } from "@/features/gridmaster/client";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { useEmployeeCount } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
@@ -164,39 +161,37 @@ export function OverviewTab({
 
     setSaving(true);
     try {
-      const updated = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        name: nextOrganization.name,
-        phone: nextOrganization.phone,
-        addressLine1: nextOrganization.addressLine1,
-        addressLine2: nextOrganization.addressLine2,
-        addressCity: nextOrganization.addressCity,
-        addressState: nextOrganization.addressState,
-        addressPostalCode: nextOrganization.addressPostalCode,
-        addressCountry: nextOrganization.addressCountry,
-        timezone: nextOrganization.timezone ?? "",
-        focusAreaLabel: nextOrganization.focusAreaLabel,
-        certificationLabel: nextOrganization.certificationLabel,
-        roleLabel: nextOrganization.roleLabel,
-        shiftDisplayMode: nextOrganization.shiftDisplayMode,
-        enforceConflictPrevention: nextOrganization.enforceConflictPrevention,
-        dataRetentionDays: nextOrganization.dataRetentionDays,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          name: nextOrganization.name,
+          phone: nextOrganization.phone,
+          addressLine1: nextOrganization.addressLine1,
+          addressLine2: nextOrganization.addressLine2,
+          addressCity: nextOrganization.addressCity,
+          addressState: nextOrganization.addressState,
+          addressPostalCode: nextOrganization.addressPostalCode,
+          addressCountry: nextOrganization.addressCountry,
+          timezone: nextOrganization.timezone ?? "",
+          focusAreaLabel: nextOrganization.focusAreaLabel,
+          certificationLabel: nextOrganization.certificationLabel,
+          roleLabel: nextOrganization.roleLabel,
+          shiftDisplayMode: nextOrganization.shiftDisplayMode,
+          enforceConflictPrevention: nextOrganization.enforceConflictPrevention,
+          dataRetentionDays: nextOrganization.dataRetentionDays,
+        },
       });
-      toast.success("Organization updated");
+      if (result.status === "saved") {
+        toast.success("Organization updated");
+      } else {
+        toast.info("Organization details were refreshed to the latest saved values.");
+      }
       setReviewOpen(false);
       setEditing(false);
-      onOrgUpdated?.(updated);
+      onOrgUpdated?.(result.organization);
     } catch (err: unknown) {
-      if (err instanceof OrganizationSettingsConflictError) {
-        toast.error(
-          "Organization details changed elsewhere. Review the latest values and try again.",
-        );
-        setReviewOpen(false);
-        setEditing(false);
-        onOrgUpdated?.(err.latestOrganization);
-        return;
-      }
       toast.error(formatClientErrorMessage(err, "We couldn't update. Try again."));
     } finally {
       setSaving(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -32,6 +32,32 @@ import {
 import dynamic from "next/dynamic";
 import { SettingsShell } from "./SettingsShell";
 
+function SettingsSectionSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading settings section"
+      data-settings-section-loading
+      style={{
+        border: "1px solid var(--dg-color-border-light)",
+        borderRadius: "var(--dg-radius-lg)",
+        background: "var(--dg-color-surface)",
+        padding: 20,
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <div className="dg-skeleton" style={{ width: 150, height: 14, borderRadius: 4 }} />
+      <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+      <div className="dg-skeleton" style={{ width: "72%", height: 14, borderRadius: 4 }} />
+      <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+    </div>
+  );
+}
+
+const settingsSectionLoading = () => <SettingsSectionSkeleton />;
+
 // Each section is loaded when its tab is opened, not when Settings mounts.
 //
 // Exactly one of these renders at a time — the JSX below is a chain of
@@ -42,20 +68,59 @@ import { SettingsShell } from "./SettingsShell";
 // ssr: false matches the treatment ShiftEditPanel and the print views already
 // get: these are authenticated, force-dynamic screens, so nothing is gained by
 // rendering them on the server first.
-const OrganizationGeneral = dynamic(() => import("./OrganizationGeneral"), { ssr: false });
-const OrganizationLabels = dynamic(() => import("./OrganizationLabels"), { ssr: false });
-const BillingSettings = dynamic(() => import("./BillingSettings"), { ssr: false });
-const DisplayMode = dynamic(() => import("./DisplayMode"), { ssr: false });
-const ScheduleRules = dynamic(() => import("./ScheduleRules"), { ssr: false });
-const ShiftCategories = dynamic(() => import("./ShiftCategories"), { ssr: false });
-const Jobs = dynamic(() => import("./Jobs"), { ssr: false });
-const AbsenceTypes = dynamic(() => import("./AbsenceTypes"), { ssr: false });
-const Coverage = dynamic(() => import("./Coverage"), { ssr: false });
-const StringListSettings = dynamic(() => import("./StringListSettings"), { ssr: false });
-const DepartmentsSettings = dynamic(() => import("./DepartmentsSettings"), { ssr: false });
-const Indicators = dynamic(() => import("./Indicators"), { ssr: false });
-const OrgActivityLog = dynamic(() => import("./ActivityLog"), { ssr: false });
-const DangerZone = dynamic(() => import("./DangerZone"), { ssr: false });
+const OrganizationGeneral = dynamic(() => import("./OrganizationGeneral"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const OrganizationLabels = dynamic(() => import("./OrganizationLabels"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const BillingSettings = dynamic(() => import("./BillingSettings"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const DisplayMode = dynamic(() => import("./DisplayMode"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const ScheduleRules = dynamic(() => import("./ScheduleRules"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const ShiftCategories = dynamic(() => import("./ShiftCategories"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const Jobs = dynamic(() => import("./Jobs"), { ssr: false, loading: settingsSectionLoading });
+const AbsenceTypes = dynamic(() => import("./AbsenceTypes"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const Coverage = dynamic(() => import("./Coverage"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const StringListSettings = dynamic(() => import("./StringListSettings"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const DepartmentsSettings = dynamic(() => import("./DepartmentsSettings"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const Indicators = dynamic(() => import("./Indicators"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const OrgActivityLog = dynamic(() => import("./ActivityLog"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
+const DangerZone = dynamic(() => import("./DangerZone"), {
+  ssr: false,
+  loading: settingsSectionLoading,
+});
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface SettingsPageProps {
@@ -202,6 +267,13 @@ export default function SettingsPage({
       ? requestedSection
       : defaultSection;
   const maxWidth = getMaxWidth(activeSection);
+  const [isRolesEditing, setIsRolesEditing] = useState(false);
+
+  useEffect(() => {
+    setIsRolesEditing(false);
+  }, [activeSection]);
+
+  const shellMaxWidth = activeSection === "staff-roles" && !isRolesEditing ? 1120 : maxWidth;
 
   // Permission notice for view-only users.
   const banner =
@@ -245,7 +317,7 @@ export default function SettingsPage({
       footerGroupIds={FOOTER_GROUP_IDS}
       defaultSection={defaultSection}
       activeSection={activeSection}
-      maxWidth={maxWidth}
+      maxWidth={shellMaxWidth}
       banner={banner}
     >
       {/* ── General group ─────────────────────────────────────── */}
@@ -294,6 +366,7 @@ export default function SettingsPage({
             orgId={organization.id}
             onChange={onShiftCategoriesChange}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
+            shiftDisplayMode={organization.shiftDisplayMode}
           />
         )}
 
@@ -349,10 +422,10 @@ export default function SettingsPage({
         <StringListSettings
           label={certificationLabel}
           sectionTitle={certificationLabel}
-          maxWidth={maxWidth}
-          wideTable
+          maxWidth={shellMaxWidth}
           items={certifications}
-          placeholder="e.g. RN"
+          placeholder="e.g. Registered Nurse"
+          hideAbbr
           onSave={async (updated, hardDeleteIds) => {
             try {
               const saved = await saveCertifications(
@@ -378,10 +451,10 @@ export default function SettingsPage({
         <StringListSettings
           label={roleLabel}
           sectionTitle={roleLabel}
-          maxWidth={maxWidth}
-          wideTable
+          maxWidth={shellMaxWidth}
           items={orgRoles}
           placeholder="e.g. Charge Nurse"
+          hideAbbr
           onSave={async (updated, hardDeleteIds) => {
             try {
               const saved = await saveOrganizationRoles(
@@ -401,6 +474,9 @@ export default function SettingsPage({
           departments={departments}
           showScheduleRoleToggle
           scheduleEligibilityHelpText="Only schedule-eligible roles can limit jobs."
+          certifications={certifications}
+          showRequiredCertifications
+          onEditingChange={setIsRolesEditing}
           onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
         />
       )}
