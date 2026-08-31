@@ -11,6 +11,10 @@ function resolveMigration(fileName: string) {
 
 describe("gridmaster account SQL boundaries", () => {
   const sql = readFileSync(resolveMigration("002_functions_triggers.sql"), "utf8");
+  const emailBoundarySql = readFileSync(
+    resolveMigration("006_block_gridmaster_employee_email.sql"),
+    "utf8",
+  );
 
   it("keeps gridmaster accounts out of org-user RPCs and tenant counts", () => {
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.get_all_users_with_profiles()");
@@ -37,5 +41,13 @@ describe("gridmaster account SQL boundaries", () => {
     expect(sql).toContain("archived_at = COALESCE(archived_at, NOW())");
     expect(sql).toContain("org_id = NULL");
     expect(sql).toContain("reason = 'gridmaster_promotion'");
+  });
+
+  it("prevents a Gridmaster login email from becoming a staff contact email", () => {
+    expect(emailBoundarySql).toContain("employee_email_belongs_to_gridmaster");
+    expect(emailBoundarySql).toContain("platform_role = 'gridmaster'::public.platform_role");
+    expect(emailBoundarySql).toContain(
+      "CREATE OR REPLACE FUNCTION public.check_employee_email_belongs_to_user()",
+    );
   });
 });

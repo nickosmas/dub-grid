@@ -82,6 +82,21 @@ describe("buildCoverageSectionsResponse", () => {
       },
     ]);
   });
+
+  it("returns every section without truncating past a fixed count", () => {
+    // Regression guard: this previously hard-capped at 10 sections
+    // regardless of how many an org actually has, which the client's
+    // "Show more" expansion could never reveal past.
+    const byFocusArea: CoverageByFocusAreaEntry[] = Array.from({ length: 14 }, (_, i) => ({
+      focusAreaId: i + 1,
+      focusAreaName: `Section ${i + 1}`,
+      requiredTotal: 2,
+      filledTotal: 1,
+      pct: 50,
+    }));
+
+    expect(buildCoverageSectionsResponse(byFocusArea)).toHaveLength(14);
+  });
 });
 
 describe("computeStaffHoursForPeriod", () => {
@@ -98,7 +113,7 @@ describe("computeStaffHoursForPeriod", () => {
       focus_area_id: 12,
       state: {
         kind: "worked",
-        segments: [{ shiftId: 10 }],
+        segments: [{ shiftId: 10, jobId: 0 }],
         customStartTime: null,
         customEndTime: null,
       },
@@ -156,7 +171,7 @@ describe("computeStaffHoursForPeriod", () => {
         date: "2026-05-11",
         state: {
           kind: "worked",
-          segments: [{ shiftId: 10 }],
+          segments: [{ shiftId: 10, jobId: 0 }],
           customStartTime: "07:00",
           customEndTime: "15:00", // 8h, not the category's 12h
         },
@@ -345,20 +360,33 @@ describe("buildActivityFeed", () => {
 });
 
 describe("buildHeroSummary", () => {
-  it("prioritizes open coverage gaps", () => {
+  it("prioritizes urgent open coverage gaps", () => {
     const result = buildHeroSummary({
-      openGapCount: 2,
+      urgentGapCount: 2,
       pendingApprovalsCount: 3,
       hasCoverageRequirements: true,
     });
 
-    expect(result.title).toBe("2 coverage gaps");
+    expect(result.title).toBe("2 urgent coverage gaps");
     expect(result.statusLabel).toBe("Attention");
   });
 
-  it("falls back to pending approvals when there are no gaps", () => {
+  it("does not escalate to Attention for gaps that are not urgent", () => {
+    // Matches web's hero headline: only high-urgency gaps trigger the
+    // top-priority alert — low/medium-urgency gaps alone fall through to the
+    // next priority tier instead of reading as "Attention".
     const result = buildHeroSummary({
-      openGapCount: 0,
+      urgentGapCount: 0,
+      pendingApprovalsCount: 0,
+      hasCoverageRequirements: true,
+    });
+
+    expect(result.statusLabel).toBe("Healthy");
+  });
+
+  it("falls back to pending approvals when there are no urgent gaps", () => {
+    const result = buildHeroSummary({
+      urgentGapCount: 0,
       pendingApprovalsCount: 1,
       hasCoverageRequirements: true,
     });
@@ -368,7 +396,7 @@ describe("buildHeroSummary", () => {
 
   it("flags unconfigured coverage requirements", () => {
     const result = buildHeroSummary({
-      openGapCount: 0,
+      urgentGapCount: 0,
       pendingApprovalsCount: 0,
       hasCoverageRequirements: false,
     });
@@ -378,7 +406,7 @@ describe("buildHeroSummary", () => {
 
   it("reports healthy when there is nothing to flag", () => {
     const result = buildHeroSummary({
-      openGapCount: 0,
+      urgentGapCount: 0,
       pendingApprovalsCount: 0,
       hasCoverageRequirements: true,
     });
@@ -424,8 +452,12 @@ describe("loadMobileDashboardPayload", () => {
       type: "pickup",
       status: "pending_approval",
       requesterName: "Alex Rivera",
-      requesterShiftDate: "2026-05-12",
+      // Far-future/never-expiring so resolveActiveShiftRequests's expiry and
+      // "already started" checks don't filter this out regardless of when
+      // the test actually runs.
+      requesterShiftDate: "2099-01-01",
       requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+      expiresAt: "2099-01-02T00:00:00.000Z",
       createdAt: "2026-05-10T09:00:00.000Z",
     } as unknown as MobileShiftRequest;
     deps.fetchMobileShiftRequests.mockResolvedValue([pendingRequest]);
@@ -452,6 +484,40 @@ describe("loadMobileDashboardPayload", () => {
     expect(deps.fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
     expect(superAdminPayload.actionQueue).toEqual([]);
     expect(superAdminPayload.metrics.pendingApprovalsCount).toBe(1);
+  });
+
+  it("returns open shifts and the action queue in full, not capped at a fixed count", async () => {
+    // Regression guard: openShifts and actionQueue previously hard-capped at
+    // 10 items regardless of an org's actual gap/request count, which the
+    // client's "Show more" expansion could never reveal past.
+    const deps = makeDeps();
+    const manyOpenShifts = Array.from({ length: 16 }, (_, i) =>
+      makeOpenShift({ id: `shift-${i + 1}` }),
+    );
+    deps.fetchMobileCoverageSummary.mockResolvedValue(
+      makeCoverageSummary({ openShifts: manyOpenShifts }),
+    );
+    const manyPendingRequests = Array.from({ length: 13 }, (_, i) => ({
+      id: `req-${i + 1}`,
+      type: "pickup",
+      status: "pending_approval",
+      requesterName: "Alex Rivera",
+      requesterShiftDate: "2099-01-01",
+      requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+      expiresAt: "2099-01-02T00:00:00.000Z",
+      createdAt: "2026-05-10T09:00:00.000Z",
+    })) as unknown as MobileShiftRequest[];
+    deps.fetchMobileShiftRequests.mockResolvedValue(manyPendingRequests);
+
+    const adminAuth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
+    const payload = await loadMobileDashboardPayload(adminAuth, range, deps);
+
+    expect(payload.openShifts).toHaveLength(16);
+    expect(payload.actionQueue).toHaveLength(13);
   });
 
   it("passes through the coverage summary's real totals/byFocusArea instead of re-deriving them", async () => {
@@ -515,7 +581,7 @@ describe("loadMobileDashboardPayload", () => {
       focus_area_id: 12,
       state: {
         kind: "worked",
-        segments: [{ shiftId: 10 }],
+        segments: [{ shiftId: 10, jobId: 0 }],
         customStartTime: null,
         customEndTime: null,
       },

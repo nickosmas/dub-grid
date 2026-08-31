@@ -307,7 +307,15 @@ export function getDefaultSection(perms: NavPermissions): SectionId {
   return groups[0]?.items[0]?.id ?? "org-general";
 }
 
-/** Get max content width for a section. */
-export function getMaxWidth(_section: SectionId): number {
+/** Get max content width for a section. Roles may grow for their extra columns. */
+export function getMaxWidth(section: SectionId): number {
+  if (section === "staff-roles") {
+    return 1280;
+  }
+
+  if (section === "staff-certifications") {
+    return 1120;
+  }
+
   return 1120;
 }

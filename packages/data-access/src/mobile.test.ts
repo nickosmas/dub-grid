@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchMobilePeopleRows, type MobilePeopleQueryRow } from "./mobile";
+import {
+  fetchMobilePeopleRows,
+  insertMobileAuditLogEntry,
+  type MobilePeopleQueryRow,
+} from "./mobile";
 
 function makeRow(n: number): MobilePeopleQueryRow {
   return {
@@ -76,5 +80,35 @@ describe("fetchMobilePeopleRows", () => {
     await expect(fetchMobilePeopleRows(client, "org-1", 5)).rejects.toEqual({
       message: "boom",
     });
+  });
+});
+
+describe("insertMobileAuditLogEntry", () => {
+  it("does not fail an already-committed mutation when activity logging fails", async () => {
+    const error = { message: "audit_log unavailable" };
+    const insert = vi.fn(async () => ({ error }));
+    const from = vi.fn(() => ({ insert }));
+    const serviceClient = { from } as unknown as SupabaseClient;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      insertMobileAuditLogEntry(serviceClient, {
+        org_id: "org-1",
+        actor_id: "actor-1",
+        actor_email: "actor@example.com",
+        action: "employee.updated",
+        resource_type: "employee",
+        resource_id: "employee-1",
+        details: {},
+        ip_address: null,
+        user_agent: null,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Mobile activity-log write failed",
+      expect.objectContaining({ action: "employee.updated", orgId: "org-1" }),
+    );
+    errorSpy.mockRestore();
   });
 });

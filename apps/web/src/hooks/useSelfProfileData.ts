@@ -20,6 +20,7 @@ interface UseSelfProfileDataResult {
   user: User | null;
   profile: SelfProfileRecord | null;
   employee: Employee | null;
+  managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
   shiftRequests: ShiftRequest[];
@@ -28,6 +29,7 @@ interface UseSelfProfileDataResult {
   error: string | null;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
+  setManagementDepartmentIds: Dispatch<SetStateAction<number[]>>;
 }
 
 export type { SelfProfileRecord };
@@ -47,6 +49,7 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
   const data: AccountSelfProfileData | null = user ? (selfQuery.data ?? null) : null;
   const profile = data?.profile ?? null;
   const employee = data?.employee ?? null;
+  const managementDepartmentIds = data?.managementDepartmentIds ?? [];
   const shifts = data?.shifts ?? {};
   const recurringShifts = data?.recurringShifts ?? [];
   const shiftRequests = data?.shiftRequests ?? [];
@@ -90,10 +93,32 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
     [queryClient, queryKey],
   );
 
+  const setManagementDepartmentIds = useCallback<Dispatch<SetStateAction<number[]>>>(
+    (nextValue) => {
+      queryClient.setQueryData<AccountSelfProfileData | undefined>(queryKey, (current) => {
+        if (!current) {
+          return current;
+        }
+
+        const nextIds =
+          typeof nextValue === "function"
+            ? nextValue(current.managementDepartmentIds ?? [])
+            : nextValue;
+
+        return {
+          ...current,
+          managementDepartmentIds: nextIds,
+        };
+      });
+    },
+    [queryClient, queryKey],
+  );
+
   return {
     user,
     profile,
     employee,
+    managementDepartmentIds,
     shifts,
     recurringShifts,
     shiftRequests,
@@ -107,5 +132,6 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
       : null,
     setProfile,
     setEmployee,
+    setManagementDepartmentIds,
   };
 }

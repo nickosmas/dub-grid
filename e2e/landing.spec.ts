@@ -79,6 +79,10 @@ test.describe("landing page at mobile width", () => {
 });
 
 test("landing header and hero stay readable in dark mode", async ({ page }) => {
+  // The app intentionally defaults new visitors to light mode. Set the same
+  // explicit preference a user creates with the theme control; emulating a
+  // dark operating-system scheme alone must not override that default.
+  await page.addInitScript(() => localStorage.setItem("theme", "dark"));
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto(apexURL);
 
@@ -104,5 +108,10 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
     "border-top-color",
     "rgb(59, 66, 82)",
+  );
+
+  await expect(page.locator(".landing-hero-gradient")).toHaveCSS(
+    "background-image",
+    "linear-gradient(rgb(29, 58, 160) 0%, rgb(11, 45, 117) 38%, rgb(7, 21, 53) 68%, rgb(5, 6, 9) 100%)",
   );
 });

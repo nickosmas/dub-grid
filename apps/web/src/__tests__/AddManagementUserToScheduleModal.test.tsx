@@ -157,7 +157,7 @@ describe("AddManagementUserToScheduleModal", () => {
     await user.type(phoneInput, "415-555-0199");
 
     await user.click(screen.getByRole("button", { name: "North" }));
-    await user.click(screen.getByRole("button", { name: "SUPV" }));
+    await user.click(screen.getByRole("button", { name: "Supervisor" }));
     const textboxes = screen.getAllByRole("textbox");
     const notesInput = textboxes[textboxes.length - 1];
     await user.type(notesInput, "Internal note");

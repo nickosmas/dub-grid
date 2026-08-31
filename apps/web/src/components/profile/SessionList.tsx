@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Monitor, Smartphone } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -238,10 +239,15 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count:
   );
 }
 
-export function SessionList() {
+export function SessionList({
+  onOtherSessionCountChange,
+}: {
+  onOtherSessionCountChange?: (count: number) => void;
+}) {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { signOut } = useLogout();
+  const [confirmCurrentSessionSignOut, setConfirmCurrentSessionSignOut] = useState(false);
 
   const sessionsQuery = useQuery({
     queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
@@ -287,6 +293,11 @@ export function SessionList() {
   const stale = sessionsQuery.data?.stale ?? [];
   const loading = authLoading || sessionsQuery.isPending;
 
+  useEffect(() => {
+    if (!sessionsQuery.data) return;
+    onOtherSessionCountChange?.(active.filter((session) => !session.isCurrent).length);
+  }, [active, onOtherSessionCountChange, sessionsQuery.data]);
+
   const revokeMutation = useMutation({
     mutationFn: (session: UserSession) =>
       revokeAccountSession(session.refreshTokenHash).then(() => session),
@@ -306,7 +317,7 @@ export function SessionList() {
 
   function handleRevoke(session: UserSession) {
     if (session.isCurrent) {
-      signOut({ scope: "local" });
+      setConfirmCurrentSessionSignOut(true);
       return;
     }
     revokeMutation.mutate(session);
@@ -377,6 +388,15 @@ export function SessionList() {
             />
           ))}
         </div>
+      )}
+      {confirmCurrentSessionSignOut && (
+        <ConfirmDialog
+          title="Sign out this device?"
+          message="You will need to sign in again to use DubGrid on this device."
+          confirmLabel="Sign out"
+          onConfirm={() => signOut({ scope: "local" })}
+          onCancel={() => setConfirmCurrentSessionSignOut(false)}
+        />
       )}
     </div>
   );

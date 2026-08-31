@@ -9,6 +9,7 @@ import {
   removeEmployee,
   updateEmployee,
 } from "@/features/employees/client";
+import { createOrganizationInvitation } from "@/features/organization/client";
 import { toast } from "sonner";
 import { SELF_ACTION_FORBIDDEN_MESSAGE, SelfActionForbiddenError } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
@@ -17,7 +18,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import type { Employee } from "@/types";
+import type { Employee, Invitation } from "@/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,15 @@ export interface EmployeesData {
     dataList: Omit<Employee, "id" | "seniority">[],
   ) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<void>;
+  /** Saves an employee whose email just changed while a pending invitation
+   *  exists, then creates and sends a replacement invitation at the new
+   *  address (reusing the old invitation's role/departments). `orgName`
+   *  isn't otherwise known to this hook, so callers pass it through. */
+  handleSaveEmployeeWithReinvite: (
+    emp: Employee,
+    oldInvitation: Invitation,
+    orgName: string,
+  ) => Promise<void>;
   handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
   handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
@@ -123,11 +133,14 @@ export function useEmployees(orgId: string | null): EmployeesData {
   const handleSaveEmployee = useCallback(
     async (emp: Employee) => {
       if (!orgId) return;
-      let prevAll: Employee[] = [];
-      setAllLocal((prev) => {
-        prevAll = prev;
-        return prev.map((e) => (e.id === emp.id ? emp : e));
-      });
+      // Read the pre-update snapshot from the ref (synchronous, updated
+      // during render) rather than capturing it inside the optimistic
+      // setAllLocal's updater closure below — that updater isn't guaranteed
+      // to run before this async function's next line reads it, so a
+      // rollback could fire with the closure variable still at its initial
+      // value and wipe the list instead of restoring it.
+      const prevAll = allEmployeesRef.current;
+      setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
       try {
         await updateEmployee(emp, orgId, emp.version);
         toast.success("Employee saved");
@@ -151,19 +164,88 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
+  const handleSaveEmployeeWithReinvite = useCallback(
+    async (emp: Employee, oldInvitation: Invitation, orgName: string) => {
+      if (!orgId) return;
+      const prevAll = allEmployeesRef.current;
+      setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+
+      try {
+        await updateEmployee(emp, orgId, emp.version);
+        invalidateEmployees();
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) =>
+            prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
+          );
+          toast.error("Employee changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setAllLocal(prevAll);
+        toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
+        Sentry.captureException(err);
+        return;
+      }
+
+      // The identity save already succeeded at this point, so a failure past
+      // here must not read as the whole action failing — the employee record
+      // is correctly saved either way.
+      try {
+        const created = await createOrganizationInvitation({
+          email: emp.email,
+          role: oldInvitation.roleToAssign,
+          orgId,
+          employeeId: emp.id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          phone: emp.phone || undefined,
+          departmentIds: oldInvitation.departmentIds,
+          deptAdminIds: oldInvitation.deptAdminIds,
+        });
+
+        const response = await fetch("/api/send-invite-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: created.token, email: emp.email, orgName }),
+        });
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          let detail = "we couldn't send the invitation email.";
+          try {
+            detail = formatClientErrorMessage(JSON.parse(body).error, detail).toLowerCase();
+          } catch {
+            /* non-JSON response */
+          }
+          throw new Error(`Employee saved, but ${detail}`);
+        }
+
+        toast.success(`Employee saved. A new invitation was sent to ${emp.email}.`);
+      } catch (err) {
+        toast.error(
+          formatClientErrorMessage(
+            err,
+            "Employee saved, but we couldn't send the new invitation. Try Reinvite from the banner.",
+          ),
+        );
+      } finally {
+        invalidateEmployees();
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
   const handleRemoveEmployee = useCallback(
     async (empId: string, note?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return;
 
       const now = new Date().toISOString();
-      let prevAll: Employee[] = [];
-      setAllLocal((prev) => {
-        prevAll = prev;
-        return prev.map((e) =>
+      const prevAll = allEmployeesRef.current;
+      setAllLocal((prev) =>
+        prev.map((e) =>
           e.id === empId ? { ...e, status: "removed" as const, statusChangedAt: now } : e,
-        );
-      });
+        ),
+      );
       try {
         const updatedEmployee = await removeEmployee(empId, orgId, targetEmployee.version, note);
         setAllLocal((prev) =>
@@ -196,10 +278,9 @@ export function useEmployees(orgId: string | null): EmployeesData {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return;
 
-      let prevAll: Employee[] = [];
-      setAllLocal((prev) => {
-        prevAll = prev;
-        return prev.map((e) =>
+      const prevAll = allEmployeesRef.current;
+      setAllLocal((prev) =>
+        prev.map((e) =>
           e.id === empId
             ? {
                 ...e,
@@ -208,8 +289,8 @@ export function useEmployees(orgId: string | null): EmployeesData {
                 statusChangedAt: new Date().toISOString(),
               }
             : e,
-        );
-      });
+        ),
+      );
       try {
         const updatedEmployee = await deactivateEmployee(
           empId,
@@ -248,15 +329,14 @@ export function useEmployees(orgId: string | null): EmployeesData {
       if (!targetEmployee || !orgId) return;
 
       const now = new Date().toISOString();
-      let prevAll: Employee[] = [];
-      setAllLocal((prev) => {
-        prevAll = prev;
-        return prev.map((e) =>
+      const prevAll = allEmployeesRef.current;
+      setAllLocal((prev) =>
+        prev.map((e) =>
           e.id === empId
             ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
             : e,
-        );
-      });
+        ),
+      );
       try {
         const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
         setAllLocal((prev) =>
@@ -291,6 +371,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     loading,
     handleAddEmployee,
     handleSaveEmployee,
+    handleSaveEmployeeWithReinvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,

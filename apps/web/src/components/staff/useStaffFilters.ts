@@ -46,16 +46,18 @@ export function useStaffFilters({
   const [filterPhonePresence, setFilterPhonePresence] = useState<ContactPresenceFilter>("all");
   const [page, setPage] = useState(1);
 
-  const hasActiveFilters =
-    filterEmploymentType !== "all" ||
-    filterDepartment !== null ||
-    filterDepartmentAdminOnly ||
-    filterFocusArea !== null ||
-    filterCertification !== null ||
-    filterRole !== null ||
-    filterAccountLink !== "all" ||
-    filterEmailPresence !== "all" ||
-    filterPhonePresence !== "all";
+  const activeFilterCount = [
+    filterEmploymentType !== "all",
+    filterDepartment !== null,
+    filterDepartmentAdminOnly,
+    filterFocusArea !== null,
+    filterCertification !== null,
+    filterRole !== null,
+    filterAccountLink !== "all",
+    filterEmailPresence !== "all",
+    filterPhonePresence !== "all",
+  ].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
 
   function clearFilters() {
     setFilterEmploymentType("all");
@@ -248,6 +250,7 @@ export function useStaffFilters({
     filterPhonePresence,
     setFilterPhonePresence,
     hasActiveFilters,
+    activeFilterCount,
     clearFilters,
     // Lists
     rawList,

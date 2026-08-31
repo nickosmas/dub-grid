@@ -20,6 +20,8 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { getCompactNamedItemLabel } from "@/lib/utils";
+import { describeCertificationRequirement } from "@/lib/credential-requirements";
 import { toast } from "sonner";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
@@ -33,10 +35,13 @@ export default function StringListSettings({
   hideAbbr = false,
   departments,
   initialEditing,
+  onEditingChange,
   onCheckDependencies,
   sectionTitle,
   showScheduleRoleToggle = false,
   scheduleEligibilityHelpText,
+  certifications,
+  showRequiredCertifications = false,
   maxWidth,
   wideTable = false,
 }: {
@@ -54,6 +59,7 @@ export default function StringListSettings({
   departments?: Department[];
   /** Start in edit mode immediately (e.g. during onboarding). */
   initialEditing?: boolean;
+  onEditingChange?: (isEditing: boolean) => void;
   /** Check if an item has dependencies before deletion. If provided, shows a warning dialog. */
   onCheckDependencies?: (itemId: number) => Promise<DependencyInfo>;
   /** When provided, wraps content in a SectionCard. */
@@ -62,6 +68,10 @@ export default function StringListSettings({
   showScheduleRoleToggle?: boolean;
   /** Optional visible helper copy for the schedule-eligibility header. */
   scheduleEligibilityHelpText?: string;
+  /** Certifications selectable as a role's requirement. Roles list only. */
+  certifications?: NamedItem[];
+  /** Shows the per-role picker for which certifications qualify someone for a role. */
+  showRequiredCertifications?: boolean;
   /** Optional max width for the card wrapper when this list is shown as a settings section. */
   maxWidth?: number;
   /** Give dense multi-column staff label tables more room per column. */
@@ -70,6 +80,10 @@ export default function StringListSettings({
   const isMobile = useMediaQuery(MOBILE);
   const isWizardMode = useWizardMode();
   const [isEditing, setIsEditing] = useState(isWizardMode ? true : (initialEditing ?? false));
+
+  useEffect(() => {
+    onEditingChange?.(isEditing);
+  }, [isEditing, onEditingChange]);
   const [local, setLocal] = useState<NamedItem[]>(items);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     idx: number;
@@ -79,6 +93,8 @@ export default function StringListSettings({
   const [pendingHardDeleteIds, setPendingHardDeleteIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCompactLabelControls, setShowCompactLabelControls] = useState(false);
+  const hideAbbrFields = hideAbbr && !showCompactLabelControls;
 
   // Wizard mode: when the persisted `items` prop changes (typically because we
   // just saved this list), resync the local draft so its IDs match the server.
@@ -111,14 +127,14 @@ export default function StringListSettings({
               })
             : null,
         abbr:
-          !hideAbbr && item.abbr.trim().length > 0
+          !hideAbbrFields && item.abbr.trim().length > 0
             ? getCodeError(item.abbr, {
                 label: "Abbreviation",
                 maxLength: 20,
               })
             : null,
       })),
-    [hideAbbr, local],
+    [hideAbbrFields, local],
   );
   const duplicateName = useMemo(() => {
     const normalizedNames = local
@@ -173,6 +189,7 @@ export default function StringListSettings({
   const handleEnterEdit = () => {
     setLocal([...items]);
     setIsEditing(true);
+    setShowCompactLabelControls(false);
     setError(null);
   };
 
@@ -190,6 +207,7 @@ export default function StringListSettings({
   const handleClose = () => {
     resetDraft();
     setIsEditing(false);
+    setShowCompactLabelControls(false);
   };
 
   const lastSaveErrorRef = useRef<unknown>(null);
@@ -219,17 +237,14 @@ export default function StringListSettings({
         normalizeCode(it.abbr, {
           label: "Abbreviation",
           maxLength: 20,
-        }) ||
-        normalizeLineText(it.name, {
-          label: "Name",
-          maxLength: 80,
-          required: true,
-          disallowUrl: true,
-        }),
+        }) || getCompactNamedItemLabel(it),
       isScheduleRole: showScheduleRoleToggle ? (it.isScheduleRole ?? true) : it.isScheduleRole,
       // Also applied here, not just on toggle, so rows that predate the rule
       // are normalized rather than persisting a second spelling of org-wide.
       departmentIds: collapseIfEveryDepartment(it.departmentIds ?? []),
+      requiredCertificationIds: showRequiredCertifications
+        ? (it.requiredCertificationIds ?? [])
+        : it.requiredCertificationIds,
       sortOrder: i,
     }));
 
@@ -371,6 +386,39 @@ export default function StringListSettings({
     );
   };
 
+  const activeCerts = useMemo(
+    () => (certifications ?? []).filter((c) => !c.archivedAt),
+    [certifications],
+  );
+  const certMap = useMemo(() => new Map(activeCerts.map((c) => [c.id, c])), [activeCerts]);
+  const showCerts = showRequiredCertifications && activeCerts.length > 0;
+
+  /**
+   * Unlike departments, selecting every certification is not collapsed to the
+   * empty "no requirement" form. "Anyone may hold this role" and "each of these
+   * certifications qualifies" are different rules, and only the latter should
+   * keep excluding staff who hold no certification at all.
+   */
+  const handleCertToggle = (i: number, certificationId: number) => {
+    setLocal((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== i) return item;
+        const current = item.requiredCertificationIds ?? [];
+        const next = current.includes(certificationId)
+          ? current.filter((id) => id !== certificationId)
+          : [...current, certificationId];
+        return { ...item, requiredCertificationIds: next };
+      }),
+    );
+  };
+
+  /** Clearing every certification is what "assignable to anyone" means. */
+  const handleCertClear = (i: number) => {
+    setLocal((prev) =>
+      prev.map((item, idx) => (idx === i ? { ...item, requiredCertificationIds: [] } : item)),
+    );
+  };
+
   const handleNameKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     item: NamedItem,
@@ -378,7 +426,7 @@ export default function StringListSettings({
   ) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (hideAbbr) {
+      if (hideAbbrFields) {
         if (!item.name.trim()) return;
         if (idx < local.length - 1) {
           nameRefs.current.get(local[idx + 1].id)?.focus();
@@ -418,7 +466,7 @@ export default function StringListSettings({
       if (idx > 0) {
         const prevId = local[idx - 1].id;
         requestAnimationFrame(() => {
-          if (hideAbbr) {
+          if (hideAbbrFields) {
             nameRefs.current.get(prevId)?.focus();
           } else {
             abbrRefs.current.get(prevId)?.focus();
@@ -448,22 +496,35 @@ export default function StringListSettings({
     ? isMobile
       ? " minmax(100px, 1fr)"
       : wideTable
-        ? " minmax(180px, 1fr)"
+        ? " minmax(130px, 160px)"
         : " minmax(140px, 1fr)"
     : "";
   const scheduleRoleCol = showScheduleRoleToggle
     ? wideTable && !isMobile
-      ? " 220px"
+      ? " 150px"
       : " 160px"
     : "";
-  const gridCols = hideAbbr
+  const certCol = showCerts
+    ? isMobile
+      ? " minmax(100px, 1fr)"
+      : wideTable
+        ? " minmax(150px, 180px)"
+        : " minmax(140px, 1fr)"
+    : "";
+  const rankCol = "";
+  const nameCol = wideTable && !isMobile ? " minmax(200px, 1fr)" : " 2fr";
+  // Keep these tables only as wide as their useful columns. A small viewport
+  // may scroll rather than squeezing controls.
+  const tableMinWidth = wideTable && !isMobile ? 820 : undefined;
+  const gridCols = hideAbbrFields
     ? isEditing
-      ? `24px 2fr${scheduleRoleCol}${deptCol} auto`
-      : `2fr${scheduleRoleCol}${deptCol}`
+      ? `24px${nameCol}${scheduleRoleCol}${deptCol}${certCol}${rankCol} auto`
+      : `${nameCol.trimStart()}${scheduleRoleCol}${deptCol}${certCol}${rankCol}`
     : isEditing
-      ? `24px 2fr 1fr${scheduleRoleCol}${deptCol} auto`
-      : `2fr 1fr${scheduleRoleCol}${deptCol}`;
+      ? `24px${nameCol} 1fr${scheduleRoleCol}${deptCol}${certCol}${rankCol} auto`
+      : `${nameCol.trimStart()} 1fr${scheduleRoleCol}${deptCol}${certCol}${rankCol}`;
 
+  const showReadOnlyEditAction = !isWizardMode && !isEditing && canEdit && displayList.length > 0;
   const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={
@@ -489,23 +550,48 @@ export default function StringListSettings({
         borderTop: sectionTitle ? "1px solid var(--dg-color-border-light)" : undefined,
       }}
     />
-  ) : canEdit && displayList.length > 0 ? (
-    <EditorActionRow
-      primaryAction={
-        <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
-          Edit
-        </Button>
-      }
-      style={{
-        marginTop: 12,
-        padding: sectionTitle ? "12px 16px" : undefined,
-        borderTop: sectionTitle ? "1px solid var(--dg-color-border-light)" : undefined,
-      }}
-    />
   ) : null;
 
   const content = (
     <div style={{ display: "flex", flexDirection: "column" }}>
+      {showReadOnlyEditAction ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--dg-color-border-light)",
+          }}
+        >
+          <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
+            Edit
+          </Button>
+        </div>
+      ) : null}
+      {hideAbbr && isEditing && canEdit ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--dg-color-border-light)",
+          }}
+        >
+          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+            Compact labels are used only where space is limited, such as the schedule grid.
+          </span>
+          <Button
+            type="button"
+            aria-expanded={showCompactLabelControls}
+            onClick={() => setShowCompactLabelControls((current) => !current)}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+          >
+            {showCompactLabelControls ? "Hide compact labels" : "Customize compact labels"}
+          </Button>
+        </div>
+      ) : null}
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
@@ -520,12 +606,15 @@ export default function StringListSettings({
           }
         />
       ) : (
-        <div>
+        <div
+          style={tableMinWidth ? { overflowX: "auto", overscrollBehaviorX: "contain" } : undefined}
+        >
           {/* Column headers */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: gridCols,
+              minWidth: tableMinWidth,
               padding: "8px 16px",
               gap: 16,
               alignItems: "start",
@@ -533,12 +622,13 @@ export default function StringListSettings({
             }}
           >
             {(isEditing
-              ? hideAbbr
+              ? hideAbbrFields
                 ? [
                     "",
                     "Name",
                     ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
+                    ...(showCerts ? ["Requires"] : []),
                     "",
                   ]
                 : [
@@ -547,19 +637,22 @@ export default function StringListSettings({
                     "Abbreviation",
                     ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
+                    ...(showCerts ? ["Requires"] : []),
                     "",
                   ]
-              : hideAbbr
+              : hideAbbrFields
                 ? [
                     "Name",
                     ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
+                    ...(showCerts ? ["Requires"] : []),
                   ]
                 : [
                     "Full Name",
                     "Abbreviation",
                     ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
+                    ...(showCerts ? ["Requires"] : []),
                   ]
             ).map((h, i) => (
               <div
@@ -612,6 +705,7 @@ export default function StringListSettings({
                     "--dg-settings-reorder-offset": `${motion.offsetY}px`,
                     display: "grid",
                     gridTemplateColumns: gridCols,
+                    minWidth: tableMinWidth,
                     padding: isEditing ? "10px 16px" : "11px 16px",
                     gap: 16,
                     alignItems: isEditing ? "start" : undefined,
@@ -625,10 +719,10 @@ export default function StringListSettings({
                 }
               >
                 {isEditing && (
-                  <div
+                  <button
+                    type="button"
                     {...reorder.getHandleProps(i)}
-                    role="button"
-                    aria-label={`Reorder ${item.name || label}`}
+                    aria-label={`Reorder ${item.name || label}. Use Arrow Up or Arrow Down to move.`}
                     className="dg-settings-reorder-handle"
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -639,7 +733,7 @@ export default function StringListSettings({
                       <rect x="3" y="10" width="2" height="2" rx="1" />
                       <rect x="9" y="10" width="2" height="2" rx="1" />
                     </svg>
-                  </div>
+                  </button>
                 )}
 
                 {isEditing ? (
@@ -699,7 +793,7 @@ export default function StringListSettings({
                   </div>
                 )}
 
-                {!hideAbbr &&
+                {!hideAbbrFields &&
                   (isEditing ? (
                     <div>
                       <input
@@ -714,6 +808,7 @@ export default function StringListSettings({
                         onMouseDown={(e) => e.stopPropagation()}
                         draggable={false}
                         placeholder="Abbreviation"
+                        aria-label={`Compact label for ${item.name || "new item"}`}
                         style={{
                           ...fieldStyle,
                           fontWeight: 600,
@@ -731,6 +826,22 @@ export default function StringListSettings({
                         >
                           {currentErrors.abbr}
                         </div>
+                      ) : null}
+                      {hideAbbr ? (
+                        <Button
+                          type="button"
+                          disabled={!item.abbr.trim()}
+                          onClick={() => handleItemChange(i, "abbr", "")}
+                          className="dg-btn dg-btn-ghost dg-btn-sm"
+                          style={{
+                            marginTop: 4,
+                            opacity: item.abbr.trim() ? undefined : 0.7,
+                          }}
+                        >
+                          {item.abbr.trim()
+                            ? "Use automatic"
+                            : `Using automatic: ${getCompactNamedItemLabel(item)}`}
+                        </Button>
                       ) : null}
                     </div>
                   ) : (
@@ -866,6 +977,69 @@ export default function StringListSettings({
                     </div>
                   ))}
 
+                {showCerts &&
+                  (isEditing ? (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                    >
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {/* Selecting none leaves the role assignable to anyone;
+                            any selected certification qualifies on its own. */}
+                        <DeptToggle
+                          label="Anyone"
+                          selected={(item.requiredCertificationIds ?? []).length === 0}
+                          onClick={() => handleCertClear(i)}
+                        />
+                        {activeCerts.map((c) => (
+                          <DeptToggle
+                            key={c.id}
+                            label={c.name}
+                            selected={(item.requiredCertificationIds ?? []).includes(c.id)}
+                            onClick={() => handleCertToggle(i, c.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {(item.requiredCertificationIds ?? []).length > 0 ? (
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            fontWeight: 500,
+                            color: "var(--dg-color-text-secondary)",
+                          }}
+                        >
+                          {describeCertificationRequirement({
+                            requiredIds: item.requiredCertificationIds ?? [],
+                            itemsById: certMap,
+                            emptyText: "—",
+                          })}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            background: "var(--dg-color-brand-bg)",
+                            border: "1px solid var(--dg-color-brand-border)",
+                            color: "var(--dg-color-brand)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Anyone
+                        </span>
+                      )}
+                    </div>
+                  ))}
+
                 {isEditing && (
                   <Button
                     onMouseDown={(e) => e.stopPropagation()}
@@ -902,7 +1076,7 @@ export default function StringListSettings({
 
           {/* Dashed add button — only in edit mode */}
           {isEditing && (
-            <div style={{ padding: "8px 16px 12px" }}>
+            <div style={{ minWidth: tableMinWidth, padding: "8px 16px 12px" }}>
               <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {placeholder.toLowerCase()}
               </Button>

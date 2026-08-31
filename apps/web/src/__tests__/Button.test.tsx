@@ -252,6 +252,7 @@ describe("Button", () => {
     // while its own latch is busy instead of adding another spinner beside it.
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByRole("status")).toHaveAttribute("width", "13");
+    expect(screen.getByRole("status")).toHaveAttribute("height", "13");
 
     await act(async () => {
       gate.resolve();

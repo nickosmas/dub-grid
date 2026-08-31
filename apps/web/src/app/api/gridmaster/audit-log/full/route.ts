@@ -5,6 +5,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 
 type ServiceClient = ReturnType<typeof getServiceClient>;
 type AuditRow = Record<string, unknown>;
@@ -42,18 +43,6 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
-const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
-const HIGH_RISK_ACTIONS = new Set([
-  "account.deleted",
-  "audit.exported",
-  "feature_flags.updated",
-  "org.archived",
-  "org.suspended",
-  "user.deactivated",
-  "user.force_logout",
-  "user.password_reset_sent",
-]);
-
 export async function GET(req: NextRequest) {
   try {
     const parsed = querySchema.safeParse({
@@ -81,55 +70,7 @@ export async function GET(req: NextRequest) {
       return serviceClient.response;
     }
 
-    let query = serviceClient
-      .from("audit_log")
-      .select(
-        "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at",
-      )
-      .order("created_at", { ascending: false })
-      .range(parsed.data.offset ?? 0, (parsed.data.offset ?? 0) + (parsed.data.limit ?? 50) - 1);
-
-    if (parsed.data.orgId) {
-      query = query.eq("org_id", parsed.data.orgId);
-    }
-    if (parsed.data.action) {
-      query = query.eq("action", parsed.data.action);
-    }
-    if (parsed.data.actionPrefix) {
-      query = query.like("action", `${parsed.data.actionPrefix}%`);
-    }
-    if (parsed.data.actionPrefixes?.length) {
-      // The zod transform already restricted these to `^[a-z0-9_]+\.$`, so
-      // there is nothing here PostgREST could read as a filter delimiter.
-      query = query.or(
-        parsed.data.actionPrefixes.map((prefix) => `action.like.${prefix}*`).join(","),
-      );
-    }
-    if (parsed.data.resourceType) {
-      query = query.eq("resource_type", parsed.data.resourceType);
-    }
-    if (parsed.data.actorId) {
-      query = query.eq("actor_id", parsed.data.actorId);
-    }
-    if (parsed.data.startDate) {
-      query = query.gte("created_at", parsed.data.startDate);
-    }
-    if (parsed.data.endDate) {
-      query = query.lte("created_at", parsed.data.endDate);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      throw error;
-    }
-    let rows = (data ?? []) as AuditRow[];
-    if (parsed.data.highRiskOnly) {
-      rows = rows.filter((row) => isHighRiskAction(String(row.action ?? "")));
-    }
-    if (parsed.data.target) {
-      const needle = parsed.data.target.toLowerCase();
-      rows = rows.filter((row) => JSON.stringify(row).toLowerCase().includes(needle));
-    }
+    const rows = await fetchFilteredAuditRows(serviceClient, parsed.data);
     const entries = await enrichAuditRows(serviceClient, rows);
 
     return NextResponse.json({
@@ -145,13 +86,6 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-function isHighRiskAction(action: string) {
-  return (
-    HIGH_RISK_ACTIONS.has(action) ||
-    HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))
-  );
 }
 
 async function authorizeOrgAuditLogAccess(req: NextRequest, orgId: string) {

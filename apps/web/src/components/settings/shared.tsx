@@ -57,6 +57,7 @@ export function SectionCard({
         ...sectionStyle,
         width: "100%",
         maxWidth,
+        margin: "0 auto",
         flexShrink: 0,
       }}
     >

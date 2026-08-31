@@ -8,7 +8,7 @@ import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 
-type SortMode = "hours" | "name" | "ot";
+type SortMode = "hours" | "name";
 
 interface ExpandedStaffHoursProps {
   currentHours: EmployeeHours[];
@@ -39,7 +39,12 @@ export default function ExpandedStaffHours({
   const prevMap = useMemo(() => new Map(prevHours.map((h) => [h.empId, h])), [prevHours]);
 
   const sorted = useMemo(() => {
-    let list = currentHours.filter((h) => h.totalHours > 0);
+    // Matches the collapsed "Overtime watch" card, which only ever passes
+    // overtime employees (AdminDashboard.tsx's `overtimeHours` prop) — the
+    // expanded panel used to default to every employee with any hours at
+    // all, so its list never matched what the card's count implied until you
+    // manually clicked "OT only".
+    let list = currentHours.filter((h) => h.isOvertime);
 
     // Focus area filter
     if (faFilter !== "all") {
@@ -49,12 +54,10 @@ export default function ExpandedStaffHours({
       });
     }
 
-    // Sort
+    // Sort — every row here is already overtime, so "hours" sorts by
+    // overtimeHours (worst offenders first) rather than totalHours.
     if (sort === "hours") {
-      list = [...list].sort((a, b) => {
-        if (a.isOvertime !== b.isOvertime) return a.isOvertime ? -1 : 1;
-        return b.totalHours - a.totalHours;
-      });
+      list = [...list].sort((a, b) => b.overtimeHours - a.overtimeHours);
     } else if (sort === "name") {
       list = [...list].sort((a, b) => {
         const ea = empMap.get(a.empId);
@@ -63,10 +66,6 @@ export default function ExpandedStaffHours({
         const nb = eb ? `${eb.lastName} ${eb.firstName}` : "";
         return na.localeCompare(nb);
       });
-    } else if (sort === "ot") {
-      list = [...list]
-        .filter((h) => h.isOvertime)
-        .sort((a, b) => b.overtimeHours - a.overtimeHours);
     }
 
     return list;
@@ -94,9 +93,8 @@ export default function ExpandedStaffHours({
           <div style={{ display: "flex", gap: 4 }}>
             {(
               [
-                ["hours", "By hours"],
+                ["hours", "By OT hours"],
                 ["name", "By name"],
-                ["ot", "OT only"],
               ] as const
             ).map(([key, label]) => {
               const active = sort === key;

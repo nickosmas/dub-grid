@@ -36,8 +36,8 @@ vi.mock("../../notifications/hooks/usePushResponseHandler", () => ({
   usePushResponseHandler,
 }));
 
-vi.mock("../components/AuthTransitionScreen", () => ({
-  AuthTransitionScreen: () => <div>auth-transition</div>,
+vi.mock("../screens/NetworkConnectionRecoveryScreen", () => ({
+  NetworkConnectionRecoveryScreen: () => <div>network-connection-recovery</div>,
 }));
 
 let useTabsGate: (typeof import("./useTabsGate"))["useTabsGate"];
@@ -108,7 +108,7 @@ describe("useTabsGate canViewRequestsTab", () => {
 
     render(<TestHost />);
 
-    expect(screen.getByText("auth-transition")).toBeTruthy();
+    expect(screen.getByText("network-connection-recovery")).toBeTruthy();
   });
 
   it("shows the Requests tab for an employee on the schedule", () => {
@@ -133,6 +133,47 @@ describe("useTabsGate canViewRequestsTab", () => {
     render(<TestHost />);
 
     expect(screen.getByTestId("requests")).toHaveTextContent("false");
+  });
+});
+
+describe("useTabsGate loading states", () => {
+  beforeEach(() => {
+    useSessionState.mockReset();
+    useBootstrap.mockReset();
+    usePushRegistration.mockReset();
+    usePushResponseHandler.mockReset();
+  });
+
+  it("renders nothing while the session itself is still restoring", () => {
+    useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    const { container } = render(<TestHost />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows every tab optimistically while bootstrap's first load is in flight", () => {
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    render(<TestHost />);
+
+    expect(screen.getByTestId("team")).toHaveTextContent("true");
+    expect(screen.getByTestId("requests")).toHaveTextContent("true");
+    expect(screen.getByTestId("home")).toHaveTextContent("true");
   });
 });
 

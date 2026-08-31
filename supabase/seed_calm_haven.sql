@@ -235,7 +235,7 @@ BEGIN
   INSERT INTO public.certifications (org_id, department_ids, name, abbr, sort_order)
   VALUES
     (org, ARRAY[dept_nursing],  'Journal Listed Christian Science Nurse', 'JLCSN',  0),
-    (org, ARRAY[dept_nursing],  'Nurse',                                'Nurse',  1),
+    (org, ARRAY[dept_nursing],  'Staff',                                'Staff',  1),
     (org, ARRAY[dept_nursing],  'Christian Science Nurse IV',            'CSN IV', 2),
     (org, ARRAY[dept_nursing],  'Christian Science Nurse III',           'CSN III',3),
     (org, ARRAY[dept_nursing],  'Christian Science Nurse II',            'CSN II', 4),
@@ -246,7 +246,7 @@ BEGIN
   SELECT id INTO cert_csn4  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse IV';
   SELECT id INTO cert_csn3  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse III';
   SELECT id INTO cert_csn2  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse II';
-  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = org AND name = 'Nurse';
+  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = org AND name = 'Staff';
 
   -- ── Organization Roles ────────────────────────────────────────────────────────
   INSERT INTO public.organization_roles (org_id, department_ids, name, abbr, sort_order)

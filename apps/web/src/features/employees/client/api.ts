@@ -121,6 +121,59 @@ export async function updateEmployeeIdentity(
   });
 }
 
+export interface EmployeeEmailConflictResult {
+  conflict: boolean;
+  conflictingEmployeeId: string | null;
+  /** Why the check flagged it (undefined when conflict is false):
+   *  - "employee_duplicate": another active employee's contact email matches.
+   *  - "gridmaster": the email belongs to a platform-only Gridmaster account.
+   *    Gridmaster is never surfaced to org users, so the UI copy for this
+   *    case must stay as generic as `getEmployeeContactConflict`'s "That
+   *    email address is reserved." — never name the account type.
+   *  - "other_account": it belongs to a different DubGrid account than the
+   *    one this employee is (or would be) linked to. */
+  reason?: "employee_duplicate" | "gridmaster" | "other_account";
+}
+
+/** Pre-flight check: does this email already belong to a different active
+ * employee in this org, or to an existing DubGrid account (a case the
+ * DB's check_employee_email_belongs_to_user trigger would otherwise only
+ * catch on submit)? Lets the UI flag it before save. `currentUserId` is the
+ * employee-being-edited's own linked account, if any, so typing their own
+ * login email back doesn't trip the "different account" case. */
+export async function checkEmployeeEmailConflict(
+  email: string,
+  orgId: string,
+  excludeEmployeeId?: string,
+  currentUserId?: string | null,
+): Promise<EmployeeEmailConflictResult> {
+  return requestEmployeesJson<EmployeeEmailConflictResult>("/api/employees/check-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, orgId, excludeEmployeeId, currentUserId }),
+  });
+}
+
+export interface EmployeePhoneConflictResult {
+  conflict: boolean;
+  conflictingEmployeeId: string | null;
+}
+
+/** Pre-flight check: does this phone number already belong to a different
+ * active employee in this org? Same non-blocking-advisory shape as
+ * checkEmployeeEmailConflict. */
+export async function checkEmployeePhoneConflict(
+  phone: string,
+  orgId: string,
+  excludeEmployeeId?: string,
+): Promise<EmployeePhoneConflictResult> {
+  return requestEmployeesJson<EmployeePhoneConflictResult>("/api/employees/check-phone", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, orgId, excludeEmployeeId }),
+  });
+}
+
 export function fetchEmployees(orgId: string, statuses?: EmployeeStatus[]): Promise<Employee[]> {
   return requestEmployeeAction<{ employees: Employee[] }>({
     action: "fetchEmployees",

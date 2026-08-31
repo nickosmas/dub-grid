@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getScheduleMonthWeekIndexForDate, hasShiftStartedAtTimeRanges } from "./index";
+import {
+  getFeaturedMeScheduleSegment,
+  getScheduleMonthWeekIndexForDate,
+  hasShiftStartedAtTimeRanges,
+} from "./index";
+import type { ScheduleEntryLike } from "./types";
 
 describe("hasShiftStartedAtTimeRanges", () => {
   // 2026-05-14, 14:30 UTC
@@ -105,6 +110,49 @@ describe("hasShiftStartedAtTimeRanges", () => {
         timeZone,
       }),
     ).toBe(true);
+  });
+});
+
+describe("getFeaturedMeScheduleSegment", () => {
+  const todayDate = "2026-05-14";
+
+  const endedTodayEntry: ScheduleEntryLike = {
+    employeeId: "emp-1",
+    employeeName: "Jordan Lee",
+    date: todayDate,
+    shiftName: "Night Shift",
+    startTime: "00:00",
+    endTime: "08:00",
+    absenceTypeId: null,
+  };
+
+  // Regression: a shift today that already ended must still surface as the
+  // featured item, not be treated as "nothing scheduled" just because there's
+  // no active/upcoming/away item today and no shift on a later day.
+  it("surfaces an already-ended shift today instead of reporting empty", () => {
+    const result = getFeaturedMeScheduleSegment({
+      currentTime: "20:06",
+      entries: [endedTodayEntry],
+      rangeStartDate: "2026-05-10",
+      selectedDate: todayDate,
+      todayDate,
+    });
+
+    expect(result.status).toBe("scheduled");
+    expect(result.item?.date).toBe(todayDate);
+  });
+
+  it("reports empty when there are truly no entries for the week", () => {
+    const result = getFeaturedMeScheduleSegment({
+      currentTime: "20:06",
+      entries: [],
+      rangeStartDate: "2026-05-10",
+      selectedDate: todayDate,
+      todayDate,
+    });
+
+    expect(result.status).toBe("empty");
+    expect(result.item).toBeNull();
   });
 });
 

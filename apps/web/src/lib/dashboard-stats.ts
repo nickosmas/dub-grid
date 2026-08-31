@@ -17,13 +17,14 @@ import type {
 } from "@/types";
 import {
   buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
-  createCoverageCreditResolver,
-  computeCoverageCategorySnapshots,
+  buildShiftMapSegmentsForKey,
 } from "@/lib/schedule-logic";
 import {
+  assembleDashboardCoverage,
   classifyOpenShiftUrgency,
+  computeShiftSegmentHours,
   hasShiftStartedAtTimeRanges,
-  summarizeCoverageTotals,
+  type CoverageTotals,
 } from "@dubgrid/schedule-core";
 import type { CoverageRuleConfig } from "@dubgrid/domain";
 import { formatDateKey, getWeekStart, addDays } from "@/lib/utils";
@@ -135,18 +136,6 @@ export interface TrendDataPoint {
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SHORT_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-function parseTimeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
-function durationHoursFromTimes(startTime: string, endTime: string): number {
-  const s = parseTimeToMinutes(startTime);
-  const e = parseTimeToMinutes(endTime);
-  const mins = e > s ? e - s : 1440 - s + e; // handles overnight
-  return mins / 60;
-}
-
 function formatTime12h(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const ampm = h >= 12 ? "pm" : "am";
@@ -205,18 +194,11 @@ export function filterShiftsByWeek(
 
 // ─── Hour Computation ───────────────────────────────────
 
-/** Resolve effective break minutes for a shift code: category → 0. */
-export function resolveBreakMinutes(
-  assignment: AssignmentDefinition,
-  categoryById?: Map<number, ShiftCategory>,
-): number {
-  if (categoryById && assignment.categoryId != null) {
-    const cat = categoryById.get(assignment.categoryId);
-    if (cat?.breakMinutes != null) return cat.breakMinutes;
-  }
-  return 0;
-}
-
+/**
+ * Thin wrapper over @dubgrid/schedule-core's canonical computeShiftSegmentHours
+ * — the same function mobile's staff-hours computation now calls, so an
+ * employee's overtime status can't diverge between platforms.
+ */
 export function computeShiftDurationHours(
   assignmentIds: number[],
   assignmentById: Map<number, AssignmentDefinition>,
@@ -224,64 +206,13 @@ export function computeShiftDurationHours(
   customEndTime?: string | null,
   categoryById?: Map<number, ShiftCategory>,
 ): number {
-  if (customStartTime && customEndTime) {
-    // Handle pipe-delimited per-pill custom times (e.g. "07:00|09:00")
-    const starts = customStartTime.split("|");
-    const ends = customEndTime.split("|");
-    if (starts.length > 1 || ends.length > 1) {
-      let total = 0;
-      for (let i = 0; i < Math.max(starts.length, ends.length); i++) {
-        const s = starts[i] || "";
-        const e = ends[i] || "";
-        const sc = assignmentIds[i] != null ? assignmentById.get(assignmentIds[i]) : undefined;
-        if (s && e) {
-          let h = durationHoursFromTimes(s, e);
-          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
-          total += h;
-        } else if (sc?.defaultStartTime && sc.defaultEndTime) {
-          let h = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
-          h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
-          total += h;
-        }
-      }
-      return total;
-    }
-    let hours = durationHoursFromTimes(customStartTime, customEndTime);
-    // Deduct break from the first code
-    for (const codeId of assignmentIds) {
-      const sc = assignmentById.get(codeId);
-      if (sc) {
-        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
-        break;
-      }
-    }
-    return hours;
-  }
-  let total = 0;
-  for (const codeId of assignmentIds) {
-    const sc = assignmentById.get(codeId);
-    if (!sc) continue;
-    if (sc.defaultStartTime && sc.defaultEndTime) {
-      // Level 2: shift code custom times
-      let hours = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
-      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
-      total += hours;
-    } else if (categoryById && sc.categoryId != null) {
-      // Level 1: fall back to shift category times
-      const cat = categoryById.get(sc.categoryId);
-      if (cat?.startTime && cat?.endTime) {
-        let hours = durationHoursFromTimes(cat.startTime, cat.endTime);
-        hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
-        total += hours;
-      }
-    } else if (sc.defaultDurationHours != null || sc.defaultDurationMinutes != null) {
-      // General codes: use duration
-      let hours = (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
-      hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
-      total += hours;
-    }
-  }
-  return total;
+  return computeShiftSegmentHours(
+    assignmentIds,
+    assignmentById,
+    customStartTime,
+    customEndTime,
+    categoryById ?? new Map(),
+  );
 }
 
 export function computeEmployeeWeeklyHours(
@@ -420,49 +351,20 @@ export function computeCoveragePctAndSlots(
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
+  shiftCategories: ShiftCategory[] = [],
   coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
 ): { pct: number; openSlots: number; totalRequired: number } {
-  if (requirements.length === 0) {
-    return { pct: 100, openSlots: 0, totalRequired: 0 };
-  }
-
-  const empsByFa = new Map<number, Employee[]>();
-  for (const fa of focusAreas) {
-    empsByFa.set(
-      fa.id,
-      employees.filter((e) => e.focusAreaIds.includes(fa.id)),
-    );
-  }
-
-  const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots({
+  const { totals } = assembleDashboardCoverage({
     focusAreas,
-    shiftCategories: [],
+    shiftCategories,
     assignments,
     requirements,
+    employees,
     dates: weekDates,
-    employeesByFocusArea: empsByFa,
-    assignmentIdsForKey: (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    assignmentIdsByFocusArea: codesByFa,
-    coverageCreditForKey,
+    segmentsForKey: buildShiftMapSegmentsForKey(shifts),
+    coverageRuleConfig,
   });
-  const { totalRequired, totalFilled, pct } = summarizeCoverageTotals(snapshots);
-  return { pct, openSlots: totalRequired - totalFilled, totalRequired };
-}
-
-/** Derive global coverage stats from pre-computed section data. */
-export function coverageFromSections(sections: SectionCoverage[]): {
-  pct: number;
-  openSlots: number;
-} {
-  const totalRequired = sections.reduce((s, sec) => s + sec.requiredTotal, 0);
-  const totalFilled = sections.reduce((s, sec) => s + sec.filledTotal, 0);
-  return {
-    pct: totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100,
-    openSlots: totalRequired - totalFilled,
-  };
+  return { pct: totals.pct, openSlots: totals.openSlots, totalRequired: totals.totalRequired };
 }
 
 /** Assemble the 4 stat card values with week-over-week deltas. */
@@ -510,6 +412,11 @@ export function computeWeeklyStats(
 
 // ─── Coverage By Section ────────────────────────────────
 
+export interface SectionCoverageResult {
+  sections: SectionCoverage[];
+  totals: CoverageTotals;
+}
+
 export function computeCoverageBySection(
   focusAreas: FocusArea[],
   weekDates: Date[],
@@ -517,8 +424,9 @@ export function computeCoverageBySection(
   employees: Employee[],
   coverageRequirements: CoverageRequirement[],
   assignments: AssignmentDefinition[],
+  shiftCategories: ShiftCategory[] = [],
   coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
-): SectionCoverage[] {
+): SectionCoverageResult {
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
     empsByFa.set(
@@ -528,24 +436,22 @@ export function computeCoverageBySection(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots({
+  const assembly = assembleDashboardCoverage({
     focusAreas,
-    shiftCategories: [],
+    shiftCategories,
     assignments,
     requirements: coverageRequirements,
+    employees,
     dates: weekDates,
-    employeesByFocusArea: empsByFa,
-    assignmentIdsForKey: (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    assignmentIdsByFocusArea: codesByFa,
-    coverageCreditForKey,
+    segmentsForKey: buildShiftMapSegmentsForKey(shifts),
+    coverageRuleConfig,
   });
+  const byFocusAreaMap = new Map(assembly.byFocusArea.map((entry) => [entry.focusAreaId, entry]));
 
   const allSections = focusAreas.map((fa) => {
     const faEmps = empsByFa.get(fa.id) ?? [];
     const faCodes = codesByFa.get(fa.id) ?? new Set();
-    const faSnapshots = snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
+    const faSnapshots = assembly.snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
 
     const daily: SectionCoverage["daily"] = weekDates.map((date) => {
       const dateKey = formatDateKey(date);
@@ -580,20 +486,23 @@ export function computeCoverageBySection(
       };
     });
 
-    const { totalFilled, totalRequired, pct } = summarizeCoverageTotals(faSnapshots);
+    const faTotals = byFocusAreaMap.get(fa.id);
 
     return {
       focusAreaId: fa.id,
       focusAreaName: fa.name,
-      filledTotal: totalFilled,
-      requiredTotal: totalRequired,
-      pct,
+      filledTotal: faTotals?.filledTotal ?? 0,
+      requiredTotal: faTotals?.requiredTotal ?? 0,
+      pct: faTotals?.pct ?? 100,
       daily,
     };
   });
 
-  // Filter out sections with no coverage requirements (0/0 is meaningless)
-  return allSections.filter((sec) => sec.requiredTotal > 0);
+  return {
+    // Filter out sections with no coverage requirements (0/0 is meaningless).
+    sections: allSections.filter((sec) => sec.requiredTotal > 0),
+    totals: assembly.totals,
+  };
 }
 
 // ─── Open Shifts ────────────────────────────────────────
@@ -607,6 +516,7 @@ export function computeOpenShifts(
   shifts: ShiftMap,
   assignmentById: Map<number, AssignmentDefinition>,
   assignmentLabelMap?: Map<number, string>,
+  shiftCategories: ShiftCategory[] = [],
   coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
   options?: {
     now?: Date;
@@ -615,39 +525,27 @@ export function computeOpenShifts(
 ): OpenShift[] {
   const openShifts: OpenShift[] = [];
 
-  const empsByFa = new Map<number, Employee[]>();
-  for (const fa of focusAreas) {
-    empsByFa.set(
-      fa.id,
-      employees.filter((e) => e.focusAreaIds.includes(fa.id)),
-    );
-  }
-
-  const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots({
+  const { gaps } = assembleDashboardCoverage({
     focusAreas,
-    shiftCategories: [],
+    shiftCategories,
     assignments,
     requirements: coverageRequirements,
+    employees,
     dates: weekDates,
-    employeesByFocusArea: empsByFa,
-    assignmentIdsForKey: (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    assignmentIdsByFocusArea: codesByFa,
+    segmentsForKey: buildShiftMapSegmentsForKey(shifts),
+    coverageRuleConfig,
     assignmentLabelMap,
-    coverageCreditForKey,
   });
   const today = options?.now ? new Date(options.now) : new Date();
   today.setHours(0, 0, 0, 0);
 
-  for (const snapshot of snapshots) {
-    const needed = snapshot.status.required - snapshot.status.actual;
-    if (needed <= 0) continue;
+  // `gaps` already contains only unmet (hasRequirement && !isMet) snapshots.
+  for (const gap of gaps) {
+    const needed = gap.status.required - gap.status.actual;
 
-    const sc = assignmentById.get(snapshot.preferredOpenAssignmentDefinitionId);
+    const sc = assignmentById.get(gap.preferredOpenAssignmentDefinitionId);
     if (!sc) continue;
-    const dateKey = formatDateKey(snapshot.date);
+    const dateKey = formatDateKey(gap.date);
     if (
       options?.now &&
       hasShiftStartedAtTimeRanges({
@@ -659,9 +557,9 @@ export function computeOpenShifts(
     ) {
       continue;
     }
-    const requirementAssignmentDefinitionId = snapshot.preferredOpenAssignmentDefinitionId;
+    const requirementAssignmentDefinitionId = gap.preferredOpenAssignmentDefinitionId;
 
-    const urgency: OpenShift["urgency"] = classifyOpenShiftUrgency(snapshot.date, today);
+    const urgency: OpenShift["urgency"] = classifyOpenShiftUrgency(gap.date, today);
 
     let timeRange = "";
     if (sc.defaultStartTime && sc.defaultEndTime) {
@@ -669,22 +567,22 @@ export function computeOpenShifts(
     }
 
     const label =
-      snapshot.shiftCategoryName !== "Uncategorized"
-        ? snapshot.shiftCategoryName
+      gap.shiftCategoryName !== "Uncategorized"
+        ? gap.shiftCategoryName
         : (assignmentLabelMap?.get(sc.id) ?? sc.name ?? sc.label);
 
     openShifts.push({
-      id: `${snapshot.focusAreaId}_${requirementAssignmentDefinitionId}_${dateKey}`,
-      date: snapshot.date,
-      dayOfWeek: SHORT_DAYS[snapshot.date.getDay()],
-      dayOfMonth: snapshot.date.getDate(),
-      focusAreaId: snapshot.focusAreaId,
+      id: `${gap.focusAreaId}_${requirementAssignmentDefinitionId}_${dateKey}`,
+      date: gap.date,
+      dayOfWeek: SHORT_DAYS[gap.date.getDay()],
+      dayOfMonth: gap.date.getDate(),
+      focusAreaId: gap.focusAreaId,
       requirementAssignmentDefinitionId,
-      eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
-      preferredOpenAssignmentDefinitionId: snapshot.preferredOpenAssignmentDefinitionId,
+      eligibleAssignmentDefinitionIds: gap.eligibleAssignmentDefinitionIds,
+      preferredOpenAssignmentDefinitionId: gap.preferredOpenAssignmentDefinitionId,
       ruleLabel: label,
       assignmentLabel: label,
-      focusAreaName: snapshot.focusAreaName,
+      focusAreaName: gap.focusAreaName,
       timeRange,
       needed,
       urgency,
@@ -887,6 +785,7 @@ export function computeCoverageTrendData(
   allShifts: ShiftMap,
   periodStart: Date,
   periodDays: number,
+  shiftCategories: ShiftCategory[] = [],
   coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
 ): TrendDataPoint[] {
   const trend: TrendDataPoint[] = [];
@@ -911,6 +810,7 @@ export function computeCoverageTrendData(
       periodDates,
       activeEmployees,
       periodShifts,
+      shiftCategories,
       coverageRuleConfig,
     );
 

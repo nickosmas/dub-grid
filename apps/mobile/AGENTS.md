@@ -181,7 +181,7 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | Need                        | Use                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------- |
 | Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                         |
-| Any button                  | `<Button>` — solid fill, no border, pill, sizes `sm`/`md`/`lg`, `iconOnly`                  |
+| Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`              |
 | A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                           |
 | A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view |
 | A pressable that is neither | `usePressAnimation()`                                                                       |
@@ -379,8 +379,8 @@ sweeps in phase. It is off entirely under reduce motion.
 
 ### Rules
 
-- **Buttons and chips are solid, borderless and pill-shaped.** Every tone. Do
-  not add `borderWidth` back.
+- **Buttons are solid, borderless, and squircle-shaped; chips stay pills.** Every
+  tone. Do not add `borderWidth` back.
 - **Soft control fills come from `controlNeutralBg` / `controlSecondaryBg`,
   not `surfaceSecondary` / `brandSoft`.** The shared tokens measure ~1.04:1
   against the page, which is not a perceivable edge for a borderless control.

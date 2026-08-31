@@ -41,8 +41,6 @@ export function StaffHoursCard({
   return (
     <Card
       title="Overtime watch"
-      icon="warning-outline"
-      iconTone={entries.length > 0 ? "danger" : "brand"}
       headerAccessory={
         entries.length > 0 ? <CountBadge label={String(entries.length)} tone="danger" /> : undefined
       }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import SettingsPage from "@/components/settings/SettingsPage";
 import BillingSettings from "@/components/settings/BillingSettings";
 import ProgressBar from "@/components/ProgressBar";
@@ -10,6 +10,46 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useOrganizationData, usePermissions } from "@/hooks";
+import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+
+function SettingsPageSkeleton() {
+  return (
+    <main
+      aria-busy="true"
+      aria-label="Loading settings"
+      style={{
+        width: "100%",
+        maxWidth: 1120,
+        margin: "0 auto",
+        padding: "32px var(--dg-page-gutter)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+      }}
+    >
+      <div className="dg-skeleton" style={{ width: 180, height: 28, borderRadius: 6 }} />
+      <div
+        className="dg-skeleton"
+        style={{ width: 360, maxWidth: "80%", height: 16, borderRadius: 4 }}
+      />
+      <div
+        style={{
+          border: "1px solid var(--dg-color-border-light)",
+          borderRadius: "var(--dg-radius-lg)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <div className="dg-skeleton" style={{ width: "38%", height: 14, borderRadius: 4 }} />
+        <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+        <div className="dg-skeleton" style={{ width: "72%", height: 14, borderRadius: 4 }} />
+        <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+      </div>
+    </main>
+  );
+}
 
 function BillingRecoverySettings({ orgId }: { orgId: string }) {
   return (
@@ -90,6 +130,7 @@ function SettingsPageContent() {
     coverageRequirements,
     loading,
     loadError,
+    bootstrapRetryable,
     setOrg,
     setFocusAreas,
     handleAbsenceTypesChange,
@@ -105,6 +146,10 @@ function SettingsPageContent() {
     enabled: canViewSettingsPage && !isCheckingBillingRecovery && !billingRecoveryOrgId,
   });
   const isLoading = permissionsLoading || isCheckingBillingRecovery || loading || !org;
+  const queryClient = useQueryClient();
+  const retryOrganizationBootstrap = useCallback(async () => {
+    await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!permissionsLoading && !canViewSettingsPage) {
@@ -124,16 +169,10 @@ function SettingsPageContent() {
 
   if (loadError && !org) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        }}
-      >
-        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
-      </div>
+      <OrganizationBootstrapRecovery
+        automaticallyRetry={bootstrapRetryable}
+        onRetry={retryOrganizationBootstrap}
+      />
     );
   }
 
@@ -148,7 +187,9 @@ function SettingsPageContent() {
     >
       <ProgressBar loading={isLoading} />
 
-      {!isLoading && (
+      {isLoading ? (
+        <SettingsPageSkeleton />
+      ) : (
         <SettingsPage
           organization={org}
           focusAreas={focusAreas}

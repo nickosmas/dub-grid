@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { formatPublishedAt, formatPublishedSummary } from "@dubgrid/schedule-core";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import { Button } from "@/components/Button";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
+import type { PublishHistoryEntryWithName } from "@/types";
 import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -33,6 +35,9 @@ const BADGE_STYLES: Record<
 interface OpenShiftsCardProps {
   openShifts: OpenShift[];
   publishedWindowState?: PublishedWindowState;
+  /** Most recent publish for the current period — who and when. */
+  publishHistory?: PublishHistoryEntryWithName | null;
+  orgTimeZone?: string | null;
   maxVisible?: number;
   periodLabel?: string;
   onExpand?: () => void;
@@ -42,6 +47,8 @@ interface OpenShiftsCardProps {
 export default function OpenShiftsCard({
   openShifts,
   publishedWindowState = "published",
+  publishHistory,
+  orgTimeZone,
   maxVisible = 5,
   periodLabel = "this week",
   onExpand,
@@ -57,6 +64,13 @@ export default function OpenShiftsCard({
     : isPartial
       ? `${openSlotCount} unfilled across published dates`
       : `${openSlotCount} unfilled ${periodLabel}`;
+  const publishSummary =
+    !isUnpublished && publishHistory
+      ? formatPublishedSummary(
+          publishHistory.publishedByName,
+          formatPublishedAt(publishHistory.publishedAt, orgTimeZone),
+        )
+      : null;
 
   return (
     <div className="dg-card" style={{ display: "flex", flexDirection: "column" }}>
@@ -65,6 +79,11 @@ export default function OpenShiftsCard({
         <div>
           <div className="dg-card-title">Open shifts</div>
           <div className="dg-card-subtitle">{subtitle}</div>
+          {publishSummary && (
+            <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+              {publishSummary}
+            </div>
+          )}
         </div>
         {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
       </div>

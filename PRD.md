@@ -234,7 +234,7 @@ Each staff member carries one primary designation code and may carry one or more
 | `DVCSN`                | Director VCSN          | Director of Visiting CS Nursing                                  |
 | `CSN III`              | CSN Level III          | Mid-tier CSN designation                                         |
 | `CSN II`               | CSN Level II           | Entry-tier CSN designation                                       |
-| `STAFF`                | General Staff          | Non-designated floor staff                                       |
+| `STAFF`                | Staff                  | Graduated past CSN IV, not yet Journal listed                    |
 | `Supv`                 | Supervisor             | Shift supervisor; assigned Ds/Es/Ns codes                        |
 | `Mentor`               | Mentor                 | Qualified to supervise/guide new or orientation staff            |
 | `CN`                   | Charge Nurse           | Charge nurse role; assigned Dcn/Ecn codes                        |

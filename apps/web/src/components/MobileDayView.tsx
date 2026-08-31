@@ -38,7 +38,7 @@ interface MobileDayViewProps {
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
-  today: Date;
+  todayKey: string;
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
@@ -50,6 +50,7 @@ interface MobileDayViewProps {
   orgRoles?: NamedItem[];
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   shiftDisplayMode?: ShiftDisplayMode;
+  useCompactRoleCertificationLabels?: boolean;
   /** Returns the absence type ID for a given cell, or null if not an absence. */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Map from absence type ID to AbsenceType for color/label resolution. */
@@ -72,7 +73,7 @@ export default function MobileDayView({
   assignmentIdsForKey,
   getShiftStyle,
   handleCellClick,
-  today,
+  todayKey,
   focusAreas,
   assignments,
   isCellInteractive = false,
@@ -81,11 +82,11 @@ export default function MobileDayView({
   certifications = [],
   draftKindForKey,
   shiftDisplayMode = "code",
+  useCompactRoleCertificationLabels = false,
   absenceTypeIdForKey,
   absenceTypeMap,
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
-  const todayKey = formatDateKey(today);
   const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
   const rootRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
@@ -258,7 +259,7 @@ export default function MobileDayView({
             <div
               style={{
                 position: "sticky",
-                top: "var(--header-height)",
+                top: "var(--dg-app-shell-header-height)",
                 zIndex: 10,
                 background: "var(--dg-color-bg)",
                 borderBottom: "1px solid var(--dg-color-border)",
@@ -362,7 +363,11 @@ export default function MobileDayView({
                   : baseRowBg;
               const certAbbr =
                 emp.certificationId != null
-                  ? getCertAbbr(emp.certificationId, certifications)
+                  ? getCertAbbr(
+                      emp.certificationId,
+                      certifications,
+                      useCompactRoleCertificationLabels,
+                    )
                   : null;
               const empName = getEmployeeDisplayName(emp);
 

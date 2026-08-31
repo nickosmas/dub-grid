@@ -360,14 +360,13 @@ describe("PersonDetailScreen", () => {
     expect(emptyStateTitles).not.toContain("Person not found");
   });
 
-  // The layout's static "Person" is a placeholder for a title that is really
-  // the person's name, and leaving it up while the rest of the page is a
-  // skeleton reads as the page having loaded with that as the name.
-  // The route's title is static ("Staff Profile"), because the page's heading is
-  // the centered identity block it draws itself. Nothing here may feed the bar a
-  // title: doing so would print the name twice, once above the avatar and once
-  // on it.
-  it("leaves the header title to the route through every state", () => {
+  // The layout's static "Staff Profile" is a placeholder for a title that is
+  // really the person's name, and leaving it up while the rest of the page is
+  // a skeleton reads as the page having loaded with that as the name. Nothing
+  // here may feed the bar a title while there is no person to name it after.
+  // Once one loads, the route gets the person's real title, invisible until
+  // the hero starts passing under the native bar.
+  it("leaves the header title to the route while loading, then names it after the person", () => {
     useQuery.mockReturnValue({
       data: undefined,
       error: null,
@@ -389,7 +388,11 @@ describe("PersonDetailScreen", () => {
     });
     rerender(<PersonDetailScreen />);
 
-    expect(stackScreenOptions).toEqual([]);
+    expect(stackScreenOptions).toHaveLength(1);
+    expect(stackScreenOptions[0]).toMatchObject({
+      headerTitleStyle: { color: "transparent" },
+      title: "Mina Diaz",
+    });
     expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
   });
 
@@ -510,11 +513,23 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    // The identity block is the page's heading: initials, the name once, and
-    // the status and tier beside it. The email is not part of it — it keeps its
-    // own row in Contact, and printing it here too is what made the old block
-    // redundant.
-    expect(stackScreenOptions).toEqual([]);
+    // The identity block is the page's heading at rest: initials, the name
+    // once, and the status and tier beside it. The email is not part of it —
+    // it keeps its own row in Contact, and printing it here too is what made
+    // the old block redundant. The native header carries the same name, but
+    // stays invisible until the hero scrolls under it.
+    expect(stackScreenOptions).toHaveLength(1);
+    expect(stackScreenOptions[0]).toMatchObject({
+      headerTitleStyle: { color: "transparent" },
+      title: "Mina Diaz",
+    });
+    const scrollRoot = screen.getByTestId("screen-scroll");
+    scrollRoot.dataset.scrollY = "24";
+    fireEvent.scroll(scrollRoot);
+    expect(stackScreenOptions.at(-1)).toMatchObject({
+      headerTitleStyle: { color: expect.not.stringMatching("transparent") },
+      title: "Mina Diaz",
+    });
     expect(screen.getByText("MD")).toBeInTheDocument();
     expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
     expect(screen.getAllByText("mina@dubgrid.com")).toHaveLength(1);

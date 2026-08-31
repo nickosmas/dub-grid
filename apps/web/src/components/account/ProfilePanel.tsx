@@ -34,7 +34,9 @@ import {
   type SelfProfileRecord,
 } from "@/features/account/client";
 import { updateAppOnlyUser } from "@/features/organization/client";
+import { updateEmployee } from "@/features/employees/client";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
+import EditEmployeePanel from "@/components/EditEmployeePanel";
 import type { Department, Employee, FocusArea, NamedItem } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
@@ -44,6 +46,9 @@ interface ProfilePanelProps {
   user: User | null;
   profile: SelfProfileRecord | null;
   employee: Employee | null;
+  /** Management department IDs from the caller's org membership — distinct
+   *  from `employee.departmentIds`, which is scheduled departments. */
+  managementDepartmentIds: number[];
   orgId: string | null;
   canEditProfileDirectly: boolean;
   isGridmaster: boolean;
@@ -65,6 +70,7 @@ interface ProfilePanelProps {
   roleLabel?: string;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
+  setManagementDepartmentIds: Dispatch<SetStateAction<number[]>>;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -98,6 +104,7 @@ export function ProfilePanel({
   user,
   profile,
   employee,
+  managementDepartmentIds,
   orgId,
   canEditProfileDirectly,
   isGridmaster,
@@ -114,11 +121,13 @@ export function ProfilePanel({
   roleLabel,
   setProfile,
   setEmployee,
+  setManagementDepartmentIds,
 }: ProfilePanelProps) {
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingWorkDetails, setIsEditingWorkDetails] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -166,7 +175,6 @@ export function ProfilePanel({
 
   const showDeletion = !isGridmaster && !canEditProfileDirectly;
 
-  const managementDepartmentIds = employee?.departmentIds ?? [];
   const allManagementDepartments = departments.filter((d) => d.type === "management");
   const managementDepartments = allManagementDepartments.filter((d) =>
     managementDepartmentIds.includes(d.id),
@@ -204,7 +212,7 @@ export function ProfilePanel({
     setSavingAccess(true);
     try {
       await updateAppOnlyUser(user.id, orgId, { departmentIds: editDeptIds });
-      setEmployee((prev) => (prev ? { ...prev, departmentIds: editDeptIds } : prev));
+      setManagementDepartmentIds(editDeptIds);
       setIsEditingAccess(false);
       toast.success("Management access updated.");
     } catch (err) {
@@ -217,6 +225,20 @@ export function ProfilePanel({
   const [showAddToSchedule, setShowAddToSchedule] = useState(false);
   const canAddToSchedule =
     canManageScheduleEmployees && !isOnSchedule && showManagementAccess && !!employee?.userId;
+
+  async function saveWorkDetails(updatedEmployee: Employee) {
+    if (!orgId || !employee) return;
+    const previousEmployee = employee;
+    setEmployee(updatedEmployee);
+    try {
+      await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+      setIsEditingWorkDetails(false);
+      toast.success("Work details updated.");
+    } catch (err) {
+      setEmployee(previousEmployee);
+      toast.error(extractErrorMessage(err, "We couldn't update your work details. Try again."));
+    }
+  }
 
   useEffect(() => {
     // Both the name-change request UI and the account-deletion section need
@@ -253,6 +275,7 @@ export function ProfilePanel({
     setEditEmail(user?.email ?? "");
     setEditPhone(employee?.phone ?? "");
     setIsEditing(true);
+    setIsEditingWorkDetails(true);
   }
 
   function cancelEditing() {
@@ -265,6 +288,7 @@ export function ProfilePanel({
   function closeEditor() {
     cancelEditing();
     setIsEditing(false);
+    setIsEditingWorkDetails(false);
   }
 
   function requestSave() {
@@ -459,7 +483,7 @@ export function ProfilePanel({
                 onClick={startEditing}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                Edit account details
+                Edit profile
               </Button>
             )}
           </div>
@@ -554,6 +578,66 @@ export function ProfilePanel({
           )}
         </div>
       </SectionCard>
+
+      {canEditProfileDirectly && employee && (
+        <SectionCard>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
+                  Work details
+                </div>
+                <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+                  Employment type, {(focusAreaLabel ?? "focus areas").toLowerCase()},{" "}
+                  {(certificationLabel ?? "certification").toLowerCase()}, and{" "}
+                  {(roleLabel ?? "roles").toLowerCase()} for this account.
+                </div>
+              </div>
+            </div>
+            {isEditingWorkDetails ? (
+              <EditEmployeePanel
+                employee={employee}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                certificationLabel={certificationLabel}
+                roles={roles}
+                roleLabel={roleLabel}
+                focusAreaLabel={focusAreaLabel}
+                isManagementUser={showManagementAccess}
+                hideIdentityFields
+                onSave={saveWorkDetails}
+                onCancel={() => setIsEditingWorkDetails(false)}
+              />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Employment"
+                  value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
+                />
+                <Field
+                  label={focusAreaLabel ?? "Focus areas"}
+                  value={employee.focusAreaIds
+                    .map((id) => focusAreas.find((area) => area.id === id)?.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                />
+                <Field
+                  label={certificationLabel ?? "Certification"}
+                  value={certifications.find((item) => item.id === employee.certificationId)?.name}
+                />
+                <Field
+                  label={roleLabel ?? "Roles"}
+                  value={employee.roleIds
+                    .map((id) => roles.find((role) => role.id === id)?.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                />
+                <Field label="Internal notes" value={employee.contactNotes} />
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      )}
 
       {showManagementAccess && (
         <SectionCard>

@@ -5,6 +5,31 @@ export function parseIsoDate(value: string): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
+/**
+ * Canonical local-calendar "YYYY-MM-DD" key <-> Date pair. Round-trips
+ * exactly regardless of server timezone because both directions use LOCAL
+ * getters/constructor args throughout — never mixed with `.toISOString()`
+ * (UTC). That mixing is a real bug class: `new Date(key + "T00:00:00")`
+ * (local midnight) formatted back via `.toISOString().slice(0, 10)` (UTC)
+ * silently shifts the date back one day on any server whose local timezone
+ * is ahead of UTC — it round-tripped "2026-08-23" to "2026-08-22" on a
+ * UTC+3 host, which is exactly what caused mobile's coverage/gap totals to
+ * drop the first day of a published week's requirements (see
+ * `apps/web/src/features/mobile/server/data.ts`'s old `formatMobileIsoDate`
+ * and `packages/mobile-api-core/src/dashboard.ts`'s old
+ * `getDateKeysInRange`, both since migrated to this pair). Use these two
+ * functions — not a local re-implementation — anywhere a Date needs to
+ * round-trip through a calendar-day string key.
+ */
+export function parseLocalDateKey(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function formatLocalDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
   if (a.start > a.end) {
     return (
@@ -137,6 +162,47 @@ export function addDaysToIsoDate(value: string, days: number): string {
   const next = parseIsoDate(value);
   next.setUTCDate(next.getUTCDate() + days);
   return next.toISOString().slice(0, 10);
+}
+
+/**
+ * Formats a publish_history `publishedAt` timestamptz as "Aug 23, 2026, 2:30
+ * PM" in the org's timezone — date AND time, not just date. Canonical so web
+ * and mobile render publish info identically instead of each formatting it
+ * separately (mobile's shiftDetailHelpers.ts used to have its own copy).
+ */
+export function formatPublishedAt(
+  value: string | null | undefined,
+  timeZone?: string | null,
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timeZone ?? "UTC",
+  }).format(new Date(value));
+}
+
+/** "Published <when> by <who>" — omits either half when its value is null. */
+export function formatPublishedSummary(
+  publishedByName: string | null | undefined,
+  publishedAtLabel: string | null | undefined,
+): string | null {
+  if (publishedByName && publishedAtLabel) {
+    return `Published ${publishedAtLabel} by ${publishedByName}`;
+  }
+  if (publishedAtLabel) {
+    return `Published ${publishedAtLabel}`;
+  }
+  if (publishedByName) {
+    return `Published by ${publishedByName}`;
+  }
+  return null;
 }
 
 export function formatDate(

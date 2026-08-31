@@ -306,7 +306,7 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Mina Diaz"));
 
     expect(routerPush).toHaveBeenCalledWith({
-      pathname: "/(tabs)/people/[id]",
+      pathname: "/person/[id]",
       params: { id: "emp-1" },
     });
   });
@@ -381,7 +381,9 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
     fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Done"));
 
     fireEvent.click(screen.getByText("Mina Diaz"));
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile");
@@ -389,7 +391,7 @@ describe("PeopleScreen", () => {
     routerPush.mockClear();
     fireEvent.click(screen.getByText("Ava Cole"));
     expect(routerPush).toHaveBeenCalledWith({
-      pathname: "/(tabs)/people/[id]",
+      pathname: "/person/[id]",
       params: { id: "emp-2" },
     });
   });
@@ -445,7 +447,9 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
     fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
 
     expect(routerPush).not.toHaveBeenCalled();
@@ -748,7 +752,7 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByText("Mina Diaz"));
     expect(routerPush).toHaveBeenCalledWith({
-      pathname: "/(tabs)/people/[id]",
+      pathname: "/person/[id]",
       params: { id: "emp-1" },
     });
   });
@@ -911,8 +915,8 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Management"));
     // Also a badge on the row behind the sheet; the sheet's row comes first.
     fireEvent.click(screen.getAllByText("Super Admin")[0]);
 
@@ -925,8 +929,8 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
 
     expect(screen.getByText("Ida Shaw")).toBeInTheDocument();
@@ -940,10 +944,11 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
     fireEvent.click(screen.getByText("Done"));
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
     fireEvent.click(screen.getByText("Schedule"));
 
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();

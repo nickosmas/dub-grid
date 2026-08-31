@@ -63,8 +63,6 @@ export function OpenShiftsCard({
   return (
     <Card
       title="Open shifts"
-      icon="calendar-outline"
-      iconTone="brand"
       headerAccessory={
         openShifts.length > 0 ? (
           <CountBadge label={String(openShifts.length)} tone="brand" />

@@ -1,4 +1,4 @@
-import { LoaderIcon } from "lucide-react";
+import { Loader } from "lucide-react";
 
 export default function ButtonSpinner({
   color = "currentColor",
@@ -8,13 +8,13 @@ export default function ButtonSpinner({
   size?: number;
 }) {
   return (
-    <LoaderIcon
-      role="status"
+    <Loader
       aria-label="Loading"
-      width={size}
-      height={size}
       className="animate-spin shrink-0"
-      style={{ color }}
+      color={color}
+      height={size}
+      role="status"
+      width={size}
     />
   );
 }

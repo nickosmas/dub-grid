@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import { Button } from "@/components/Button";
+import Modal from "@/components/Modal";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
@@ -10,7 +11,6 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import {
   ACTIVITY_CATEGORIES,
   matchesCategory,
-  matchesSearch,
   describeAction,
   getActionSeverity,
   severityColor,
@@ -21,10 +21,12 @@ import {
   getAuditActorSecondaryLabel,
   getAuditCategoryLabel,
   getAuditTargetLabel,
+  getResourceTypeLabel,
 } from "@/lib/activity-log-utils";
 import type { DetailItem } from "@/lib/activity-log-utils";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { EmptyState } from "@/components/EmptyState";
+import { formatDateTime } from "@/lib/audit/details";
 
 const PAGE_SIZE = 50;
 
@@ -62,6 +64,7 @@ const TH_STYLE: React.CSSProperties = {
   letterSpacing: "0.05em",
   whiteSpace: "nowrap",
   borderBottom: "1px solid var(--dg-color-border)",
+  borderRight: "1px solid var(--dg-color-border)",
 };
 
 const TD_STYLE: React.CSSProperties = {
@@ -69,6 +72,7 @@ const TD_STYLE: React.CSSProperties = {
   fontSize: "var(--dg-fs-body-sm)",
   verticalAlign: "top",
   borderBottom: "1px solid var(--dg-color-border-light)",
+  borderRight: "1px solid var(--dg-color-border-light)",
 };
 
 // ---------------------------------------------------------------------------
@@ -185,6 +189,7 @@ function ActionBadge({ action }: { action: string }) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         background: colors.bg,
+        border: `1px solid ${colors.border}`,
         color: colors.fg,
         whiteSpace: "nowrap",
       }}
@@ -194,7 +199,15 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
-function DetailsCell({ description, details }: { description: string; details: DetailItem[] }) {
+function DetailsCell({
+  description,
+  details,
+  onOpen,
+}: {
+  description: string;
+  details: DetailItem[];
+  onOpen: () => void;
+}) {
   const hasDetails = details.length > 0;
 
   return (
@@ -216,17 +229,139 @@ function DetailsCell({ description, details }: { description: string; details: D
             lineHeight: 1.5,
           }}
         >
-          {details.map((item, i) => (
-            <span key={i}>
-              {i > 0 && (
-                <span style={{ margin: "0 4px", color: "var(--dg-color-text-faint)" }}>·</span>
-              )}
-              <span style={{ fontWeight: 600 }}>{item.label}:</span> {item.value}
-            </span>
+          {details.map((item) => (
+            <div key={`${item.label}:${item.value}`} style={{ overflowWrap: "anywhere" }}>
+              <span style={{ fontWeight: 700 }}>{item.label}:</span> {item.value}
+            </div>
           ))}
         </div>
       )}
+      <Button
+        className="dg-btn dg-btn-ghost dg-btn-sm"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        style={{ marginTop: hasDetails ? 8 : 6 }}
+      >
+        View details
+      </Button>
     </td>
+  );
+}
+
+function ActivityDetailsDialog({
+  entry,
+  onClose,
+}: {
+  entry: FullAuditLogEntry;
+  onClose: () => void;
+}) {
+  const details = formatDetails(entry);
+  const actor = getAuditActorLabel(entry);
+  const actorSecondary = getAuditActorSecondaryLabel(entry);
+  const target = getAuditTargetLabel(entry);
+  const targetSecondary = entry.targetLabel ? entry.targetEmail : null;
+  const timestamp = new Date(entry.createdAt);
+
+  return (
+    <Modal
+      title="Activity details"
+      onClose={onClose}
+      style={{ maxWidth: 600, width: "min(600px, calc(100vw - 32px))" }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <ActionBadge action={entry.action} />
+          <div
+            style={{
+              color: "var(--dg-color-text-primary)",
+              fontSize: "var(--dg-fs-card-title)",
+              fontWeight: 800,
+            }}
+          >
+            {describeAction(entry)}
+          </div>
+        </div>
+        <DetailRows
+          rows={[
+            [
+              "Date and time",
+              Number.isNaN(timestamp.getTime())
+                ? entry.createdAt
+                : timestamp.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+            ],
+            ["Performed by", actorSecondary ? `${actor} (${actorSecondary})` : actor],
+            ["Target changed", targetSecondary ? `${target} (${targetSecondary})` : target],
+            ["Item type", getResourceTypeLabel(entry.resourceType)],
+            ["Activity type", getAuditCategoryLabel(entry.action)],
+          ]}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            style={{
+              color: "var(--dg-color-text-muted)",
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 800,
+              textTransform: "uppercase",
+            }}
+          >
+            What changed
+          </div>
+          {details.length > 0 ? (
+            <DetailRows rows={details.map((detail) => [detail.label, detail.value])} />
+          ) : (
+            <div
+              style={{
+                color: "var(--dg-color-text-muted)",
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+              }}
+            >
+              No additional details were recorded.
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DetailRows({ rows }: { rows: Array<[string, string]> }) {
+  return (
+    <dl
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(104px, max-content) minmax(0, 1fr)",
+        gap: "8px 14px",
+        margin: 0,
+      }}
+    >
+      {rows.map(([label, value]) => (
+        <React.Fragment key={`${label}:${value}`}>
+          <dt
+            style={{
+              color: "var(--dg-color-text-muted)",
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 800,
+            }}
+          >
+            {label}
+          </dt>
+          <dd
+            style={{
+              color: "var(--dg-color-text-primary)",
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 650,
+              margin: 0,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {value}
+          </dd>
+        </React.Fragment>
+      ))}
+    </dl>
   );
 }
 
@@ -333,6 +468,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
   const [page, setPage] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
 
   // Every category filters server-side, so the page counts stay honest.
   const serverPrefixes = useMemo(
@@ -349,6 +485,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       actionPrefixes: serverPrefixes.length > 0 ? serverPrefixes : undefined,
+      target: searchQuery.trim() || undefined,
     })
       .then((data) => {
         if (!cancelled) setEntries(data);
@@ -364,7 +501,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orgId, page, serverPrefixes]);
+  }, [orgId, page, searchQuery, serverPrefixes]);
 
   const handleCategoryChange = (value: string) => {
     setCategoryFilter(value);
@@ -374,6 +511,8 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   const handleSearchChange = (q: string) => {
     setSearchQuery(q);
+    setPage(0);
+    setLoading(true);
   };
 
   const descriptions = useMemo(
@@ -387,11 +526,8 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
   );
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((e) => {
-      if (!matchesCategory(e.action, categoryFilter)) return false;
-      return matchesSearch(e, searchQuery, descriptions.get(e.id) ?? "");
-    });
-  }, [entries, categoryFilter, searchQuery, descriptions]);
+    return entries.filter((entry) => matchesCategory(entry.action, categoryFilter));
+  }, [entries, categoryFilter]);
 
   const groups = useMemo(() => groupByDate(filteredEntries), [filteredEntries]);
 
@@ -443,15 +579,22 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
         />
       ) : (
         <>
-          <div style={{ overflowX: "auto" }}>
+          <div
+            style={{
+              overflowX: "auto",
+              border: "1px solid var(--dg-color-border)",
+              borderRadius: "var(--dg-radius-lg)",
+              background: "var(--dg-color-surface)",
+            }}
+          >
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th style={TH_STYLE}>When</th>
-                  <th style={TH_STYLE}>Category</th>
-                  {!isMobile && <th style={TH_STYLE}>Who</th>}
-                  {!isMobile && <th style={TH_STYLE}>Target</th>}
-                  <th style={{ ...TH_STYLE, width: "100%" }}>Details</th>
+                  <th style={TH_STYLE}>Date and time</th>
+                  <th style={TH_STYLE}>Activity type</th>
+                  {!isMobile && <th style={TH_STYLE}>Performed by</th>}
+                  {!isMobile && <th style={TH_STYLE}>Target changed</th>}
+                  <th style={{ ...TH_STYLE, width: "100%" }}>Activity and changes</th>
                 </tr>
               </thead>
               <tbody>
@@ -463,10 +606,15 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                       const description = descriptions.get(entry.id) ?? "";
                       const actorLabel = getAuditActorLabel(entry);
                       const targetLabel = getAuditTargetLabel(entry);
-                      const mobileDescription = `${description}, ${actorLabel} -> ${targetLabel}`;
+                      const mobileDescription = `${description}. Performed by ${actorLabel}. Target changed: ${targetLabel}.`;
+                      const exactDateTime = formatDateTime(entry.createdAt);
 
                       return (
-                        <tr key={entry.id} style={{ transition: "background 150ms ease" }}>
+                        <tr
+                          key={entry.id}
+                          onClick={() => setSelectedEntry(entry)}
+                          style={{ cursor: "pointer", transition: "background 150ms ease" }}
+                        >
                           {/* When */}
                           <td
                             style={{
@@ -476,6 +624,17 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                             }}
                           >
                             {formatRelativeTime(entry.createdAt)}
+                            {exactDateTime && (
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  color: "var(--dg-color-text-faint)",
+                                  fontSize: "var(--dg-fs-footnote)",
+                                }}
+                              >
+                                {exactDateTime}
+                              </div>
+                            )}
                           </td>
 
                           {/* Category badge */}
@@ -507,6 +666,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                           <DetailsCell
                             description={isMobile ? mobileDescription : description}
                             details={details}
+                            onOpen={() => setSelectedEntry(entry)}
                           />
                         </tr>
                       );
@@ -528,6 +688,9 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
           />
         </>
       )}
+      {selectedEntry ? (
+        <ActivityDetailsDialog entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
+      ) : null}
     </div>
   );
 }

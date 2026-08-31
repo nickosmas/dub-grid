@@ -15,6 +15,7 @@ import { usePressAnimation, type PressHaptic } from "../motion/usePressAnimation
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   mobileMotion,
+  mobileRadius,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -39,6 +40,11 @@ export type ButtonTone =
 
 export type ButtonSize = "sm" | "md" | "lg";
 
+/** `"pill"` is the default, matching every other rounded control in the app
+ * (chips, the segmented control, the tab strip). `"squircle"` is reserved for
+ * the rare button that intentionally needs a tighter corner. */
+export type ButtonShape = "pill" | "squircle";
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SIZE = {
@@ -57,6 +63,7 @@ export function Button({
   children,
   label,
   tone = "primary",
+  shape = "pill",
   size,
   compact = false,
   icon,
@@ -74,12 +81,13 @@ export function Button({
 }: PropsWithChildren<{
   label?: string;
   tone?: ButtonTone;
+  shape?: ButtonShape;
   size?: ButtonSize;
   /** @deprecated pass `size="sm"`. */
   compact?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
   iconPosition?: "leading" | "trailing";
-  /** Circular icon button. Requires `accessibilityLabel`, since it has no text. */
+  /** Icon button. Requires `accessibilityLabel`, since it has no text. */
   iconOnly?: boolean;
   accessibilityLabel?: string;
   /** @deprecated pass `icon`, or a node for genuinely custom accessories. */
@@ -169,6 +177,7 @@ export function Button({
           height: metrics.iconOnly,
           paddingVertical: 0,
         },
+        shape === "pill" && styles.buttonPill,
         stretches ? styles.buttonFullWidth : styles.buttonHugging,
         styles[TONE_STYLE[tone]],
         isDisabled && styles.buttonDisabled,
@@ -246,14 +255,19 @@ function resolveRippleColor(tone: ButtonTone, mobileColors: MobileColors): strin
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     button: {
-      // Pill and borderless across every tone. A solid fill carries the button;
-      // an outline on top of it is the thing that dates the look.
-      borderRadius: mobileRadii.pill,
+      // Borderless across every tone, matching the web button system. A solid
+      // fill carries the button; an outline on top of it is the thing that
+      // dates the look. This base radius is the squircle exception — the
+      // default `shape="pill"` always layers `buttonPill` on top of it.
+      borderRadius: mobileRadius.md,
       borderWidth: 0,
       paddingVertical: mobileSpace.md,
       justifyContent: "center",
       alignItems: "center",
       overflow: "hidden",
+    },
+    buttonPill: {
+      borderRadius: mobileRadii.pill,
     },
     buttonFullWidth: {
       alignSelf: "stretch",

@@ -11,6 +11,11 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { z, type ZodError } from "zod";
+import {
+  describeCertificationRequirement,
+  satisfiesCertificationRequirement,
+  type RequirementItem,
+} from "@/lib/credential-requirements";
 
 type StaffFieldName =
   | "firstName"
@@ -42,6 +47,12 @@ type StaffReferenceValidationInput = {
   departmentIds?: number[];
   deptAdminIds?: number[];
   certificationId?: number | null;
+  /**
+   * The employee's stored certification. A partial update may omit
+   * `certificationId` while still changing roles, and "not being changed" must
+   * not read as "holds none" when checking a role's certification requirement.
+   */
+  currentCertificationId?: number | null;
   requireFocusArea?: boolean;
 };
 
@@ -202,11 +213,77 @@ export async function validateStaffOrgReferences(
 
   if (roleIds) {
     checks.push(
-      fetchActiveIds(serviceClient, "organization_roles", orgId, roleIds).then((validIds) => {
-        if (validIds.size !== roleIds.length) {
+      (async () => {
+        const { data, error } = await serviceClient
+          .from("organization_roles")
+          .select("id, name, required_certification_ids")
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .in("id", roleIds);
+        if (error) throw error;
+
+        const roles = data ?? [];
+        if (roles.length !== roleIds.length) {
           fieldErrors.roleIds = "Select valid roles from this organization";
+          return;
         }
-      }),
+
+        // An omitted certificationId means "unchanged", so fall back to what the
+        // employee already holds rather than treating it as none.
+        const effectiveCertificationId =
+          input.certificationId !== undefined
+            ? input.certificationId
+            : (input.currentCertificationId ?? null);
+        const held = [effectiveCertificationId];
+
+        const unmet = roles.filter(
+          (role) =>
+            !satisfiesCertificationRequirement({
+              heldIds: held,
+              requiredIds: (role.required_certification_ids as number[] | null) ?? [],
+            }),
+        );
+        if (unmet.length === 0) return;
+
+        const certificationIds = [
+          ...new Set([
+            ...unmet.flatMap((role) => (role.required_certification_ids as number[] | null) ?? []),
+          ]),
+        ];
+
+        const { data: certRows, error: certError } = await serviceClient
+          .from("certifications")
+          .select("id, name, abbr")
+          .eq("org_id", orgId)
+          .in("id", certificationIds);
+        if (certError) throw certError;
+
+        const certificationsById = new Map<number, RequirementItem>(
+          (certRows ?? []).map((row) => [
+            row.id as number,
+            {
+              id: row.id as number,
+              name: row.name as string,
+              abbr: (row.abbr as string | null) ?? undefined,
+            },
+          ]),
+        );
+
+        if (unmet.length > 0) {
+          if (unmet.length === 1) {
+            const role = unmet[0];
+            const requirement = describeCertificationRequirement({
+              requiredIds: (role.required_certification_ids as number[] | null) ?? [],
+              itemsById: certificationsById,
+              emptyText: "a qualifying certification",
+            });
+            fieldErrors.roleIds = `${role.name} requires ${requirement}`;
+          } else {
+            const names = unmet.map((role) => role.name as string).join(", ");
+            fieldErrors.roleIds = `These roles require a qualifying certification: ${names}`;
+          }
+        }
+      })(),
     );
   }
 

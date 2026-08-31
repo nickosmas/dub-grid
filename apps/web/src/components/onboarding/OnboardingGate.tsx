@@ -86,9 +86,12 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   if (!perms.orgId) return <>{children}</>;
   if (perms.isImpersonating) return <>{children}</>;
 
-  // User is authenticated with an org — check onboarding status
+  // User is authenticated with an org — check onboarding status. Resolving a
+  // search parameter must never cover an already signed-in refresh with an
+  // auth-transition screen; the app shell and each page own their normal
+  // loading states.
   return (
-    <Suspense fallback={<AuthTransitionScreen phase="organization" />}>
+    <Suspense fallback={<>{children}</>}>
       <OnboardingCheckWithSection
         userId={user.id}
         orgId={perms.orgId}
@@ -139,6 +142,7 @@ function OnboardingCheck({
   children: React.ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const authTransitionPending = useAuthTransitionPending();
   const {
     org,
     setupStatus,
@@ -184,9 +188,9 @@ function OnboardingCheck({
     return <>{children}</>;
   }
 
-  // Render the branded splash (not a blank frame) while these gate queries
-  // resolve — this route bypasses ProtectedRoute's splash, so without it the
-  // post-login screen flashes blank before the wizard mounts.
+  // A post-login handoff needs a branded transition while the onboarding
+  // decision resolves. Ordinary signed-in refreshes keep the app visible so
+  // their page-level loading states can render instead of a full-screen gate.
   if (entryGate?.billingLocked) {
     if (isBillingRecoveryRoute(pathname, section)) {
       return <>{children}</>;
@@ -194,7 +198,9 @@ function OnboardingCheck({
     return <BillingRedirect />;
   }
 
-  if (orgLoading || entryGate === null) return <AuthTransitionScreen phase="organization" />;
+  if (orgLoading || entryGate === null) {
+    return authTransitionPending ? <AuthTransitionScreen phase="workspace" /> : <>{children}</>;
+  }
 
   // (auth-transition flag is consumed by the effect above once settled — M-5)
 

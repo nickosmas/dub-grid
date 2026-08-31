@@ -28,6 +28,46 @@ if (typeof window !== "undefined") {
   });
 }
 
+// Node 26 defines its own `globalThis.localStorage`, which is undefined unless
+// the runtime is started with --localstorage-file, and it shadows the one jsdom
+// installs. Tests that clear storage in beforeEach then fail on undefined. Give
+// them a real in-memory Storage rather than making every call site defensive.
+if (typeof window !== "undefined") {
+  const createStorage = (): Storage => {
+    let entries = new Map<string, string>();
+    return {
+      get length() {
+        return entries.size;
+      },
+      clear: () => {
+        entries = new Map();
+      },
+      getItem: (key: string) => entries.get(key) ?? null,
+      key: (index: number) => Array.from(entries.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        entries.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        entries.set(key, String(value));
+      },
+    } as Storage;
+  };
+
+  for (const name of ["localStorage", "sessionStorage"] as const) {
+    let storage: Storage | undefined;
+    try {
+      storage = window[name];
+    } catch {
+      storage = undefined;
+    }
+    if (storage == null) {
+      const value = createStorage();
+      Object.defineProperty(window, name, { writable: true, configurable: true, value });
+      Object.defineProperty(globalThis, name, { writable: true, configurable: true, value });
+    }
+  }
+}
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: vi.fn().mockReturnValue({

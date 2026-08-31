@@ -111,6 +111,8 @@ vi.mock("react-native", async () => {
             : "false",
           "data-automatically-adjusts-scroll-indicator-insets":
             props.automaticallyAdjustsScrollIndicatorInsets ? "true" : "false",
+          "data-always-bounce-horizontal": props.alwaysBounceHorizontal ? "true" : "false",
+          "data-directional-lock-enabled": props.directionalLockEnabled ? "true" : "false",
           "data-keyboard-dismiss-mode": props.keyboardDismissMode,
           "data-testid": "screen-scroll-view",
         },
@@ -184,6 +186,8 @@ describe("Screen", () => {
       "true",
     );
     expect(scrollView.getAttribute("data-keyboard-dismiss-mode")).toBe("interactive");
+    expect(scrollView.getAttribute("data-always-bounce-horizontal")).toBe("false");
+    expect(scrollView.getAttribute("data-directional-lock-enabled")).toBe("true");
   });
 
   it("applies bottom padding modes to the scroll content container", () => {
@@ -311,20 +315,11 @@ describe("Screen", () => {
 });
 
 describe("Card", () => {
-  it("renders without an icon by default", () => {
+  it("renders the title and body", () => {
     render(<Card title="Plain card" body="Some body text" />);
 
     expect(screen.getByText("Plain card")).toBeInTheDocument();
     expect(screen.getByText("Some body text")).toBeInTheDocument();
-  });
-
-  it("renders a leading icon chip when an icon is provided", () => {
-    const { container } = render(
-      <Card title="With icon" icon="alert-circle-outline" iconTone="warning" />,
-    );
-
-    expect(screen.getByText("With icon")).toBeInTheDocument();
-    expect(container.querySelector('[data-icon-name="alert-circle-outline"]')).toBeTruthy();
   });
 
   it("renders header accessory content", () => {

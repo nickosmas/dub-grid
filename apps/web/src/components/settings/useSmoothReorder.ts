@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type PointerEvent,
+  type KeyboardEvent,
 } from "react";
 
 const SETTLE_MS = 190;
@@ -257,6 +258,24 @@ export function useSmoothReorder<T>({
     [resetDrag],
   );
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>, index: number) => {
+      if (!enabled || !items[index]) return;
+
+      const direction = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+      if (direction === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nextIndex = index + direction;
+      if (nextIndex >= 0 && nextIndex < items.length) {
+        onReorder(index, nextIndex);
+      }
+    },
+    [enabled, items, onReorder],
+  );
+
   const offsets = useMemo(() => {
     const nextOffsets = new Map<number | string, number>();
     if (!enabled || draggedIdx === null || dragOverIdx === null) {
@@ -314,8 +333,18 @@ export function useSmoothReorder<T>({
       onPointerMove: enabled ? handlePointerMove : undefined,
       onPointerUp: enabled ? handlePointerEnd : undefined,
       onPointerCancel: enabled ? handlePointerCancel : undefined,
+      onKeyDown: enabled
+        ? (event: KeyboardEvent<HTMLElement>) => handleKeyDown(event, index)
+        : undefined,
     }),
-    [enabled, handlePointerCancel, handlePointerDown, handlePointerEnd, handlePointerMove],
+    [
+      enabled,
+      handleKeyDown,
+      handlePointerCancel,
+      handlePointerDown,
+      handlePointerEnd,
+      handlePointerMove,
+    ],
   );
 
   return {

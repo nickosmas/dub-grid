@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Linking,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MobileBootstrapResponse,
@@ -59,6 +67,7 @@ import {
   mobileRadii,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -190,6 +199,7 @@ export default function PersonDetailScreen() {
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
   const [showManagementAccess, setShowManagementAccess] = useState(false);
+  const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
 
   const personQuery = useQuery({
     queryKey: ["mobile", "person", accessToken, personId],
@@ -244,6 +254,8 @@ export default function PersonDetailScreen() {
   }
 
   const maps = useMemo(() => buildLookupMaps(bootstrapQuery.data), [bootstrapQuery.data]);
+  const useCompactRoleCertificationLabels =
+    bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   // Declared up here rather than with the other labels below because
   // `handleSave` names it in a validation message.
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
@@ -450,13 +462,16 @@ export default function PersonDetailScreen() {
     const emailError = getOptionalStaffEmailError(draft.email);
     const phoneError = getOptionalUsPhoneError(draft.phone);
     const notesError = getStaffNotesError(draft.contactNotes);
+    // Someone with management access doesn't need at least one focus area to
+    // fall back on — they can come off the schedule entirely and keep managing.
+    const hasManagementAccess = person.managementDepartmentIds.length > 0;
     if (
       firstNameError ||
       lastNameError ||
       emailError ||
       phoneError ||
       notesError ||
-      draft.focusAreaIds.length === 0
+      (draft.focusAreaIds.length === 0 && !hasManagementAccess)
     ) {
       pushToast({
         title: "Check required fields",
@@ -492,6 +507,15 @@ export default function PersonDetailScreen() {
       roleIds: draft.roleIds,
       departmentIds: draft.departmentIds,
     });
+  }
+
+  function handlePersonScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    // Keep the hero as the identity at rest. Once it begins to pass under the
+    // native bar, UIKit's scroll-edge effect takes over and the compact title
+    // gives the page a stable identity. A small threshold prevents the title
+    // flickering during the scroll view's elastic resting bounce.
+    const nextVisible = event.nativeEvent.contentOffset.y > 12;
+    setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
   }
 
   if (contentState.kind === "loading") {
@@ -691,8 +715,23 @@ export default function PersonDetailScreen() {
     <Screen
       bottomPaddingMode="tabbed"
       onRefresh={manualRefresh.refresh}
+      onScroll={handlePersonScroll}
       refreshing={manualRefresh.isRefreshing}
+      scrollEventThrottle={16}
     >
+      {/* The native inline header is deliberately the person, not "Staff
+          Profile". It stays compact and gets UIKit's scroll-edge blur from the
+          route while the hero below scrolls beneath it, the same pattern
+          ProfileScreen uses for the signed-in user's own name. */}
+      <Stack.Screen
+        options={{
+          title: fullName,
+          headerTitleStyle: {
+            color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
+            fontFamily: mobileTypography.fontFamily.bold,
+          },
+        }}
+      />
       <AccountLinkChallengeModal
         challenge={accountLinkChallenge}
         isPending={invitationMutation.isPending}
@@ -706,12 +745,9 @@ export default function PersonDetailScreen() {
         }
       />
 
-      {/* The page's heading is the identity block below, so the route keeps a
-          plain static title rather than the person's name — printing the name
-          in the bar and again under the avatar is the duplication this block
-          was built to avoid. It carries the same three facts the old meta grid
-          did, and no more: the org tier as its badge (web's People table calls
-          it "Access" too), then status and where their app account stands. */}
+      {/* The hero carries the same three facts the old meta grid did, and no
+          more: the org tier as its badge (web's People table calls it
+          "Access" too), then status and where their app account stands. */}
       <ProfileHero
         align="center"
         badge={orgRoleBadge.label}
@@ -792,12 +828,14 @@ export default function PersonDetailScreen() {
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
           hasChanges={hasChanges}
+          hasManagementAccess={person.managementDepartmentIds.length > 0}
           onCancel={guard.requestClose}
           onChange={setDraft}
           onDiscard={guard.discard}
           onSave={handleSave}
           roleLabel={roleLabel}
           roles={bootstrapQuery.data?.roles ?? []}
+          useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
         />
       ) : (
         <>
@@ -1147,10 +1185,21 @@ function AccountLinkChallengeModal({
 }
 
 function buildLookupMaps(data: MobileBootstrapResponse | undefined) {
+  const useCompactLabels = data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   return {
     focusAreas: new Map((data?.focusAreas ?? []).map((item) => [item.id, item.name])),
-    roles: new Map((data?.roles ?? []).map((item) => [item.id, item.name])),
-    certifications: new Map((data?.certifications ?? []).map((item) => [item.id, item.name])),
+    roles: new Map(
+      (data?.roles ?? []).map((item) => [
+        item.id,
+        useCompactLabels ? item.abbr || item.name : item.name,
+      ]),
+    ),
+    certifications: new Map(
+      (data?.certifications ?? []).map((item) => [
+        item.id,
+        useCompactLabels ? item.abbr || item.name : item.name,
+      ]),
+    ),
   };
 }
 
@@ -1180,7 +1229,9 @@ function EditPanel({
   certifications,
   roleLabel,
   roles,
+  useCompactRoleCertificationLabels,
   hasChanges,
+  hasManagementAccess,
   onChange,
   onCancel,
   onDiscard,
@@ -1193,7 +1244,9 @@ function EditPanel({
   certificationLabel: string;
   certifications: MobileNamedItem[];
   roleLabel: string;
+  hasManagementAccess: boolean;
   roles: MobileNamedItem[];
+  useCompactRoleCertificationLabels: boolean;
   hasChanges: boolean;
   onChange: (draft: EditDraft) => void;
   onCancel: () => void;
@@ -1212,7 +1265,7 @@ function EditPanel({
     email: getOptionalStaffEmailError(draft.email),
     contactNotes: getStaffNotesError(draft.contactNotes),
     focusAreaIds:
-      draft.focusAreaIds.length === 0
+      draft.focusAreaIds.length === 0 && !hasManagementAccess
         ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
         : null,
   };
@@ -1314,8 +1367,7 @@ function EditPanel({
               { id: -1, name: "None" },
               ...certifications.map((item) => ({
                 id: item.id,
-                name: item.name,
-                abbr: item.abbr || item.name,
+                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
               })),
             ]}
             label={certificationLabel}
@@ -1340,8 +1392,7 @@ function EditPanel({
           <ProfileChoiceGroup
             items={roles.map((item) => ({
               id: item.id,
-              name: item.name,
-              abbr: item.abbr || item.name,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
             }))}
             label={roleLabel}
             selectedIds={draft.roleIds}

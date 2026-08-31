@@ -21,8 +21,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T/;
 
-/** Longest list we'll spell out before collapsing the tail into a count. */
-const MAX_LIST_ITEMS = 6;
 /** How far into a nested object we're willing to descend for detail rows. */
 const MAX_DEPTH = 2;
 
@@ -115,6 +113,7 @@ const DETAIL_LABELS: Record<string, string> = {
   occurrences: "Shifts created",
   orgRole: "Organization role",
   reason: "Reason",
+  report: "Report",
   role: "Role",
   rowCount: "Records",
   scope: "Applied to",
@@ -130,6 +129,22 @@ const DETAIL_LABELS: Record<string, string> = {
   toRole: "New role",
   to_role: "New role",
   type: "Type",
+};
+
+const REPORT_LABELS: Record<string, string> = {
+  "employee-directory": "Employee directory",
+  "staff-hours": "Staff hours",
+  "staff-activity": "Staff activity",
+  "mentoring-hours": "Mentoring hours",
+  "mentoring-detail": "Mentoring detail",
+  coverage: "Coverage",
+  "shift-period-summary": "Period summary",
+  "shift-requests": "Shift requests",
+  "absences-calloffs": "Absences and call-offs",
+  "roster-status": "Roster status",
+  "certification-role-matrix": "Certifications and roles",
+  "account-access": "Account access",
+  "schedule-matrix": "Schedule matrix",
 };
 
 export function friendlyLabel(key: string): string {
@@ -192,6 +207,7 @@ export function formatScalar(key: string, value: unknown): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
     if (isUuid(trimmed)) return null;
+    if (key === "report") return REPORT_LABELS[trimmed] ?? titleCase(trimmed);
     if (DATE_ONLY_RE.test(trimmed)) return formatShortDate(trimmed);
     if (DATE_TIME_RE.test(trimmed)) return formatDateTime(trimmed) ?? null;
     if (isEnumKey(key)) return titleCase(trimmed);
@@ -216,8 +232,7 @@ export function formatValue(key: string, value: unknown): string | null {
       .map((item) => formatScalar(key, item))
       .filter((v): v is string => v !== null);
     if (parts.length === 0) return null;
-    if (parts.length <= MAX_LIST_ITEMS) return parts.join(", ");
-    return `${parts.slice(0, MAX_LIST_ITEMS).join(", ")} and ${parts.length - MAX_LIST_ITEMS} more`;
+    return parts.join(", ");
   }
   return formatScalar(key, value);
 }

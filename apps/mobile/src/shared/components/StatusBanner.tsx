@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
@@ -133,10 +133,12 @@ function CenteredStatus({
 }) {
   const mobileColors = useMobileColors();
   const centeredStyles = useMemo(() => createCenteredStyles(mobileColors), [mobileColors]);
-  const { height: windowHeight } = useWindowDimensions();
+  // `Screen`'s scroll content stretches to fill the viewport when it's
+  // shorter than the screen (see its `flexGrow: 1`), so this only has to
+  // claim that space and center within it — no window-height guesswork.
   const fillStyle = fillScreen
     ? {
-        minHeight: Math.max(360, Math.min(520, windowHeight * 0.55)),
+        flexGrow: 1,
         justifyContent: "center" as const,
       }
     : null;
@@ -149,7 +151,7 @@ function CenteredStatus({
         {body ? <Text style={centeredStyles.body}>{body}</Text> : null}
       </View>
       {actionLabel && onAction ? (
-        <Button compact label={actionLabel} onPress={onAction} tone="ghost" />
+        <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
       ) : null}
     </View>
   );

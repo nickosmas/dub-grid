@@ -1201,17 +1201,6 @@ export default function OrganizationSetupWizard({
                   placeholder="e.g. Registered Nurse"
                   style={{ flex: 2 }}
                 />
-                <input
-                  className="dg-input"
-                  value={cert.abbr}
-                  onChange={(e) =>
-                    updateNamedItem(setCertifications, idx, {
-                      abbr: e.target.value,
-                    })
-                  }
-                  placeholder="e.g. RN"
-                  style={{ flex: 1, maxWidth: 100 }}
-                />
                 {certifications.length > 1 && (
                   <Button
                     type="button"
@@ -1276,13 +1265,6 @@ export default function OrganizationSetupWizard({
                   onChange={(e) => updateNamedItem(setOrgRoles, idx, { name: e.target.value })}
                   placeholder="e.g. Charge Nurse"
                   style={{ flex: 2 }}
-                />
-                <input
-                  className="dg-input"
-                  value={role.abbr}
-                  onChange={(e) => updateNamedItem(setOrgRoles, idx, { abbr: e.target.value })}
-                  placeholder="e.g. CN"
-                  style={{ flex: 1, maxWidth: 100 }}
                 />
                 {orgRoles.length > 1 && (
                   <Button
@@ -1518,19 +1500,21 @@ export default function OrganizationSetupWizard({
                         flexShrink: 0,
                       }}
                     />
-                    <input
-                      className="dg-input"
-                      value={job.label}
-                      onChange={(e) =>
-                        setJobs((prev) =>
-                          prev.map((item, i) =>
-                            i === idx ? { ...item, label: e.target.value } : item,
-                          ),
-                        )
-                      }
-                      placeholder="e.g. SUP"
-                      style={{ flex: 1, maxWidth: 90 }}
-                    />
+                    {shiftDisplayMode === "code" && (
+                      <input
+                        className="dg-input"
+                        value={job.label}
+                        onChange={(e) =>
+                          setJobs((prev) =>
+                            prev.map((item, i) =>
+                              i === idx ? { ...item, label: e.target.value } : item,
+                            ),
+                          )
+                        }
+                        placeholder="e.g. SUP"
+                        style={{ flex: 1, maxWidth: 90 }}
+                      />
+                    )}
                     <input
                       className="dg-input"
                       value={job.name}

@@ -14,6 +14,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     sectionCoverage,
     openShifts,
     publishedWindowState,
+    publishHistory,
     activityItems,
     currentHours,
     activeEmployees,
@@ -64,12 +65,16 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           hasRequirements={coverageRequirements.length > 0}
           canManageCoverageRequirements={permissions.canManageCoverageRequirements}
           publishedWindowState={publishedWindowState}
+          publishHistory={publishHistory}
+          orgTimeZone={org.timezone}
           periodLabel={periodLabel}
           onExpand={() => onExpandPanel("coverage")}
         />
         <OpenShiftsCard
           openShifts={openShifts}
           publishedWindowState={publishedWindowState}
+          publishHistory={publishHistory}
+          orgTimeZone={org.timezone}
           periodLabel={periodLabel}
           onExpand={() => onExpandPanel("openShifts")}
         />

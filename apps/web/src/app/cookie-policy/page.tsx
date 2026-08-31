@@ -197,8 +197,9 @@ export default function CookiePolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2 style={sectionHeading}>Analytics Cookies</h2>
           <p style={{ ...bodyText, marginBottom: "16px" }}>
-            These cookies are only set if you choose &ldquo;Accept all&rdquo; in the consent banner.
-            They help us understand usage patterns so we can improve DubGrid.
+            These technologies are enabled only if you choose &ldquo;Accept all&rdquo; in the
+            consent banner or enable Analytics in its Customize view. They help us understand usage
+            patterns so we can improve DubGrid.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table
@@ -229,7 +230,7 @@ export default function CookiePolicyPage() {
                   <td style={tableCell}>
                     Web performance metrics (Core Web Vitals) collected by our hosting provider.
                   </td>
-                  <td style={tableCell}>Cookie / beacon</td>
+                  <td style={tableCell}>Cookie-free page-view beacon</td>
                 </tr>
                 <tr>
                   <td style={tableCell}>Sentry Session Replay</td>
@@ -277,7 +278,8 @@ export default function CookiePolicyPage() {
                     when errors occur so we can fix bugs.
                   </td>
                   <td style={tableCell}>
-                    No. Personally identifiable information is not sent to Sentry.
+                    For signed-in users, Sentry receives the user ID and email address to help us
+                    investigate account-specific errors.
                   </td>
                 </tr>
               </tbody>

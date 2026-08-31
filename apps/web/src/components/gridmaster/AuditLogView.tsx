@@ -42,6 +42,7 @@ function ActionBadge({ action }: { action: string }) {
         padding: "2px 8px",
         borderRadius: 4,
         background: colors.bg,
+        border: `1px solid ${colors.border}`,
         color: colors.fg,
         whiteSpace: "nowrap",
       }}

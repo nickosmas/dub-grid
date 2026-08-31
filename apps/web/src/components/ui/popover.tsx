@@ -115,7 +115,10 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
           sideOffset={sideOffset}
           className={(state) => cn("isolate z-50", resolveStateValue(positionerClassName, state))}
           style={(state) => ({
-            zIndex: 10002,
+            // Above Modal/ConfirmDialog's .dg-modal-overlay (10010) — a
+            // popover-based dropdown (CustomSelect, etc.) must render above
+            // whatever container it's opened from, including a modal.
+            zIndex: 10020,
             ...resolveStateValue(positionerStyle, state),
           })}
         >

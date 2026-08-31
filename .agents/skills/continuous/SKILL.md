@@ -1,9 +1,15 @@
 ---
 name: continuous
-description: Explicit multi-feature Blueprint mode that builds every remaining planned feature serially, resuming or selecting the next unchecked build-plan item and repeating the human-style lifecycle through the configured limit or end of plan. It creates one local branch and one clean default-branch commit per feature, implements small steps, verifies, applies Continuous quality gates, archives and squash-merges each completed feature, deletes its branch, and continues. It stops on decisions, unsafe work, unresolved failures, or P0/P1 blockers. It never pushes, deploys, publishes, sends, or performs destructive actions. Use only when the user runs /continuous, invokes $continuous, or directly asks to run Continuous Mode.
+description: Explicit multi-feature Blueprint mode that builds every remaining planned feature serially on dev, resuming or selecting the next unchecked build-plan item and repeating the human-style lifecycle through the configured limit or end of plan. It creates one clean dev commit per feature, implements small steps, verifies, applies Continuous quality gates, archives each completed feature, and continues. It stops on decisions, unsafe work, unresolved failures, or P0/P1 blockers. It never pushes, deploys, publishes, sends, or performs destructive actions. Use only when the user runs /continuous, invokes $continuous, or directly asks to run Continuous Mode.
 ---
 
 # continuous - complete the build plan one local feature at a time
+
+## DubGrid branch override
+
+For DubGrid, all development work stays directly on `dev`. This replaces every
+other branch-creation, switching, merging, and deletion instruction in this
+skill: never create a development branch or work on `main`.
 
 **First action:** Before project inspection, preflight, or any other tool call,
 publish `running` to `blueprint/.state/run.json` using the dashboard activity

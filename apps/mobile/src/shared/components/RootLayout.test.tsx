@@ -7,6 +7,8 @@ import {
 } from "../../test/native";
 import * as envModule from "../lib/env";
 
+const navigationThemeValues: Array<{ colors?: { background?: string; card?: string } }> = [];
+
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
@@ -56,8 +58,10 @@ vi.mock("@react-navigation/native", async () => {
   const React = await import("react");
 
   return {
-    ThemeProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement("div", { "data-testid": "theme-provider" }, children),
+    ThemeProvider: ({ children, value }: { children: React.ReactNode; value: unknown }) => {
+      navigationThemeValues.push(value as { colors?: { background?: string; card?: string } });
+      return React.createElement("div", { "data-testid": "theme-provider" }, children);
+    },
   };
 });
 
@@ -162,6 +166,7 @@ beforeAll(async () => {
 describe("RootLayout", () => {
   beforeEach(() => {
     validateMobileEnvSpy.mockReset();
+    navigationThemeValues.length = 0;
   });
 
   it("shows the mobile setup screen when env validation fails", () => {
@@ -201,5 +206,9 @@ describe("RootLayout", () => {
     expect(screen.getByTestId("app-lock-provider")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
     expect(screen.getByTestId("stack")).toBeInTheDocument();
+    expect(navigationThemeValues.at(-1)?.colors).toMatchObject({
+      background: "#EFF2F6",
+      card: "#EFF2F6",
+    });
   });
 });

@@ -93,29 +93,28 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       toast.error("We couldn't switch organizations. Try again.");
       return false;
     }
-    // First super_admin login starts this org's trial. Idempotent and
-    // self-gated server-side, so safe to fire whenever a super_admin signs
-    // in. Non-fatal: never blocks sign-in on failure.
-    try {
-      await startBrowserTrial(targetOrgId);
-    } catch {
-      // Non-fatal: never block sign-in on trial activation.
-    }
-    // Fresh login = previous session ended. Wipe any sandbox left over from
-    // that session (involuntary logout / browser close that never ran the
-    // explicit exit) so stale sandbox data is never resumed.
+    // First super_admin login starts this org's trial (idempotent,
+    // self-gated server-side) and wiping any sandbox left over from the
+    // previous session (involuntary logout / browser close that never ran
+    // the explicit exit) are independent of each other, so run them
+    // concurrently rather than one after the other.
     //
-    // Awaited, not fire-and-forget: the caller hard-navigates immediately after
-    // this returns, which aborted the in-flight request often enough that the
-    // sandbox routinely survived the switch — and a surviving sandbox cookie
-    // pins every later request to a clone of the org the user just left, at an
-    // elevated role. Failure is still non-fatal, because the switch route now
-    // clears the cookie server-side; this call is what deletes the org row.
-    try {
-      await exitSandbox();
-    } catch {
-      // Non-fatal: never block sign-in on sandbox teardown.
-    }
+    // Both stay awaited, not fire-and-forget: the caller hard-navigates
+    // immediately after this returns, which aborted the in-flight sandbox
+    // request often enough that the sandbox routinely survived the switch —
+    // and a surviving sandbox cookie pins every later request to a clone of
+    // the org the user just left, at an elevated role. Both are still
+    // non-fatal on failure: trial activation never blocks sign-in, and the
+    // switch route now clears the sandbox cookie server-side regardless, so
+    // this call is only what deletes the org row.
+    await Promise.all([
+      startBrowserTrial(targetOrgId).catch(() => {
+        // Non-fatal: never block sign-in on trial activation.
+      }),
+      exitSandbox().catch(() => {
+        // Non-fatal: never block sign-in on sandbox teardown.
+      }),
+    ]);
     // The prior org's permissions are cached in a module-level singleton keyed
     // by user id, which a same-user org switch does not invalidate on its own.
     return true;
@@ -316,7 +315,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
     }
   }
 
-  function handleMFAVerified() {
+  async function handleMFAVerified() {
     // After MFA verification, proceed with the org slug verification and
     // dashboard redirect. Unlike handleSubmit above, this can't go through
     // POST /api/auth/login (that already happened before MFA) — the second
@@ -369,7 +368,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         setMfaRequired(false);
       }
     }
-    proceed();
+    return proceed();
   }
 
   function handleMFACancel() {
@@ -404,7 +403,11 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   return (
     <PublicRoute>
       <PageShell signInDisclaimer>
-        <div data-testid="organization-login" data-hydrated={isHydrated}>
+        <div
+          className="dg-auth-organization-login"
+          data-testid="organization-login"
+          data-hydrated={isHydrated}
+        >
           <Card>
             {/* Logo — links to apex landing page */}
             <a href={apexHref} className="dg-auth-logo-block dg-auth-logo-block--spacious">

@@ -46,6 +46,7 @@ interface StaffRowSharedProps {
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
+  useCompactRoleCertificationLabels?: boolean;
   /** Access role (org_role) of the linked user, if any. Null for staff with no login. */
   orgRole?: OrganizationRole | null;
   /** Inline role-change handler. Omitted when the viewer can't manage access. */
@@ -102,6 +103,7 @@ function StaffRowCells({
   focusAreas,
   certifications,
   roles,
+  useCompactRoleCertificationLabels = false,
   orgRole,
   onRoleChange,
   pendingInviteByEmployeeId,
@@ -292,7 +294,11 @@ function StaffRowCells({
         gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
       >
         {(() => {
-          const certAbbr = getCertAbbr(emp.certificationId, certifications);
+          const certAbbr = getCertAbbr(
+            emp.certificationId,
+            certifications,
+            useCompactRoleCertificationLabels,
+          );
           const certName = getCertName(emp.certificationId, certifications);
           return (
             <span
@@ -312,7 +318,9 @@ function StaffRowCells({
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
         <span className="text-[12px] text-[var(--dg-color-text-muted)]">
-          {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "\u2014"}
+          {emp.roleIds.length > 0
+            ? getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")
+            : "\u2014"}
         </span>
       </StaffCell>
 

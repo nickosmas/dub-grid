@@ -67,6 +67,13 @@ function getManagementStaffDraft(person: DirectoryPerson): ManagementStaffDraft 
 
 interface ManagementStaffPanelProps {
   person: DirectoryPerson;
+  /** The real employees.email column value (not person.email, which falls
+   *  back to a linked auth user's or a pending invitation's email when the
+   *  contact email is blank). Null when there's no employees row yet (a
+   *  pure pending invitation). employees.email is the single source of
+   *  truth for this person's email once set, so the field is read-only
+   *  whenever this is non-blank. */
+  contactEmail: string | null;
   departments: NamedItem[];
   /** Label for management departments on the access roster. */
   departmentLabel: string;
@@ -96,6 +103,7 @@ interface ManagementStaffPanelProps {
 
 export function ManagementStaffPanel({
   person,
+  contactEmail,
   departments,
   departmentLabel,
   canManageScheduleEmployees,
@@ -113,14 +121,23 @@ export function ManagementStaffPanel({
   const [closing, setClosing] = useState(false);
   const onCloseRef = useLatestRef(onClose);
 
+  // employees.email (when present) is the single source of truth — it
+  // overrides person.email, which falls back to a linked auth user's or a
+  // pending invitation's email when the contact email is blank and would
+  // otherwise show a value here that isn't actually this person's contact
+  // email on file.
+  const effectiveEmail = contactEmail ?? person.email;
+  const emailReadOnly = !!contactEmail;
+
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);
-  const [email, setEmail] = useState(person.email);
+  const [email, setEmail] = useState(effectiveEmail);
   const [phone, setPhone] = useState(person.phone);
   const [deptIds, setDeptIds] = useState<number[]>(person.managementDepartmentIds);
-  const [savedDraft, setSavedDraft] = useState<ManagementStaffDraft>(() =>
-    getManagementStaffDraft(person),
-  );
+  const [savedDraft, setSavedDraft] = useState<ManagementStaffDraft>(() => ({
+    ...getManagementStaffDraft(person),
+    email: effectiveEmail.trim(),
+  }));
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
@@ -131,11 +148,17 @@ export function ManagementStaffPanel({
       normalizeManagementStaffDraft({
         firstName: person.firstName,
         lastName: person.lastName,
-        email: person.email,
+        email: effectiveEmail,
         phone: person.phone,
         managementDepartmentIds: person.managementDepartmentIds,
       }),
-    [person.firstName, person.lastName, person.email, person.phone, person.managementDepartmentIds],
+    [
+      person.firstName,
+      person.lastName,
+      effectiveEmail,
+      person.phone,
+      person.managementDepartmentIds,
+    ],
   );
 
   // Reset form when person changes
@@ -244,18 +267,19 @@ export function ManagementStaffPanel({
         !isEmployee && touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName: !isEmployee && touched.lastName ? validateRequired(lastName, "Last name") : null,
       // Email is optional everywhere now (so admins can schedule before
-      // onboarding). Only complain about formatting when a value is present.
-      email: touched.email && email.trim() ? getOptionalStaffEmailError(email) : null,
+      // onboarding). Only complain about formatting when a value is present
+      // and the field is actually editable (a locked contact email is
+      // already valid by construction).
+      email:
+        !emailReadOnly && touched.email && email.trim() ? getOptionalStaffEmailError(email) : null,
       phone: touched.phone ? validatePhone(phone) : null,
       managementDepartmentIds:
         !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
           ? "People who are not on the schedule must stay assigned to at least one management department."
           : null,
     }),
-    [deptIds.length, email, firstName, isEmployee, lastName, phone, touched],
+    [deptIds.length, email, emailReadOnly, firstName, isEmployee, lastName, phone, touched],
   );
-
-  const showScheduleOnlyHint = isEmployee && deptIds.length === 0;
 
   const toggleDepartment = useCallback(
     (departmentId: number) => {
@@ -288,7 +312,7 @@ export function ManagementStaffPanel({
       }));
       return;
     }
-    if (email.trim() && getOptionalStaffEmailError(email)) {
+    if (!emailReadOnly && email.trim() && getOptionalStaffEmailError(email)) {
       setTouched((prev) => ({
         ...prev,
         email: true,
@@ -604,141 +628,12 @@ export function ManagementStaffPanel({
             gap: 16,
           }}
         >
-          {/* Read-only details for on-schedule employees */}
-          {canManageManagementAccess && isEmployee && (
-            <>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>First name</label>
-                  <input
-                    value={person.firstName}
-                    readOnly
-                    style={{
-                      ...inputStyle,
-                      background: "var(--dg-color-bg-secondary)",
-                      color: "var(--dg-color-text-muted)",
-                      cursor: "default",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Last name</label>
-                  <input
-                    value={person.lastName}
-                    readOnly
-                    style={{
-                      ...inputStyle,
-                      background: "var(--dg-color-bg-secondary)",
-                      color: "var(--dg-color-text-muted)",
-                      cursor: "default",
-                    }}
-                  />
-                </div>
-              </div>
-              {person.phone && (
-                <div>
-                  <label style={labelStyle}>Phone</label>
-                  <input
-                    value={person.phone}
-                    readOnly
-                    style={{
-                      ...inputStyle,
-                      background: "var(--dg-color-bg-secondary)",
-                      color: "var(--dg-color-text-muted)",
-                      cursor: "default",
-                    }}
-                  />
-                </div>
-              )}
-              {departments.length > 0 && (
-                <div>
-                  <label style={labelStyle}>{departmentLabel}</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {departments.map((department) => (
-                      <SelectableTag
-                        key={department.id}
-                        selected={deptIds.includes(department.id)}
-                        onClick={() => toggleDepartment(department.id)}
-                        padding="5px 12px"
-                        unselectedBackground="var(--dg-color-bg-secondary)"
-                        unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--dg-color-text-faint)"
-                      >
-                        {department.name}
-                      </SelectableTag>
-                    ))}
-                  </div>
-                  {showScheduleOnlyHint && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-text-muted)",
-                      }}
-                    >
-                      Saving now removes their management access. They'll stay on the schedule.
-                    </div>
-                  )}
-                </div>
-              )}
-              {accessControls}
-              <EditorActionRow
-                destructiveAction={
-                  !isSelf && person.managementDepartmentIds.length > 0 && deptIds.length > 0 ? (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        markTouched("managementDepartmentIds");
-                        setDeptIds([]);
-                      }}
-                      className="dg-btn dg-btn-ghost"
-                      style={{ color: "var(--dg-color-danger)" }}
-                    >
-                      Remove from Management
-                    </Button>
-                  ) : undefined
-                }
-                secondaryAction={
-                  <Button
-                    onClick={handleDismissClick}
-                    disabled={saving}
-                    className="dg-btn dg-btn-secondary"
-                  >
-                    {dismissLabel}
-                  </Button>
-                }
-                primaryAction={
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving || !hasChanges}
-                    className="dg-btn dg-btn-primary"
-                  >
-                    <ButtonLoading loading={saving} spinnerSize={16}>
-                      {EDITOR_ACTION_LABELS.save}
-                    </ButtonLoading>
-                  </Button>
-                }
-              />
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--dg-color-text-faint)",
-                  fontStyle: "italic",
-                }}
-              >
-                Edit other details from the on-schedule profile.
-              </div>
-            </>
-          )}
-
-          {/* Editable fields — only for non-employee members */}
-          {canManageManagementAccess && !isEmployee && (
+          {/* On-schedule people never reach this panel: MembersSection routes
+              them to StaffDetailPanel/StaffReadOnlyDetailPanel instead, so
+              every field is editable from whichever list they're opened
+              from. This panel only ever handles management-only members and
+              pending invites. */}
+          {canManageManagementAccess && (
             <>
               <div
                 style={{
@@ -816,12 +711,24 @@ export function ManagementStaffPanel({
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => markTouched("email")}
                   placeholder="name@example.com"
+                  disabled={emailReadOnly}
                   style={
                     fieldErrors.email
                       ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
                       : inputStyle
                   }
                 />
+                {emailReadOnly && (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
+                  >
+                    This is their contact email from Staff details. Change it there to update it.
+                  </div>
+                )}
                 {fieldErrors.email && (
                   <div
                     style={{

@@ -19,6 +19,7 @@ import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
+import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyScheduleCard } from "../components/MyScheduleCard";
 import { CoverageBySectionCard } from "../components/CoverageBySectionCard";
@@ -29,8 +30,8 @@ import { StaffHoursCard } from "../components/StaffHoursCard";
 export function AdminHomeScreen() {
   const { accessToken } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  // One global toggle (in the hero card) drives the whole dashboard — a
-  // single fetch, one consistent period across every card.
+  // One global toggle (at the top of the screen) drives the whole dashboard —
+  // a single fetch, one consistent period across every card.
   const [periodMode, setPeriodMode] = useState<DashboardPeriodMode>("week");
   const payPeriodStartDate = bootstrapQuery.data?.currentOrg?.payPeriodStartDate ?? null;
   const range = useMemo(
@@ -167,13 +168,12 @@ export function AdminHomeScreen() {
         />
       }
     >
-      <DashboardHeroCard
-        summary={data.heroSummary}
-        metrics={data.metrics}
-        periodMode={periodMode}
-        onPeriodModeChange={setPeriodMode}
-        isFetching={dashboardQuery.isFetching}
+      <PeriodToggle
+        mode={periodMode}
+        onChange={setPeriodMode}
+        loading={dashboardQuery.isFetching}
       />
+      <DashboardHeroCard summary={data.heroSummary} metrics={data.metrics} />
       {role === "admin" ? (
         <ActionQueueCard
           requests={data.actionQueue}

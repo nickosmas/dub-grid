@@ -165,8 +165,9 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Analytics data (with consent).</strong> If you accept analytics cookies, we
-              use PostHog and Vercel Analytics to collect anonymized usage data such as page views
-              and performance metrics. This data is not collected until you provide consent. See our{" "}
+              use PostHog and Vercel Analytics to collect product-usage and performance data. For
+              signed-in users, PostHog associates page views and feature-usage events with your user
+              ID and email address. This data is not collected until you provide consent. See our{" "}
               <Link
                 href="/cookie-policy"
                 style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
@@ -177,9 +178,10 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Error reports.</strong> We use Sentry for error monitoring. When an error
-              occurs, technical context (stack traces, request metadata) is captured to help us
-              diagnose issues. Personally identifiable information is not included in error reports.
-              Sentry also offers session replay, which we enable only with your analytics consent.
+              occurs, technical context (stack traces and request metadata) is captured to help us
+              diagnose issues. For signed-in users, we send Sentry the user ID and email address to
+              help investigate account-specific errors. Sentry also offers session replay, which we
+              enable only with your analytics consent.
             </li>
           </ul>
         </section>
@@ -257,16 +259,13 @@ export default function PrivacyPolicyPage() {
               color: "var(--dg-color-text-secondary)",
             }}
           >
-            Your data is stored on secure servers provided by our infrastructure and database
-            provider, encrypted in transit and at rest. We use row-level security and role-based
-            access control so that access to data is restricted by organization and by your role.
-            Passwords are managed by our authentication provider and are never stored in plain text,
-            and we support multi-factor authentication. We track active sessions, rate-limit
-            sensitive endpoints, and keep audit logs of role changes and schedule publishing. We do
-            not sell your personal information to third parties. No method of transmission or
-            storage is completely secure; if we become aware of a security incident affecting your
-            personal information, we will notify affected users and authorities as required by
-            applicable law.
+            We use row-level security and role-based access control so that access to data is
+            restricted by organization and by your role. Passwords are managed by our authentication
+            provider and are never stored in plain text, and we support multi-factor authentication.
+            We track active sessions, rate-limit sensitive endpoints, and keep audit logs of role
+            changes and schedule publishing. No method of transmission or storage is completely
+            secure; if we become aware of a security incident affecting your personal information,
+            we will notify affected users and authorities as required by applicable law.
           </p>
           <div
             style={{
@@ -326,11 +325,10 @@ export default function PrivacyPolicyPage() {
           >
             We retain your account and profile data for as long as your account is active and as
             needed to provide the Service. Organization data, employee rosters, shifts, and notes
-            are retained while the organization uses the Service; archived records are retained
-            according to each organization&apos;s configurable retention setting (365 days by
-            default) before being purged. Cookie consent records are kept as an append-only
-            compliance log and are not deleted with your account. We keep routine encrypted backups
-            for disaster recovery, and these may persist for a limited period after deletion.
+            are retained while the organization uses the Service. Organizations can configure a
+            retention period for archived records (365 days by default). We may retain data for a
+            limited period where needed for backups, security, legal obligations, or dispute
+            resolution.
           </p>
           <p
             style={{
@@ -341,10 +339,10 @@ export default function PrivacyPolicyPage() {
             }}
           >
             You can request a copy of your personal data (data export) or its deletion at any time.
-            Account deletion removes your profile, memberships, sessions, and preferences, and
-            either deletes or anonymizes the personal data associated with your account, subject to
-            records we must keep by law. See Your California Privacy Rights below for how to make a
-            request.
+            Account deletion removes your profile, memberships, sessions, preferences, and consent
+            records. It either deletes or anonymizes the personal data associated with your account,
+            subject to records we must keep by law. See Your California Privacy Rights below for how
+            to make a request.
           </p>
         </section>
 
@@ -379,9 +377,8 @@ export default function PrivacyPolicyPage() {
               marginBottom: "16px",
             }}
           >
-            In the past twelve months we have collected these categories of personal information,
-            used for the business purposes described in this policy and disclosed only to the
-            service providers listed below:
+            We may collect the following categories of personal information for the business
+            purposes described in this policy:
           </p>
           <ul
             style={{
@@ -421,10 +418,8 @@ export default function PrivacyPolicyPage() {
               marginBottom: "16px",
             }}
           >
-            <strong>We do not sell or share your personal information</strong>, and we have not done
-            so in the past twelve months. We do not use sensitive personal information for purposes
-            that would require a right to limit. We do not knowingly collect personal information
-            from minors.
+            We do not knowingly collect personal information from minors. We do not use sensitive
+            personal information for purposes that would require a right to limit.
           </p>
           <p
             style={{
@@ -503,9 +498,8 @@ export default function PrivacyPolicyPage() {
               marginBottom: "16px",
             }}
           >
-            We use the following US-based service providers to operate and improve DubGrid. Each
-            processes data on our behalf under data processing terms and in accordance with its own
-            privacy policy:
+            We use the following service providers to operate DubGrid. Their processing of
+            information is governed by their applicable terms and privacy notices:
           </p>
           <ul
             style={{
@@ -529,8 +523,8 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Sentry</strong> (error monitoring, always on; session replay, analytics
-              consent required): stack traces and request context. No personally identifiable
-              information is sent.
+              consent required): stack traces, request context, and, for signed-in users, user ID
+              and email address.
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Stripe</strong> (payment processing): billing contact and payment metadata,
@@ -663,10 +657,6 @@ export default function PrivacyPolicyPage() {
               marginTop: "12px",
             }}
           >
-            DubGrid LLC
-            <br />
-            [REGISTERED ADDRESS]
-            <br />
             <a
               href="mailto:support@dubgrid.com"
               style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}

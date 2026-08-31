@@ -6,6 +6,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import logger from "@/lib/logger";
+import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 
 const exportSchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -19,18 +20,6 @@ const exportSchema = z.object({
   highRiskOnly: z.boolean().optional().default(false),
   limit: z.number().int().min(1).max(5000).optional().default(1000),
 });
-
-const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
-const HIGH_RISK_ACTIONS = new Set([
-  "account.deleted",
-  "audit.exported",
-  "feature_flags.updated",
-  "org.archived",
-  "org.suspended",
-  "user.deactivated",
-  "user.force_logout",
-  "user.password_reset_sent",
-]);
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -57,33 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     const serviceClient = getServiceClient();
-    let query = serviceClient
-      .from("audit_log")
-      .select(
-        "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(parsed.data.limit);
-
-    if (parsed.data.orgId) query = query.eq("org_id", parsed.data.orgId);
-    if (parsed.data.action) query = query.eq("action", parsed.data.action);
-    if (parsed.data.actionPrefix) query = query.like("action", `${parsed.data.actionPrefix}%`);
-    if (parsed.data.resourceType) query = query.eq("resource_type", parsed.data.resourceType);
-    if (parsed.data.actorId) query = query.eq("actor_id", parsed.data.actorId);
-    if (parsed.data.startDate) query = query.gte("created_at", parsed.data.startDate);
-    if (parsed.data.endDate) query = query.lte("created_at", parsed.data.endDate);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    let entries = ((data ?? []) as Record<string, unknown>[]).map(mapAuditExportRow);
-    if (parsed.data.highRiskOnly) {
-      entries = entries.filter((entry) => isHighRiskAction(entry.action));
-    }
-    if (parsed.data.target) {
-      const needle = parsed.data.target.toLowerCase();
-      entries = entries.filter((entry) => JSON.stringify(entry).toLowerCase().includes(needle));
-    }
+    const rows = await fetchFilteredAuditRows(serviceClient, parsed.data);
+    const entries = rows.map(mapAuditExportRow);
 
     const exportedAt = new Date().toISOString();
     await writeGridmasterAuditLog({
@@ -129,13 +93,6 @@ function mapAuditExportRow(row: Record<string, unknown>) {
     details: objectOrEmpty(row.details),
     createdAt: String(row.created_at ?? ""),
   };
-}
-
-function isHighRiskAction(action: string) {
-  return (
-    HIGH_RISK_ACTIONS.has(action) ||
-    HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))
-  );
 }
 
 function stringOrNull(value: unknown) {

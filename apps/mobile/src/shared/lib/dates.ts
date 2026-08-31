@@ -1,4 +1,4 @@
-import { getDashboardPeriodStartIso } from "@dubgrid/schedule-core";
+import { formatLocalDateKey, getDashboardPeriodStartIso } from "@dubgrid/schedule-core";
 
 // Formats an ISO "YYYY-MM-DD" date key using US conventions (short month
 // name first, e.g. "May 12") — never the raw ISO/YYYY-MM-DD string, which
@@ -23,15 +23,15 @@ export function formatUsTime(time: string): string {
 
 export type DashboardPeriodMode = "day" | "week" | "2weeks";
 
-// Local Y-M-D formatting — deliberately not toISOString(), which converts to
-// UTC and can shift the calendar day on a device whose local timezone isn't
-// UTC (e.g. evening hours in US timezones rolling into the next UTC day).
-function formatIsoDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+// @dubgrid/schedule-core's canonical local Y-M-D formatter — deliberately
+// not toISOString(), which converts to UTC and can shift the calendar day on
+// a device whose local timezone isn't UTC (e.g. evening hours in US
+// timezones rolling into the next UTC day). The server-side mobile pipeline
+// had a local copy of this exact function that DID route through
+// toISOString() and silently dropped a day's worth of coverage requirements
+// on any server ahead of UTC — this alias keeps the client on the one
+// correct implementation instead of a second hand-rolled copy.
+const formatIsoDateKey = formatLocalDateKey;
 
 // "day" = today only; "week" = Sunday-start current week; "2weeks" = the
 // org's actual 14-day pay period containing today when `payPeriodStartDate`

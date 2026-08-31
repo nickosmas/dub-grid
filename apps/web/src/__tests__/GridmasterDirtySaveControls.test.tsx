@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import {
   fetchOrganizationEmployeeCount,
+  saveOrganizationSettingsWithRecovery,
   updateOrganizationSettings,
 } from "@/features/organization/client";
 import { fetchGridmasterBilling, updateGridmasterSubscription } from "@/features/gridmaster/client";
@@ -14,6 +15,7 @@ vi.mock("@/features/organization/client", () => ({
   fetchOrganizationUsers: vi.fn(),
   fetchOrganizationEmployeeCount: vi.fn(),
   updateOrganizationSettings: vi.fn(),
+  saveOrganizationSettingsWithRecovery: vi.fn(),
   OrganizationSettingsConflictError: class OrganizationSettingsConflictError extends Error {
     latestOrganization: Organization;
 
@@ -65,6 +67,7 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -120,6 +123,10 @@ describe("gridmaster dirty save controls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(updateOrganizationSettings).mockResolvedValue(makeOrganization());
+    vi.mocked(saveOrganizationSettingsWithRecovery).mockImplementation(async ({ input }) => ({
+      status: "saved",
+      organization: await vi.mocked(updateOrganizationSettings)(input),
+    }));
     vi.mocked(fetchOrganizationEmployeeCount).mockResolvedValue({
       employeeCount: 42,
     });

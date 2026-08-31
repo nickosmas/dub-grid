@@ -33,6 +33,7 @@ interface SharedSelfWorkProps {
   recurringShifts: RecurringShift[];
   shiftRequests: ShiftRequest[];
   auditNames: Map<string, string>;
+  assignmentNameMap: Map<number, string>;
 }
 
 function useSelfWorkMaps({
@@ -120,6 +121,7 @@ export function SelfWorkSchedule({
   recurringShifts,
   shiftRequests,
   auditNames,
+  assignmentNameMap,
   ...rest
 }: SharedSelfWorkProps) {
   const { assignmentById, categoryById, focusAreaById, absenceTypeById } = useSelfWorkMaps({
@@ -179,6 +181,7 @@ export function SelfWorkSchedule({
         employee={employee}
         shifts={shifts}
         assignmentById={assignmentById}
+        assignmentNameMap={assignmentNameMap}
         focusAreas={focusAreas}
         categoryById={categoryById}
         focusAreaById={focusAreaById}

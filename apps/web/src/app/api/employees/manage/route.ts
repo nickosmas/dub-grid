@@ -256,6 +256,103 @@ function diffEmployeeProfileFields(
   return fields;
 }
 
+type EmployeeAuditReferenceLabels = {
+  certifications: Map<number, string>;
+  departments: Map<number, string>;
+  focusAreas: Map<number, string>;
+  roles: Map<number, string>;
+};
+
+async function fetchEmployeeAuditReferenceLabels(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  before: EmployeeProfileFields,
+  after: EmployeeProfileFields,
+  changedFields: string[],
+): Promise<EmployeeAuditReferenceLabels> {
+  const ids = {
+    certifications: changedFields.includes("certification")
+      ? [before.certificationId, after.certificationId].filter((id): id is number => id !== null)
+      : [],
+    departments: changedFields.some(
+      (field) => field === "departments" || field === "departmentAdmin",
+    )
+      ? [
+          ...before.departmentIds,
+          ...before.deptAdminIds,
+          ...after.departmentIds,
+          ...after.deptAdminIds,
+        ]
+      : [],
+    focusAreas: changedFields.includes("focusAreas")
+      ? [...before.focusAreaIds, ...after.focusAreaIds]
+      : [],
+    roles: changedFields.includes("roles") ? [...before.roleIds, ...after.roleIds] : [],
+  };
+
+  const fetchLabels = async (
+    table: "certifications" | "departments" | "focus_areas" | "organization_roles",
+    tableIds: number[],
+  ) => {
+    if (tableIds.length === 0) return new Map<number, string>();
+    const { data, error } = await serviceClient
+      .from(table)
+      .select("id, name")
+      .eq("org_id", orgId)
+      .in("id", [...new Set(tableIds)]);
+    if (error) throw error;
+    return new Map((data ?? []).map((row) => [row.id as number, row.name as string] as const));
+  };
+
+  const [certifications, departments, focusAreas, roles] = await Promise.all([
+    fetchLabels("certifications", ids.certifications),
+    fetchLabels("departments", ids.departments),
+    fetchLabels("focus_areas", ids.focusAreas),
+    fetchLabels("organization_roles", ids.roles),
+  ]);
+  return { certifications, departments, focusAreas, roles };
+}
+
+function employeeAuditReferenceValues(
+  before: EmployeeProfileFields,
+  after: EmployeeProfileFields,
+  labels: EmployeeAuditReferenceLabels,
+  changedFields: string[],
+): { from: Record<string, unknown>; to: Record<string, unknown> } {
+  const from: Record<string, unknown> = {};
+  const to: Record<string, unknown> = {};
+  const names = (ids: number[], labelsById: Map<number, string>) =>
+    ids.map((id) => labelsById.get(id) ?? "Unavailable reference");
+
+  if (changedFields.includes("certification")) {
+    from.certification =
+      before.certificationId === null
+        ? null
+        : (labels.certifications.get(before.certificationId) ?? "Unavailable reference");
+    to.certification =
+      after.certificationId === null
+        ? null
+        : (labels.certifications.get(after.certificationId) ?? "Unavailable reference");
+  }
+  if (changedFields.includes("roles")) {
+    from.roles = names(before.roleIds, labels.roles);
+    to.roles = names(after.roleIds, labels.roles);
+  }
+  if (changedFields.includes("focusAreas")) {
+    from.focusAreas = names(before.focusAreaIds, labels.focusAreas);
+    to.focusAreas = names(after.focusAreaIds, labels.focusAreas);
+  }
+  if (changedFields.includes("departments")) {
+    from.departments = names(before.departmentIds, labels.departments);
+    to.departments = names(after.departmentIds, labels.departments);
+  }
+  if (changedFields.includes("departmentAdmin")) {
+    from.departmentAdmin = names(before.deptAdminIds, labels.departments);
+    to.departmentAdmin = names(after.deptAdminIds, labels.departments);
+  }
+  return { from, to };
+}
+
 async function fetchLatestEmployee(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -463,12 +560,23 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        // Someone with management access doesn't need at least one focus
+        // area to fall back on — they can come off the schedule entirely and
+        // keep managing. Only require it when they have no management
+        // department assignment of their own.
+        const managementMembership = data.employee.userId
+          ? await fetchMobileManagementMembershipRowsByUserIds(auth.serviceClient, data.orgId, [
+              data.employee.userId,
+            ])
+          : [];
+        const hasManagementAccess = (managementMembership[0]?.department_ids?.length ?? 0) > 0;
+
         const referenceErrors = await validateStaffOrgReferences(auth.serviceClient, data.orgId, {
           certificationId: data.employee.certificationId,
           departmentIds: data.employee.departmentIds,
           deptAdminIds: data.employee.deptAdminIds,
           focusAreaIds: data.employee.focusAreaIds,
-          requireFocusArea: true,
+          requireFocusArea: !hasManagementAccess,
           roleIds: data.employee.roleIds,
         });
         if (Object.keys(referenceErrors).length > 0) {
@@ -499,6 +607,24 @@ export async function POST(req: NextRequest) {
           data.orgId,
           nextEmployee.id,
         );
+        const changedProfileFields = previousRow
+          ? diffEmployeeProfileFields(previousRow, nextEmployee)
+          : [];
+        const referenceAuditValues =
+          previousRow && changedProfileFields.length > 0
+            ? employeeAuditReferenceValues(
+                previousRow,
+                nextEmployee,
+                await fetchEmployeeAuditReferenceLabels(
+                  auth.serviceClient,
+                  data.orgId,
+                  previousRow,
+                  nextEmployee,
+                  changedProfileFields,
+                ),
+                changedProfileFields,
+              )
+            : { from: {}, to: {} };
 
         let query = auth.serviceClient
           .from("employees")
@@ -547,7 +673,6 @@ export async function POST(req: NextRequest) {
               toStatus: nextEmployee.status,
             });
           }
-          const changedProfileFields = diffEmployeeProfileFields(previousRow, nextEmployee);
           if (changedProfileFields.length > 0) {
             void dispatchNotificationEvent(auth.actor.id, {
               action: "employee_profile_changed",
@@ -563,8 +688,8 @@ export async function POST(req: NextRequest) {
             : changedProfileFields;
 
           if (changedFields.length > 0) {
-            const from: Record<string, unknown> = {};
-            const to: Record<string, unknown> = {};
+            const from: Record<string, unknown> = { ...referenceAuditValues.from };
+            const to: Record<string, unknown> = { ...referenceAuditValues.to };
             if (changedFields.includes("firstName")) {
               from.firstName = previousRow.firstName;
               to.firstName = nextEmployee.firstName;

@@ -1,9 +1,16 @@
 ---
 name: implement
-description: "Build the feature, fix, or rollback spec'd in blueprint/context/current-feature.md, one small reviewable step at a time. Creates the matching branch, implements each step, shows the diff and explains it in plain English, tests, and iterates until it works. Type: Rollback specs use a guarded reverse patch that preserves Blueprint history. After each approved step it offers an optional commit checkpoint on the branch; the work-level commit, merge, and logging are /complete's job. Use when the user runs /implement, or asks to build, implement, or start the current feature, fix, or rollback once its spec is ready."
+description: "Build the feature, fix, or rollback spec'd in blueprint/context/current-feature.md, one small reviewable step at a time on dev. It implements each step, shows the diff and explains it in plain English, tests, and iterates until it works. Type: Rollback specs use a guarded reverse patch that preserves Blueprint history. After each approved step it offers an optional commit checkpoint on dev; the work-level commit and logging are /complete's job. Use when the user runs /implement, or asks to build, implement, or start the current feature, fix, or rollback once its spec is ready."
 ---
 
 # implement - build the current spec, one reviewed step at a time
+
+## DubGrid branch override
+
+For DubGrid, all development work stays directly on `dev`. This replaces every
+other branch-creation, switching, merging, and deletion instruction in this
+skill: confirm `dev` before editing, do not create a feature/fix/rollback branch,
+and never develop on `main`.
 
 **First action:** Before project inspection, preflight, or any other tool call,
 publish `running` to `blueprint/.state/run.json` using the dashboard activity
@@ -52,14 +59,10 @@ in the working tree, then continue from the **first unchecked step** instead of
 starting over. No separate save/load is needed - the project instructions load
 `current-feature.md` every session.
 
-## Step 1 - branch
+## Step 1 - development branch
 
-Create and check out a branch named from the spec, using the prefixes in
-`blueprint/config.json`. The defaults are `feature/<name>` for a feature,
-`fix/<name>` for a fix, and `rollback/<name>` for a Type: Rollback spec. If the
-project isn't a git repo yet, say so and ask the user to run `git init` first;
-the loop needs branches. On resume, the branch already exists - check it out
-instead of creating a new one.
+Confirm `dev` is the current branch before making changes. If it is not, stop
+and ask the user to switch to `dev`; do not create or switch to another branch.
 
 ### Type: Rollback safeguard
 

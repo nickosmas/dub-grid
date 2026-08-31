@@ -61,6 +61,22 @@ describe("top-level stack options on iOS", () => {
     expect(options.headerStyle).toMatchObject({ backgroundColor: mobileColors.background });
   });
 
+  it("keeps an inline title while letting UIKit apply its native scroll-edge blur", () => {
+    const options = createDetailStackOptions(mobileColors, "Staff Profile", {
+      scrollEdge: true,
+    });
+
+    expect(options).toMatchObject({
+      headerLargeTitle: false,
+      headerLargeTitleEnabled: false,
+      headerTransparent: true,
+    });
+    expect(options.headerStyle).toBeUndefined();
+    // iOS 26 applies the default automatic scroll-edge effect itself. A fixed
+    // header blur on top would produce two overlapping blurs.
+    expect(options.headerBlurEffect).toBeUndefined();
+  });
+
   // The People and Profile sections take large titles at every level, so their
   // pushed screens opt in — and then they have to follow the same
   // no-background rule as the tab roots, or they lose the title to the iOS 26
@@ -71,10 +87,9 @@ describe("top-level stack options on iOS", () => {
     expect(options).toMatchObject({
       headerLargeTitle: true,
       headerLargeTitleEnabled: true,
-      // Kept: a pushed screen still wants the full-width back swipe.
-      fullScreenGestureEnabled: true,
     });
     expect(options.headerStyle).toBeUndefined();
+    expect(options.fullScreenGestureEnabled).toBeUndefined();
     // Never both: a transparent bar is what costs a large title its collapse.
     expect(options.headerTransparent).toBeUndefined();
     expect(options.headerBlurEffect).toBeUndefined();

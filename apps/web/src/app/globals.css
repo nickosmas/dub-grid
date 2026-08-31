@@ -61,6 +61,7 @@
   --color-warning-bg: var(--dg-color-warning-bg);
   --color-warning-text: var(--dg-color-warning-text);
   --color-warning-border: var(--dg-color-warning-border);
+  --color-warning-dark: var(--dg-color-warning-dark);
   --color-danger: var(--dg-color-danger);
   --color-danger-bg: var(--dg-color-danger-bg);
   --color-danger-text: var(--dg-color-danger-text);
@@ -94,6 +95,7 @@
   color-scheme: light;
   /* Layout, type, spacing, radii, motion, and state effects. */
   --header-height: 56px;
+  --dg-app-shell-header-height: var(--header-height);
   --dg-toolbar-h: 38px;
   --dg-btn-radius: 6px;
   --dg-btn-h: 38px;
@@ -178,16 +180,16 @@
   --dg-toast-warning-border: #92400e;
 
   /* Light palette. `--dg-color-*` is the canonical web color namespace. */
-  --dg-color-bg: #f8fafc;
+  --dg-color-bg: #fcfcfc;
   --dg-color-surface: #ffffff;
   --dg-color-surface-alt: #fafbfc;
   --dg-color-surface-hover: #f1f5f9;
   --dg-color-bg-secondary: #f1f5f9;
   --dg-color-row-alt: #fafbfc;
   --dg-color-row-hover: #f1f5f9;
-  --dg-color-border: #cbd5e1;
-  --dg-color-border-light: #e2e8f0;
-  --dg-color-border-subtle: #e2e8f0;
+  --dg-color-border: #e5e5e5;
+  --dg-color-border-light: #ededed;
+  --dg-color-border-subtle: #ededed;
   --dg-color-border-strong: #94a3b8;
   --dg-color-border-focus: #3b82f6;
   --dg-color-text-primary: #0f172a;
@@ -222,6 +224,7 @@
   --dg-color-warning-bg: #fffbeb;
   --dg-color-warning-text: #92400e;
   --dg-color-warning-border: #fde68a;
+  --dg-color-warning-dark: #d97706;
   --dg-color-danger: #ef4444;
   --dg-color-danger-bg: #fef2f2;
   --dg-color-danger-text: #b91c1c;
@@ -258,7 +261,7 @@
   --tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);
   --dg-shadow-sidebar-toggle: 0 1px 4px rgba(0, 0, 0, 0.08);
   --dg-shadow-staff-detail: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08);
-  --dg-shadow-auth-card: 0 2px 16px rgba(0, 0, 0, 0.07);
+  --dg-shadow-auth-card: none;
 
   /* shadcn semantic primitives remain separate from the DubGrid palette. */
   --background: oklch(1 0 0);
@@ -342,6 +345,7 @@
   --dg-color-warning-bg: #241c0b;
   --dg-color-warning-text: #fbbf24;
   --dg-color-warning-border: #3f2f10;
+  --dg-color-warning-dark: #fbbf24;
   --dg-color-danger-bg: #2a1414;
   --dg-color-danger-text: #ff5c5c;
   --dg-color-danger-border: #4a1f1f;
@@ -369,7 +373,7 @@
   --tooltip-shadow: 0 0 18px rgba(0, 0, 0, 0.6), 0 0 36px rgba(0, 0, 0, 0.5);
   --dg-shadow-sidebar-toggle: 0 1px 4px rgba(0, 0, 0, 0.5);
   --dg-shadow-staff-detail: 0 8px 40px rgba(0, 0, 0, 0.7), 0 2px 12px rgba(0, 0, 0, 0.5);
-  --dg-shadow-auth-card: 0 2px 16px rgba(0, 0, 0, 0.5);
+  --dg-shadow-auth-card: none;
   --background: oklch(0 0 0);
   --foreground: oklch(0.97 0 0);
   --card: oklch(0.09 0 0);
@@ -562,11 +566,11 @@ textarea {
 }
 
 .dg-btn-danger-filled:hover {
-  filter: brightness(0.95);
+  background: color-mix(in srgb, var(--dg-color-danger) 95%, black);
 }
 
 .dg-btn-danger-filled:active {
-  filter: brightness(0.9);
+  background: color-mix(in srgb, var(--dg-color-danger) 90%, black);
 }
 
 /* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
@@ -578,11 +582,11 @@ textarea {
 }
 
 .dg-btn-on-danger-solid:hover {
-  filter: brightness(0.92);
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 92%, black);
 }
 
 .dg-btn-on-danger-solid:active {
-  filter: brightness(0.85);
+  background: color-mix(in srgb, var(--dg-color-text-inverse) 85%, black);
 }
 
 .dg-btn-on-danger-outline {
@@ -610,11 +614,11 @@ textarea {
 }
 
 .dg-btn-on-brand-solid:hover {
-  filter: brightness(0.92);
+  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 92%, black);
 }
 
 .dg-btn-on-brand-solid:active {
-  filter: brightness(0.85);
+  background: color-mix(in srgb, var(--dg-color-on-brand-surface) 85%, black);
 }
 
 /* Landing page: the brand field belongs to the header and hero; content settles
@@ -640,7 +644,7 @@ textarea {
 }
 
 .dark .landing-hero-gradient {
-  background: linear-gradient(180deg, #0b2d75 0%, #1d3aa0 38%, #0a1442 68%, #050609 100%);
+  background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 38%, #071535 68%, #050609 100%);
 }
 
 .landing-nav {
@@ -650,7 +654,7 @@ textarea {
 }
 
 .dark .landing-nav {
-  background: rgba(11, 45, 117, 0.55);
+  background: rgba(29, 58, 160, 0.55);
 }
 
 .landing-nav-sign-in {
@@ -762,7 +766,7 @@ textarea {
 }
 
 .dark .landing-mobile-menu {
-  background: linear-gradient(180deg, #0b2d75 0%, #1d3aa0 42%, #0a1442 70%, #050609 100%);
+  background: linear-gradient(180deg, #1d3aa0 0%, #0b2d75 42%, #071535 70%, #050609 100%);
 }
 
 .landing-screenshot {
@@ -941,11 +945,11 @@ textarea {
 }
 
 .dg-btn-warning-filled:hover {
-  filter: brightness(0.95);
+  background: color-mix(in srgb, var(--dg-color-warning) 95%, black);
 }
 
 .dg-btn-warning-filled:active {
-  filter: brightness(0.9);
+  background: color-mix(in srgb, var(--dg-color-warning) 90%, black);
 }
 
 /* Dashed outline (add item) */
@@ -1725,6 +1729,11 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--dg-color-text-faint);
   cursor: grab;
   touch-action: none;
@@ -1937,7 +1946,11 @@ textarea {
   background: var(--dg-overlay);
   backdrop-filter: blur(var(--dg-overlay-blur));
   -webkit-backdrop-filter: blur(var(--dg-overlay-blur));
-  z-index: 10000;
+  /* Above .staff-detail-pane/.dg-panel (z-index 10001): a Modal or
+     ConfirmDialog opened from a slide-over (e.g. Edit Management Access from
+     the staff detail panel) must stack over the panel that spawned it, not
+     behind it. */
+  z-index: 10010;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1946,7 +1959,7 @@ textarea {
 
 /* Variant: keep the sticky app header visible above the overlay. */
 .dg-modal-overlay.is-header-safe {
-  top: var(--header-height);
+  top: var(--dg-app-shell-header-height);
 }
 
 .dg-app-shell-header {
@@ -2325,7 +2338,7 @@ table tbody > tr:last-child > th {
   top: 12px;
   right: 12px;
   bottom: 12px;
-  width: min(480px, calc(100vw - 24px));
+  width: min(640px, calc(100vw - 24px));
   background: var(--dg-color-surface);
   display: flex;
   flex-direction: column;
@@ -2690,7 +2703,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   color: var(--dg-color-text-inverse);
   font-size: var(--dg-fs-badge);
   font-weight: 700;
-  border-radius: var(--dg-radius-md);
+  border-radius: 9999px;
   min-width: 18px;
   height: 18px;
   display: inline-flex;
@@ -3006,25 +3019,13 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   transform: translateY(-1px);
 }
 
-/* ── Spinner ────────────────────────────────────────────── */
-@keyframes dg-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.dg-spinner {
-  animation: dg-spin 700ms linear infinite;
-  flex-shrink: 0;
-}
-
 /* ── Loading Patterns ──────────────────────────────────── */
 /*
   Four sanctioned loading patterns:
   1. Page-level:   <ProgressBar loading={bool} />      — thin bar at top of viewport
   2. Button-level: <ButtonLoading loading={bool}>      — spinner overlay preserving button size
   3. Skeleton:     .dg-skeleton + size variants below  — shimmer placeholder while content loads
-  4. Spinner:      .dg-spinner                         — rotating icon for inline/blocking states
+  4. Spinner:      <ButtonSpinner>                     — shared native activity indicator
 */
 
 :where(.dg-skeleton) {
@@ -3147,21 +3148,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.dg-auth-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--dg-color-border-light);
-  border-top-color: var(--dg-color-primary);
-  border-radius: 50%;
-  animation: dg-auth-spin 0.8s linear infinite;
-}
-
-@keyframes dg-auth-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .dg-auth-shell {
@@ -3749,6 +3735,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   box-shadow: var(--dg-shadow-auth-card);
 }
 
+.dg-auth-organization-login {
+  width: 100%;
+  max-width: 440px;
+}
+
 /* ── Responsive: Tablet ────────────────────────────────── */
 @media (min-width: 768px) and (max-width: 1024px) {
   :root {
@@ -3915,7 +3906,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     border-bottom: 1px solid var(--dg-color-border-light);
     background: var(--dg-color-surface);
     position: sticky;
-    top: var(--header-height);
+    top: var(--dg-app-shell-header-height);
     z-index: 50;
   }
   .dg-mobile-section-bar::-webkit-scrollbar {

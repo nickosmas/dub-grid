@@ -56,7 +56,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             inline runtime string. */}
         <Script id="dg-theme-seed" src="/dg-theme-seed.js" strategy="beforeInteractive" />
       </head>
-      <body className="min-h-screen bg-[var(--dg-color-bg)] text-[var(--dg-color-text-primary)] antialiased">
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-[var(--dg-color-bg)] text-[var(--dg-color-text-primary)] antialiased"
+      >
         <ThemeProvider>
           {/* Only what every page needs. The auth, query and nav-shell
               providers moved to (app)/layout.tsx so the marketing pages stop

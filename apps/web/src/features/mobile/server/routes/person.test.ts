@@ -4,7 +4,9 @@ const requireMobileAuth = vi.fn();
 const fetchMobileEmployeeRowById = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
+const updateMobileEmployeeDetailsRow = vi.fn();
 const rowToEmployee = vi.fn();
+const validateStaffOrgReferences = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
@@ -14,13 +16,18 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileEmployeeRowById,
   fetchMobileManagementMembershipRowsByUserIds,
   fetchMobilePendingInvitationRowByEmployeeId,
-  insertMobileAuditLogEntry: vi.fn(),
-  updateMobileEmployeeDetailsRow: vi.fn(),
+  updateMobileEmployeeDetailsRow,
 }));
 
 vi.mock("@/lib/db/mappers", () => ({
   rowToEmployee,
 }));
+
+vi.mock("@/lib/staff-validation", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/staff-validation")>("@/lib/staff-validation");
+  return { ...actual, validateStaffOrgReferences };
+});
 
 const VIEWER_USER_ID = "3f1c5b7e-90ab-4c3d-8e2f-6a5b4c3d2e1f";
 const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
@@ -87,6 +94,7 @@ describe("mobile person route", () => {
     rowToEmployee.mockReturnValue(makeEmployee());
     mockManagementMemberships([{ user_id: PERSON_USER_ID, department_ids: [8] }]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
+    validateStaffOrgReferences.mockResolvedValue({});
   });
 
   it("rejects users without staff visibility", async () => {
@@ -212,6 +220,117 @@ describe("mobile person route", () => {
       roleIds: [],
       statusNote: "",
       userId: null,
+    });
+  });
+
+  describe("PATCH", () => {
+    function patchRequest(overrides: Record<string, unknown> = {}) {
+      return new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            expectedVersion: 7,
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "(415) 425-3334",
+            email: "mina@dubgrid.com",
+            contactNotes: "",
+            employmentType: "full_time",
+            certificationId: null,
+            focusAreaIds: [],
+            roleIds: [],
+            departmentIds: [],
+            ...overrides,
+          }),
+        },
+      ) as never;
+    }
+
+    it("rejects clearing focus areas for a person with no management access", async () => {
+      requireMobileAuth.mockResolvedValue(makeAuth());
+      mockManagementMemberships([]);
+      validateStaffOrgReferences.mockResolvedValueOnce({
+        focusAreaIds: "Select at least one focus area",
+      });
+
+      const { PATCH } = await import("./person");
+      const response = await PATCH(patchRequest(), {
+        params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }),
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("allows clearing focus areas for a person who also holds management access", async () => {
+      requireMobileAuth.mockResolvedValue(makeAuth());
+      mockManagementMemberships([{ user_id: PERSON_USER_ID, department_ids: [8] }]);
+      updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+
+      const { PATCH } = await import("./person");
+      const response = await PATCH(patchRequest(), {
+        params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }),
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    it("records only a certification change with its before and after values", async () => {
+      requireMobileAuth.mockResolvedValue(makeAuth());
+      updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+
+      const { PATCH } = await import("./person");
+      const response = await PATCH(
+        patchRequest({
+          contactNotes: "Weekend availability",
+          certificationId: 12,
+          focusAreaIds: [2],
+          roleIds: [3],
+          departmentIds: [4],
+        }),
+        {
+          params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(updateMobileEmployeeDetailsRow).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          audit: expect.objectContaining({
+            details: {
+              changedFields: ["certification"],
+              from: { certification: null },
+              to: { certification: 12 },
+            },
+          }),
+        }),
+      );
+    });
+
+    it("authorizes a no-op save without writing an audit payload", async () => {
+      requireMobileAuth.mockResolvedValue(makeAuth());
+      updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+
+      const { PATCH } = await import("./person");
+      const response = await PATCH(
+        patchRequest({
+          contactNotes: "Weekend availability",
+          focusAreaIds: [2],
+          roleIds: [3],
+          departmentIds: [4],
+        }),
+        {
+          params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const input = updateMobileEmployeeDetailsRow.mock.calls[0]?.[1] as {
+        audit: { actorId: string; details?: Record<string, unknown> };
+      };
+      expect(input.audit.actorId).toBe(VIEWER_USER_ID);
+      expect(input.audit).not.toHaveProperty("details");
     });
   });
 });

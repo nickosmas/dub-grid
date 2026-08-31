@@ -17,6 +17,7 @@ export const namedItemSchema = z.object({
   abbr: z.string(),
   isScheduleRole: z.boolean().optional(),
   departmentIds: z.array(z.number().int()).optional(),
+  requiredCertificationIds: z.array(z.number().int()).optional(),
   sortOrder: z.number().int(),
   archivedAt: z.string().nullable().optional(),
 });

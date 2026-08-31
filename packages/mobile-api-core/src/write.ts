@@ -1,13 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MobileNotificationBulkBody } from "@dubgrid/contracts";
 
-export class MobileApiRefreshError extends Error {
-  constructor(message = "Unable to refresh unread notification count") {
-    super(message);
-    this.name = "MobileApiRefreshError";
-  }
-}
-
 export type MobileNotificationMutationContext = {
   userClient: SupabaseClient;
 };
@@ -21,20 +14,11 @@ export type MobilePushTokenContext = {
   };
 };
 
-async function readUnreadNotificationCount(userClient: SupabaseClient): Promise<number> {
-  const unreadCountResult = await userClient.rpc("get_unread_notification_count");
-  if (unreadCountResult.error) {
-    throw unreadCountResult.error;
-  }
-
-  return (unreadCountResult.data as number | null) ?? 0;
-}
-
 export async function markMobileNotificationRead(
   auth: MobileNotificationMutationContext,
   notificationId: string,
 ): Promise<{ success: true; unreadCount: number }> {
-  const markReadResult = await auth.userClient.rpc("mark_notification_read", {
+  const markReadResult = await auth.userClient.rpc("mark_notification_read_with_unread_count", {
     p_notification_id: notificationId,
   });
 
@@ -42,36 +26,18 @@ export async function markMobileNotificationRead(
     throw markReadResult.error;
   }
 
-  try {
-    const unreadCount = await readUnreadNotificationCount(auth.userClient);
-
-    return {
-      success: true,
-      unreadCount,
-    };
-  } catch (error) {
-    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
-  }
+  return { success: true, unreadCount: (markReadResult.data as number | null) ?? 0 };
 }
 
 export async function markAllMobileNotificationsRead(
   auth: MobileNotificationMutationContext,
 ): Promise<{ success: true; unreadCount: number }> {
-  const markAllResult = await auth.userClient.rpc("mark_all_notifications_read");
+  const markAllResult = await auth.userClient.rpc("mark_all_notifications_read_with_unread_count");
   if (markAllResult.error) {
     throw markAllResult.error;
   }
 
-  try {
-    const unreadCount = await readUnreadNotificationCount(auth.userClient);
-
-    return {
-      success: true,
-      unreadCount,
-    };
-  } catch (error) {
-    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
-  }
+  return { success: true, unreadCount: (markAllResult.data as number | null) ?? 0 };
 }
 
 export async function bulkMutateMobileNotifications(
@@ -80,37 +46,18 @@ export async function bulkMutateMobileNotifications(
 ): Promise<{ success: true; unreadCount: number; updatedCount: number }> {
   const { ids, action } = input;
 
-  const patch =
-    action === "read"
-      ? { read_at: new Date().toISOString() }
-      : action === "unread"
-        ? { read_at: null }
-        : action === "archive"
-          ? { archived_at: new Date().toISOString() }
-          : { archived_at: null };
+  const { data, error } = await auth.userClient.rpc("mutate_notifications_with_unread_count", {
+    p_action: action,
+    p_notification_ids: ids,
+  });
+  if (error) throw error;
 
-  const { error: mutationError, count } = await auth.userClient
-    .from("notifications")
-    .update(patch, { count: "exact" })
-    .in("id", ids);
-
-  if (mutationError) {
-    throw mutationError;
-  }
-
-  const updatedCount = count ?? 0;
-
-  try {
-    const unreadCount = await readUnreadNotificationCount(auth.userClient);
-
-    return {
-      success: true,
-      unreadCount,
-      updatedCount,
-    };
-  } catch (error) {
-    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
-  }
+  const result = (data ?? {}) as { unreadCount?: number; updatedCount?: number };
+  return {
+    success: true,
+    unreadCount: result.unreadCount ?? 0,
+    updatedCount: result.updatedCount ?? 0,
+  };
 }
 
 export async function registerMobilePushToken(

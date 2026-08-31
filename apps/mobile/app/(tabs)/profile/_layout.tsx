@@ -1,18 +1,27 @@
 import { Stack } from "expo-router";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import {
-  createDetailStackOptions,
-  createTopLevelStackOptions,
-} from "../../../src/shared/navigation/top-level-stack";
+import { mobileTypography } from "../../../src/shared/theme/tokens";
+import { createDetailStackOptions } from "../../../src/shared/navigation/top-level-stack";
 
 export default function ProfileLayout() {
   const mobileColors = useMobileColors();
 
   return (
     <Stack>
-      {/* Large titles all the way down this section, the way Settings does it:
-          each pushed panel reads as a place of its own. */}
-      <Stack.Screen name="index" options={createTopLevelStackOptions(mobileColors, "Profile")} />
+      {/* The hub keeps a compact native bar. ProfileScreen replaces this
+          placeholder with the person's name once the profile is available. */}
+      <Stack.Screen
+        name="index"
+        options={{
+          ...createDetailStackOptions(mobileColors, "Profile", { scrollEdge: true }),
+          // Keep the native title machinery in place, but hide its placeholder
+          // until ProfileScreen has the person's name and the hero scrolls.
+          headerTitleStyle: {
+            color: "transparent",
+            fontFamily: mobileTypography.fontFamily.bold,
+          },
+        }}
+      />
       <Stack.Screen
         name="account"
         options={createDetailStackOptions(mobileColors, "Profile details", { largeTitle: true })}

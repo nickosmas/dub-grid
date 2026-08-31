@@ -202,4 +202,10 @@ describe("SettingsPage title help", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
+
+  it("keeps the footer navigation group label visible", () => {
+    render(<SettingsPage {...baseProps} />);
+
+    expect(screen.getByText("Danger Zone")).toBeInTheDocument();
+  });
 });

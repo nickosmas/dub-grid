@@ -3,10 +3,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { Organization } from "@/types";
 import { Button } from "@/components/Button";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -120,29 +117,31 @@ export default function OrganizationLabels({
             })
           : "Roles",
       };
-      const persisted = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        focusAreaLabel: updated.focusAreaLabel,
-        certificationLabel: updated.certificationLabel,
-        roleLabel: updated.roleLabel,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          focusAreaLabel: updated.focusAreaLabel,
+          certificationLabel: updated.certificationLabel,
+          roleLabel: updated.roleLabel,
+        },
       });
-      onSave(persisted);
+      onSave(result.organization);
+      if (result.status === "changed_elsewhere") {
+        setForm({
+          focusAreaLabel: result.organization.focusAreaLabel,
+          certificationLabel: result.organization.certificationLabel,
+          roleLabel: result.organization.roleLabel,
+        });
+        toast.info("Labels were refreshed to the latest saved values.");
+        return;
+      }
       toast.success("Labels saved");
     } catch (err) {
       lastSaveErrorRef.current = err;
-      if (err instanceof OrganizationSettingsConflictError) {
-        onSave(err.latestOrganization);
-        setForm({
-          focusAreaLabel: err.latestOrganization.focusAreaLabel,
-          certificationLabel: err.latestOrganization.certificationLabel,
-          roleLabel: err.latestOrganization.roleLabel,
-        });
-        toast.error("Labels changed elsewhere. Review the latest values and try again.");
-      } else {
-        toast.error("We couldn't save your labels. Try again.");
-        Sentry.captureException(err);
-      }
+      toast.error("We couldn't save your labels. Try again.");
+      Sentry.captureException(err);
     } finally {
       setSaving(false);
     }

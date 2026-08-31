@@ -18,6 +18,7 @@ import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
+import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatShiftRequestStatusLabel, formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import {
@@ -36,6 +37,7 @@ interface ScheduleTabProps {
   employee: Employee;
   shifts: ShiftMap;
   assignmentById: Map<number, AssignmentDefinition>;
+  assignmentNameMap: Map<number, string>;
   focusAreas: FocusArea[];
   categoryById: Map<number, ShiftCategory>;
   focusAreaById: Map<number, FocusArea>;
@@ -56,6 +58,7 @@ export function ScheduleTab({
   employee,
   shifts,
   assignmentById,
+  assignmentNameMap,
   categoryById,
   focusAreaById,
   absenceTypeById,
@@ -532,6 +535,10 @@ export function ScheduleTab({
                       <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
                       <TableCell className="text-[13px] font-semibold">
                         {joinShiftJobSegmentNames(request.requesterSegments ?? []) ||
+                          joinAssignmentNames(
+                            request.requesterAssignmentDefinitionIds,
+                            assignmentNameMap,
+                          ) ||
                           request.requesterShiftLabel}
                       </TableCell>
                       <TableCell>

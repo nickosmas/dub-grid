@@ -103,16 +103,21 @@ async function cloneOrgIntoSandbox(
   // Phase 2 — depend on departments. Certifications and roles carry
   // department_ids referencing the source organization's departments, so
   // without remapping the cloned rows would point back at the source org.
-  const [focusAreaMap, roleMap, certificationMap] = await Promise.all([
+  const [focusAreaMap, certificationMap] = await Promise.all([
     cloneOrgTable(svc, "focus_areas", sourceOrgId, sandboxOrgId, [
       { col: "department_id", map: departmentMap },
-    ]),
-    cloneOrgTable(svc, "organization_roles", sourceOrgId, sandboxOrgId, [
-      { col: "department_ids", map: departmentMap, isArray: true },
     ]),
     cloneOrgTable(svc, "certifications", sourceOrgId, sandboxOrgId, [
       { col: "department_ids", map: departmentMap, isArray: true },
     ]),
+  ]);
+
+  // Roles carry required_certification_ids, so they clone after certifications
+  // rather than beside them: cloning in the same phase would copy the source
+  // org's certification ids verbatim and leave every gated role unassignable.
+  const roleMap = await cloneOrgTable(svc, "organization_roles", sourceOrgId, sandboxOrgId, [
+    { col: "department_ids", map: departmentMap, isArray: true },
+    { col: "required_certification_ids", map: certificationMap, isArray: true },
   ]);
 
   // Phase 3 — shift categories depend on focus areas

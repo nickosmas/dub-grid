@@ -88,6 +88,12 @@ export function fetchShiftRequests(
     status?: ShiftRequestStatus[];
     type?: ShiftRequestType;
     empId?: string;
+    // Optional: scopes to requests whose requester/target shift date falls in
+    // this range. Omit for the unbounded, org-wide fetch (e.g. the schedule
+    // page's request-review UI, which must not silently drop older pending
+    // requests just because they fall outside a dashboard's period window).
+    startDate?: string;
+    endDate?: string;
   },
 ): Promise<ShiftRequest[]> {
   return requestScheduleAction<{ requests: ShiftRequest[] }>({
@@ -196,11 +202,13 @@ export function fetchPublishHistory(
   orgId: string,
   limit = 20,
   offset = 0,
+  dateRange?: { startDate: string; endDate: string },
 ): Promise<PublishHistoryEntryWithName[]> {
   const params = new URLSearchParams({
     orgId,
     limit: String(limit),
     offset: String(offset),
+    ...(dateRange ? { startDate: dateRange.startDate, endDate: dateRange.endDate } : {}),
   });
   return requestScheduleJson<{ entries: PublishHistoryEntryWithName[] }>(
     `/api/schedule/publish-history?${params}`,

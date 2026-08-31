@@ -115,6 +115,7 @@ function buildSource(
             shiftId: 60,
             jobId: 70,
             label: "DAY Caregiver",
+            isMentored: true,
             startTime: "07:00",
             endTime: "15:00",
           },
@@ -209,6 +210,25 @@ describe("operations reports", () => {
       absenceCount: 0,
       overtime: false,
     });
+    expect(payload.reports.mentoringHours).toEqual([
+      {
+        employeeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        employeeName: "Avery Ng",
+        mentoringHours: 8,
+        mentoredAssignmentCount: 1,
+        mentoredDays: 1,
+      },
+    ]);
+    expect(payload.reports.mentoringDetail).toEqual([
+      expect.objectContaining({
+        employeeName: "Avery Ng",
+        date: "2026-05-03",
+        focusArea: "North",
+        shift: "Day",
+        job: "Caregiver",
+        mentoringHours: 8,
+      }),
+    ]);
     expect(payload.reports.coverage[0]).toMatchObject({
       date: "2026-05-03",
       required: 2,
@@ -283,6 +303,7 @@ describe("operations reports", () => {
                 shiftId: 60,
                 jobId: 70,
                 label: "DAY Caregiver",
+                isMentored: true,
                 startTime: "07:00",
                 endTime: "15:00",
               },
@@ -299,6 +320,14 @@ describe("operations reports", () => {
       ]),
     );
     expect(payload.reports.scheduleMatrix.rows).toEqual(
+      expect.arrayContaining([expect.objectContaining({ employeeName: "Riley Stone" })]),
+    );
+    expect(payload.reports.mentoringHours).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ employeeName: "Riley Stone", mentoringHours: 8 }),
+      ]),
+    );
+    expect(payload.reports.mentoringDetail).toEqual(
       expect.arrayContaining([expect.objectContaining({ employeeName: "Riley Stone" })]),
     );
     expect(payload.reports.coverage[0]).toMatchObject({ scheduled: 2, openSlots: 0 });
@@ -352,6 +381,8 @@ describe("operations reports", () => {
     expect(payload.filters).toEqual({
       employeeIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
       focusAreaIds: [10],
+      shiftCategoryIds: [],
+      jobIds: [],
       dates: ["2026-05-03"],
     });
     expect(payload.filterOptions.focusAreas).toEqual([
@@ -368,6 +399,263 @@ describe("operations reports", () => {
     expect(payload.reports.absencesCalloffs).toEqual([
       expect.objectContaining({ kind: "calloff", employeeName: "Avery Ng" }),
     ]);
+  });
+
+  it("builds staff activity from published cells and request snapshots", () => {
+    const source = buildSource({
+      shiftCategories: [
+        { id: 60, name: "Day", focus_area_id: 10 },
+        { id: 61, name: "Night", focus_area_id: 10 },
+      ],
+      publishedRows: [
+        {
+          ...buildSource().publishedRows[0],
+          resolvedSegments: [
+            {
+              shiftId: 60,
+              jobId: 70,
+              label: "DAY Caregiver",
+              startTime: "07:00",
+              endTime: "15:00",
+            },
+            {
+              shiftId: 61,
+              jobId: 70,
+              label: "NIGHT Caregiver",
+              startTime: "15:00",
+              endTime: "23:00",
+            },
+          ],
+        },
+      ],
+      shiftRequests: [
+        {
+          ...buildSource().shiftRequests[0],
+          type: "swap",
+          status: "approved",
+          target_emp_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          target_shift_date: "2026-05-04",
+          requester_state: {
+            kind: "worked",
+            segments: [{ shiftId: 60, jobId: 70, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          target_state: {
+            kind: "worked",
+            segments: [{ shiftId: 61, jobId: 70, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(
+      source,
+      { startDate: "2026-05-03", endDate: "2026-05-04" },
+      { employeeIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"], shiftCategoryIds: [60] },
+    );
+
+    expect(payload.reports.staffHours[0]).toMatchObject({
+      scheduledHours: 8,
+      shiftBreakdown: "Day (1, 8h)",
+      jobBreakdown: "Caregiver (1, 8h)",
+    });
+    expect(payload.reports.staffActivity.summaries[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      publishedAbsenceDays: 0,
+      unscheduledDays: 1,
+      approvedImpactCount: 1,
+      allRequestCount: 1,
+      initiatedRequestCount: 1,
+      receivedRequestCount: 0,
+    });
+    expect(payload.reports.staffActivity.events).toEqual([
+      expect.objectContaining({
+        employeeName: "Avery Ng",
+        requestType: "swap",
+        participation: "initiated",
+        shiftCategories: "Day",
+      }),
+    ]);
+  });
+
+  it("labels valid shiftless assignments as General shift", () => {
+    const source = buildSource({
+      publishedRows: [
+        {
+          ...buildSource().publishedRows[0],
+          resolvedSegments: [
+            {
+              shiftId: null,
+              jobId: 70,
+              label: "Office",
+              startTime: "08:00",
+              endTime: "12:00",
+            },
+          ],
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-03",
+    });
+
+    expect(payload.reports.staffHours[0]).toMatchObject({
+      shiftBreakdown: "General shift (1, 4h)",
+      jobBreakdown: "Caregiver (1, 4h)",
+    });
+  });
+
+  it("intersects selected shift categories and jobs for one employee", () => {
+    const source = buildSource({
+      jobs: [
+        { id: 70, name: "Caregiver" },
+        { id: 71, name: "Supervisor" },
+      ],
+      publishedRows: [
+        {
+          ...buildSource().publishedRows[0],
+          resolvedSegments: [
+            {
+              shiftId: 60,
+              jobId: 70,
+              label: "DAY Caregiver",
+              startTime: "07:00",
+              endTime: "11:00",
+            },
+            {
+              shiftId: 60,
+              jobId: 71,
+              label: "DAY Supervisor",
+              startTime: "11:00",
+              endTime: "15:00",
+            },
+          ],
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(
+      source,
+      { startDate: "2026-05-03", endDate: "2026-05-03" },
+      {
+        employeeIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+        shiftCategoryIds: [60],
+        jobIds: [71],
+      },
+    );
+
+    expect(payload.reports.staffHours).toEqual([
+      expect.objectContaining({
+        employeeName: "Avery Ng",
+        scheduledHours: 4,
+        shiftBreakdown: "Day (1, 4h)",
+        jobBreakdown: "Supervisor (1, 4h)",
+      }),
+    ]);
+  });
+
+  it("counts only published mentored segments with their own duration and focus area", () => {
+    const source = buildSource({
+      employees: [{ ...buildSource().employees[0], focus_area_ids: [10, 11] }],
+      focusAreas: [
+        { id: 10, name: "North" },
+        { id: 11, name: "South" },
+      ],
+      shiftCategories: [
+        { id: 60, name: "Day", focus_area_id: 10 },
+        { id: 61, name: "Evening", focus_area_id: 11 },
+      ],
+      publishedRows: [
+        {
+          ...buildSource().publishedRows[0],
+          resolvedSegments: [
+            {
+              shiftId: 60,
+              jobId: 70,
+              label: "DAY Caregiver",
+              isMentored: true,
+              startTime: "07:00",
+              endTime: "15:00",
+              breakMinutes: 30,
+            },
+            {
+              shiftId: 61,
+              jobId: 70,
+              label: "EVE Caregiver",
+              isMentored: false,
+              startTime: "15:00",
+              endTime: "23:00",
+            },
+            {
+              shiftId: null,
+              jobId: 70,
+              label: "Mentoring meeting",
+              isMentored: true,
+              startTime: null,
+              endTime: null,
+              durationHours: 1.5,
+            },
+          ],
+        },
+        {
+          ...buildSource().publishedRows[0],
+          date: "2026-05-04",
+          resolvedSegments: [
+            {
+              shiftId: 60,
+              jobId: 70,
+              label: "DAY Caregiver",
+              isMentored: true,
+              startTime: "23:00",
+              endTime: "03:00",
+            },
+          ],
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(
+      source,
+      { startDate: "2026-05-03", endDate: "2026-05-04" },
+      { focusAreaIds: [10], dates: ["2026-05-04"] },
+    );
+
+    expect(payload.reports.mentoringHours).toEqual([
+      expect.objectContaining({
+        employeeName: "Avery Ng",
+        mentoringHours: 4,
+        mentoredAssignmentCount: 1,
+        mentoredDays: 1,
+      }),
+    ]);
+    expect(payload.reports.mentoringDetail).toEqual([
+      expect.objectContaining({
+        date: "2026-05-04",
+        focusArea: "North",
+        mentoringHours: 4,
+      }),
+    ]);
+
+    const fullRangePayload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+    expect(fullRangePayload.reports.mentoringHours[0]).toMatchObject({
+      mentoringHours: 13,
+      mentoredAssignmentCount: 3,
+      mentoredDays: 2,
+    });
   });
 
   it("keeps management-only staff (no focus area) in roster reports but not schedule reports, even with a focus area filter", () => {
@@ -622,16 +910,18 @@ describe("operations reports", () => {
         "Scheduled hours",
         "Shifts worked",
         "Days worked",
+        "Shift breakdown",
+        "Job breakdown",
         "Absence days",
         "Overtime hours",
       ],
       rows: [
-        ["Avery Ng", 8, 1, 1, 0, 0],
-        ["Blake Diaz", 0, 0, 0, 1, 0],
+        ["Avery Ng", 8, 1, 1, "Day (1, 8h)", "Caregiver (1, 8h)", 0, 0],
+        ["Blake Diaz", 0, 0, 0, "No categorized shifts", "No jobs", 1, 0],
       ],
     });
     expect(buildOperationsReportCsv(payload, "staff-hours")).toContain(
-      "Employee,Scheduled hours,Shifts worked,Days worked,Absence days,Overtime hours\r\nAvery Ng,8,1,1,0,0",
+      'Employee,Scheduled hours,Shifts worked,Days worked,Shift breakdown,Job breakdown,Absence days,Overtime hours\r\nAvery Ng,8,1,1,"Day (1, 8h)","Caregiver (1, 8h)",0,0',
     );
     const employeeDirectoryCsv = buildOperationsReportCsv(payload, "employee-directory");
     expect(employeeDirectoryCsv).toContain(
@@ -690,10 +980,60 @@ describe("operations reports", () => {
           "Scheduled hours",
           "Shifts worked",
           "Days worked",
+          "Shift breakdown",
+          "Job breakdown",
           "Absence days",
           "Overtime hours",
         ],
-        firstRow: ["Avery Ng", 8, 1, 1, 0, 0],
+        firstRow: ["Avery Ng", 8, 1, 1, "Day (1, 8h)", "Caregiver (1, 8h)", 0, 0],
+      },
+      {
+        report: "staff-activity",
+        headers: [
+          "Staff member",
+          "Scheduled hours",
+          "Shift assignments",
+          "Work days",
+          "Shift breakdown",
+          "Job breakdown",
+          "Published off days",
+          "Unscheduled days",
+          "Approved impact",
+          "All request activity",
+          "Request breakdown",
+        ],
+        firstRow: [
+          "Avery Ng",
+          8,
+          1,
+          1,
+          "Day (1, 8h)",
+          "Caregiver (1, 8h)",
+          0,
+          1,
+          1,
+          1,
+          "Initiated calloff (approved) (1)",
+        ],
+      },
+      {
+        report: "mentoring-hours",
+        headers: ["Staff member", "Mentoring hours", "Mentored assignments", "Mentored days"],
+        firstRow: ["Avery Ng", 8, 1, 1],
+      },
+      {
+        report: "mentoring-detail",
+        headers: [
+          "Staff member",
+          "Date",
+          "Focus area",
+          "Shift",
+          "Job",
+          "Start time",
+          "End time",
+          "Mentoring hours",
+        ],
+        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "07:00", "15:00", 8],
       },
       {
         report: "coverage",

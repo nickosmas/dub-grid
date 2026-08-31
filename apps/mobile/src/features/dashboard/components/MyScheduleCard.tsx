@@ -161,8 +161,6 @@ export function MyScheduleCard({
   return (
     <Card
       title="Your schedule"
-      icon="calendar-outline"
-      iconTone="brand"
       headerAccessory={
         onExpand ? (
           <ExpandButton accessibilityLabel="Expand your schedule" onPress={onExpand} />

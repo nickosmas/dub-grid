@@ -67,8 +67,6 @@ export function ActivityFeedCard({
   return (
     <Card
       title="Recent activity"
-      icon="time-outline"
-      iconTone="brand"
       detail={
         items.length > 0 ? (
           <ExpandableList

@@ -98,7 +98,7 @@ export default function ImpersonationBanner() {
       style={{
         height: BANNER_HEIGHT,
         background: "linear-gradient(135deg, var(--dg-color-danger), var(--dg-color-danger-dark))",
-        color: "#fff",
+        color: "var(--dg-color-text-inverse)",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
@@ -160,7 +160,7 @@ export default function ImpersonationBanner() {
         disabled={ending}
         style={{
           background: "rgba(255,255,255,0.2)",
-          color: "#fff",
+          color: "var(--dg-color-text-inverse)",
           border: "1px solid rgba(255,255,255,0.4)",
           borderRadius: 6,
           padding: "4px 12px",

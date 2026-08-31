@@ -60,6 +60,7 @@ import type {
 } from "./schedule-grid/model";
 import {
   getCertAbbr,
+  getCertName,
   getRoleAbbrs,
   getEmployeeDisplayName,
   fmt12h,
@@ -159,7 +160,7 @@ interface LegacyScheduleGridProps {
     focusAreaName?: string,
     trigger?: "click" | "keyboard",
   ) => void;
-  today: Date;
+  todayKey: string;
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   focusAreas: FocusArea[];
@@ -228,6 +229,8 @@ interface LegacyScheduleGridProps {
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+  /** Whether roles and certifications use their saved compact labels. */
+  useCompactRoleCertificationLabels?: boolean;
   /** Whether shift pills reveal full cell details on hover. */
   showShiftDetailHoverCards?: boolean;
   /** Resolves a user UUID to a display name for publish tooltips */
@@ -324,6 +327,7 @@ interface SectionBlockProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  useCompactRoleCertificationLabels?: boolean;
   showShiftDetailHoverCards?: boolean;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
@@ -350,6 +354,107 @@ type ShiftDetailEntry = {
   isCustomTime: boolean;
   isMentored: boolean;
 };
+
+function EmployeeDetailHoverCard({
+  employeeName,
+  certificationName,
+  roleNames,
+  children,
+}: {
+  employeeName: string;
+  certificationName: string;
+  roleNames: string[];
+  children: React.ReactElement<
+    React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
+  >;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+
+  const trigger = React.cloneElement(children, {
+    ref: (node: HTMLDivElement | null) => {
+      triggerRef.current = node;
+    },
+    onMouseEnter: (event: React.MouseEvent<HTMLDivElement>) => {
+      children.props.onMouseEnter?.(event);
+      setIsOpen(true);
+    },
+    onMouseLeave: (event: React.MouseEvent<HTMLDivElement>) => {
+      children.props.onMouseLeave?.(event);
+      setIsOpen(false);
+    },
+  });
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      {trigger}
+      {isOpen && triggerRef.current ? (
+        <PopoverContent
+          anchor={triggerRef}
+          collisionPadding={12}
+          positionMethod="fixed"
+          side="right"
+          sideOffset={10}
+          showArrow
+          data-employee-detail-card
+          style={{
+            display: "block",
+            width: 300,
+            maxWidth: "calc(100vw - 32px)",
+            padding: 0,
+            border: "1px solid var(--dg-color-border)",
+            borderRadius: "var(--dg-radius-md)",
+            background: "var(--dg-color-surface)",
+            color: "var(--dg-color-text-primary)",
+            boxShadow: "var(--tooltip-shadow)",
+            overflow: "visible",
+          }}
+        >
+          <div
+            style={{
+              overflow: "hidden",
+              borderRadius: "var(--dg-radius-md)",
+            }}
+          >
+            <div
+              data-employee-detail-header
+              style={{
+                margin: "2px 2px 0",
+                padding: "10px 12px",
+                background: "var(--dg-color-bg-secondary)",
+                borderRadius: "var(--dg-radius-sm)",
+              }}
+            >
+              <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700 }}>{employeeName}</div>
+            </div>
+            <dl style={{ display: "grid", gap: 10, margin: 0, padding: 12 }}>
+              <div>
+                <dt
+                  style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}
+                >
+                  Certification
+                </dt>
+                <dd style={{ margin: "2px 0 0", fontSize: "var(--dg-fs-label)" }}>
+                  {certificationName || "None"}
+                </dd>
+              </div>
+              <div>
+                <dt
+                  style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}
+                >
+                  Roles
+                </dt>
+                <dd style={{ margin: "2px 0 0", fontSize: "var(--dg-fs-label)" }}>
+                  {roleNames.length > 0 ? roleNames.join(", ") : "None"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </PopoverContent>
+      ) : null}
+    </Popover>
+  );
+}
 
 function ShiftDetailHoverCard({
   enabled,
@@ -382,7 +487,6 @@ function ShiftDetailHoverCard({
     month: "short",
     day: "numeric",
   });
-
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
       triggerRef.current = node;
@@ -422,16 +526,18 @@ function ShiftDetailHoverCard({
           }}
         >
           <div
+            data-shift-detail-header
             style={{
               overflow: "hidden",
-              borderRadius: "inherit",
+              borderRadius: "var(--dg-radius-md)",
             }}
           >
             <div
               style={{
+                margin: "2px 2px 0",
                 padding: "10px 12px",
-                borderBottom: "1px solid var(--dg-color-border-light)",
                 background: "var(--dg-color-bg-secondary)",
+                borderRadius: "var(--dg-radius-sm)",
               }}
             >
               <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700 }}>{employeeName}</div>
@@ -451,7 +557,12 @@ function ShiftDetailHoverCard({
                   key={`${entry.label}-${index}`}
                   style={{ display: "flex", flexDirection: "column", gap: 2 }}
                 >
-                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700 }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 700,
+                    }}
+                  >
                     {entry.label}
                   </div>
                   {entry.jobName ? (
@@ -480,6 +591,7 @@ function ShiftDetailHoverCard({
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         color: "var(--dg-color-text-muted)",
+                        overflowWrap: "anywhere",
                       }}
                     >
                       {entry.focusAreaName}
@@ -569,6 +681,7 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeIdForKey,
   activeRequestForKey,
   shiftDisplayMode = "code",
+  useCompactRoleCertificationLabels = false,
   showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
@@ -942,7 +1055,7 @@ const SectionBlock = memo(function SectionBlock({
       <div style={{ marginBottom: 24 }}>
         <div
           style={{
-            fontSize: "var(--dg-fs-heading)",
+            fontSize: "var(--dg-fs-section-title)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
             padding: "10px 0 8px",
@@ -972,27 +1085,13 @@ const SectionBlock = memo(function SectionBlock({
       {/* Section label */}
       <div
         style={{
-          fontSize: "var(--dg-fs-heading)",
+          fontSize: "var(--dg-fs-section-title)",
           fontWeight: 800,
-          color: "var(--dg-color-text-secondary)",
+          color: "var(--dg-color-text-primary)",
           marginBottom: 10,
-          padding: "6px 10px 6px 8px",
-          background: "var(--dg-color-bg-secondary)",
-          borderRadius: 6,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
+          padding: "2px 0",
         }}
       >
-        <span
-          style={{
-            width: 3,
-            height: 18,
-            borderRadius: 2,
-            background: "var(--dg-color-brand)",
-            flexShrink: 0,
-          }}
-        />
         {sectionName}
       </div>
 
@@ -1439,7 +1538,10 @@ const SectionBlock = memo(function SectionBlock({
                     ? "linear-gradient(90deg, var(--dg-color-brand-bg) 0%, var(--dg-color-today-bg) 100%)"
                     : "var(--dg-color-brand-bg)"
                   : baseRowBg;
-              const certAbbr = getCertAbbr(emp.certificationId, certifications);
+              const certAbbr = getCertAbbr(emp.certificationId, certifications, true);
+              const certificationName = getCertName(emp.certificationId, certifications);
+              const roleAbbrs = getRoleAbbrs(emp.roleIds, orgRoles, true);
+              const roleNames = getRoleAbbrs(emp.roleIds, orgRoles, false);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
               return (
@@ -1509,36 +1611,51 @@ const SectionBlock = memo(function SectionBlock({
                         </span>
                       </MaybeHint>
                       {emp.roleIds.length > 0 && (
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-badge)",
-                            color: "var(--dg-color-text-subtle)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            lineHeight: "var(--dg-lh-tight)",
-                          }}
+                        <EmployeeDetailHoverCard
+                          employeeName={getEmployeeDisplayName(emp)}
+                          certificationName={certificationName}
+                          roleNames={roleNames}
                         >
-                          {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
-                        </span>
+                          <div style={{ minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: "var(--dg-fs-badge)",
+                                color: "var(--dg-color-text-subtle)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                lineHeight: "var(--dg-lh-tight)",
+                              }}
+                            >
+                              {roleAbbrs.join(", ")}
+                            </span>
+                          </div>
+                        </EmployeeDetailHoverCard>
                       )}
                     </div>
                     {emp.certificationId != null && (
-                      <span
-                        style={{
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 700,
-                          background: dc.bg,
-                          color: dc.text,
-                          padding: "2px 7px",
-                          borderRadius: 20,
-                          whiteSpace: "nowrap",
-                          flexShrink: 0,
-                          letterSpacing: "0.01em",
-                        }}
+                      <EmployeeDetailHoverCard
+                        employeeName={getEmployeeDisplayName(emp)}
+                        certificationName={certificationName}
+                        roleNames={roleNames}
                       >
-                        {certAbbr}
-                      </span>
+                        <div style={{ flexShrink: 0 }}>
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              fontWeight: 700,
+                              background: dc.bg,
+                              color: dc.text,
+                              padding: "2px 7px",
+                              borderRadius: 20,
+                              whiteSpace: "nowrap",
+                              letterSpacing: "0.01em",
+                            }}
+                          >
+                            {certAbbr}
+                          </span>
+                        </div>
+                      </EmployeeDetailHoverCard>
                     )}
                   </div>
 
@@ -3432,7 +3549,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedSegmentsForKey,
   getShiftStyle,
   handleCellClick,
-  today,
+  todayKey,
   highlightEmpIds,
   highlightScrollKey,
   focusAreas,
@@ -3468,6 +3585,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   absenceTypeIdForKey,
   activeRequestForKey,
   shiftDisplayMode = "code",
+  useCompactRoleCertificationLabels = false,
   showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
@@ -3478,8 +3596,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   bulkSelectableCellKeys,
   onToggleBulkDeleteCell,
 }: LegacyScheduleGridProps) {
-  const todayKey = useMemo(() => formatDateKey(today), [today]);
-
   const departmentSections = useMemo(() => {
     // Get scheduled departments, sorted
     const scheduledDepts = departments
@@ -3794,6 +3910,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     absenceTypeIdForKey={absenceTypeIdForKey}
                     activeRequestForKey={activeRequestForKey}
                     shiftDisplayMode={shiftDisplayMode}
+                    useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
                     showShiftDetailHoverCards={showShiftDetailHoverCards}
                     resolvePublisherName={resolvePublisherName}
                     openShifts={openShifts?.filter(
@@ -3979,7 +4096,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         publishedSegmentsForKey={model.accessors.publishedSegmentsForKey}
         getShiftStyle={model.accessors.getShiftStyle}
         handleCellClick={handleLegacyCellClick}
-        today={model.today}
+        todayKey={model.todayKey}
         highlightEmpIds={model.options.highlightEmpIds}
         highlightScrollKey={model.options.highlightScrollKey}
         focusAreas={model.focusAreas}
@@ -3995,6 +4112,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         activeFocusArea={model.activeFocusArea}
         certifications={model.certifications}
         orgRoles={model.orgRoles}
+        useCompactRoleCertificationLabels={model.useCompactRoleCertificationLabels}
         getCustomShiftTimes={model.accessors.getCustomShiftTimes}
         getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
         draftKindForKey={model.accessors.draftKindForKey}

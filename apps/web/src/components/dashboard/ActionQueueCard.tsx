@@ -5,6 +5,7 @@ import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/Button";
 import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
+import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import type { ShiftRequest } from "@/types";
 import type { OpenShift } from "@/lib/dashboard-stats";
 
@@ -25,7 +26,10 @@ const URGENCY_DOT: Record<string, string> = {
   low: "var(--dg-color-info)",
 };
 
-function getRequestShiftName(request: ShiftRequest): string {
+function getRequestShiftName(
+  request: ShiftRequest,
+  assignmentNameMap: Map<number, string>,
+): string {
   const segmentNames =
     request.requesterPresentation?.segments
       ?.map((segment) => segment.shiftName?.trim())
@@ -39,6 +43,7 @@ function getRequestShiftName(request: ShiftRequest): string {
   return (
     request.requesterPresentation?.shiftName?.trim() ||
     request.requesterPresentation?.label?.trim() ||
+    joinAssignmentNames(request.requesterAssignmentDefinitionIds, assignmentNameMap) ||
     request.requesterShiftLabel
   );
 }
@@ -61,6 +66,7 @@ export function buildActionItems({
   onResolve,
   onRespond,
   onClaim,
+  assignmentNameMap,
 }: {
   isAdmin: boolean;
   pendingApproval: ShiftRequest[];
@@ -72,13 +78,14 @@ export function buildActionItems({
   onResolve?: (id: string, approved: boolean) => Promise<boolean>;
   onRespond?: (id: string, empId: string, accept: boolean) => Promise<boolean>;
   onClaim?: (id: string, empId: string) => Promise<boolean>;
+  assignmentNameMap: Map<number, string>;
 }): ActionItem[] {
   const items: ActionItem[] = [];
 
   if (isAdmin) {
     // Pending approvals
     for (const req of pendingApproval.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req);
+      const shiftName = getRequestShiftName(req, assignmentNameMap);
       items.push({
         id: `approval-${req.id}`,
         type: "approval",
@@ -122,7 +129,7 @@ export function buildActionItems({
   } else {
     // User: swap proposals
     for (const req of swapProposals.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req);
+      const shiftName = getRequestShiftName(req, assignmentNameMap);
       items.push({
         id: `swap-${req.id}`,
         type: "swap_proposal",
@@ -148,7 +155,7 @@ export function buildActionItems({
 
     // User: open pickups
     for (const req of openPickups.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req);
+      const shiftName = getRequestShiftName(req, assignmentNameMap);
       items.push({
         id: `pickup-${req.id}`,
         type: "pickup",

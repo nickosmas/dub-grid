@@ -20,10 +20,7 @@ import {
 } from "@/features/settings/client";
 import type { DependencyInfo } from "@/features/settings/client";
 import { Button } from "@/components/Button";
-import {
-  OrganizationSettingsConflictError,
-  updateOrganizationSettings,
-} from "@/features/organization/client";
+import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -100,6 +97,10 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
 } as const;
 const DEFAULT_SHIFT_JOB_NAME = "Default shift job";
 const DEFAULT_SHIFT_JOB_ABBR = "SHIFT";
+
+function deriveJobAbbreviation(name: string): string {
+  return name.trim().slice(0, 4).toUpperCase();
+}
 
 function getJobSection(job: Pick<JobDefinition, "assignmentMode">): JobSection {
   return job.assignmentMode === "shiftless" ? "shiftless" : "scheduled";
@@ -395,12 +396,59 @@ function ShiftPreviewPill({
 function SectionBlock({
   title,
   description,
+  summary,
+  collapsible = false,
+  defaultOpen = true,
   children,
 }: {
   title: string;
   description?: string;
+  summary?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = React.useId();
+
+  useEffect(() => {
+    if (defaultOpen) {
+      setOpen(true);
+    }
+  }, [defaultOpen]);
+
+  const header = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 800,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: "var(--dg-color-text-secondary)",
+        }}
+      >
+        {title}
+      </div>
+      {description ? (
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </div>
+      ) : null}
+      {summary ? (
+        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-faint)" }}>
+          {summary}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -413,33 +461,42 @@ function SectionBlock({
         gap: 12,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
+      {collapsible ? (
+        <Button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((current) => !current)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            width: "100%",
+            padding: 0,
+            background: "transparent",
+            border: "none",
+            textAlign: "left",
+          }}
+        >
+          {header}
+          <span
+            aria-hidden="true"
             style={{
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 800,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: "var(--dg-color-text-secondary)",
+              color: "var(--dg-color-text-faint)",
+              transform: open ? "rotate(180deg)" : "none",
+              transition: "transform 150ms ease",
             }}
           >
-            {title}
-          </div>
-        </div>
-        {description ? (
-          <div
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--dg-color-text-muted)",
-              lineHeight: 1.5,
-            }}
-          >
-            {description}
-          </div>
-        ) : null}
+            ▾
+          </span>
+        </Button>
+      ) : (
+        header
+      )}
+      <div id={collapsible ? panelId : undefined} hidden={collapsible && !open}>
+        {children}
       </div>
-      {children}
     </div>
   );
 }
@@ -659,22 +716,25 @@ function DefaultShiftToggle({
 
     setSaving(true);
     try {
-      const updated = await updateOrganizationSettings({
-        orgId: organization.id,
-        expectedUpdatedAt: organization.updatedAt,
-        defaultShiftEnabled: next,
+      const result = await saveOrganizationSettingsWithRecovery({
+        baseline: organization,
+        input: {
+          orgId: organization.id,
+          expectedUpdatedAt: organization.updatedAt,
+          defaultShiftEnabled: next,
+        },
       });
-      setEnabled(next);
-      onOrganizationSave(updated);
-      toast.success(next ? "Shift-only assignments enabled" : "Shift-only assignments disabled");
+      setEnabled(result.organization.defaultShiftEnabled);
+      onOrganizationSave(result.organization);
+      toast[result.status === "saved" ? "success" : "info"](
+        result.status === "saved"
+          ? next
+            ? "Shift-only assignments enabled"
+            : "Shift-only assignments disabled"
+          : "This setting was refreshed to the latest saved value.",
+      );
     } catch (err) {
-      if (err instanceof OrganizationSettingsConflictError) {
-        onOrganizationSave(err.latestOrganization);
-        setEnabled(err.latestOrganization.defaultShiftEnabled);
-        toast.error("This setting changed elsewhere. Review the latest value and try again.");
-      } else {
-        toast.error("We couldn't save that setting. Try again.");
-      }
+      toast.error("We couldn't save that setting. Try again.");
     } finally {
       setSaving(false);
       setPendingValue(null);
@@ -850,6 +910,7 @@ function JobRow({
   onDeleted,
   canManageScheduleDefinitions,
   allJobs,
+  shiftDisplayMode,
   isLast,
 }: {
   job: JobDefinition & { isNew?: boolean };
@@ -866,9 +927,11 @@ function JobRow({
   onDeleted: (id: number) => void;
   canManageScheduleDefinitions: boolean;
   allJobs: Array<JobDefinition & { isNew?: boolean }>;
+  shiftDisplayMode: ShiftDisplayMode;
   isLast?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
+  const isNameMode = shiftDisplayMode === "name";
   const isRegularStaffJob = isRegularStaffSystemJob(job);
   const isDefaultShiftJob = section === "defaultShift" || isDefaultShiftSystemJob(job);
   const isLockedIdentityJob = isProtectedSystemJob(job) || isDefaultShiftJob;
@@ -1015,7 +1078,7 @@ function JobRow({
         })
       : null;
   const abbrError =
-    form.abbr.trim().length > 0
+    !isNameMode && form.abbr.trim().length > 0
       ? getCodeError(form.abbr, {
           label: "Job abbreviation",
           maxLength: 6,
@@ -1031,6 +1094,7 @@ function JobRow({
         candidate.id !== job.id && candidate.name.trim().toLowerCase() === normalizedName,
     );
   const duplicateAbbr =
+    !isNameMode &&
     !isLockedIdentityJob &&
     normalizedAbbr.length > 0 &&
     allJobs.some(
@@ -1046,7 +1110,7 @@ function JobRow({
   const canSave =
     isDirty &&
     !!form.name.trim() &&
-    !!form.abbr.trim() &&
+    (isNameMode || !!form.abbr.trim()) &&
     !nameError &&
     !abbrError &&
     !duplicateName &&
@@ -1154,12 +1218,14 @@ function JobRow({
             }),
         abbr: isDefaultShiftJob
           ? DEFAULT_SHIFT_JOB_ABBR
-          : normalizeCode(form.abbr, {
-              label: "Job abbreviation",
-              maxLength: 6,
-              required: true,
-              uppercase: true,
-            }),
+          : isNameMode
+            ? form.abbr.trim() || deriveJobAbbreviation(form.name)
+            : normalizeCode(form.abbr, {
+                label: "Job abbreviation",
+                maxLength: 6,
+                required: true,
+                uppercase: true,
+              }),
         showOnGrid: isLockedIdentityJob ? false : true,
         assignmentMode: section === "shiftless" ? "shiftless" : "with_shift",
         eligibilityMode: form.eligibilityMode,
@@ -1262,6 +1328,15 @@ function JobRow({
       : `${formatCount(form.requiredCertificationIds.length, certificationLabel.toLowerCase())} selected`;
   const eligibilityModeDimmed =
     form.eligibleRoleIds.length === 0 || form.requiredCertificationIds.length === 0;
+  const overrideCount =
+    Object.keys(form.shiftColorOverrides).length + Object.keys(form.shiftTimeOverrides).length;
+  const perShiftSettingsSummary =
+    form.applicableShiftIds.length === 0
+      ? "Select shifts in Placement first."
+      : overrideCount === 0
+        ? "Using each selected shift's defaults."
+        : `${formatCount(overrideCount, "override")} configured`;
+  const editorId = React.useId();
 
   return (
     <div
@@ -1270,8 +1345,11 @@ function JobRow({
         borderBottom: expanded || isLast ? "none" : "1px solid var(--dg-color-border-light)",
       }}
     >
-      <div
+      <Button
+        type="button"
         className="dg-hover-row"
+        aria-expanded={expanded}
+        aria-controls={editorId}
         style={{
           display: "flex",
           alignItems: "center",
@@ -1280,6 +1358,10 @@ function JobRow({
           borderRadius: 8,
           cursor: "pointer",
           transition: "background 0.15s",
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
         }}
         onClick={toggleExpanded}
       >
@@ -1315,10 +1397,11 @@ function JobRow({
         >
           ▾
         </span>
-      </div>
+      </Button>
 
       {expanded ? (
         <div
+          id={editorId}
           style={{
             background: "var(--dg-color-bg-secondary)",
             borderRadius: "var(--dg-radius-lg)",
@@ -1335,392 +1418,412 @@ function JobRow({
             title="Basics"
             description={
               isDefaultShiftJob
-                ? "Use this row for assignments that should display as the shift only, like D or Day Shift."
+                ? isNameMode
+                  ? "Use this row for assignments that should display as the shift only."
+                  : "Use this row for assignments that should display as the shift only, like D or Day Shift."
                 : section === "scheduled"
                   ? "Name the job once, then configure exactly how it behaves on the selected shifts."
                   : "Use shiftless jobs for work that stands on its own without a scheduled shift."
             }
           >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 150px",
-                gap: 10,
-              }}
-            >
-              <div>
-                <label style={labelStyle}>JOB NAME</label>
-                <input
-                  value={form.name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  placeholder={section === "shiftless" ? "e.g. Office" : "e.g. Supervisor"}
-                  className="dg-input"
-                  maxLength={50}
-                  disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
-                  style={nameError ? { borderColor: "var(--dg-color-danger)" } : undefined}
-                />
-                {nameError ? (
-                  <p
-                    role="alert"
-                    style={{
-                      margin: "4px 0 0",
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-danger)",
-                    }}
-                  >
-                    {nameError}
-                  </p>
-                ) : null}
-              </div>
-              <div>
-                <label style={labelStyle}>GRID ABBR</label>
-                <input
-                  value={form.abbr}
-                  onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))}
-                  placeholder={section === "shiftless" ? "e.g. OFC" : "e.g. SUP"}
-                  className="dg-input"
-                  maxLength={6}
-                  disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
-                  style={abbrError ? { borderColor: "var(--dg-color-danger)" } : undefined}
-                />
-                {abbrError ? (
-                  <p
-                    role="alert"
-                    style={{
-                      margin: "4px 0 0",
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-danger)",
-                    }}
-                  >
-                    {abbrError}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            {section === "shiftless" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)",
-                  gap: 12,
+                  gridTemplateColumns: isNameMode || isMobile ? "1fr" : "minmax(0, 1fr) 150px",
+                  gap: 10,
                 }}
               >
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={labelStyle}>COLOR PRESET</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <PresetColorPicker
-                      valueBg={form.color}
-                      onChange={(color) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          color: color.bg,
-                          text: color.text,
-                          border: TRANSPARENT_BORDER,
-                        }))
-                      }
-                      disabled={!canManageScheduleDefinitions}
-                    />
-                    <ShiftPreviewPill
-                      primary={getJobPreviewLabel({
-                        jobName: form.name,
-                        jobAbbr: form.abbr,
-                        shiftDisplayMode: "name",
-                      })}
-                      bg={form.color}
-                      mode="name"
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {hasGeneralJobDuration ? (
-                    <>
-                      <label style={labelStyle}>DEFAULT DURATION</label>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={23}
-                          value={normalizedShiftlessTiming.defaultDurationHours ?? ""}
-                          onChange={(event) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              defaultStartTime: null,
-                              defaultEndTime: null,
-                              defaultDurationHours:
-                                event.target.value === ""
-                                  ? null
-                                  : Math.max(0, Math.min(23, Number(event.target.value))),
-                            }))
-                          }
-                          style={{ ...inputStyle, width: 72, textAlign: "center" }}
-                          disabled={!canManageScheduleDefinitions}
-                        />
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-label)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          h
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={59}
-                          value={normalizedShiftlessTiming.defaultDurationMinutes ?? ""}
-                          onChange={(event) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              defaultStartTime: null,
-                              defaultEndTime: null,
-                              defaultDurationMinutes:
-                                event.target.value === ""
-                                  ? null
-                                  : Math.max(0, Math.min(59, Number(event.target.value))),
-                            }))
-                          }
-                          style={{ ...inputStyle, width: 72, textAlign: "center" }}
-                          disabled={!canManageScheduleDefinitions}
-                        />
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-label)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          m
-                        </span>
-                      </div>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "var(--dg-fs-caption)",
-                          color: "var(--dg-color-text-muted)",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        Use a duration when this general job should stay untethered from a fixed
-                        start and end time.
-                      </p>
-                      {canManageScheduleDefinitions ? (
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultDurationHours: null,
-                                defaultDurationMinutes: null,
-                              }))
-                            }
-                          >
-                            Remove duration
-                          </Button>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultStartTime: "07:00",
-                                defaultEndTime: "15:00",
-                                defaultDurationHours: null,
-                                defaultDurationMinutes: null,
-                              }))
-                            }
-                          >
-                            Set actual times instead
-                          </Button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : hasGeneralJobFixedTime ? (
-                    <>
-                      <label style={labelStyle}>DEFAULT START / END</label>
-                      <div
-                        style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
-                      >
-                        <TimeInput12h
-                          value={normalizedShiftlessTiming.defaultStartTime}
-                          onChange={(value) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              defaultStartTime: value,
-                              defaultDurationHours: null,
-                              defaultDurationMinutes: null,
-                            }))
-                          }
-                          disabled={!canManageScheduleDefinitions}
-                        />
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-label)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          to
-                        </span>
-                        <TimeInput12h
-                          value={normalizedShiftlessTiming.defaultEndTime}
-                          onChange={(value) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              defaultEndTime: value,
-                              defaultDurationHours: null,
-                              defaultDurationMinutes: null,
-                            }))
-                          }
-                          disabled={!canManageScheduleDefinitions}
-                        />
-                      </div>
-                      {calcTimeDuration(
-                        normalizedShiftlessTiming.defaultStartTime,
-                        normalizedShiftlessTiming.defaultEndTime,
-                      ) ? (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-caption)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          Duration:{" "}
-                          <span
-                            style={{ fontWeight: 600, color: "var(--dg-color-text-secondary)" }}
-                          >
-                            {calcTimeDuration(
-                              normalizedShiftlessTiming.defaultStartTime,
-                              normalizedShiftlessTiming.defaultEndTime,
-                            )}
-                          </span>
-                        </div>
-                      ) : null}
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "var(--dg-fs-caption)",
-                          color: "var(--dg-color-text-muted)",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        Fixed times take priority over duration for general jobs, so only one timing
-                        mode can be saved at once.
-                      </p>
-                      {canManageScheduleDefinitions ? (
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultStartTime: null,
-                                defaultEndTime: null,
-                              }))
-                            }
-                          >
-                            Remove default time
-                          </Button>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultStartTime: null,
-                                defaultEndTime: null,
-                                defaultDurationHours: 0,
-                                defaultDurationMinutes: 0,
-                              }))
-                            }
-                          >
-                            Use duration instead
-                          </Button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <label style={labelStyle}>DEFAULT TIMING</label>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "var(--dg-fs-caption)",
-                          color: "var(--dg-color-text-muted)",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        Choose one timing mode for general jobs. Use either a fixed start and end
-                        time or a duration.
-                      </p>
-                      {canManageScheduleDefinitions ? (
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultStartTime: "07:00",
-                                defaultEndTime: "15:00",
-                                defaultDurationHours: null,
-                                defaultDurationMinutes: null,
-                              }))
-                            }
-                          >
-                            Set actual times
-                          </Button>
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() =>
-                              setForm((prev) => ({
-                                ...prev,
-                                defaultStartTime: null,
-                                defaultEndTime: null,
-                                defaultDurationHours: 0,
-                                defaultDurationMinutes: 0,
-                              }))
-                            }
-                          >
-                            Set duration instead
-                          </Button>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-caption)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          No default time or duration is set.
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {normalizedShiftlessTiming.defaultStartTime != null &&
-                  normalizedShiftlessTiming.defaultEndTime != null ? (
-                    <div
+                <div>
+                  <label style={labelStyle}>JOB NAME</label>
+                  <input
+                    value={form.name}
+                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder={section === "shiftless" ? "e.g. Office" : "e.g. Supervisor"}
+                    className="dg-input"
+                    maxLength={50}
+                    disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
+                    style={nameError ? { borderColor: "var(--dg-color-danger)" } : undefined}
+                  />
+                  {nameError ? (
+                    <p
+                      role="alert"
                       style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-text-muted)",
+                        margin: "4px 0 0",
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--dg-color-danger)",
                       }}
                     >
-                      {fmt12h(normalizedShiftlessTiming.defaultStartTime)} to{" "}
-                      {fmt12h(normalizedShiftlessTiming.defaultEndTime)}
-                    </div>
+                      {nameError}
+                    </p>
                   ) : null}
                 </div>
+                {!isNameMode && (
+                  <div>
+                    <label style={labelStyle}>GRID ABBR</label>
+                    <input
+                      value={form.abbr}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, abbr: event.target.value }))
+                      }
+                      placeholder={section === "shiftless" ? "e.g. OFC" : "e.g. SUP"}
+                      className="dg-input"
+                      maxLength={6}
+                      disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
+                      style={abbrError ? { borderColor: "var(--dg-color-danger)" } : undefined}
+                    />
+                    {abbrError ? (
+                      <p
+                        role="alert"
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--dg-color-danger)",
+                        }}
+                      >
+                        {abbrError}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
-            ) : null}
+
+              {section === "shiftless" ? (
+                <div
+                  data-job-timing-layout
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "minmax(220px, 280px) minmax(0, 520px)",
+                    gap: isMobile ? 16 : 24,
+                    alignItems: "start",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label style={labelStyle}>COLOR PRESET</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <PresetColorPicker
+                        valueBg={form.color}
+                        onChange={(color) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            color: color.bg,
+                            text: color.text,
+                            border: TRANSPARENT_BORDER,
+                          }))
+                        }
+                        disabled={!canManageScheduleDefinitions}
+                      />
+                      <ShiftPreviewPill
+                        primary={getJobPreviewLabel({
+                          jobName: form.name,
+                          jobAbbr: form.abbr,
+                          shiftDisplayMode: "name",
+                        })}
+                        bg={form.color}
+                        mode="name"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {hasGeneralJobDuration ? (
+                      <>
+                        <label style={labelStyle}>DEFAULT DURATION</label>
+                        <div
+                          style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}
+                        >
+                          <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={normalizedShiftlessTiming.defaultDurationHours ?? ""}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                defaultStartTime: null,
+                                defaultEndTime: null,
+                                defaultDurationHours:
+                                  event.target.value === ""
+                                    ? null
+                                    : Math.max(0, Math.min(23, Number(event.target.value))),
+                              }))
+                            }
+                            style={{ ...inputStyle, width: 72, textAlign: "center" }}
+                            disabled={!canManageScheduleDefinitions}
+                          />
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              color: "var(--dg-color-text-muted)",
+                            }}
+                          >
+                            h
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={normalizedShiftlessTiming.defaultDurationMinutes ?? ""}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                defaultStartTime: null,
+                                defaultEndTime: null,
+                                defaultDurationMinutes:
+                                  event.target.value === ""
+                                    ? null
+                                    : Math.max(0, Math.min(59, Number(event.target.value))),
+                              }))
+                            }
+                            style={{ ...inputStyle, width: 72, textAlign: "center" }}
+                            disabled={!canManageScheduleDefinitions}
+                          />
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              color: "var(--dg-color-text-muted)",
+                            }}
+                          >
+                            m
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          Use a duration when this general job should stay untethered from a fixed
+                          start and end time.
+                        </p>
+                        {canManageScheduleDefinitions ? (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultDurationHours: null,
+                                  defaultDurationMinutes: null,
+                                }))
+                              }
+                            >
+                              Remove duration
+                            </Button>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultStartTime: "07:00",
+                                  defaultEndTime: "15:00",
+                                  defaultDurationHours: null,
+                                  defaultDurationMinutes: null,
+                                }))
+                              }
+                            >
+                              Set actual times instead
+                            </Button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : hasGeneralJobFixedTime ? (
+                      <>
+                        <label style={labelStyle}>DEFAULT START / END</label>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <TimeInput12h
+                            value={normalizedShiftlessTiming.defaultStartTime}
+                            onChange={(value) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                defaultStartTime: value,
+                                defaultDurationHours: null,
+                                defaultDurationMinutes: null,
+                              }))
+                            }
+                            disabled={!canManageScheduleDefinitions}
+                          />
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              color: "var(--dg-color-text-muted)",
+                            }}
+                          >
+                            to
+                          </span>
+                          <TimeInput12h
+                            value={normalizedShiftlessTiming.defaultEndTime}
+                            onChange={(value) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                defaultEndTime: value,
+                                defaultDurationHours: null,
+                                defaultDurationMinutes: null,
+                              }))
+                            }
+                            disabled={!canManageScheduleDefinitions}
+                          />
+                        </div>
+                        {calcTimeDuration(
+                          normalizedShiftlessTiming.defaultStartTime,
+                          normalizedShiftlessTiming.defaultEndTime,
+                        ) ? (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--dg-color-text-muted)",
+                            }}
+                          >
+                            Duration:{" "}
+                            <span
+                              style={{ fontWeight: 600, color: "var(--dg-color-text-secondary)" }}
+                            >
+                              {calcTimeDuration(
+                                normalizedShiftlessTiming.defaultStartTime,
+                                normalizedShiftlessTiming.defaultEndTime,
+                              )}
+                            </span>
+                          </div>
+                        ) : null}
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          Fixed times take priority over duration for general jobs, so only one
+                          timing mode can be saved at once.
+                        </p>
+                        {canManageScheduleDefinitions ? (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultStartTime: null,
+                                  defaultEndTime: null,
+                                }))
+                              }
+                            >
+                              Remove default time
+                            </Button>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultStartTime: null,
+                                  defaultEndTime: null,
+                                  defaultDurationHours: 0,
+                                  defaultDurationMinutes: 0,
+                                }))
+                              }
+                            >
+                              Use duration instead
+                            </Button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <label style={labelStyle}>DEFAULT TIMING</label>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          Choose one timing mode for general jobs. Use either a fixed start and end
+                          time or a duration.
+                        </p>
+                        {canManageScheduleDefinitions ? (
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultStartTime: "07:00",
+                                  defaultEndTime: "15:00",
+                                  defaultDurationHours: null,
+                                  defaultDurationMinutes: null,
+                                }))
+                              }
+                            >
+                              Set actual times
+                            </Button>
+                            <Button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  defaultStartTime: null,
+                                  defaultEndTime: null,
+                                  defaultDurationHours: 0,
+                                  defaultDurationMinutes: 0,
+                                }))
+                              }
+                            >
+                              Set duration instead
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--dg-color-text-muted)",
+                            }}
+                          >
+                            No default time or duration is set.
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {normalizedShiftlessTiming.defaultStartTime != null &&
+                    normalizedShiftlessTiming.defaultEndTime != null ? (
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        {fmt12h(normalizedShiftlessTiming.defaultStartTime)} to{" "}
+                        {fmt12h(normalizedShiftlessTiming.defaultEndTime)}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </SectionBlock>
 
           {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Placement"
               description="Choose the scheduled departments first. Then select the focus areas inside them and the shifts where this job applies."
+              summary={placementSummary}
+              collapsible
+              defaultOpen={form.departmentIds.length === 0}
             >
               <div
                 style={{
@@ -1961,6 +2064,9 @@ function JobRow({
             <SectionBlock
               title="Per-shift Settings"
               description="Scheduled jobs inherit each selected shift by default. Customize the color and time only where this job needs to behave differently."
+              summary={perShiftSettingsSummary}
+              collapsible
+              defaultOpen={overrideCount > 0}
             >
               {selectedShifts.length === 0 ? (
                 <div
@@ -2223,6 +2329,9 @@ function JobRow({
           <SectionBlock
             title="Eligibility"
             description={`Pick any schedule-eligible ${roleLabel.toLowerCase()} and ${certificationLabel.toLowerCase()} that can qualify staff. Selections inside each list are alternatives. Leave either list empty to keep that gate open.`}
+            summary={`${eligibleRoleSummary} · ${certificationSummary}`}
+            collapsible
+            defaultOpen={false}
           >
             <div
               style={{
@@ -2238,7 +2347,6 @@ function JobRow({
                 items={scheduleRoles.map((role) => ({
                   id: role.id,
                   label: role.name,
-                  description: role.abbr ? role.abbr : undefined,
                 }))}
                 selectedIds={form.eligibleRoleIds}
                 onToggle={(roleId) =>
@@ -2298,7 +2406,6 @@ function JobRow({
                 items={certifications.map((certification) => ({
                   id: certification.id,
                   label: certification.name,
-                  description: certification.abbr ? certification.abbr : undefined,
                 }))}
                 selectedIds={form.requiredCertificationIds}
                 onToggle={(certificationId) =>
@@ -2823,6 +2930,7 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
+            shiftDisplayMode={organization?.shiftDisplayMode ?? "code"}
             isLast={jobIndex === scheduledRows.length - 1}
           />
         ))}
@@ -2865,6 +2973,7 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
+            shiftDisplayMode={organization?.shiftDisplayMode ?? "code"}
             isLast={jobIndex === shiftlessRows.length - 1}
           />
         ))}

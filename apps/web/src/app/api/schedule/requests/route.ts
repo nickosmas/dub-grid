@@ -36,6 +36,8 @@ const requestSchema = z
       status: z.array(shiftRequestStatusSchema).optional(),
       type: shiftRequestTypeSchema.optional(),
       empId: z.string().uuid().optional(),
+      startDate: z.string().date().optional(),
+      endDate: z.string().date().optional(),
     }),
     z.object({
       action: z.literal("createShiftRequest"),
@@ -239,6 +241,29 @@ export async function POST(req: NextRequest) {
         if (data.empId) {
           assertSafeFilterValue(data.empId, "empId");
           query = query.or(`requester_emp_id.eq.${data.empId},target_emp_id.eq.${data.empId}`);
+        }
+        if (data.startDate || data.endDate) {
+          // Matches requester OR target shift date falling in range — same
+          // semantics as mobile's fetchMobileShiftRequestRows date filter
+          // (packages/data-access/src/mobile.ts), so a caller that scopes by
+          // date (the dashboard) gets the same request set on both platforms.
+          const buildDateClauses = (column: "requester_shift_date" | "target_shift_date") => {
+            const clauses: string[] = [];
+            if (data.startDate) {
+              assertSafeFilterValue(data.startDate, "startDate");
+              clauses.push(`${column}.gte.${data.startDate}`);
+            }
+            if (data.endDate) {
+              assertSafeFilterValue(data.endDate, "endDate");
+              clauses.push(`${column}.lte.${data.endDate}`);
+            }
+            return clauses.length === 1 ? clauses[0] : `and(${clauses.join(",")})`;
+          };
+          query = query.or(
+            [buildDateClauses("requester_shift_date"), buildDateClauses("target_shift_date")].join(
+              ",",
+            ),
+          );
         }
 
         const { data: rows, error } = await query;

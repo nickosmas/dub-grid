@@ -20,6 +20,9 @@ export interface SelfProfileRecord {
 export interface AccountSelfProfileData {
   profile: SelfProfileRecord | null;
   employee: Employee | null;
+  /** Management department IDs from the caller's org membership — distinct
+   *  from `employee.departmentIds`, which is scheduled departments. */
+  managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
   shiftRequests: ShiftRequest[];

@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import DashboardView from "@/components/dashboard/DashboardView";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+import { queryKeys } from "@/lib/query-keys";
 
 const GridmasterPortal = dynamic(() => import("@/components/gridmaster/GridmasterPortal"), {
   loading: () => null,
@@ -37,6 +40,7 @@ function DashboardContent() {
     jobs,
     coverageRequirements,
     assignmentLabelMap: assignmentLabelMap,
+    assignmentNameMap,
     absenceTypeMap,
     absenceTypes,
     certifications,
@@ -44,7 +48,12 @@ function DashboardContent() {
     departments,
     loading: refLoading,
     loadError,
+    bootstrapRetryable,
   } = useOrganizationData();
+  const queryClient = useQueryClient();
+  const retryOrganizationBootstrap = useCallback(async () => {
+    await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
+  }, [queryClient]);
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
 
   const isLoading = refLoading || empLoading || perms.isLoading;
@@ -61,16 +70,10 @@ function DashboardContent() {
 
   if (loadError && !org) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        }}
-      >
-        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
-      </div>
+      <OrganizationBootstrapRecovery
+        automaticallyRetry={bootstrapRetryable}
+        onRetry={retryOrganizationBootstrap}
+      />
     );
   }
 
@@ -87,6 +90,7 @@ function DashboardContent() {
           jobs={jobs}
           coverageRequirements={coverageRequirements}
           assignmentLabelMap={assignmentLabelMap}
+          assignmentNameMap={assignmentNameMap}
           assignmentById={assignmentById}
           absenceTypeMap={absenceTypeMap}
           absenceTypes={absenceTypes}

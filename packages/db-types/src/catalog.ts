@@ -130,6 +130,8 @@ export interface DbNamedItem {
   is_schedule_role?: boolean | null;
   /** Scheduled departments this item belongs to. Empty = org-wide. */
   department_ids: number[];
+  /** Roles only: certifications that qualify someone for this role. Empty = no requirement. */
+  required_certification_ids?: number[] | null;
   sort_order: number;
   archived_at: string | null;
 }

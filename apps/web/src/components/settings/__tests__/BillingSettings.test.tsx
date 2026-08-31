@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BillingSettings from "@/components/settings/BillingSettings";
 import { fetchOrganizationBilling } from "@/features/billing/client";
@@ -161,7 +161,9 @@ describe("BillingSettings", () => {
   it("opens billing operation details from the activity table", async () => {
     renderBillingSettings();
 
-    fireEvent.click(await screen.findByText("Subscription canceled"));
+    const canceledRow = (await screen.findByText("Subscription canceled")).closest("tr");
+    expect(canceledRow).not.toBeNull();
+    fireEvent.click(within(canceledRow!).getByRole("button", { name: "View details" }));
 
     expect(
       await screen.findByRole("dialog", { name: "Billing activity details" }),

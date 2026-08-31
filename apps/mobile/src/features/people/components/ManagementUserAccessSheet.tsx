@@ -165,7 +165,7 @@ export function ManagementUserAccessSheet({
             </View>
             {draft.managementDepartmentIds.length === 0 ? (
               <AppText tone="danger" variant="meta">
-                {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}, or remove their access instead`}
+                {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}, or close this and use Remove from Management instead`}
               </AppText>
             ) : null}
           </View>

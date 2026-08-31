@@ -132,6 +132,11 @@ describe("OrganizationSetupWizard", () => {
       expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);
+      expect(screen.queryByPlaceholderText("e.g. RN")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g. CN")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("radio", { name: /full name/i }));
+      expect(screen.queryByPlaceholderText("e.g. SUP")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /^skip$/i }));
 

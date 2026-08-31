@@ -126,6 +126,7 @@ export const mobileOrgConfigSchema = z.object({
   // null falls back to a plain Sunday-aligned window.
   payPeriodStartDate: z.string().nullable().default(null),
   shiftDisplayMode: z.enum(["code", "name"]),
+  useCompactRoleCertificationLabels: z.boolean().default(false),
   labels: z.object({
     focusArea: z.string(),
     certification: z.string(),
@@ -800,7 +801,10 @@ export const mobilePersonUpdateBodySchema = z.object({
   contactNotes: staffNotesSchema,
   employmentType: z.enum(["full_time", "part_time"]).optional(),
   certificationId: z.number().int().nullable(),
-  focusAreaIds: z.array(z.number().int()).min(1),
+  // No .min(1) here: someone who also holds management access can come off
+  // the schedule entirely. The server enforces "at least one, unless they
+  // have management access to fall back on" via requireFocusArea.
+  focusAreaIds: z.array(z.number().int()),
   roleIds: z.array(z.number().int()),
   departmentIds: z.array(z.number().int()),
 });

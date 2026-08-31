@@ -1,5 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
@@ -8,7 +8,10 @@ import {
   fetchEmployeeShifts,
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
+  updateEmployee,
 } from "@/features/employees/client";
+import { toast } from "sonner";
+import { createOrganizationInvitation } from "@/features/organization/client";
 import { fetchRecurringShifts, fetchShiftRequests } from "@/features/schedule/client";
 
 const mockReplace = vi.fn();
@@ -24,6 +27,7 @@ const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
 
 vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("sonner", () => ({
@@ -38,6 +42,9 @@ vi.mock("@/hooks", () => ({
   usePermissions: () => mockUsePermissions(),
   useOrganizationData: () => mockUseOrganizationData(),
   useDirectory: () => mockUseDirectory(),
+  useMediaQuery: () => false,
+  MOBILE: 640,
+  TABLET: 1024,
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -60,6 +67,12 @@ vi.mock("@/features/employees/client", () => ({
   removeEmployee: vi.fn(),
 }));
 
+vi.mock("@/features/organization/client", () => ({
+  revokeInvitation: vi.fn(),
+  updateOrganizationMembershipGuarded: vi.fn(),
+  createOrganizationInvitation: vi.fn(),
+}));
+
 vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(),
   fetchShiftRequests: vi.fn(),
@@ -71,24 +84,7 @@ vi.mock("@/components/ProgressBar", () => ({
 }));
 
 vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
-  StaffDetailHeader: ({
-    canEditDetails,
-    showManagementPanel,
-    onToggleEditDetails,
-  }: {
-    canEditDetails: boolean;
-    showManagementPanel: boolean;
-    onToggleEditDetails: () => void;
-  }) => (
-    <div>
-      <div>Personal details header</div>
-      {canEditDetails ? (
-        <button onClick={onToggleEditDetails}>
-          {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
-        </button>
-      ) : null}
-    </div>
-  ),
+  StaffDetailHeader: () => <div>Personal details header</div>,
 }));
 
 vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
@@ -109,8 +105,22 @@ vi.mock("@/components/staff-detail/tabs/ActivityTab", () => ({
   ActivityTab: () => <div>Activity panel</div>,
 }));
 
+let lastEditEmployeePanelSave: ((updatedEmployee: unknown) => void | Promise<void>) | null = null;
+let lastEditEmployeePanelSaveWithReinvite:
+  ((updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>) | null = null;
+let lastEditEmployeePanelPendingInvitation: unknown = undefined;
+
 vi.mock("@/components/EditEmployeePanel", () => ({
-  default: () => <div>Edit details form</div>,
+  default: (props: {
+    onSave: (updatedEmployee: unknown) => void | Promise<void>;
+    onSaveWithReinvite?: (updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>;
+    pendingInvitation?: unknown;
+  }) => {
+    lastEditEmployeePanelSave = props.onSave;
+    lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
+    lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
+    return <div>Edit details form</div>;
+  },
 }));
 
 vi.mock("@/components/InviteEmployeeModal", () => ({
@@ -118,10 +128,12 @@ vi.mock("@/components/InviteEmployeeModal", () => ({
 }));
 
 vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
-  EmployeeManagementAccessModal: () => <div>Management access modal</div>,
+  EmployeeManagementAccessEditor: () => <div>Management access editor</div>,
 }));
 
 const mockedFetchEmployeeById = vi.mocked(fetchEmployeeById);
+const mockedUpdateEmployee = vi.mocked(updateEmployee);
+const mockedCreateOrganizationInvitation = vi.mocked(createOrganizationInvitation);
 const mockedFetchEmployeeShifts = vi.mocked(fetchEmployeeShifts);
 const mockedFetchRecurringShifts = vi.mocked(fetchRecurringShifts);
 const mockedFetchEmployeeInvitations = vi.mocked(fetchEmployeeInvitations);
@@ -140,6 +152,16 @@ const mockEmployee = makeEmployee({
 describe("StaffDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // SettingsShell reads a sidebar-collapse preference from localStorage on
+    // mount; jsdom in this project doesn't provide it by default.
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear(),
+    });
 
     mockUseOrganizationData.mockReturnValue({
       org: {
@@ -197,6 +219,11 @@ describe("StaffDetailPage", () => {
     ]);
     mockedFetchEmployeeRoleHistory.mockResolvedValue([]);
     mockedFetchShiftRequests.mockResolvedValue([]);
+    mockedUpdateEmployee.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("redirects to /people when employee detail access is denied", async () => {
@@ -221,42 +248,43 @@ describe("StaffDetailPage", () => {
   it("defaults to the overview section", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Overview content")).toBeInTheDocument();
+    expect(await screen.findByText("Work details")).toBeInTheDocument();
     expect(screen.getByText("Personal details header")).toBeInTheDocument();
     expect(screen.queryByText("Schedule panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
-    expect(screen.getByText("Account summary")).toBeInTheDocument();
-    expect(screen.getByText("Employment summary")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
 
-  it("switches between overview, schedule, and activity sections", async () => {
+  it("uses the same account and work navigation structure as My Profile", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Overview content")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
-
-    expect(screen.queryByText("Overview content")).not.toBeInTheDocument();
-    expect(screen.getByText("Schedule panel")).toBeInTheDocument();
-    expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Activity" }));
-
-    expect(screen.queryByText("Overview content")).not.toBeInTheDocument();
-    expect(screen.getByText("Activity panel")).toBeInTheDocument();
-    expect(screen.queryByText("Schedule panel")).not.toBeInTheDocument();
+    expect(await screen.findByText("Work details")).toBeInTheDocument();
+    expect(screen.getByText("Account")).toBeInTheDocument();
+    expect(screen.getByText("My work")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "href",
+      "/people/emp-1?section=overview",
+    );
+    expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute(
+      "href",
+      "/people/emp-1?section=schedule",
+    );
+    expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute(
+      "href",
+      "/people/emp-1?section=activity",
+    );
   });
 
-  it("shows staffing and access actions without requiring edit mode", async () => {
+  it("uses a focused sidebar instead of an actions menu", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Overview content");
+    await screen.findByText("Work details");
 
-    expect(screen.getByText("Staffing actions")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
+    expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    expect(screen.getByText("Invitation pending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
-    expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
 
   it("still exposes management tools for super admins", async () => {
@@ -271,11 +299,11 @@ describe("StaffDetailPage", () => {
     });
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Overview content");
-    expect(screen.getByRole("button", { name: "Edit Details" })).toBeInTheDocument();
+    await screen.findByText("Work details");
+    expect(screen.getByText("Edit details form")).toBeInTheDocument();
   });
 
-  it("shows management access controls and invite flows available in the popover", async () => {
+  it("shows management access controls and invite flows in the detail page", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,
       canViewRecurringShifts: false,
@@ -350,25 +378,118 @@ describe("StaffDetailPage", () => {
     });
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Overview content");
-    expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
+    await screen.findByText("Work details");
+    expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+    expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-    expect(screen.getByText("Management access modal")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
+    expect(screen.getByText("Management access editor")).toBeInTheDocument();
   });
 
-  it("keeps edit mode focused on biodata changes", async () => {
+  it("keeps the work-details form focused on biodata, without invite UI leaking in", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Overview content");
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit Details" }));
+    await screen.findByText("Work details");
 
     expect(screen.getByText("Edit details form")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();
+  });
+
+  it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    if (!lastEditEmployeePanelSave) {
+      throw new Error("Expected EditEmployeePanel to receive onSave");
+    }
+    await act(async () => {
+      await lastEditEmployeePanelSave!({ ...mockEmployee, email: "new.address@example.com" });
+    });
+
+    await waitFor(() => {
+      expect(mockedUpdateEmployee).toHaveBeenCalled();
+    });
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
+      expect.stringContaining("margaret@example.com"),
+    );
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(expect.stringContaining("revoked"));
+  });
+
+  it("shows the plain saved toast when the email is unchanged, even with a pending invitation present", async () => {
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    if (!lastEditEmployeePanelSave) {
+      throw new Error("Expected EditEmployeePanel to receive onSave");
+    }
+    await act(async () => {
+      await lastEditEmployeePanelSave!({ ...mockEmployee, firstName: "Marge" });
+    });
+
+    await waitFor(() => {
+      expect(mockedUpdateEmployee).toHaveBeenCalled();
+    });
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith("Employee saved");
+  });
+
+  it("passes the live pending invitation and a reinvite handler into EditEmployeePanel", async () => {
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    expect(lastEditEmployeePanelPendingInvitation).toMatchObject({
+      id: "invite-1",
+      email: "margaret@example.com",
+    });
+    expect(lastEditEmployeePanelSaveWithReinvite).toBeTypeOf("function");
+  });
+
+  it("saving with the reinvite confirmation creates and sends a new invitation with the old one's role and departments", async () => {
+    mockedCreateOrganizationInvitation.mockResolvedValue({
+      invitationId: "invite-2",
+      token: "fresh-token",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "",
+        json: async () => ({ success: true }),
+      }),
+    );
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    if (!lastEditEmployeePanelSaveWithReinvite) {
+      throw new Error("Expected EditEmployeePanel to receive onSaveWithReinvite");
+    }
+    const oldInvitation = lastEditEmployeePanelPendingInvitation;
+    await act(async () => {
+      await lastEditEmployeePanelSaveWithReinvite!(
+        { ...mockEmployee, email: "new.address@example.com" },
+        oldInvitation,
+      );
+    });
+
+    expect(mockedUpdateEmployee).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "new.address@example.com" }),
+      "org-1",
+      expect.anything(),
+    );
+    expect(mockedCreateOrganizationInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "new.address@example.com",
+        role: "user",
+        employeeId: "emp-1",
+        departmentIds: undefined,
+      }),
+    );
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
+      expect.stringContaining("new.address@example.com"),
+    );
   });
 
   it("hides management tools for viewers without edit access", async () => {
@@ -383,7 +504,11 @@ describe("StaffDetailPage", () => {
     });
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Overview content");
-    expect(screen.queryByRole("button", { name: "Edit Details" })).not.toBeInTheDocument();
+    await screen.findByText("Work details");
+    // canViewEmployeeDetails can be granted without canManageEmployees (a
+    // per-person admin permission bit) — that viewer must see the read-only
+    // summary, never the live editable form.
+    expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
+    expect(screen.getByText("Employment")).toBeInTheDocument();
   });
 });

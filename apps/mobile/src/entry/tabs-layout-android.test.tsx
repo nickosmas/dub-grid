@@ -76,11 +76,11 @@ vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
   };
 });
 
-vi.mock("../features/auth/components/AuthTransitionScreen", async () => {
+vi.mock("../features/auth/screens/NetworkConnectionRecoveryScreen", async () => {
   const React = await import("react");
   return {
-    AuthTransitionScreen: ({ phase }: { phase: string }) =>
-      React.createElement("div", {}, `auth-transition:${phase}`),
+    NetworkConnectionRecoveryScreen: () =>
+      React.createElement("div", {}, "network-connection-recovery"),
   };
 });
 
@@ -128,16 +128,36 @@ describe("TabsLayoutAndroid", () => {
     useBootstrap.mockReturnValue(bootstrap());
   });
 
-  // The launch splash lives above the router. Once it has completed, the tabs
-  // gate must give an in-app handoff status instead of showing a second splash
-  // or a blank screen.
-  it("shows a labeled handoff rather than a second splash while the session is restoring", () => {
+  // StartupSplashGate owns the launch splash and is still covering the
+  // screen for the entire window the session takes to restore, so this
+  // renders nothing rather than a second, competing loading screen.
+  it("renders nothing while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
+
+    const { container } = render(<TabsLayoutAndroid />);
+
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  // Bootstrap's first load no longer blocks the tab tree: every tab shows
+  // optimistically (see useTabsGate) and each destination screen owns its
+  // own useBootstrap call and skeleton, so it settles into the right shape
+  // once this resolves instead of the whole layout staying blank.
+  it("shows every tab optimistically while bootstrap's first load is in flight", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
-    expect(screen.getByText("auth-transition:organization")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-home")).toHaveTextContent("home:Home:visible");
+    expect(screen.getByTestId("tab-team")).toHaveTextContent("team:Schedule:visible");
+    expect(screen.getByTestId("tab-requests")).toHaveTextContent("requests:Requests:visible");
   });
 
   it("redirects to login without a session", () => {

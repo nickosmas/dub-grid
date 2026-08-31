@@ -289,6 +289,8 @@ export default function PeopleScreen() {
   const profileRequests = profileRequestsQuery.data?.requests ?? [];
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
+  const useCompactRoleCertificationLabels =
+    bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(
     () =>
       (bootstrapQuery.data?.departments ?? []).filter(
@@ -449,6 +451,19 @@ export default function PeopleScreen() {
         onDone={() => setIsFilterModalVisible(false)}
         visible={isFilterModalVisible}
       >
+        {canSeeManagementRoster ? (
+          <View style={styles.rosterTabs}>
+            <SegmentedControl
+              accessibilityLabel="Directory section"
+              onChange={setRosterTab}
+              options={[
+                { value: "schedule", label: "Schedule", count: visiblePeople.length },
+                { value: "management", label: "Management", count: managementUsers.length },
+              ]}
+              value={rosterTab}
+            />
+          </View>
+        ) : null}
         {isManagementTab ? (
           <>
             <SelectionSection label="Management department">
@@ -544,7 +559,11 @@ export default function PeopleScreen() {
                 {certifications.map((certification) => (
                   <SelectionRow
                     key={certification.id}
-                    label={certification.name}
+                    label={
+                      useCompactRoleCertificationLabels
+                        ? certification.abbr || certification.name
+                        : certification.name
+                    }
                     onPress={() => setStaffFilter("certificationId", certification.id)}
                     selected={staffFilters.certificationId === certification.id}
                   />
@@ -629,19 +648,6 @@ export default function PeopleScreen() {
       </FilterSheet>
 
       <View style={styles.section}>
-        {canSeeManagementRoster ? (
-          <View style={styles.rosterTabs}>
-            <SegmentedControl
-              accessibilityLabel="Directory section"
-              onChange={setRosterTab}
-              options={[
-                { value: "schedule", label: "Schedule", count: visiblePeople.length },
-                { value: "management", label: "Management", count: managementUsers.length },
-              ]}
-              value={rosterTab}
-            />
-          </View>
-        ) : null}
         <View style={styles.searchBarRow}>
           <SearchBar
             accessibilityLabel="Search people"
@@ -793,7 +799,7 @@ export default function PeopleScreen() {
                         }
                         if (managementUser.employeeId) {
                           router.push({
-                            pathname: "/(tabs)/people/[id]",
+                            pathname: "/person/[id]",
                             params: { id: managementUser.employeeId },
                           });
                           return;
@@ -873,7 +879,7 @@ export default function PeopleScreen() {
                         return;
                       }
                       router.push({
-                        pathname: "/(tabs)/people/[id]",
+                        pathname: "/person/[id]",
                         params: { id: person.id },
                       });
                     }}
@@ -1037,7 +1043,12 @@ function PersonRow({
           },
         ]}
       >
-        <Text style={[styles.personAvatarText, { color: avatarTone.textColor }]}>{initials}</Text>
+        <Text
+          maxFontSizeMultiplier={1.5}
+          style={[styles.personAvatarText, { color: avatarTone.textColor }]}
+        >
+          {initials}
+        </Text>
       </View>
       <View style={styles.personCopy}>
         <View style={styles.personNameRow}>
@@ -1083,9 +1094,9 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     rosterTabs: {
       // The control sizes to its own labels, so it needs a start-aligned row
-      // rather than stretching across the gutter.
+      // rather than stretching across the gutter. The sheet body's own `gap`
+      // spaces it from the sections below.
       alignItems: "flex-start",
-      marginBottom: 10,
     },
     addPersonButton: {
       alignItems: "center",

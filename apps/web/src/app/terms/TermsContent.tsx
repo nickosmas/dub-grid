@@ -289,10 +289,6 @@ export default function TermsContent() {
         <h2 style={h2Style}>17. Contact</h2>
         <p style={pStyle}>For questions about these Terms of Service, contact us at:</p>
         <p style={{ ...pStyle, marginTop: "12px" }}>
-          DubGrid LLC
-          <br />
-          [REGISTERED ADDRESS]
-          <br />
           <a
             href="mailto:support@dubgrid.com"
             style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}

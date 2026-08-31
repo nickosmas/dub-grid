@@ -72,6 +72,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     qualities: [75, 95],
+    localPatterns: [{ pathname: "/landing/screenshots/**" }],
     remotePatterns: [
       {
         protocol: "https",

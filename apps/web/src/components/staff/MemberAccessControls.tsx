@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { Button } from "@/components/Button";
 import type { AdminPermissions, OrganizationRole } from "@/types";
+import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PermissionsEditor from "@/components/PermissionsEditor";
@@ -67,6 +68,15 @@ export function MemberAccessControls({
               options={[{ value: orgRole, label: ROLE_LABELS[orgRole] ?? orgRole }]}
             />
           </div>
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-text-muted)",
+            }}
+          >
+            {SELF_ACTION_FORBIDDEN_MESSAGE}
+          </p>
         </div>
       )}
       {onRoleChange && orgRole && !isSelf && (
@@ -102,6 +112,7 @@ export function MemberAccessControls({
                 setChangingRole(true);
                 try {
                   await onRoleChange(next);
+                  toast.success(`Role updated to ${ROLE_LABELS[next] ?? next}.`);
                   setPendingRole(null);
                 } catch (error) {
                   toast.error(

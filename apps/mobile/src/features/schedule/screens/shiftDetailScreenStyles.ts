@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 import {
-  mobileMotion,
+  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -23,26 +23,19 @@ export const ACTION_SEGMENT_OPTION_RADIUS = Math.min(
  * The stylesheet for the shift-detail screen's screen. Split out of the screen file
  * purely for size; this is a move, not a rewrite.
  */
-export const createStyles = (mobileColors: MobileColors) =>
+export const createStyles = (mobileColors: MobileColors, isDark = false) =>
   StyleSheet.create({
     shiftDetailCard: {
       backgroundColor: mobileColors.surface,
-      borderRadius: 20,
-      borderWidth: 1,
+      borderRadius: mobileRadii.card,
+      // Borderless in light mode, hairline in dark: matches the shared Card.
+      borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.borderSubtle,
       marginTop: 12,
       marginBottom: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 16,
-      gap: 16,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 12,
-      elevation: 2,
+      padding: mobileSpace.xl,
+      gap: mobileSpace.lg,
+      ...mobileElevation("card", isDark),
     },
     detailHeroHeader: {
       flexDirection: "row",
@@ -99,37 +92,9 @@ export const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 10,
     },
-    // Mirrors the shared Button at size lg: solid fill, no border, pill. The JSX
-    // still hand-rolls the Pressable because these buttons flex to share a row;
-    // it converts to <Button fullWidth> when this screen is next opened.
-    detailActionButton: {
+    // Splits the row evenly between the two shared <Button fullWidth> actions.
+    detailActionButtonWrap: {
       flex: 1,
-      minHeight: 56,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 0,
-      backgroundColor: mobileColors.dangerSoft,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.md,
-    },
-    detailActionButtonSecondary: {
-      backgroundColor: mobileColors.brandSoft,
-    },
-    detailActionButtonPressed: {
-      transform: [{ scale: mobileMotion.press.scale }],
-    },
-    detailActionButtonDisabled: {
-      opacity: 0.4,
-    },
-    detailActionButtonContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-    },
-    detailActionButtonText: {
-      ...mobileText.bodyStrong,
     },
     detailPublishedFooter: {
       borderTopWidth: 1,
@@ -156,10 +121,14 @@ export const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: 10,
     },
+    // 32/10/bordered: matches the app's shared icon-tile pattern (Screen.tsx's
+    // cardIconFrame, ProfilePrimitives' iconBadge) rather than the borderless
+    // circle reserved for large standalone icons.
     detailInfoIconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
     },

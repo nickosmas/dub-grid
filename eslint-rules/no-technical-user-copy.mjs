@@ -86,6 +86,11 @@ const ALLOWED = [
   /Terms of Service/i,
   /Privacy Policy/i,
   /crash reporting/i,
+  // AuthTransitionScreen's sign-in/bootstrap handoff copy: a deliberate,
+  // product-decided exception to the tenant-is-"Organization" rule below —
+  // this "workspace" means "your app environment is starting up", not the
+  // Organization entity, and is shown before any org context is loaded.
+  /(?:loading|preparing) your workspace/i,
 ];
 
 function isAllowed(text) {

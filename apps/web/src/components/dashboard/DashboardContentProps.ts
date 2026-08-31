@@ -9,7 +9,7 @@ import type {
   CoverageRequirement,
   Employee,
   ShiftMap,
-  PublishHistoryEntry,
+  PublishHistoryEntryWithName,
   AbsenceType,
 } from "@/types";
 import type {
@@ -34,6 +34,7 @@ export interface DashboardContentProps {
   jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
+  assignmentNameMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
   employees: Employee[];
   activeEmployees: Employee[];
@@ -74,7 +75,7 @@ export interface DashboardContentProps {
   currentEmployee: Employee | undefined;
 
   // Publish history
-  publishHistory: PublishHistoryEntry | null;
+  publishHistory: PublishHistoryEntryWithName | null;
 
   // Draft counts
   draftNewCount: number;

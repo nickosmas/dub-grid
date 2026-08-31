@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 
@@ -43,6 +43,14 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [signingOut, setSigningOut] = useState<"others" | "global" | null>(null);
+  const [pendingSessionSignOut, setPendingSessionSignOut] = useState<"others" | "global" | null>(
+    null,
+  );
+  const [otherSessionCount, setOtherSessionCount] = useState<number | null>(null);
+
+  const handleOtherSessionCountChange = useCallback((count: number) => {
+    setOtherSessionCount(count);
+  }, []);
 
   const hasPasswordChanges =
     currentPassword.length > 0 || newPassword.length > 0 || confirmPassword.length > 0;
@@ -143,16 +151,19 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setSigningOut("others");
     try {
       await signOutOthers();
+      setOtherSessionCount(0);
       toast.success("Your other devices are signed out.");
     } catch {
       toast.error("We couldn't sign out your other devices. Try again.");
     } finally {
       setSigningOut(null);
+      setPendingSessionSignOut(null);
     }
   }
 
   function handleSignOutAll() {
     setSigningOut("global");
+    setPendingSessionSignOut(null);
     signOut({ scope: "global" });
   }
 
@@ -294,8 +305,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              onClick={handleSignOutOthers}
-              disabled={signingOut !== null}
+              onClick={() => setPendingSessionSignOut("others")}
+              disabled={signingOut !== null || otherSessionCount === 0}
               className="dg-btn dg-btn-secondary"
             >
               <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
@@ -304,7 +315,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
             </Button>
             <Button
               type="button"
-              onClick={handleSignOutAll}
+              onClick={() => setPendingSessionSignOut("global")}
               disabled={signingOut !== null}
               className="dg-btn dg-btn-danger"
             >
@@ -322,7 +333,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 Inspect authenticated devices and recent sign-in history.
               </div>
             </div>
-            <SessionList />
+            <SessionList onOtherSessionCountChange={handleOtherSessionCountChange} />
           </div>
         </div>
       </SectionCard>
@@ -337,6 +348,27 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           onConfirm={() => handlePasswordChange()}
           onCancel={() => {
             if (!saving) setPendingConfirm(false);
+          }}
+        />
+      )}
+      {pendingSessionSignOut && (
+        <ConfirmDialog
+          title={
+            pendingSessionSignOut === "others" ? "Sign out other devices?" : "Sign out everywhere?"
+          }
+          message={
+            pendingSessionSignOut === "others"
+              ? "Every other device will be signed out. You will stay signed in here."
+              : "Every device, including this one, will be signed out. You will need to sign in again."
+          }
+          confirmLabel={
+            pendingSessionSignOut === "others" ? "Sign out other devices" : "Sign out everywhere"
+          }
+          variant="danger"
+          isLoading={signingOut === pendingSessionSignOut}
+          onConfirm={pendingSessionSignOut === "others" ? handleSignOutOthers : handleSignOutAll}
+          onCancel={() => {
+            if (signingOut === null) setPendingSessionSignOut(null);
           }}
         />
       )}

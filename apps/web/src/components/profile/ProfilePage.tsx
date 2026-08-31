@@ -49,17 +49,20 @@ export function ProfilePage() {
     certifications,
     orgRoles,
     departments,
+    assignmentNameMap,
   } = useOrganizationData();
   const {
     user,
     profile,
     employee,
+    managementDepartmentIds,
     shifts,
     recurringShifts,
     shiftRequests,
     auditNames,
     setProfile,
     setEmployee,
+    setManagementDepartmentIds,
   } = useSelfProfileData({ orgId });
 
   // Management-only employees have a row in `employees` but no focus
@@ -102,6 +105,7 @@ export function ProfilePage() {
           user={user}
           profile={profile}
           employee={employee}
+          managementDepartmentIds={managementDepartmentIds}
           orgId={orgId}
           canEditProfileDirectly={canEditProfileDirectly}
           isGridmaster={Boolean(isGridmaster)}
@@ -118,6 +122,7 @@ export function ProfilePage() {
           roleLabel={org?.roleLabel}
           setProfile={setProfile}
           setEmployee={setEmployee}
+          setManagementDepartmentIds={setManagementDepartmentIds}
         />
       )}
 
@@ -152,6 +157,7 @@ export function ProfilePage() {
           recurringShifts={recurringShifts}
           shiftRequests={shiftRequests}
           auditNames={auditNames}
+          assignmentNameMap={assignmentNameMap}
         />
       )}
 
@@ -169,6 +175,7 @@ export function ProfilePage() {
           recurringShifts={recurringShifts}
           shiftRequests={shiftRequests}
           auditNames={auditNames}
+          assignmentNameMap={assignmentNameMap}
         />
       )}
     </SettingsShell>

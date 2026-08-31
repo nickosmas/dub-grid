@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
+import { mobileRadii, mobileRadius } from "../theme/tokens";
 
 const hapticSelection = vi.fn();
 const hapticImpact = vi.fn();
@@ -38,6 +39,22 @@ describe("Button", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the pill radius by default", () => {
+    render(<Button label="Save changes" onPress={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Save changes" })).toHaveStyle({
+      borderRadius: mobileRadii.pill,
+    });
+  });
+
+  it("uses the tighter squircle radius when explicitly asked for one", () => {
+    render(<Button label="Save changes" onPress={vi.fn()} shape="squircle" />);
+
+    expect(screen.getByRole("button", { name: "Save changes" })).toHaveStyle({
+      borderRadius: mobileRadius.md,
+    });
   });
 
   it("prefers children over label for content", () => {

@@ -31,6 +31,14 @@ The workflow is defined by the local skills and context files below.
 
 ## Project configuration
 
+## DubGrid Git policy
+
+All development work happens directly on `dev`. Do not create, switch to, or
+work on feature, fix, rollback, or other development branches. Do not develop
+on `main`. Keep `main` for an explicitly requested release PR whose head is
+`dev`; preparing that PR does not authorize a checkout, merge, rewrite, or push
+of `main`.
+
 `blueprint/config.json` is the user-owned, machine-readable workflow policy for
 this project. Workflow skills read the relevant settings before acting. A
 missing file means built-in defaults. An invalid file falls back to defaults for
@@ -106,14 +114,14 @@ through any conversation before running `/overview`.
 
 Optional explicit-only skill: `autopilot` can run one bounded spec/build pass
 when directly invoked, including the configured regular quality gates. It may
-create checkpoint commits on the feature or fix branch after passing steps and
+create checkpoint commits on `dev` after passing steps and
 repair confirmed P0/P1 findings when its audit gate runs. It stops before
 `/complete`, merge, push, deploy, or destructive actions.
 
 Optional explicit-only skill: `continuous` can resume or select the next planned
-feature and repeat the complete local feature lifecycle through the configured
-limit or end of the build plan. It creates one branch and one local main commit
-per feature, applies the Continuous quality gates, archives and merges serially,
+feature and repeat the complete local feature lifecycle on `dev` through the
+configured limit or end of the build plan. It creates one local `dev` commit
+per feature, applies the Continuous quality gates and archives work serially,
 and stops on decisions or failed safety gates. It never pushes, deploys,
 publishes, sends, or performs destructive actions.
 
@@ -192,15 +200,22 @@ checks do not make the Blueprint unusable.
 
 ## Commands
 
-<!-- blueprint:onboarding-required -->
+Current DubGrid commands (root, npm workspaces + Turborepo):
 
-Current DubGrid commands:
-
-- Dev server: `npm run dev` (http://localhost:3000)
+- Dev server (web): `npm run dev` (http://localhost:3000)
+- Dev server (mobile): `npm run dev:mobile`
 - Build: `npm run build`
 - Production server: `npm run start`
 - Lint: `npm run lint`
+- Type check: `npm run type-check`
+- Test (unit/integration, all workspaces): `npm run test`
+- Test (web only): `npm run test:web`
+- Test (mobile + shared packages): `npm run test:mobile`
+- Test (E2E, Playwright): `npm run test:e2e`
 
-Testing is opt-in. If this project does not already have a unit test runner, run
-`/tests` or `$tests` to add one and update this section with the real test
-commands.
+Testing is already configured (Vitest + Testing Library, Playwright for E2E),
+so the testing gate described in `coding-standards.md` is on. GitHub Actions
+already run CI (`ci.yml`, `e2e.yml`, `dependency-audit.yml`,
+`cron-expire-requests.yml`). No single documented `Verify` command exists yet;
+run `/ci` or `$ci` if you want one combined command and a matching workflow
+instead of running type-check/test/build separately.

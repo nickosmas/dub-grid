@@ -197,7 +197,7 @@ export const colorTokens = lightColorTokens;
 export const spacingTokens = {
   screenX: 16,
   /** Vertical rhythm between cards/sections on a mobile screen. */
-  sectionGap: 20,
+  sectionGap: 32,
   /**
    * @deprecated Disagrees with the real card gap. `Screen.tsx`'s Card uses
    * `mobileSpacingTokens.md` (12); this 8 is only still read by

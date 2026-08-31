@@ -485,16 +485,26 @@ export default function OrganizationLocationFields({
       </div>
       {showEmployeeCount && (
         <div>
-          <label htmlFor={`${idBase}-employees`} style={labelStyle}>
-            Employees
-          </label>
-          <input
-            id={`${idBase}-employees`}
-            className="dg-input"
-            value={employeeCountLoading ? "Loading…" : String(employeeCount ?? 0)}
-            readOnly
-            aria-readonly="true"
-          />
+          <div style={labelStyle}>Employees</div>
+          <output
+            aria-label="Employees"
+            style={{
+              minHeight: 36,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              color: "var(--dg-color-text-secondary)",
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+            }}
+          >
+            {employeeCountLoading ? "Loading…" : String(employeeCount ?? 0)}
+            {!employeeCountLoading ? (
+              <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 500 }}>
+                Managed in People
+              </span>
+            ) : null}
+          </output>
         </div>
       )}
       <div style={{ gridColumn: "1 / -1" }}>

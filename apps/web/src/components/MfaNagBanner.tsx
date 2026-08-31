@@ -29,8 +29,9 @@ export default function MfaNagBanner() {
     <div
       style={{
         height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, #f59e0b, #d97706)",
-        color: "#fff",
+        background:
+          "linear-gradient(135deg, var(--dg-color-warning), var(--dg-color-warning-dark))",
+        color: "var(--dg-color-text-inverse)",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
@@ -59,7 +60,11 @@ export default function MfaNagBanner() {
       Your account doesn&apos;t have two-factor authentication enabled.
       <Link
         href="/profile?section=security"
-        style={{ color: "#fff", textDecoration: "underline", fontWeight: 700 }}
+        style={{
+          color: "var(--dg-color-text-inverse)",
+          textDecoration: "underline",
+          fontWeight: 700,
+        }}
       >
         Set it up
       </Link>
@@ -68,7 +73,7 @@ export default function MfaNagBanner() {
         aria-label="Dismiss"
         style={{
           background: "rgba(255,255,255,0.2)",
-          color: "#fff",
+          color: "var(--dg-color-text-inverse)",
           border: "1px solid rgba(255,255,255,0.4)",
           borderRadius: 6,
           padding: "2px 10px",

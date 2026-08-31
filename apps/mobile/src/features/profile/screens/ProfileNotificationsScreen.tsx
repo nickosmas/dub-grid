@@ -192,7 +192,9 @@ export default function ProfileNotificationsScreen() {
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load preferences"
+          variant="centered"
           onAction={() => {
             void prefsQuery.refetch();
           }}

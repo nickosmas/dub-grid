@@ -1,9 +1,16 @@
 ---
 name: complete
-description: Wrap up a finished feature, fix, or rollback. Runs a final safety pass, archives its spec to blueprint/history/features/, blueprint/history/fixes/, or blueprint/history/rollbacks/, updates the build plan for features and rollbacks, resets blueprint/context/current-feature.md to its stub, makes one work-level commit, then squash-merges the branch to main and deletes it. Merges only with explicit approval, then asks separately before pushing main. Use when the user runs /complete, or asks to finish, wrap up, merge, or close out the current feature, fix, or rollback after it is built and reviewed.
+description: Wrap up a finished feature, fix, or rollback on dev. Runs a final safety pass, archives its spec to blueprint/history/features/, blueprint/history/fixes/, or blueprint/history/rollbacks/, updates the build plan for features and rollbacks, resets blueprint/context/current-feature.md to its stub, and makes one work-level commit on dev. A release is an explicitly requested PR from dev to main. Use when the user runs /complete, or asks to finish, wrap up, merge, or close out the current feature, fix, or rollback after it is built and reviewed.
 ---
 
 # complete - log the finished work, make the work commit, and merge
+
+## DubGrid branch override
+
+For DubGrid, all development work stays directly on `dev`. This replaces every
+other branch-creation, switching, merging, and deletion instruction in this
+skill: complete work on `dev` only and leave `main` untouched. A release is an
+explicitly requested PR from `dev` to `main`, not a local merge.
 
 **First action:** Before project inspection, preflight, or any other tool call,
 publish `running` to `blueprint/.state/run.json` using the dashboard activity

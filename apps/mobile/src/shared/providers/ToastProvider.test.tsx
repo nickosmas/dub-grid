@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { act } from "react";
+import { act, useEffect } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../test/native";
+import { NetworkRecoveryProvider, useNetworkRecovery } from "./NetworkRecoveryProvider";
 
 vi.useFakeTimers();
 
@@ -76,6 +77,16 @@ function ToastHarness() {
       </button>
     </>
   );
+}
+
+function NetworkRecoveryToggle({ active }: { active: boolean }) {
+  const { setNetworkRecoveryActive } = useNetworkRecovery();
+
+  useEffect(() => {
+    setNetworkRecoveryActive(active);
+  }, [active, setNetworkRecoveryActive]);
+
+  return null;
 }
 
 describe("ToastProvider", () => {
@@ -269,6 +280,25 @@ describe("ToastProvider", () => {
 
     expect(screen.getByText("Network connection issue")).toBeInTheDocument();
     expect(screen.getByText("Check your internet connection and try again.")).toBeInTheDocument();
+  });
+
+  it("does not stack the offline banner over a blocking connection recovery screen", () => {
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+
+    render(
+      <NetworkRecoveryProvider>
+        <ToastProvider>
+          <NetworkRecoveryToggle active />
+          <ToastHarness />
+        </ToastProvider>
+      </NetworkRecoveryProvider>,
+    );
+
+    expect(screen.queryByTestId("offline-toast")).not.toBeInTheDocument();
   });
 
   it("suppresses queued network toasts while the offline toast is visible", () => {

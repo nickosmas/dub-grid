@@ -53,7 +53,7 @@ describe("theme architecture", () => {
     expect(globalError).not.toMatch(/<body[\\s\\S]*?style=/);
     expect(globalsCss).toContain(":root,\n.dg-force-light {");
     expect(globalsCss).toContain(".dark {");
-    expect(globalsCss).toContain("--dg-color-bg: #f8fafc;");
+    expect(globalsCss).toContain("--dg-color-bg: #fcfcfc;");
     expect(globalsCss).toContain("--dg-color-bg: #02070f;");
   });
 

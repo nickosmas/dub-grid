@@ -26,6 +26,7 @@ import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useMediaQuery, MOBILE } from "@/hooks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -352,6 +353,7 @@ function CoverageOptionRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const panelId = React.useId();
+  const isMobile = useMediaQuery(MOBILE);
 
   return (
     <div
@@ -493,7 +495,13 @@ function CoverageOptionRow({
             </div>
           ) : (
             <div
-              style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile
+                  ? "repeat(2, minmax(0, 1fr))"
+                  : "repeat(7, minmax(0, 1fr))",
+                gap: 8,
+              }}
             >
               {DAY_NAMES.map((day, index) => (
                 <label
