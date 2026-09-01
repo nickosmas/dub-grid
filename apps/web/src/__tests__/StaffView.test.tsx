@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Department, Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
 import { saveRecurringShifts } from "@/features/schedule/client";
+import { fetchOrganizationInvitations } from "@/features/organization/client";
 
 const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
   mockToastSuccess: vi.fn(),
@@ -462,6 +463,57 @@ describe("StaffView", () => {
       expect(screen.queryByRole("button", { name: /On Schedule/i })).not.toBeInTheDocument();
       expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
       expect(screen.queryByRole("gridcell")).not.toBeInTheDocument();
+      expect(vi.mocked(fetchOrganizationInvitations)).not.toHaveBeenCalled();
+    });
+
+    it("still loads invitation state for People administrators", async () => {
+      renderWithProviders(<StaffView {...defaultProps} orgId="org-1" />);
+
+      await waitFor(() => {
+        expect(vi.mocked(fetchOrganizationInvitations)).toHaveBeenCalledWith("org-1");
+      });
+    });
+
+    it("excludes the signed-in employee and hides employment summaries for regular users", () => {
+      mockCurrentUser = { id: "user-alice" };
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          employees={filterEmployees}
+          canManageEmployees={false}
+          canViewEmployeeDetails={false}
+        />,
+      );
+
+      expect(screen.queryByText("Alice Alpha")).not.toBeInTheDocument();
+      expect(screen.getByText("Bob Beta")).toBeInTheDocument();
+      expect(screen.getByText("Casey Clark")).toBeInTheDocument();
+      expect(
+        within(screen.getByLabelText("On schedule staff count")).getByText("2"),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText("Full-time staff count")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Part-time staff count")).not.toBeInTheDocument();
+    });
+
+    it("shows regular users only qualification filters", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          employees={filterEmployees}
+          canManageEmployees={false}
+          canViewEmployeeDetails={false}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+
+      expect(screen.getByText("Qualifications")).toBeInTheDocument();
+      expect(screen.queryByText("Employment")).not.toBeInTheDocument();
+      expect(screen.queryByText("Account")).not.toBeInTheDocument();
+      expect(screen.queryByText("Contact")).not.toBeInTheDocument();
+      expect(screen.queryByText("Department admins only")).not.toBeInTheDocument();
     });
   });
 
@@ -571,6 +623,28 @@ describe("StaffView", () => {
   });
 
   describe("Detailed filters", () => {
+    it("matches only visible directory fields for regular users", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          employees={filterEmployees}
+          canManageEmployees={false}
+          canViewEmployeeDetails={false}
+        />,
+      );
+
+      const search = screen.getByPlaceholderText("Search by name or qualification...");
+      await user.type(search, "casey@example.com");
+      expect(screen.queryByText("Casey Clark")).not.toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "DVCSN");
+      expect(screen.getByText("Bob Beta")).toBeInTheDocument();
+      expect(screen.getByText("Casey Clark")).toBeInTheDocument();
+      expect(screen.queryByText("Alice Alpha")).not.toBeInTheDocument();
+    });
+
     it("locks page scroll while the filter window is open", async () => {
       const user = userEvent.setup();
       renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);

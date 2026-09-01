@@ -45,6 +45,8 @@ export interface SettingsShellProps<TId extends string = string> {
   navGroups: ShellNavGroup<TId>[];
   /** Group IDs that pin to the sidebar footer instead of scrolling. */
   footerGroupIds?: string[];
+  /** Hide labels for the scrolling groups while retaining footer group labels. */
+  hideContentGroupLabels?: boolean;
   /** Section to load when the URL has no `?section=` param. */
   defaultSection: TId;
   /** The active section ID — usually resolved upstream from the URL. */
@@ -68,6 +70,7 @@ export function SettingsShell<TId extends string = string>({
   basePath,
   navGroups,
   footerGroupIds = [],
+  hideContentGroupLabels = false,
   defaultSection,
   activeSection,
   maxWidth = 1120,
@@ -116,11 +119,14 @@ export function SettingsShell<TId extends string = string>({
             icon: <item.Icon />,
             href: hrefFor(item.id),
             active: isActive,
-            group: group.label,
+            group:
+              hideContentGroupLabels && !footerGroupIds.includes(group.id)
+                ? undefined
+                : group.label,
           };
         }),
       ),
-    [navGroups, activeSection, hrefFor],
+    [activeSection, footerGroupIds, hideContentGroupLabels, hrefFor, navGroups],
   );
   useSetMobileSubNav(subNavItems);
 
@@ -171,9 +177,11 @@ export function SettingsShell<TId extends string = string>({
               )}
               {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
-                  <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
-                    {group.label}
-                  </SidebarGroupLabel>
+                  {!hideContentGroupLabels && (
+                    <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
+                      {group.label}
+                    </SidebarGroupLabel>
+                  )}
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {group.items.map((item) => {

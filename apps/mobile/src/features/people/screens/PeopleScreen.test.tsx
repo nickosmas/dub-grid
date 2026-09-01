@@ -673,6 +673,96 @@ describe("PeopleScreen", () => {
     expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
   });
 
+  it("excludes self and hides employment details and administrative filters for regular users", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [],
+        roles: [{ id: 9, name: "Charge Nurse", abbr: "CN" }],
+        user: { id: "user-self" },
+        linkedEmployee: { id: "emp-self" },
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-self", firstName: "Current", userId: "user-self" }),
+          buildPerson({ id: "emp-2", firstName: "Mina", focusAreaIds: [2], roleIds: [9] }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.queryByText("Current Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.queryByText("FT")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
+    expect(screen.queryByText("App access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status")).not.toBeInTheDocument();
+    expect(screen.getByText("Focus area")).toBeInTheDocument();
+    expect(screen.getByText("Role")).toBeInTheDocument();
+    expect(screen.getByText("Sort by")).toBeInTheDocument();
+  });
+
+  it("matches regular-user search against qualifications but not hidden contact fields", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [{ id: 7, name: "Registered Nurse", abbr: "RN" }],
+        roles: [{ id: 9, name: "Charge Nurse", abbr: "CN" }],
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({
+            id: "emp-2",
+            email: "private@dubgrid.com",
+            focusAreaIds: [2],
+            certificationId: 7,
+            roleIds: [9],
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.change(screen.getByLabelText("Search people"), {
+      target: { value: "private@dubgrid.com" },
+    });
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search people"), {
+      target: { value: "Charge Nurse" },
+    });
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+  });
+
   it("shows management users to regular users without opening their profile", () => {
     useBootstrap.mockReturnValue({
       data: {

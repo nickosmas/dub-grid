@@ -35,8 +35,11 @@ import {
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
-import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
-import { formatDateKey } from "@/lib/utils";
+import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
+import {
+  getProfileOverviewCurrentWeekDateKeys,
+  getProfileOverviewDateRange,
+} from "@/features/account/shared/profile-schedule";
 import type {
   AdminPermissions,
   DirectoryPerson,
@@ -47,13 +50,8 @@ import type {
   OrganizationRole,
   OrganizationUser,
   AuditLogEntry,
-  ShiftRequest,
 } from "@/types";
-import {
-  fetchRecurringShifts,
-  fetchScheduleActorNames,
-  fetchShiftRequests,
-} from "@/features/schedule/client";
+import { fetchRecurringShifts } from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
   revokeInvitation,
@@ -64,21 +62,16 @@ import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { EmployeeStatusActions } from "./EmployeeStatusActions";
 import { OverviewTab } from "./tabs/OverviewTab";
-import { ScheduleTab } from "./tabs/ScheduleTab";
 import { ActivityTab } from "./tabs/ActivityTab";
+import { RecurringScheduleCard } from "./RecurringScheduleCard";
 import { SettingsShell, type ShellNavGroup } from "@/components/settings/SettingsShell";
-import {
-  ActivityIcon,
-  DashboardIcon,
-  ProfileIcon,
-  ScheduleIcon,
-} from "@/components/icons/NavIcons";
+import { ActivityIcon, DashboardIcon, ProfileIcon } from "@/components/icons/NavIcons";
 
 interface StaffDetailPageProps {
   employeeId: string;
 }
 
-type StaffProfileSection = "profile" | "overview" | "schedule" | "activity";
+type StaffProfileSection = "profile" | "overview" | "activity";
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
@@ -89,13 +82,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     org,
     focusAreas,
     assignments: assignments,
-    absenceTypes,
     shiftCategories,
     certifications,
     orgRoles,
     departments,
     assignmentLabelMap,
-    assignmentNameMap,
     absenceTypeMap,
     loading: orgLoading,
   } = useOrganizationData();
@@ -103,7 +94,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
-  const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditingManagementAccess, setIsEditingManagementAccess] = useState(false);
@@ -111,6 +101,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
 
   const orgId = perms.orgId ?? org?.id ?? null;
+  const overviewRange = useMemo(
+    () => getProfileOverviewDateRange(new Date(), org?.timezone),
+    [org?.timezone],
+  );
   const { directory } = useDirectory(orgId);
   const queryClient = useQueryClient();
 
@@ -122,9 +116,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       ? [...queryKeys.org.invitations(orgId), employeeId]
       : ["org", "anon", "invitations", employeeId],
     queryFn: () => fetchEmployeeInvitations(orgId!, employeeId),
-    enabled: !!orgId,
+    enabled: Boolean(orgId) && !perms.isLoading && perms.canViewEmployeeDetails,
   });
-  const invitations = invitationsQuery.data ?? [];
+  const invitations = perms.canViewEmployeeDetails ? (invitationsQuery.data ?? []) : [];
   const pendingInvite = useMemo(() => {
     return (
       invitations.find(
@@ -166,18 +160,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return map;
   }, [shiftCategories]);
 
-  const focusAreaById = useMemo(() => {
-    const map = new Map<number, (typeof focusAreas)[number]>();
-    for (const fa of focusAreas) map.set(fa.id, fa);
-    return map;
-  }, [focusAreas]);
-
-  const absenceTypeById = useMemo(() => {
-    const map = new Map<number, (typeof absenceTypes)[number]>();
-    for (const at of absenceTypes) map.set(at.id, at);
-    return map;
-  }, [absenceTypes]);
-
   // Fetch employee data once we have orgId
   useEffect(() => {
     if (perms.isLoading || !perms.canViewEmployeeDetails) return;
@@ -199,18 +181,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setEmployee(emp);
 
         // Fetch the rest in parallel
-        const [empShifts, recShifts, empRequests] = await Promise.all([
-          fetchEmployeeShifts(employeeId, orgId, assignmentLabelMap, absenceTypeMap),
+        const [empShifts, recShifts] = await Promise.all([
+          fetchEmployeeShifts(
+            employeeId,
+            orgId,
+            assignmentLabelMap,
+            absenceTypeMap,
+            overviewRange.startDate,
+            overviewRange.endDate,
+          ),
           perms.canViewRecurringShifts
             ? fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap)
             : Promise.resolve([]),
-          fetchShiftRequests(orgId, assignmentLabelMap, { empId: employeeId }),
         ]);
 
         if (cancelled) return;
         setShifts(empShifts);
         setRecurringShifts(recShifts);
-        setShiftRequests(empRequests);
       } catch (err: unknown) {
         if (!cancelled) {
           if (err instanceof EmployeeAccessDeniedError) {
@@ -241,6 +228,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     perms.isGridmaster,
     perms.isLoading,
     router,
+    overviewRange.endDate,
+    overviewRange.startDate,
   ]);
 
   useEffect(() => {
@@ -543,50 +532,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
-    const weekStart = getWeekStart(new Date());
-    const weekDateKeys = getWeekDates(weekStart).map(formatDateKey);
     return computeEmployeeWeeklyHours(
       employee.id,
-      weekDateKeys,
+      getProfileOverviewCurrentWeekDateKeys(overviewRange),
       shifts,
       assignmentById,
       40,
       categoryById,
     );
-  }, [assignmentById, categoryById, employee, shifts]);
-
-  // Batch-fetch profile names for shift audit display (who created/edited each shift)
-  const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
-  useEffect(() => {
-    const ids = new Set<string>();
-    for (const entry of Object.values(shifts)) {
-      if (entry.createdBy) ids.add(entry.createdBy);
-      if (entry.updatedBy) ids.add(entry.updatedBy);
-    }
-    if (ids.size === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!orgId) return;
-        const { names } = await fetchScheduleActorNames({
-          ids: Array.from(ids),
-          orgId,
-        });
-        if (cancelled) return;
-        const map = new Map<string, string>();
-        for (const [id, name] of Object.entries(names)) {
-          if (name) map.set(id, name);
-        }
-        setAuditNames(map);
-      } catch {
-        // Non-critical — audit names are informational
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, shifts]);
+  }, [assignmentById, categoryById, employee, overviewRange, shifts]);
 
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
   const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
@@ -594,22 +548,19 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => directory.find((person) => person.employeeId === employee?.id) ?? null,
     [directory, employee?.id],
   );
-  // Management-only people have an `employees` row but no focus areas — they
-  // have no schedule of their own, so hide the Schedule tab (see ProfilePage's
-  // identical isOnSchedule check).
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const profileSection = searchParams.get("section");
   const activeSection: StaffProfileSection =
-    profileSection === "overview" ||
-    profileSection === "activity" ||
-    (profileSection === "schedule" && isOnSchedule)
-      ? profileSection
-      : "profile";
+    profileSection === "activity"
+      ? "activity"
+      : profileSection === "overview" || (profileSection === "schedule" && isOnSchedule)
+        ? "overview"
+        : "profile";
   const profileNavGroups = useMemo<ShellNavGroup<StaffProfileSection>[]>(
     () => [
       {
-        id: "account",
-        label: "Account",
+        id: "primary",
+        label: "Profile",
         items: [
           {
             id: "profile",
@@ -617,28 +568,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             Icon: ProfileIcon,
             description: "Account and work details for this staff member.",
           },
-        ],
-      },
-      {
-        id: "work",
-        label: "My work",
-        items: [
           {
             id: "overview",
             label: "Overview",
             Icon: DashboardIcon,
-            description: "Current work details, assignments, and weekly hours.",
+            description: "Current work details, assignments, weekly hours, and recurring schedule.",
           },
-          ...(isOnSchedule
-            ? [
-                {
-                  id: "schedule" as const,
-                  label: "Schedule",
-                  Icon: ScheduleIcon,
-                  description: "Upcoming shifts, recurring schedule, and requests.",
-                },
-              ]
-            : []),
         ],
       },
       {
@@ -654,7 +589,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         ],
       },
     ],
-    [isOnSchedule],
+    [],
   );
   const hasPendingManagementInvite =
     !!directoryPerson &&
@@ -748,6 +683,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           defaultSection="profile"
           activeSection={activeSection}
           footerGroupIds={["history"]}
+          hideContentGroupLabels
           leadingNavigation={{ href: "/people", label: "Back to People", Icon: ChevronLeft }}
         >
           {activeSection === "profile" && (
@@ -994,22 +930,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   orgRoles={orgRoles}
                   pendingInvite={pendingInvite}
                   thisWeekHours={thisWeekHours}
-                />
-              ) : null}
-              {activeSection === "schedule" && isOnSchedule ? (
-                <ScheduleTab
-                  employee={employee}
-                  shifts={shifts}
-                  assignmentById={assignmentById}
-                  assignmentNameMap={assignmentNameMap}
-                  focusAreas={focusAreas}
-                  categoryById={categoryById}
-                  focusAreaById={focusAreaById}
-                  absenceTypeById={absenceTypeById}
-                  auditNames={auditNames}
-                  shiftRequests={shiftRequests}
-                  recurringShifts={recurringShifts}
-                  canViewRecurringShifts={perms.canViewRecurringShifts}
+                  timeZone={org?.timezone}
+                  scheduleOverview={
+                    perms.canViewRecurringShifts ? (
+                      <RecurringScheduleCard recurringShifts={recurringShifts} />
+                    ) : undefined
+                  }
                 />
               ) : null}
               {activeSection === "activity" ? (

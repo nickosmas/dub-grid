@@ -72,7 +72,7 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, { now });
 
     expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
     expect(overview.active.map((s) => s.id)).toEqual(["web-active"]);
@@ -92,13 +92,13 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, { now });
 
     expect(overview.active.map((s) => s.id)).toEqual(["ios-active"]);
     expect(overview.stale.map((s) => s.id)).toEqual(["android-old"]);
   });
 
-  it("marks only the single most recent same-platform session as active", async () => {
+  it("keeps multiple recently active sessions on the same platform active", async () => {
     const now = new Date("2026-05-08T12:00:00.000Z");
     const rows = [
       sessionRow({ id: "safari-now", platform: "web", last_active_at: now.toISOString() }),
@@ -111,10 +111,59 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, { now });
 
-    expect(overview.active.map((s) => s.id)).toEqual(["safari-now"]);
-    expect(overview.stale.map((s) => s.id)).toEqual(["chrome-1m-ago"]);
+    expect(overview.active.map((s) => s.id)).toEqual(["safari-now", "chrome-1m-ago"]);
+    expect(overview.stale).toEqual([]);
+  });
+
+  it("forces the authenticated session active when its presence tracker is behind", async () => {
+    const now = new Date("2026-05-08T12:00:00.000Z");
+    const rows = [
+      sessionRow({
+        id: "other-recent",
+        supabase_session_id: "other-session",
+        last_active_at: "2026-05-08T11:59:00.000Z",
+      }),
+      sessionRow({
+        id: "current-lagging",
+        supabase_session_id: "current-session",
+        last_active_at: "2026-05-01T09:00:00.000Z",
+      }),
+    ];
+    const builder = makeUserSessionsBuilder(rows);
+    fromMock.mockReturnValue(builder);
+
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, {
+      now,
+      currentSupabaseSessionId: "current-session",
+    });
+
+    expect(overview.active.map((session) => session.id)).toEqual([
+      "other-recent",
+      "current-lagging",
+    ]);
+    expect(overview.stale).toEqual([]);
+  });
+
+  it("does not treat null session identifiers as the authenticated session", async () => {
+    const now = new Date("2026-05-08T12:00:00.000Z");
+    const builder = makeUserSessionsBuilder([
+      sessionRow({
+        id: "unidentified-old-session",
+        supabase_session_id: null,
+        last_active_at: "2026-05-01T09:00:00.000Z",
+      }),
+    ]);
+    fromMock.mockReturnValue(builder);
+
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, {
+      now,
+      currentSupabaseSessionId: null,
+    });
+
+    expect(overview.active).toEqual([]);
+    expect(overview.stale.map((session) => session.id)).toEqual(["unidentified-old-session"]);
   });
 
   it("caps stale sessions at the 5 most recently used", async () => {
@@ -132,7 +181,7 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, { now });
 
     expect(overview.stale).toHaveLength(5);
     expect(overview.stale.map((s) => s.id)).toEqual([

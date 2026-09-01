@@ -69,7 +69,6 @@ import {
   computeCoverageGaps,
   createCoverageCreditResolver,
   filterPublishedDates,
-  getPublishedWindowState,
   timesOverlap,
   checkCrossDateOverlap,
   checkSameDayOverlaps,
@@ -124,7 +123,11 @@ import {
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
-import { getScheduleStartForSpan, resolveScheduleSpan } from "@/lib/schedule-view";
+import {
+  getScheduleStartForSpan,
+  realignTwoWeekScheduleStart,
+  resolveScheduleSpan,
+} from "@/lib/schedule-view";
 import {
   usePermissions,
   useOrganizationData,
@@ -184,6 +187,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { queryKeys } from "@/lib/query-keys";
 import { buildScheduleNoteMap, scheduleNoteKey } from "./_lib/schedule-window";
+import {
+  beginPublicationRangeLoad,
+  completePublicationRangeLoad,
+  failPublicationRangeLoad,
+  getLoadedPublishedWindowState,
+  type PublicationRangeLoadState,
+} from "./_lib/publication-range-state";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -415,14 +425,7 @@ function SchedulerContent() {
   // Wider desktops keep 2-week available and rely on the grid's readable min widths.
   const spanWeeks: 1 | 2 | "month" = resolveScheduleSpan(preferredSpan, shouldAutoUseOneWeek);
   useEffect(() => {
-    if (spanWeeks !== 2) return;
-    setWeekStart((prev) =>
-      getScheduleStartForSpan({
-        date: prev,
-        span: 2,
-        payPeriodStartDate,
-      }),
-    );
+    setWeekStart((current) => realignTwoWeekScheduleStart(current, spanWeeks, payPeriodStartDate));
   }, [payPeriodStartDate, spanWeeks]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   // Set when the grid has been seeded from the previous visit's snapshot.
@@ -499,9 +502,10 @@ function SchedulerContent() {
 
   // ── Open shifts (calloff-spawned pickups) ──
   const [calloffOpenShifts, setCalloffOpenShifts] = useState<GridOpenShift[]>([]);
-  const [publishedDateRanges, setPublishedDateRanges] = useState<
-    { startDate: string; endDate: string }[]
-  >([]);
+  const [publicationRangeState, setPublicationRangeState] = useState<PublicationRangeLoadState>(
+    () => beginPublicationRangeLoad(),
+  );
+  const publishedDateRanges = publicationRangeState.ranges;
   const liveCalloffOpenShifts = useMemo(
     () =>
       buildGridCalloffOpenShiftsFromRequests({
@@ -958,6 +962,7 @@ function SchedulerContent() {
       scheduleLoadStarted.current = false;
       draftCheckStarted.current = false;
       setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
+      setPublicationRangeState(beginPublicationRangeLoad());
     }
     if (orgLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
@@ -1034,8 +1039,9 @@ function SchedulerContent() {
             toast.error("We couldn't load the open shifts. Refresh and try again.");
             return [] as GridOpenShift[];
           }),
-          fetchPublishedDateRanges(orgId, defaultShiftFetchStart, defaultShiftFetchEnd).catch(
-            (err) => {
+          fetchPublishedDateRanges(orgId, defaultShiftFetchStart, defaultShiftFetchEnd)
+            .then(completePublicationRangeLoad)
+            .catch((err) => {
               Sentry.captureException(err, {
                 extra: {
                   context: "schedule.initial_published_ranges",
@@ -1044,9 +1050,8 @@ function SchedulerContent() {
                   endDate: defaultShiftFetchEnd,
                 },
               });
-              return [] as { startDate: string; endDate: string }[];
-            },
-          ),
+              return failPublicationRangeLoad();
+            }),
         ]);
 
         lastViewedRef.current = lastViewed;
@@ -1069,7 +1074,7 @@ function SchedulerContent() {
         });
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
-        setPublishedDateRanges(initialPublishedDateRanges);
+        setPublicationRangeState(initialPublishedDateRanges);
         if (recentPublishes.length > 0) setPublishHistory(recentPublishes);
 
         // Show "what changed" toast once per mount
@@ -1799,12 +1804,16 @@ function SchedulerContent() {
     () => buildPublishedDateSet(publishedDateRanges),
     [publishedDateRanges],
   );
+  const loadedPublishedWindowState = useMemo(
+    () => getLoadedPublishedWindowState(publicationRangeState, dates),
+    [dates, publicationRangeState],
+  );
   const publishedWindowState = useMemo(() => {
     if (coverageRequirements.length === 0 || dates.length === 0) {
       return "published";
     }
-    return getPublishedWindowState(dates, publishedDateSet);
-  }, [coverageRequirements.length, dates, publishedDateSet]);
+    return loadedPublishedWindowState ?? "published";
+  }, [coverageRequirements.length, dates.length, loadedPublishedWindowState]);
   const publishedVisibleDates = useMemo(() => {
     if (coverageRequirements.length === 0 || dates.length === 0) return dates;
     return filterPublishedDates(dates, publishedDateSet);
@@ -1812,12 +1821,7 @@ function SchedulerContent() {
   // Use the raw publish state (ignoring the coverage-requirements shortcut that
   // forces publishedWindowState to "published") so non-editors see the empty
   // state whenever the visible window genuinely has no published dates.
-  const rawPublishedWindowState = useMemo(
-    () => getPublishedWindowState(dates, publishedDateSet),
-    [dates, publishedDateSet],
-  );
-  const hideGridForUnpublishedViewer =
-    !isScheduleEditor && rawPublishedWindowState === "unpublished";
+  const rawPublishedWindowState = loadedPublishedWindowState ?? "published";
 
   const filteredEmployees = useMemo(
     () => filterAndSortEmployees(employees, activeFocusArea, scheduleSortBy),
@@ -1836,13 +1840,14 @@ function SchedulerContent() {
   }, [employees, normalizedStaffSearch]);
   const refetchPublishedRanges = useCallback(async () => {
     if (!org) {
-      setPublishedDateRanges([]);
+      setPublicationRangeState(beginPublicationRangeLoad());
       return;
     }
 
+    setPublicationRangeState((current) => beginPublicationRangeLoad(current.ranges));
     try {
       const ranges = await fetchPublishedDateRanges(org.id, shiftFetchStart, shiftFetchEnd);
-      setPublishedDateRanges(ranges);
+      setPublicationRangeState(completePublicationRangeLoad(ranges));
     } catch (err) {
       Sentry.captureException(err, {
         extra: {
@@ -1852,7 +1857,7 @@ function SchedulerContent() {
           endDate: shiftFetchEnd,
         },
       });
-      setPublishedDateRanges([]);
+      setPublicationRangeState((current) => failPublicationRangeLoad(current.ranges));
     }
   }, [org, shiftFetchEnd, shiftFetchStart]);
   refetchPublishedRangesRef.current = refetchPublishedRanges;
@@ -5281,6 +5286,15 @@ function SchedulerContent() {
     return false;
   }, [scheduleGridModel.columns, scheduleGridModel.departments, shifts]);
 
+  const showPublicationRangeErrorForViewer =
+    !isScheduleEditor && publicationRangeState.status === "error" && !hasVisibleScheduleEntries;
+  const hideGridForUnpublishedViewer =
+    !isScheduleEditor &&
+    publicationRangeState.status === "loaded" &&
+    rawPublishedWindowState === "unpublished";
+  const hideGridForPublicationState =
+    hideGridForUnpublishedViewer || showPublicationRangeErrorForViewer;
+
   const bulkDeleteSelectedTargets = useMemo(
     () =>
       Array.from(bulkDeleteSelectedKeys)
@@ -5996,6 +6010,22 @@ function SchedulerContent() {
           </div>
 
           <div style={{ padding: isMobile ? "8px 0" : "16px 16px" }}>
+            {showPublicationRangeErrorForViewer && (
+              <EmptyState
+                heading="We couldn't confirm this period's publication status"
+                description="Check your connection and try loading the publication status again."
+                action={
+                  <Button
+                    type="button"
+                    className="dg-btn dg-btn-secondary"
+                    onClick={() => void refetchPublishedRanges()}
+                  >
+                    Try again
+                  </Button>
+                }
+              />
+            )}
+
             {hideGridForUnpublishedViewer && (
               <EmptyState
                 heading="This period has not been published yet"
@@ -6004,7 +6034,7 @@ function SchedulerContent() {
             )}
 
             {/* Mobile Day View */}
-            {spanWeeks !== "month" && isMobile && !hideGridForUnpublishedViewer && (
+            {spanWeeks !== "month" && isMobile && !hideGridForPublicationState && (
               <MobileDayView
                 filteredEmployees={filteredEmployees}
                 allEmployees={employees}
@@ -6033,7 +6063,7 @@ function SchedulerContent() {
             )}
 
             {/* Desktop/Tablet Grid */}
-            {spanWeeks !== "month" && !isMobile && !hideGridForUnpublishedViewer && (
+            {spanWeeks !== "month" && !isMobile && !hideGridForPublicationState && (
               <div data-tour="schedule-grid">
                 <ScheduleGrid
                   model={scheduleGridModel}
@@ -6446,7 +6476,7 @@ function SchedulerContent() {
               />
             )}
 
-            {spanWeeks === "month" && !hideGridForUnpublishedViewer && (
+            {spanWeeks === "month" && !hideGridForPublicationState && (
               <MonthView
                 monthStart={monthStart}
                 filteredEmployees={filteredEmployees}

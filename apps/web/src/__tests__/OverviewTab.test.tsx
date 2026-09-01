@@ -4,6 +4,26 @@ import { OverviewTab } from "@/components/staff-detail/tabs/OverviewTab";
 import { makeEmployee, makeFocusArea } from "@/__tests__/factories";
 
 describe("OverviewTab", () => {
+  it("places schedule overview cards directly after the summary", () => {
+    render(
+      <OverviewTab
+        employee={makeEmployee()}
+        shifts={{}}
+        assignmentById={new Map()}
+        categoryById={new Map()}
+        focusAreas={[]}
+        certifications={[]}
+        orgRoles={[]}
+        pendingInvite={null}
+        thisWeekHours={null}
+        scheduleOverview={<div>Recurring schedule card</div>}
+      />,
+    );
+
+    const summary = screen.getByText("Summary").closest(".dg-card");
+    expect(summary?.nextElementSibling).toHaveTextContent("Recurring schedule card");
+  });
+
   it("shows assigned focus areas in details using the organization's custom label", () => {
     render(
       <OverviewTab

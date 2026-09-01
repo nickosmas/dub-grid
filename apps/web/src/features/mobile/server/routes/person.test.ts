@@ -223,6 +223,29 @@ describe("mobile person route", () => {
     });
   });
 
+  it("does not return the signed-in user's own employee through the person endpoint", async () => {
+    requireMobileAuth.mockResolvedValue(
+      makeAuth({ canManageEmployees: false, canViewStaff: true }),
+    );
+    rowToEmployee.mockReturnValue(makeEmployee({ userId: VIEWER_USER_ID }));
+    mockManagementMemberships([]);
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      {
+        params: Promise.resolve({
+          id: "d660d308-4e0d-4daf-84fd-6753405e6740",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Employee not found" });
+  });
+
   describe("PATCH", () => {
     function patchRequest(overrides: Record<string, unknown> = {}) {
       return new Request(

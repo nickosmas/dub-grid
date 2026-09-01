@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DbAbsenceType,
   DbEmployee,
@@ -8,7 +9,6 @@ import type {
   DbRecurringShift,
   DbScheduleCell,
   DbShiftCategory,
-  DbShiftRequest,
 } from "@dubgrid/db-types";
 import type { Employee } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -21,14 +21,18 @@ import {
   rowToJobDefinition,
   rowToRecurringShift,
   rowToShiftCategory,
-  rowToShiftRequest,
 } from "@/lib/db/mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+import {
+  getProfileOverviewDateRange,
+  toPublishedOnlyProfileEntry,
+  type ProfileOverviewDateRange,
+} from "@/features/account/shared/profile-schedule";
 import {
   createAssignmentDefinitionIdByPairMap,
   createShiftJobCompatibilityMaps,
 } from "@/lib/shift-job-segments";
-import type { RecurringShift, ShiftMap, ShiftRequest } from "@/types";
+import type { RecurringShift, ShiftMap } from "@/types";
 
 export interface SelfProfileSnapshot {
   firstName: string | null;
@@ -52,8 +56,6 @@ export interface SelfWorkProfileSnapshot {
   managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
-  shiftRequests: ShiftRequest[];
-  auditNames: Array<[string, string]>;
 }
 
 export interface AccountIdentitySnapshot {
@@ -236,73 +238,32 @@ async function fetchAssignmentContext(orgId: string) {
   };
 }
 
-function mapShiftRequestRows(
-  rows: Record<string, unknown>[],
-  input: {
-    assignmentLabelMap: Map<number, string>;
-    assignmentIdByPair: Map<string, number>;
-    segmentCompatibility: ReturnType<typeof createShiftJobCompatibilityMaps>;
-  },
-): ShiftRequest[] {
-  return rows.map((row) => {
-    const requester = row.requester as { first_name: string; last_name: string } | null;
-    const target = row.target as { first_name: string; last_name: string } | null;
-
-    const mapped: DbShiftRequest = {
-      id: row.id as string,
-      org_id: row.org_id as string,
-      type: row.type as DbShiftRequest["type"],
-      status: row.status as DbShiftRequest["status"],
-      requester_emp_id: row.requester_emp_id as string,
-      requester_shift_date: row.requester_shift_date as string,
-      requester_state: row.requester_state as DbShiftRequest["requester_state"],
-      target_emp_id: (row.target_emp_id as string | null) ?? null,
-      target_shift_date: (row.target_shift_date as string | null) ?? null,
-      target_state: (row.target_state as DbShiftRequest["target_state"] | null | undefined) ?? null,
-      absence_type_id: (row.absence_type_id as number | null) ?? null,
-      parent_request_id: (row.parent_request_id as string | null) ?? null,
-      admin_user_id: (row.admin_user_id as string | null) ?? null,
-      admin_note: (row.admin_note as string | null) ?? null,
-      expires_at: row.expires_at as string,
-      resolved_at: (row.resolved_at as string | null) ?? null,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
-      requester_first_name: requester?.first_name,
-      requester_last_name: requester?.last_name,
-      target_first_name: target?.first_name ?? null,
-      target_last_name: target?.last_name ?? null,
-    };
-
-    return rowToShiftRequest(
-      mapped,
-      input.assignmentLabelMap,
-      input.segmentCompatibility,
-      input.assignmentIdByPair,
-    );
-  });
+async function fetchOrganizationTimeZone(orgId: string): Promise<string> {
+  const { data, error } = await getServiceClient()
+    .from("organizations")
+    .select("timezone")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.timezone ?? "UTC";
 }
 
-async function fetchAuditNames(userIds: Iterable<string>): Promise<Array<[string, string]>> {
-  const ids = Array.from(new Set(Array.from(userIds).filter(Boolean)));
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getServiceClient()
-    .from("profiles")
-    .select("id, first_name, last_name")
-    .in("id", ids);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? [])
-    .map((row: { id: string; first_name: string | null; last_name: string | null }) => {
-      const name = [row.first_name?.trim(), row.last_name?.trim()].filter(Boolean).join(" ");
-      return name ? ([row.id, name] as [string, string]) : null;
-    })
-    .filter((entry): entry is [string, string] => entry !== null);
+export async function fetchProfileOverviewScheduleCells(
+  client: SupabaseClient,
+  orgId: string,
+  employeeId: string,
+  range: ProfileOverviewDateRange,
+): Promise<DbScheduleCell[]> {
+  const { data, error } = await client
+    .from("schedule_cells")
+    .select(SCHEDULE_CELL_SELECT)
+    .eq("org_id", orgId)
+    .eq("emp_id", employeeId)
+    .gte("date", range.startDate)
+    .lte("date", range.endDate)
+    .order("date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbScheduleCell[];
 }
 
 export async function fetchSelfWorkProfileSnapshot(
@@ -325,8 +286,6 @@ export async function fetchSelfWorkProfileSnapshot(
       managementDepartmentIds: [],
       shifts: {},
       recurringShifts: [],
-      shiftRequests: [],
-      auditNames: [],
     };
   }
 
@@ -344,13 +303,14 @@ export async function fetchSelfWorkProfileSnapshot(
       managementDepartmentIds,
       shifts: {},
       recurringShifts: [],
-      shiftRequests: [],
-      auditNames: [],
     };
   }
 
-  const { assignments, shiftCategories, jobs, absenceTypeMap } =
-    await fetchAssignmentContext(orgId);
+  const [assignmentContext, timeZone] = await Promise.all([
+    fetchAssignmentContext(orgId),
+    fetchOrganizationTimeZone(orgId),
+  ]);
+  const { assignments, shiftCategories, jobs, absenceTypeMap } = assignmentContext;
   const assignmentLabelMap = new Map(
     assignments.map((assignment) => [assignment.id, assignment.label]),
   );
@@ -362,14 +322,10 @@ export async function fetchSelfWorkProfileSnapshot(
     shiftDisplayMode: "code",
   });
   const serviceClient = getServiceClient();
+  const overviewRange = getProfileOverviewDateRange(new Date(), timeZone);
 
-  const [scheduleCellsResult, recurringResult, shiftRequestsResult] = await Promise.all([
-    serviceClient
-      .from("schedule_cells")
-      .select(SCHEDULE_CELL_SELECT)
-      .eq("org_id", orgId)
-      .eq("emp_id", employee.id)
-      .order("date", { ascending: false }),
+  const [scheduleCellsResult, recurringResult] = await Promise.all([
+    fetchProfileOverviewScheduleCells(serviceClient, orgId, employee.id, overviewRange),
     serviceClient
       .from("recurring_shifts")
       .select(RECURRING_SHIFT_COLS)
@@ -378,28 +334,15 @@ export async function fetchSelfWorkProfileSnapshot(
       .is("archived_at", null)
       .order("day_of_week")
       .order("effective_from", { ascending: false }),
-    serviceClient
-      .from("shift_requests")
-      .select(
-        `*,
-           requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
-           target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
-      )
-      .eq("org_id", orgId)
-      .or(`requester_emp_id.eq.${employee.id},target_emp_id.eq.${employee.id}`)
-      .order("created_at", { ascending: false }),
   ]);
 
-  if (scheduleCellsResult.error) throw scheduleCellsResult.error;
   if (recurringResult.error) throw recurringResult.error;
-  if (shiftRequestsResult.error) throw shiftRequestsResult.error;
 
   const shifts: ShiftMap = {};
-  const auditUserIds = new Set<string>();
 
-  for (const row of (scheduleCellsResult.data ?? []) as DbScheduleCell[]) {
+  for (const row of scheduleCellsResult) {
     const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
-      isScheduler: true,
+      isScheduler: false,
       assignmentLabelMap,
       assignmentIdByPair,
       absenceTypeMap,
@@ -409,9 +352,7 @@ export async function fetchSelfWorkProfileSnapshot(
       continue;
     }
 
-    if (entry.createdBy) auditUserIds.add(entry.createdBy);
-    if (entry.updatedBy) auditUserIds.add(entry.updatedBy);
-    shifts[`${row.emp_id}_${row.date}`] = entry;
+    shifts[`${row.emp_id}_${row.date}`] = toPublishedOnlyProfileEntry(entry);
   }
 
   const recurringShifts = ((recurringResult.data ?? []) as DbRecurringShift[]).map((row) =>
@@ -423,24 +364,12 @@ export async function fetchSelfWorkProfileSnapshot(
       assignmentIdByPair,
     ),
   );
-  const shiftRequests = mapShiftRequestRows(
-    (shiftRequestsResult.data ?? []) as Record<string, unknown>[],
-    {
-      assignmentLabelMap,
-      assignmentIdByPair,
-      segmentCompatibility,
-    },
-  );
-  const auditNames = await fetchAuditNames(auditUserIds);
-
   return {
     profile,
     employee,
     managementDepartmentIds,
     shifts,
     recurringShifts,
-    shiftRequests,
-    auditNames,
   };
 }
 

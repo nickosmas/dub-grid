@@ -17,8 +17,12 @@ import {
   computeShiftDistribution,
   computeOvertimeSummary,
 } from "@/lib/staff-detail-stats";
+import {
+  getProfileOverviewDateRange,
+  PROFILE_OVERVIEW_WEEK_COUNT,
+} from "@/features/account/shared/profile-schedule";
 
-const WEEK_COUNT = 12;
+const WEEK_COUNT = PROFILE_OVERVIEW_WEEK_COUNT;
 
 interface OverviewTabProps {
   employee: Employee;
@@ -31,6 +35,8 @@ interface OverviewTabProps {
   orgRoles: NamedItem[];
   pendingInvite: Invitation | null;
   thisWeekHours: EmployeeHours | null;
+  scheduleOverview?: ReactNode;
+  timeZone?: string | null;
 }
 
 export function OverviewTab({
@@ -44,7 +50,13 @@ export function OverviewTab({
   orgRoles,
   pendingInvite,
   thisWeekHours,
+  scheduleOverview,
+  timeZone,
 }: OverviewTabProps) {
+  const overviewRange = useMemo(
+    () => getProfileOverviewDateRange(new Date(), timeZone),
+    [timeZone],
+  );
   const hoursHistory = useMemo(
     () =>
       computeEmployeeHoursHistory(
@@ -54,13 +66,21 @@ export function OverviewTab({
         WEEK_COUNT,
         40,
         categoryById,
+        overviewRange.startDate,
       ),
-    [employee.id, shifts, assignmentById, categoryById],
+    [employee.id, shifts, assignmentById, categoryById, overviewRange.startDate],
   );
 
   const shiftDistribution = useMemo(
-    () => computeShiftDistribution(employee.id, shifts, assignmentById),
-    [employee.id, shifts, assignmentById],
+    () =>
+      computeShiftDistribution(
+        employee.id,
+        shifts,
+        assignmentById,
+        overviewRange.startDate,
+        overviewRange.endDate,
+      ),
+    [employee.id, shifts, assignmentById, overviewRange.startDate, overviewRange.endDate],
   );
 
   const overtimeSummary = useMemo(() => computeOvertimeSummary(hoursHistory), [hoursHistory]);
@@ -162,6 +182,8 @@ export function OverviewTab({
           />
         </div>
       </div>
+
+      {scheduleOverview}
 
       <div className="grid gap-4 md:grid-cols-2">
         <StatusCard

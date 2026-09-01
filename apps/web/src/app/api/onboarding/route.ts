@@ -5,6 +5,7 @@ import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -56,12 +57,6 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUser(req);
-    if ("response" in auth) {
-      return auth.response;
-    }
-    void auth;
-
     let body: unknown;
     try {
       body = await req.json();
@@ -74,13 +69,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
-    const supabase = createRequestSupabaseClient(req);
-    const result = await supabase.rpc("complete_onboarding", {
-      p_org_id: parsed.data.orgId,
+    const orgAuth = await requireOrgPermissions(req, parsed.data.orgId, () => true, {
+      allowDuringSetup: true,
+      allowLockedOrganization: true,
+    });
+    if ("response" in orgAuth) return orgAuth.response;
+
+    const result = await orgAuth.userClient.rpc("complete_onboarding", {
+      p_org_id: orgAuth.orgId,
     });
     if (result.error) throw result.error;
 
-    return NextResponse.json({ success: true });
+    const { data: membership, error: verificationError } = await orgAuth.serviceClient
+      .from("organization_memberships")
+      .select("onboarding_completed_at")
+      .eq("user_id", orgAuth.actor.id)
+      .eq("org_id", orgAuth.orgId)
+      .maybeSingle();
+    if (verificationError) throw verificationError;
+
+    const completedAt = membership?.onboarding_completed_at;
+    if (typeof completedAt !== "string" || completedAt.length === 0) {
+      return NextResponse.json(
+        { error: "We couldn't confirm setup was saved. Try again." },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({ success: true, completedAt });
   } catch (error) {
     logger.error({ error }, "onboarding POST failed");
     return NextResponse.json({ error: "We couldn't finish setup. Try again." }, { status: 500 });

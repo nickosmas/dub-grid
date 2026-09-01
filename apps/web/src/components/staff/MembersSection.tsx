@@ -125,9 +125,9 @@ export interface MembersSectionProps {
 }
 
 export function MembersSection({
-  employees,
-  inactiveEmployees,
-  removedEmployees,
+  employees: suppliedEmployees,
+  inactiveEmployees: suppliedInactiveEmployees,
+  removedEmployees: suppliedRemovedEmployees,
   focusAreas,
   certifications,
   roles,
@@ -160,6 +160,34 @@ export function MembersSection({
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const currentUserId = currentUser?.id ?? null;
+  const regularUserMode = !canManageEmployees;
+  const employees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedEmployees,
+    [currentUserId, regularUserMode, suppliedEmployees],
+  );
+  const inactiveEmployees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedInactiveEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedInactiveEmployees,
+    [currentUserId, regularUserMode, suppliedInactiveEmployees],
+  );
+  const removedEmployees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedRemovedEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedRemovedEmployees,
+    [currentUserId, regularUserMode, suppliedRemovedEmployees],
+  );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
   // Broader, view-only gate: lets a non-admin management-only user see the
@@ -176,6 +204,9 @@ export function MembersSection({
     inactiveEmployees,
     removedEmployees,
     focusAreas,
+    certifications,
+    roles,
+    regularUserMode,
   });
   const {
     activeTab,
@@ -499,7 +530,7 @@ export function MembersSection({
   const [exportConfirm, setExportConfirm] = useState(false);
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || regularUserMode) return;
     let cancelled = false;
 
     fetchOrganizationInvitations(orgId)
@@ -518,7 +549,7 @@ export function MembersSection({
     return () => {
       cancelled = true;
     };
-  }, [orgId]);
+  }, [orgId, regularUserMode]);
 
   // Re-derive against "now" on a slow tick so invitations that cross their
   // 72h expiry while the page is open stop rendering as "Pending". Without
@@ -532,14 +563,14 @@ export function MembersSection({
 
   const pendingInviteByEmployeeId = useMemo(() => {
     const map = new Map<string, Invitation>();
-    for (const inv of pendingInvitations) {
+    for (const inv of regularUserMode ? [] : pendingInvitations) {
       if (new Date(inv.expiresAt).getTime() <= nowMs) continue;
       if (inv.employeeId) {
         map.set(inv.employeeId, inv);
       }
     }
     return map;
-  }, [pendingInvitations, nowMs]);
+  }, [pendingInvitations, nowMs, regularUserMode]);
 
   const {
     directory,
@@ -764,7 +795,7 @@ export function MembersSection({
   }
 
   function refreshInvitations() {
-    if (!orgId) return;
+    if (!orgId || regularUserMode) return;
 
     fetchOrganizationInvitations(orgId)
       .then((invites) => {
@@ -1001,6 +1032,7 @@ export function MembersSection({
             onScheduleCount={employees.length}
             fullTimeCount={employmentSummary.fullTime}
             partTimeCount={employmentSummary.partTime}
+            showEmploymentCounts={!regularUserMode}
           />
 
           {!showManagement && (
@@ -1249,7 +1281,11 @@ export function MembersSection({
                   className="dg-input w-full"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by name, email, or phone..."
+                  placeholder={
+                    regularUserMode
+                      ? "Search by name or qualification..."
+                      : "Search by name, email, or phone..."
+                  }
                   style={{
                     height: 32,
                     paddingLeft: 32,
@@ -1474,6 +1510,7 @@ export function MembersSection({
               onFilterPhonePresenceChange={setFilterPhonePresence}
               onClearAll={clearFilters}
               hasActiveFilters={hasActiveFilters}
+              showAdministrativeFilters={!regularUserMode}
             />
           )}
 

@@ -12,6 +12,7 @@ const useLocalSearchParams = vi.fn();
 // Every options object the screen hands the native header, in render order.
 const stackScreenOptions: { title?: string }[] = [];
 const pushToast = vi.fn();
+const routerReplace = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -33,6 +34,9 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("expo-router", () => ({
+  router: {
+    replace: routerReplace,
+  },
   Stack: {
     Screen: (props: { options?: { title?: string } }) => {
       stackScreenOptions.push(props.options ?? {});
@@ -108,6 +112,7 @@ describe("PersonDetailScreen", () => {
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
+    routerReplace.mockReset();
     emptyStateTitles.length = 0;
     stackScreenOptions.length = 0;
 
@@ -177,6 +182,46 @@ describe("PersonDetailScreen", () => {
       ...overrides,
     };
   }
+
+  it("redirects a direct self link without enabling the teammate query", async () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [],
+        roles: [],
+        certifications: [],
+        departments: [],
+        linkedEmployee: { id: "emp-1" },
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(useQuery).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/(tabs)/profile");
+    });
+    expect(emptyStateTitles).not.toContain("Person not found");
+  });
 
   // The tier used to hang off the status chip behind a "·", which read as a
   // caption on that chip and left the account chip alone on the next line. It

@@ -2,9 +2,13 @@
 
 import type { Employee } from "@dubgrid/domain";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import type { RecurringShift, ShiftMap, ShiftRequest } from "@/types";
+import type { RecurringShift, ShiftMap } from "@/types";
 import type { NotificationPreferenceMap } from "@/features/account/shared/preferences";
 import type { Permissions } from "@/features/permissions/shared";
+import type {
+  CalendarSubscriptionIssued,
+  CalendarSubscriptionStatus,
+} from "@/features/account/shared/calendar-subscription";
 import {
   EmployeeContactConflictError,
   EmployeeProfileConflictError,
@@ -29,8 +33,6 @@ export interface AccountSelfProfileData {
   managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
-  shiftRequests: ShiftRequest[];
-  auditNames: Array<[string, string]>;
 }
 
 export interface AccountSessionRecord {
@@ -178,6 +180,28 @@ export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfP
   }
   const suffix = params.toString();
   return requestJson<AccountSelfProfileData>(`/api/account/self${suffix ? `?${suffix}` : ""}`);
+}
+
+export function fetchCalendarSubscriptionStatus(): Promise<CalendarSubscriptionStatus> {
+  return requestJson<CalendarSubscriptionStatus>("/api/account/calendar-subscription");
+}
+
+export function createCalendarSubscription(): Promise<CalendarSubscriptionIssued> {
+  return requestJson<CalendarSubscriptionIssued>("/api/account/calendar-subscription", {
+    method: "POST",
+  });
+}
+
+export function rotateCalendarSubscription(): Promise<CalendarSubscriptionIssued> {
+  return requestJson<CalendarSubscriptionIssued>("/api/account/calendar-subscription", {
+    method: "PUT",
+  });
+}
+
+export function revokeCalendarSubscription(): Promise<CalendarSubscriptionStatus> {
+  return requestJson<CalendarSubscriptionStatus>("/api/account/calendar-subscription", {
+    method: "DELETE",
+  });
 }
 
 export function updateSelfProfileDetails(input: {

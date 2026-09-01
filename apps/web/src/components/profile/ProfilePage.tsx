@@ -15,7 +15,7 @@ import {
   resolveProfileSection,
   PROFILE_FOOTER_GROUP_IDS,
 } from "./profile-nav-config";
-import { SelfWorkOverview, SelfWorkSchedule } from "./SelfWorkProfile";
+import { SelfWorkOverview } from "./SelfWorkProfile";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
@@ -24,9 +24,8 @@ import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 
 /**
  * /profile — the user's home for everything about them:
- *   - Account: profile (incl. account deletion request), security,
- *     notifications, data & privacy (cookie preferences + policy links)
- *   - My work (employees only): overview, schedule
+ *   - Profile, security, notifications, appearance, and data & privacy
+ *   - Work overview for on-schedule employees
  *
  * Shares the SettingsShell chrome with /settings so the navigation feels
  * the same across the app. Org admin configuration still lives at /settings.
@@ -41,17 +40,8 @@ export function ProfilePage() {
     isGridmaster,
     isLoading: permsLoading,
   } = usePermissions();
-  const {
-    org,
-    focusAreas,
-    assignments,
-    shiftCategories,
-    absenceTypes,
-    certifications,
-    orgRoles,
-    departments,
-    assignmentNameMap,
-  } = useOrganizationData();
+  const { org, focusAreas, assignments, shiftCategories, certifications, orgRoles, departments } =
+    useOrganizationData();
   const {
     user,
     profile,
@@ -59,8 +49,6 @@ export function ProfilePage() {
     managementDepartmentIds,
     shifts,
     recurringShifts,
-    shiftRequests,
-    auditNames,
     isLoading: profileLoading,
     error: profileError,
     refetch: refetchProfile,
@@ -70,8 +58,7 @@ export function ProfilePage() {
   } = useSelfProfileData({ orgId });
 
   // Management-only employees have a row in `employees` but no focus
-  // areas — they're not on the schedule grid, so don't surface the
-  // My work group (which is just "your schedule" + "your overview").
+  // areas, so they have no personal schedule overview.
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const navGroups = useMemo(() => buildProfileNavGroups({ isOnSchedule }), [isOnSchedule]);
   const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
@@ -112,9 +99,8 @@ export function ProfilePage() {
       defaultSection={defaultSection}
       activeSection={activeSection}
       footerGroupIds={PROFILE_FOOTER_GROUP_IDS}
+      hideContentGroupLabels
     >
-      {/* ── Account group ─────────────────────────────────────── */}
-
       {activeSection === "profile" && (
         <ProfilePanel
           user={user}
@@ -156,8 +142,6 @@ export function ProfilePage() {
 
       {activeSection === "data-privacy" && <DataPrivacyPanel />}
 
-      {/* ── My work group (employees only) ────────────────────── */}
-
       {activeSection === "overview" && isOnSchedule && employee && (
         <SelfWorkOverview
           employee={employee}
@@ -165,32 +149,11 @@ export function ProfilePage() {
           focusAreaLabel={org?.focusAreaLabel}
           assignments={assignments}
           shiftCategories={shiftCategories}
-          absenceTypes={absenceTypes}
           certifications={certifications}
           orgRoles={orgRoles}
           shifts={shifts}
           recurringShifts={recurringShifts}
-          shiftRequests={shiftRequests}
-          auditNames={auditNames}
-          assignmentNameMap={assignmentNameMap}
-        />
-      )}
-
-      {activeSection === "schedule" && isOnSchedule && employee && (
-        <SelfWorkSchedule
-          employee={employee}
-          focusAreas={focusAreas}
-          focusAreaLabel={org?.focusAreaLabel}
-          assignments={assignments}
-          shiftCategories={shiftCategories}
-          absenceTypes={absenceTypes}
-          certifications={certifications}
-          orgRoles={orgRoles}
-          shifts={shifts}
-          recurringShifts={recurringShifts}
-          shiftRequests={shiftRequests}
-          auditNames={auditNames}
-          assignmentNameMap={assignmentNameMap}
+          timeZone={org?.timezone}
         />
       )}
     </SettingsShell>

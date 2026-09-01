@@ -16,6 +16,7 @@ import type {
   FocusAreaDistributionEntry,
 } from "@/types";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
+import { addDaysToIsoDate } from "@dubgrid/schedule-core";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -32,24 +33,18 @@ export function computeEmployeeHoursHistory(
   weekCount: number,
   otThreshold: number = 40,
   categoryById?: Map<number, ShiftCategory>,
+  overviewStartDate?: string,
 ): WeeklyHoursSummary[] {
   const now = new Date();
   const results: WeeklyHoursSummary[] = [];
 
   for (let w = weekCount - 1; w >= 0; w--) {
-    const weekStart = new Date(now);
-    weekStart.setHours(0, 0, 0, 0);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() - w * 7);
-
-    const weekDateKeys: string[] = [];
-    for (let d = 0; d < 7; d++) {
-      const day = new Date(weekStart);
-      day.setDate(day.getDate() + d);
-      const y = day.getFullYear();
-      const m = String(day.getMonth() + 1).padStart(2, "0");
-      const dd = String(day.getDate()).padStart(2, "0");
-      weekDateKeys.push(`${y}-${m}-${dd}`);
-    }
+    const weekIndex = weekCount - 1 - w;
+    const weekDateKeys = overviewStartDate
+      ? Array.from({ length: 7 }, (_, dayIndex) =>
+          addDaysToIsoDate(overviewStartDate, weekIndex * 7 + dayIndex),
+        )
+      : getLocalWeekDateKeys(now, w);
 
     let totalHours = 0;
     let shiftCount = 0;
@@ -87,18 +82,37 @@ export function computeEmployeeHoursHistory(
   return results;
 }
 
+function getLocalWeekDateKeys(now: Date, weeksAgo: number): string[] {
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay() - weeksAgo * 7);
+  return Array.from({ length: 7 }, (_, dayIndex) => {
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + dayIndex);
+    const year = day.getFullYear();
+    const month = String(day.getMonth() + 1).padStart(2, "0");
+    const date = String(day.getDate()).padStart(2, "0");
+    return `${year}-${month}-${date}`;
+  });
+}
+
 // ─── Assignment Distribution ────────────────────────────
 
 export function computeShiftDistribution(
   empId: string,
   shifts: ShiftMap,
   assignmentById: Map<number, AssignmentDefinition>,
+  startDate?: string,
+  endDate?: string,
 ): ShiftDistributionEntry[] {
   const counts = new Map<number, number>();
   let total = 0;
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (!key.startsWith(`${empId}_`)) continue;
+    const dateKey = key.slice(empId.length + 1);
+    if (startDate && dateKey < startDate) continue;
+    if (endDate && dateKey > endDate) continue;
     if (entry.isDelete || entry.assignmentIds.length === 0) continue;
 
     for (const codeId of entry.assignmentIds) {

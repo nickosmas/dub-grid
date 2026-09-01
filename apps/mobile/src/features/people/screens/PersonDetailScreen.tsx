@@ -186,6 +186,12 @@ export default function PersonDetailScreen() {
   const personId = Array.isArray(params.id) ? params.id[0] : params.id;
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  // A person's own employee record belongs to the Profile tab. Resolve that
+  // from bootstrap before enabling this query so a pasted /person/[id] URL
+  // cannot briefly fetch and render the duplicate teammate-profile surface.
+  const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+  const isSelfRoute = Boolean(personId && currentEmployeeId && personId === currentEmployeeId);
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -206,12 +212,11 @@ export default function PersonDetailScreen() {
   const personQuery = useQuery({
     queryKey: ["mobile", "person", accessToken, personId],
     queryFn: () => getMobilePerson(accessToken!, personId!),
-    enabled: Boolean(accessToken && personId),
+    enabled: Boolean(accessToken && personId && bootstrapQuery.data && !isSelfRoute),
   });
   const manualRefresh = useManualRefresh(() =>
     Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]),
   );
-  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   // Super-admin/gridmaster only, the same bar web holds management access
   // behind — it is not one of the admin permissions.
   const canManageManagementAccess = Boolean(
@@ -221,7 +226,8 @@ export default function PersonDetailScreen() {
   const rawPerson = personQuery.data?.person ?? null;
   const person =
     rawPerson && (canManageEmployees || rawPerson.status === "active") ? rawPerson : null;
-  const isSelf = Boolean(currentUserId && person?.userId && person.userId === currentUserId);
+  const isSelf =
+    isSelfRoute || Boolean(currentUserId && person?.userId && person.userId === currentUserId);
   const canEdit = canManageEmployees && person?.status !== "removed";
   const contentState = useMobileContentState({
     // Bootstrap belongs in both halves, not just `isLoading`. `person` above is
@@ -518,6 +524,10 @@ export default function PersonDetailScreen() {
     // flickering during the scroll view's elastic resting bounce.
     const nextVisible = event.nativeEvent.contentOffset.y > 12;
     setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
+  }
+
+  if (isSelf) {
+    return <Screen bottomPaddingMode="tabbed" scrollEnabled={false} />;
   }
 
   if (contentState.kind === "loading") {
