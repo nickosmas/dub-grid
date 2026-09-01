@@ -88,10 +88,7 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
-import {
-  getRoleCertificationRequirement,
-  isRoleCertificationBlocked,
-} from "../../profile/lib/role-certification";
+import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
 import {
@@ -1395,27 +1392,20 @@ function EditPanel({
             onToggle={(id) => toggle("focusAreaIds", id)}
           />
           <ProfileChoiceGroup
-            items={roles.map((item) => {
-              const disabled = isRoleCertificationBlocked({
-                role: item,
-                certificationId: draft.certificationId,
-                selectedRoleIds: draft.roleIds,
-                roleId: item.id,
-              });
-              return {
+            items={roles
+              .filter(
+                (item) =>
+                  !isRoleCertificationBlocked({
+                    role: item,
+                    certificationId: draft.certificationId,
+                    selectedRoleIds: draft.roleIds,
+                    roleId: item.id,
+                  }),
+              )
+              .map((item) => ({
                 id: item.id,
                 name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                disabled,
-                disabledReason: disabled
-                  ? getRoleCertificationRequirement({
-                      role: item,
-                      certifications,
-                      certificationLabel,
-                      useCompactLabels: useCompactRoleCertificationLabels,
-                    })
-                  : undefined,
-              };
-            })}
+              }))}
             label={roleLabel}
             selectedIds={draft.roleIds}
             onToggle={(id) => toggle("roleIds", id)}

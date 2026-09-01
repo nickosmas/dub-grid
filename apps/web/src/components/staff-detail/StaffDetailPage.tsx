@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +8,6 @@ import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
-import Modal from "@/components/Modal";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
@@ -32,8 +30,8 @@ import {
   removeEmployee,
   EmployeeAccessDeniedError,
   EmployeeContactConflictError,
+  EmployeeProfileConflictError,
   EmployeeStatusConflictError,
-  OptimisticLockError,
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
@@ -108,7 +106,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
+  const [isEditingManagementAccess, setIsEditingManagementAccess] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
 
@@ -246,7 +244,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   ]);
 
   useEffect(() => {
-    setShowManagementAccessModal(false);
+    setIsEditingManagementAccess(false);
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
   }, [employeeId]);
@@ -315,8 +313,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           : null;
       setEmployee(updatedEmployee);
       try {
-        await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-        syncEmployeeCaches(updatedEmployee);
+        const savedEmployee = await updateEmployee(
+          updatedEmployee,
+          orgId,
+          previousEmployee.version,
+        );
+        setEmployee(savedEmployee);
+        syncEmployeeCaches(savedEmployee);
         toast.success(
           revokedInvitationEmail
             ? `Employee saved. Their pending invitation to ${revokedInvitationEmail} was revoked.`
@@ -327,14 +330,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           void refreshInvitations();
         }
       } catch (err) {
-        if (err instanceof OptimisticLockError) {
-          const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
-          if (latestEmployee) {
-            setEmployee(latestEmployee);
-            syncEmployeeCaches(latestEmployee);
-          } else {
-            setEmployee(previousEmployee);
-          }
+        if (err instanceof EmployeeProfileConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
           );
@@ -362,18 +360,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       const previousEmployee = employee;
       setEmployee(updatedEmployee);
 
+      let savedEmployee: Employee;
       try {
-        await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-        syncEmployeeCaches(updatedEmployee);
+        savedEmployee = await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+        setEmployee(savedEmployee);
+        syncEmployeeCaches(savedEmployee);
       } catch (err) {
-        if (err instanceof OptimisticLockError) {
-          const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
-          if (latestEmployee) {
-            setEmployee(latestEmployee);
-            syncEmployeeCaches(latestEmployee);
-          } else {
-            setEmployee(previousEmployee);
-          }
+        if (err instanceof EmployeeProfileConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
           );
@@ -393,13 +388,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       // is correctly saved either way.
       try {
         const created = await createOrganizationInvitation({
-          email: updatedEmployee.email,
+          email: savedEmployee.email,
           role: oldInvitation.roleToAssign,
           orgId,
-          employeeId: updatedEmployee.id,
-          firstName: updatedEmployee.firstName,
-          lastName: updatedEmployee.lastName,
-          phone: updatedEmployee.phone || undefined,
+          employeeId: savedEmployee.id,
+          firstName: savedEmployee.firstName,
+          lastName: savedEmployee.lastName,
+          phone: savedEmployee.phone || undefined,
           departmentIds: oldInvitation.departmentIds,
           deptAdminIds: oldInvitation.deptAdminIds,
         });
@@ -409,7 +404,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             token: created.token,
-            email: updatedEmployee.email,
+            email: savedEmployee.email,
             orgName: org?.name || "your organization",
           }),
         });
@@ -424,7 +419,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           throw new Error(`Employee saved, but ${detail}`);
         }
 
-        toast.success(`Employee saved. A new invitation was sent to ${updatedEmployee.email}.`);
+        toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
         toast.error(
           formatClientErrorMessage(
@@ -753,15 +748,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           defaultSection="profile"
           activeSection={activeSection}
           footerGroupIds={["history"]}
-          banner={
-            <Link
-              href="/people"
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-color-text-muted)] transition-colors hover:text-[var(--dg-color-text-primary)]"
-            >
-              <ChevronLeft className="size-4" strokeWidth={2.5} />
-              People
-            </Link>
-          }
+          leadingNavigation={{ href: "/people", label: "Back to People", Icon: ChevronLeft }}
         >
           {activeSection === "profile" && (
             <div className="space-y-6">
@@ -801,6 +788,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       certificationLabel={org?.certificationLabel}
                       roleLabel={org?.roleLabel}
                       isManagementUser={directoryPerson?.isManagementUser}
+                      persistent
                       onSave={handleSaveEmployee}
                       onCancel={() => {}}
                       pendingInvitation={pendingInvite ?? undefined}
@@ -846,7 +834,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               </section>
 
               {canManageManagementAccess &&
-                (directoryPerson?.isManagementUser || hasPendingManagementInvite) && (
+                orgId &&
+                (directoryPerson?.isManagementUser ||
+                  hasPendingManagementInvite ||
+                  isEditingManagementAccess) && (
                   <section>
                     <div className="dg-card">
                       <div className="dg-card-header">
@@ -856,40 +847,81 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             Organization role and management department assignment.
                           </div>
                         </div>
-                        {employee.status !== "removed" ? (
+                        {!isEditingManagementAccess && employee.status !== "removed" ? (
                           <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() => setShowManagementAccessModal(true)}
+                            onClick={() => setIsEditingManagementAccess(true)}
                           >
                             Edit access
                           </Button>
                         ) : null}
                       </div>
-                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                        <ProfileField
-                          label="Role"
-                          value={
-                            directoryPerson?.orgRole
-                              ? formatOrganizationRole(directoryPerson.orgRole)
-                              : "No app access"
-                          }
-                        />
-                        <ProfileField
-                          label="Management departments"
-                          value={
-                            directoryPerson?.managementDepartmentIds.length
-                              ? directoryPerson.managementDepartmentIds
-                                  .map(
-                                    (id) =>
-                                      departments.find((department) => department.id === id)?.name,
-                                  )
-                                  .filter(Boolean)
-                                  .join(", ")
-                              : "—"
-                          }
-                        />
-                      </div>
+                      {isEditingManagementAccess ? (
+                        <div className="dg-card-body flex flex-col gap-6">
+                          {directoryPerson?.orgRole ? (
+                            <MemberAccessControls
+                              orgRole={directoryPerson.orgRole}
+                              adminPermissions={directoryPerson.adminPermissions}
+                              onRoleChange={handleRoleChange}
+                              onPermissionsChange={handlePermissionsChange}
+                              isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                            />
+                          ) : null}
+                          <EmployeeManagementAccessEditor
+                            employee={employee}
+                            orgId={orgId}
+                            orgName={org.name || "your organization"}
+                            managementDepartments={(departments ?? []).filter(
+                              (department) => department.type === "management",
+                            )}
+                            directoryPerson={directoryPerson}
+                            pendingInvitation={pendingInvite ?? undefined}
+                            onClose={() => setIsEditingManagementAccess(false)}
+                            onCompleted={async (updatedEmployee) => {
+                              if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
+                              await refreshInvitations();
+                              await Promise.all([
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.org.directory(orgId),
+                                }),
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.org.users(orgId),
+                                }),
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.employees.all(orgId),
+                                }),
+                              ]);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="dg-card-body grid gap-4 sm:grid-cols-2">
+                          <ProfileField
+                            label="Role"
+                            value={
+                              directoryPerson?.orgRole
+                                ? formatOrganizationRole(directoryPerson.orgRole)
+                                : "No app access"
+                            }
+                          />
+                          <ProfileField
+                            label="Management departments"
+                            value={
+                              directoryPerson?.managementDepartmentIds.length
+                                ? directoryPerson.managementDepartmentIds
+                                    .map(
+                                      (id) =>
+                                        departments.find((department) => department.id === id)
+                                          ?.name,
+                                    )
+                                    .filter(Boolean)
+                                    .join(", ")
+                                : "—"
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}
@@ -918,7 +950,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <Button
                       type="button"
                       className="dg-btn dg-btn-secondary"
-                      onClick={() => setShowManagementAccessModal(true)}
+                      onClick={() => setIsEditingManagementAccess(true)}
                     >
                       Add to management
                     </Button>
@@ -1027,42 +1059,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             setShowAddToScheduleModal(false);
           }}
         />
-      )}
-
-      {showManagementAccessModal && employee && orgId && org && (
-        <Modal title="Management Access" onClose={() => setShowManagementAccessModal(false)}>
-          <div className="mt-4 flex flex-col gap-6">
-            {directoryPerson?.orgRole ? (
-              <MemberAccessControls
-                orgRole={directoryPerson.orgRole}
-                adminPermissions={directoryPerson.adminPermissions}
-                onRoleChange={handleRoleChange}
-                onPermissionsChange={handlePermissionsChange}
-                isSelf={isSelfAction(currentUser?.id, employee.userId)}
-              />
-            ) : null}
-            <EmployeeManagementAccessEditor
-              employee={employee}
-              orgId={orgId}
-              orgName={org.name || "your organization"}
-              managementDepartments={(departments ?? []).filter(
-                (department) => department.type === "management",
-              )}
-              directoryPerson={directoryPerson}
-              pendingInvitation={pendingInvite ?? undefined}
-              onClose={() => setShowManagementAccessModal(false)}
-              onCompleted={async (updatedEmployee) => {
-                syncEmployeeCaches(updatedEmployee);
-                await refreshInvitations();
-                await Promise.all([
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
-                ]);
-              }}
-            />
-          </div>
-        </Modal>
       )}
     </>
   );

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
   deactivateEmployee,
+  EmployeeProfileConflictError,
   EmployeeStatusConflictError,
   fetchEmployees,
   insertEmployee,
@@ -142,14 +143,17 @@ export function useEmployees(orgId: string | null): EmployeesData {
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
       try {
-        await updateEmployee(emp, orgId, emp.version);
+        const savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        setAllLocal((prev) =>
+          prev.map((employee) => (employee.id === emp.id ? savedEmployee : employee)),
+        );
         toast.success("Employee saved");
         invalidateEmployees();
       } catch (err) {
         // On version conflict, swap in the server's latest copy instead of
         // rolling back to pre-edit state — that way the user sees what
         // actually exists and can re-edit from the real current row.
-        if (err instanceof EmployeeStatusConflictError) {
+        if (err instanceof EmployeeProfileConflictError) {
           setAllLocal((prev) =>
             prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
           );
@@ -170,11 +174,15 @@ export function useEmployees(orgId: string | null): EmployeesData {
       const prevAll = allEmployeesRef.current;
       setAllLocal((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
 
+      let savedEmployee: Employee;
       try {
-        await updateEmployee(emp, orgId, emp.version);
+        savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        setAllLocal((prev) =>
+          prev.map((employee) => (employee.id === emp.id ? savedEmployee : employee)),
+        );
         invalidateEmployees();
       } catch (err) {
-        if (err instanceof EmployeeStatusConflictError) {
+        if (err instanceof EmployeeProfileConflictError) {
           setAllLocal((prev) =>
             prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
           );
@@ -192,13 +200,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // is correctly saved either way.
       try {
         const created = await createOrganizationInvitation({
-          email: emp.email,
+          email: savedEmployee.email,
           role: oldInvitation.roleToAssign,
           orgId,
-          employeeId: emp.id,
-          firstName: emp.firstName,
-          lastName: emp.lastName,
-          phone: emp.phone || undefined,
+          employeeId: savedEmployee.id,
+          firstName: savedEmployee.firstName,
+          lastName: savedEmployee.lastName,
+          phone: savedEmployee.phone || undefined,
           departmentIds: oldInvitation.departmentIds,
           deptAdminIds: oldInvitation.deptAdminIds,
         });
@@ -206,7 +214,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         const response = await fetch("/api/send-invite-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: created.token, email: emp.email, orgName }),
+          body: JSON.stringify({ token: created.token, email: savedEmployee.email, orgName }),
         });
         if (!response.ok) {
           const body = await response.text().catch(() => "");
@@ -219,7 +227,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           throw new Error(`Employee saved, but ${detail}`);
         }
 
-        toast.success(`Employee saved. A new invitation was sent to ${emp.email}.`);
+        toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
         toast.error(
           formatClientErrorMessage(

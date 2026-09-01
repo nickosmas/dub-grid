@@ -56,16 +56,34 @@ vi.mock("@/components/AuthProvider", () => ({
 // `mockInvalidateQueries` is retained for compatibility but is unused.
 void mockInvalidateQueries;
 
-vi.mock("@/features/employees/client", () => ({
-  fetchEmployeeById: vi.fn(),
-  fetchEmployeeShifts: vi.fn(),
-  fetchEmployeeInvitations: vi.fn(),
-  fetchEmployeeRoleHistory: vi.fn(),
-  updateEmployee: vi.fn(),
-  deactivateEmployee: vi.fn(),
-  activateEmployee: vi.fn(),
-  removeEmployee: vi.fn(),
-}));
+vi.mock("@/features/employees/client", () => {
+  class MockEmployeeProfileConflictError extends Error {
+    constructor(public readonly latestEmployee: unknown) {
+      super("Employee details changed elsewhere.");
+    }
+  }
+  class MockEmployeeContactConflictError extends Error {}
+  class MockEmployeeStatusConflictError extends Error {
+    constructor(public readonly latestEmployee: unknown) {
+      super("Employee status changed elsewhere.");
+    }
+  }
+  class MockEmployeeAccessDeniedError extends Error {}
+  return {
+    EmployeeAccessDeniedError: MockEmployeeAccessDeniedError,
+    EmployeeContactConflictError: MockEmployeeContactConflictError,
+    EmployeeProfileConflictError: MockEmployeeProfileConflictError,
+    EmployeeStatusConflictError: MockEmployeeStatusConflictError,
+    fetchEmployeeById: vi.fn(),
+    fetchEmployeeShifts: vi.fn(),
+    fetchEmployeeInvitations: vi.fn(),
+    fetchEmployeeRoleHistory: vi.fn(),
+    updateEmployee: vi.fn(),
+    deactivateEmployee: vi.fn(),
+    activateEmployee: vi.fn(),
+    removeEmployee: vi.fn(),
+  };
+});
 
 vi.mock("@/features/organization/client", () => ({
   revokeInvitation: vi.fn(),
@@ -109,16 +127,19 @@ let lastEditEmployeePanelSave: ((updatedEmployee: unknown) => void | Promise<voi
 let lastEditEmployeePanelSaveWithReinvite:
   ((updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>) | null = null;
 let lastEditEmployeePanelPendingInvitation: unknown = undefined;
+let lastEditEmployeePanelPersistent = false;
 
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: (props: {
     onSave: (updatedEmployee: unknown) => void | Promise<void>;
     onSaveWithReinvite?: (updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>;
     pendingInvitation?: unknown;
+    persistent?: boolean;
   }) => {
     lastEditEmployeePanelSave = props.onSave;
     lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
     lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
+    lastEditEmployeePanelPersistent = props.persistent ?? false;
     return <div>Edit details form</div>;
   },
 }));
@@ -219,7 +240,10 @@ describe("StaffDetailPage", () => {
     ]);
     mockedFetchEmployeeRoleHistory.mockResolvedValue([]);
     mockedFetchShiftRequests.mockResolvedValue([]);
-    mockedUpdateEmployee.mockResolvedValue(undefined);
+    mockedUpdateEmployee.mockImplementation(async (employee) => ({
+      ...employee,
+      version: employee.version + 1,
+    }));
   });
 
   afterEach(() => {
@@ -386,6 +410,7 @@ describe("StaffDetailPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
     expect(screen.getByText("Management access editor")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("keeps the work-details form focused on biodata, without invite UI leaking in", async () => {
@@ -393,6 +418,8 @@ describe("StaffDetailPage", () => {
     await screen.findByText("Work details");
 
     expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    expect(lastEditEmployeePanelPersistent).toBe(true);
+    expect(screen.getByRole("link", { name: "Back to People" })).toHaveAttribute("href", "/people");
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();
   });

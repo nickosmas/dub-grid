@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getOptionalUsPhoneError,
   getRequiredStaffEmailError,
@@ -34,9 +34,9 @@ import {
   type SelfProfileRecord,
 } from "@/features/account/client";
 import { updateAppOnlyUser } from "@/features/organization/client";
-import { updateEmployee } from "@/features/employees/client";
+import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
-import EditEmployeePanel from "@/components/EditEmployeePanel";
+import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import type { Department, Employee, FocusArea, NamedItem } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
@@ -126,14 +126,18 @@ export function ProfilePanel({
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [isEditingWorkDetails, setIsEditingWorkDetails] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [requestedEmail, setRequestedEmail] = useState<string | null>(null);
+  const [workHasChanges, setWorkHasChanges] = useState(false);
+  const [workEmailConflict, setWorkEmailConflict] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
+  const workEditorRef = useRef<EditEmployeePanelHandle>(null);
+  const seededIdentityRef = useRef<string | null>(null);
+  const accountDraftTouchedRef = useRef(false);
 
   const [changeRequests, setChangeRequests] = useState<ProfileChangeRequest[]>([]);
   const [loadingChangeRequests, setLoadingChangeRequests] = useState(false);
@@ -146,7 +150,7 @@ export function ProfilePanel({
 
   const savedFirstName = firstName ?? "";
   const savedLastName = lastName ?? "";
-  const savedEmail = (user?.email ?? "").trim().toLowerCase();
+  const savedEmail = (requestedEmail ?? user?.email ?? "").trim().toLowerCase();
   const editedEmail = editEmail.trim().toLowerCase();
   const hasNameChanges =
     canEditProfileDirectly &&
@@ -154,18 +158,37 @@ export function ProfilePanel({
   const hasEmailChanges = editedEmail !== "" && editedEmail !== savedEmail;
   const savedPhone = employee?.phone ?? "";
 
-  const firstNameError =
-    canEditProfileDirectly && isEditing ? getStaffNameError(editFirstName, "First name") : null;
-  const lastNameError =
-    canEditProfileDirectly && isEditing ? getStaffNameError(editLastName, "Last name") : null;
-  const emailError = isEditing ? getRequiredStaffEmailError(editEmail) : null;
-  const phoneError = employee && isEditing ? getOptionalUsPhoneError(editPhone) : null;
+  const firstNameError = canEditProfileDirectly
+    ? getStaffNameError(editFirstName, "First name")
+    : null;
+  const lastNameError = canEditProfileDirectly
+    ? getStaffNameError(editLastName, "Last name")
+    : null;
+  const emailError = getRequiredStaffEmailError(editEmail);
+  const phoneError = employee ? getOptionalUsPhoneError(editPhone) : null;
   const normalizedPhone =
     phoneError || !employee ? editPhone.trim() : normalizeOptionalUsPhone(editPhone);
   const hasPhoneChanges = normalizedPhone !== savedPhone;
-  const hasAnyChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges;
-  const hasInvalidDraft =
-    isEditing && Boolean(firstNameError || lastNameError || emailError || phoneError);
+  const hasAnyChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges || workHasChanges;
+  const hasInvalidDraft = Boolean(
+    firstNameError || lastNameError || emailError || phoneError || workEmailConflict,
+  );
+
+  useEffect(() => {
+    const seedKey = `${user?.id ?? "anonymous"}:${employee?.id ?? "no-employee"}`;
+    if (!user) return;
+    if (
+      seededIdentityRef.current === seedKey &&
+      (accountDraftTouchedRef.current || workHasChanges)
+    ) {
+      return;
+    }
+    seededIdentityRef.current = seedKey;
+    setEditFirstName(savedFirstName);
+    setEditLastName(savedLastName);
+    setEditEmail(user.email ?? "");
+    setEditPhone(employee?.phone ?? "");
+  }, [employee?.id, employee?.phone, savedFirstName, savedLastName, user, workHasChanges]);
 
   const requestFirstNameError =
     requestFirstName.trim().length > 0 ? getStaffNameError(requestFirstName, "First name") : null;
@@ -226,18 +249,35 @@ export function ProfilePanel({
   const canAddToSchedule =
     canManageScheduleEmployees && !isOnSchedule && showManagementAccess && !!employee?.userId;
 
-  async function saveWorkDetails(updatedEmployee: Employee) {
-    if (!orgId || !employee) return;
-    const previousEmployee = employee;
-    setEmployee(updatedEmployee);
-    try {
-      await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-      setIsEditingWorkDetails(false);
-      toast.success("Work details updated.");
-    } catch (err) {
-      setEmployee(previousEmployee);
-      toast.error(extractErrorMessage(err, "We couldn't update your work details. Try again."));
+  async function saveWorkDetails(updatedEmployee: Employee): Promise<Employee> {
+    if (!orgId || !employee) {
+      throw new Error("This account is not linked to an organization staff profile.");
     }
+    const previousEmployee = employee;
+    const mergedEmployee = {
+      ...updatedEmployee,
+      firstName: canEditProfileDirectly
+        ? normalizeStaffName(editFirstName)
+        : updatedEmployee.firstName,
+      lastName: canEditProfileDirectly
+        ? normalizeStaffName(editLastName)
+        : updatedEmployee.lastName,
+      phone: normalizeOptionalUsPhone(editPhone),
+    };
+    const savedEmployee = await updateEmployee(mergedEmployee, orgId, previousEmployee.version);
+    setEmployee(savedEmployee);
+    if (canEditProfileDirectly) {
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              first_name: savedEmployee.firstName,
+              last_name: savedEmployee.lastName,
+            }
+          : current,
+      );
+    }
+    return savedEmployee;
   }
 
   useEffect(() => {
@@ -269,48 +309,40 @@ export function ProfilePanel({
   const pendingNameRequest = pendingRequests.find((r) => r.type === "profile_update");
   const pendingDeletion = pendingRequests.find((r) => r.type === "account_deletion");
 
-  function startEditing() {
-    setEditFirstName(savedFirstName);
-    setEditLastName(savedLastName);
-    setEditEmail(user?.email ?? "");
-    setEditPhone(employee?.phone ?? "");
-    setIsEditing(true);
-    setIsEditingWorkDetails(true);
-  }
-
   function cancelEditing() {
+    accountDraftTouchedRef.current = false;
     setEditFirstName(savedFirstName);
     setEditLastName(savedLastName);
     setEditEmail(user?.email ?? "");
     setEditPhone(employee?.phone ?? "");
-  }
-
-  function closeEditor() {
-    cancelEditing();
-    setIsEditing(false);
-    setIsEditingWorkDetails(false);
+    workEditorRef.current?.requestDismiss();
   }
 
   function requestSave() {
     if (saving || hasInvalidDraft) return;
-    if (!hasAnyChanges) {
-      setIsEditing(false);
-      return;
-    }
+    if (!hasAnyChanges) return;
     setPendingConfirm("account-details");
   }
 
   async function saveAccount() {
     if (!user) return;
     setSaving(true);
+    let profileSaved = false;
     try {
       const nextEmail = normalizeRequiredStaffEmail(editEmail);
       const nextFirst = normalizeStaffName(editFirstName);
       const nextLast = normalizeStaffName(editLastName);
       const nextPhone = employee ? normalizeOptionalUsPhone(editPhone) : "";
 
-      if (hasEmailChanges) await updateBrowserUserEmail(nextEmail);
-      if (hasNameChanges) {
+      if (canEditProfileDirectly && employee && orgId) {
+        if (workHasChanges) {
+          const workSaved = await workEditorRef.current?.save();
+          if (!workSaved) return;
+        } else if (hasNameChanges || hasPhoneChanges) {
+          await saveWorkDetails(employee);
+        }
+        profileSaved = hasNameChanges || hasPhoneChanges || workHasChanges;
+      } else if (hasNameChanges) {
         const updated = await updateSelfProfileDetails({
           firstName: nextFirst,
           lastName: nextLast,
@@ -318,23 +350,51 @@ export function ProfilePanel({
         });
         setProfile(updated.profile);
         if (updated.employee) setEmployee(updated.employee);
+        profileSaved = true;
       }
-      if (hasPhoneChanges && orgId && employee) {
+      if (!canEditProfileDirectly && hasPhoneChanges && orgId && employee) {
         const updated = await updateSelfProfilePhone({
           orgId,
           phone: nextPhone,
           expectedVersion: employee.version,
         });
         setEmployee(updated.employee);
+        profileSaved = true;
       }
-      setIsEditing(false);
       if (hasEmailChanges) {
-        toast.success("Confirmation sent to your new email address.");
-      } else {
-        toast.success("Account details updated.");
+        try {
+          await updateBrowserUserEmail(nextEmail);
+          setRequestedEmail(nextEmail);
+        } catch (err) {
+          toast.error(
+            profileSaved
+              ? "Your profile was saved, but we couldn't start the email change. Try the email again."
+              : extractErrorMessage(err, "We couldn't update your email. Try again."),
+          );
+          return;
+        }
       }
+      accountDraftTouchedRef.current = false;
+      setEditFirstName(nextFirst);
+      setEditLastName(nextLast);
+      setEditEmail(nextEmail);
+      if (employee) setEditPhone(nextPhone);
+      toast.success(
+        hasEmailChanges
+          ? profileSaved
+            ? "Profile updated. Confirmation sent to your new email address."
+            : "Confirmation sent to your new email address."
+          : "Profile updated.",
+      );
     } catch (err) {
-      toast.error(extractErrorMessage(err, "We couldn't update account details. Try again."));
+      if (err instanceof EmployeeProfileConflictError) {
+        setEmployee(err.latestEmployee);
+        toast.error(
+          "Your staff profile changed elsewhere. Review the latest values and try again.",
+        );
+        return;
+      }
+      toast.error(extractErrorMessage(err, "We couldn't update your profile. Try again."));
     } finally {
       setSaving(false);
     }
@@ -471,111 +531,85 @@ export function ProfilePanel({
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                Account details
+                Profile details
               </div>
               <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Name, email, and phone for this account.
+                Account and contact information. Changes stay editable on this page.
               </div>
             </div>
-            {!isEditing && (
-              <Button
-                type="button"
-                onClick={startEditing}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-              >
-                Edit profile
-              </Button>
-            )}
           </div>
 
-          {isEditing ? (
-            <Form
-              onSubmit={(e) => {
-                e.preventDefault();
-                requestSave();
-              }}
-              className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3"
-            >
-              {canEditProfileDirectly && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="dg-label">First name</label>
-                    <input
-                      aria-label="First name"
-                      value={editFirstName}
-                      onChange={(e) => setEditFirstName(e.target.value)}
-                      className="dg-input"
-                    />
-                    {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
-                  </div>
-                  <div>
-                    <label className="dg-label">Last name</label>
-                    <input
-                      aria-label="Last name"
-                      value={editLastName}
-                      onChange={(e) => setEditLastName(e.target.value)}
-                      className="dg-input"
-                    />
-                    {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="dg-label">Email</label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="dg-input"
-                  autoFocus
-                />
-                {emailError && <p className="dg-form-error">{emailError}</p>}
-              </div>
-              {employee && (
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              requestSave();
+            }}
+            className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3"
+          >
+            {canEditProfileDirectly && (
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="dg-label">Phone</label>
+                  <label className="dg-label">First name</label>
                   <input
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    onBlur={() => {
-                      if (!phoneError && editPhone.trim()) setEditPhone(normalizedPhone);
+                    aria-label="First name"
+                    value={editFirstName}
+                    onChange={(e) => {
+                      accountDraftTouchedRef.current = true;
+                      setEditFirstName(e.target.value);
                     }}
-                    placeholder="Phone"
                     className="dg-input"
                   />
-                  {phoneError && <p className="dg-form-error">{phoneError}</p>}
+                  {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
                 </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  disabled={saving || !hasAnyChanges || hasInvalidDraft}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
-                >
-                  <ButtonLoading loading={saving} spinnerSize={14} icon={<Check size={14} />}>
-                    Save changes
-                  </ButtonLoading>
-                </button>
-                <Button
-                  type="button"
-                  onClick={hasAnyChanges ? cancelEditing : closeEditor}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  <X size={14} />
-                  {getEditorDismissLabel({ hasUnsavedChanges: hasAnyChanges })}
-                </Button>
+                <div>
+                  <label className="dg-label">Last name</label>
+                  <input
+                    aria-label="Last name"
+                    value={editLastName}
+                    onChange={(e) => {
+                      accountDraftTouchedRef.current = true;
+                      setEditLastName(e.target.value);
+                    }}
+                    className="dg-input"
+                  />
+                  {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
+                </div>
               </div>
-            </Form>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="First name" value={firstName} />
-                <Field label="Last name" value={lastName} />
-              </div>
-              <Field label="Email" value={user?.email} />
-              {employee && <Field label="Phone" value={employee.phone} />}
+            )}
+            <div>
+              <label className="dg-label">Email</label>
+              <input
+                aria-label="Email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => {
+                  accountDraftTouchedRef.current = true;
+                  setEditEmail(e.target.value);
+                }}
+                className="dg-input"
+              />
+              {emailError && <p className="dg-form-error">{emailError}</p>}
             </div>
-          )}
+            {employee && (
+              <div>
+                <label className="dg-label">Phone</label>
+                <input
+                  aria-label="Phone"
+                  value={editPhone}
+                  onChange={(e) => {
+                    accountDraftTouchedRef.current = true;
+                    setEditPhone(e.target.value);
+                  }}
+                  onBlur={() => {
+                    if (!phoneError && editPhone.trim()) setEditPhone(normalizedPhone);
+                  }}
+                  placeholder="Phone"
+                  className="dg-input"
+                />
+                {phoneError && <p className="dg-form-error">{phoneError}</p>}
+              </div>
+            )}
+          </Form>
         </div>
       </SectionCard>
 
@@ -594,50 +628,55 @@ export function ProfilePanel({
                 </div>
               </div>
             </div>
-            {isEditingWorkDetails ? (
-              <EditEmployeePanel
-                employee={employee}
-                focusAreas={focusAreas}
-                certifications={certifications}
-                certificationLabel={certificationLabel}
-                roles={roles}
-                roleLabel={roleLabel}
-                focusAreaLabel={focusAreaLabel}
-                isManagementUser={showManagementAccess}
-                hideIdentityFields
-                onSave={saveWorkDetails}
-                onCancel={() => setIsEditingWorkDetails(false)}
-              />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="Employment"
-                  value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
-                />
-                <Field
-                  label={focusAreaLabel ?? "Focus areas"}
-                  value={employee.focusAreaIds
-                    .map((id) => focusAreas.find((area) => area.id === id)?.name)
-                    .filter(Boolean)
-                    .join(", ")}
-                />
-                <Field
-                  label={certificationLabel ?? "Certification"}
-                  value={certifications.find((item) => item.id === employee.certificationId)?.name}
-                />
-                <Field
-                  label={roleLabel ?? "Roles"}
-                  value={employee.roleIds
-                    .map((id) => roles.find((role) => role.id === id)?.name)
-                    .filter(Boolean)
-                    .join(", ")}
-                />
-                <Field label="Internal notes" value={employee.contactNotes} />
-              </div>
-            )}
+            <EditEmployeePanel
+              ref={workEditorRef}
+              employee={employee}
+              focusAreas={focusAreas}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              roles={roles}
+              roleLabel={roleLabel}
+              focusAreaLabel={focusAreaLabel}
+              isManagementUser={showManagementAccess}
+              hideIdentityFields
+              hideActions
+              persistent
+              onDirtyChange={setWorkHasChanges}
+              onEmailConflictChange={setWorkEmailConflict}
+              onSave={async (updatedEmployee) => {
+                await saveWorkDetails(updatedEmployee);
+              }}
+              onCancel={() => undefined}
+            />
           </div>
         </SectionCard>
       )}
+
+      <SectionCard>
+        <div className="flex flex-wrap justify-end gap-2">
+          {hasAnyChanges && (
+            <Button
+              type="button"
+              onClick={cancelEditing}
+              disabled={saving}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              <X size={14} />
+              {EDITOR_ACTION_LABELS.discard}
+            </Button>
+          )}
+          <Button
+            type="button"
+            onClick={requestSave}
+            disabled={saving || !hasAnyChanges || hasInvalidDraft}
+            className="dg-btn dg-btn-primary dg-btn-sm"
+          >
+            <ButtonLoading loading={saving} spinnerSize={14} icon={<Check size={14} />}>
+              Save changes
+            </ButtonLoading>
+          </Button>
+        </div>
+      </SectionCard>
 
       {showManagementAccess && (
         <SectionCard>

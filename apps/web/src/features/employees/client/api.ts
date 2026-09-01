@@ -38,6 +38,13 @@ export class EmployeeStatusConflictError extends Error {
   }
 }
 
+export class EmployeeProfileConflictError extends Error {
+  constructor(public readonly latestEmployee: Employee) {
+    super("Employee details changed elsewhere.");
+    this.name = "EmployeeProfileConflictError";
+  }
+}
+
 export class EmployeeContactConflictError extends Error {
   constructor(
     message: string,
@@ -194,7 +201,7 @@ export async function updateEmployee(
   employee: Employee,
   orgId: string,
   expectedVersion?: number,
-): Promise<void> {
+): Promise<Employee> {
   const response = await fetch(resolveClientUrl("/api/employees/manage"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -225,12 +232,8 @@ export async function updateEmployee(
     );
   }
 
-  if (response.status === 409) {
-    throw new OptimisticLockError(
-      employee.id,
-      expectedVersion ?? employee.version,
-      body?.employee?.version,
-    );
+  if (response.status === 409 && body?.employee) {
+    throw new EmployeeProfileConflictError(body.employee);
   }
 
   if (!response.ok) {
@@ -238,6 +241,11 @@ export async function updateEmployee(
       formatClientErrorMessage(body?.error, "We couldn't save those changes. Try again."),
     );
   }
+
+  if (!body?.employee) {
+    throw new Error("The server saved the employee but did not return the updated profile.");
+  }
+  return body.employee;
 }
 
 export function fetchEmployeeById(employeeId: string, orgId: string): Promise<Employee | null> {

@@ -32,6 +32,12 @@ export interface ShellNavGroup<TId extends string = string> {
   items: ShellNavItem<TId>[];
 }
 
+export interface ShellLeadingNavigation {
+  href: string;
+  label: string;
+  Icon: NavIconComponent;
+}
+
 export interface SettingsShellProps<TId extends string = string> {
   /** URL base for sidebar links — e.g. "/settings" or "/account". */
   basePath: string;
@@ -47,6 +53,8 @@ export interface SettingsShellProps<TId extends string = string> {
   maxWidth?: number;
   /** Optional banner above the active panel (e.g. permission notice). */
   banner?: React.ReactNode;
+  /** Optional return navigation rendered first in the desktop sidebar and above content on mobile. */
+  leadingNavigation?: ShellLeadingNavigation;
   /** The active panel itself. Caller owns the switch on activeSection. */
   children: React.ReactNode;
 }
@@ -64,6 +72,7 @@ export function SettingsShell<TId extends string = string>({
   activeSection,
   maxWidth = 1120,
   banner,
+  leadingNavigation,
   children,
 }: SettingsShellProps<TId>) {
   const isMobile = useMediaQuery(MOBILE);
@@ -138,6 +147,28 @@ export function SettingsShell<TId extends string = string>({
             }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
+              {leadingNavigation && (
+                <SidebarGroup className="pb-0">
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          render={<Link href={leadingNavigation.href} />}
+                          tooltip={leadingNavigation.label}
+                          className="h-9 text-[var(--dg-color-text-faint)] transition-all ease-in-out duration-150 hover:text-[var(--dg-color-text-primary)]"
+                        >
+                          <span className="flex shrink-0 items-center justify-center">
+                            <leadingNavigation.Icon />
+                          </span>
+                          <span className="text-sm font-normal tracking-normal">
+                            {leadingNavigation.label}
+                          </span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
               {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
                   <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
@@ -260,6 +291,17 @@ export function SettingsShell<TId extends string = string>({
             alignItems: "center",
           }}
         >
+          {isMobile && leadingNavigation && (
+            <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>
+              <Link
+                href={leadingNavigation.href}
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-color-text-muted)] transition-colors hover:text-[var(--dg-color-text-primary)]"
+              >
+                <leadingNavigation.Icon />
+                {leadingNavigation.label}
+              </Link>
+            </div>
+          )}
           {activeItem && (
             <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
               <h1

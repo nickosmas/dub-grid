@@ -626,14 +626,16 @@ export async function POST(req: NextRequest) {
               )
             : { from: {}, to: {} };
 
-        let query = auth.serviceClient
+        const expectedVersion = data.expectedVersion ?? nextEmployee.version;
+        const query = auth.serviceClient
           .from("employees")
-          .update(employeeToRow(nextEmployee, data.orgId))
+          .update({
+            ...employeeToRow(nextEmployee, data.orgId),
+            version: expectedVersion + 1,
+          })
           .eq("org_id", data.orgId)
-          .eq("id", nextEmployee.id);
-        if (data.expectedVersion !== undefined) {
-          query = query.eq("version", data.expectedVersion);
-        }
+          .eq("id", nextEmployee.id)
+          .eq("version", expectedVersion);
 
         const { data: updatedRow, error } = await query.select(EMPLOYEE_COLS).maybeSingle();
         if (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
@@ -57,6 +57,7 @@ interface StaffDetailPanelProps {
   hasManagementAccess?: boolean;
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
+  managementAccessEditor?: (onDirtyChange: (hasUnsavedChanges: boolean) => void) => ReactNode;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
 }
 
@@ -84,6 +85,7 @@ export function StaffDetailPanel({
   hasManagementAccess,
   hasPendingManagementInvite,
   onManageManagementAccess,
+  managementAccessEditor,
   onRevoke,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
@@ -95,6 +97,7 @@ export function StaffDetailPanel({
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [open, setOpen] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const isEditingManagementAccess = Boolean(managementAccessEditor);
   const [hasEmailConflict, setHasEmailConflict] = useState(false);
   const onCloseRef = useLatestRef(onClose);
   const pendingInvitation = canManageEmployees
@@ -153,6 +156,10 @@ export function StaffDetailPanel({
     setHasEmailConflict(false);
     setOpen(true);
   }, [employee.id]);
+
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+  }, [isEditingManagementAccess]);
 
   const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
 
@@ -308,137 +315,145 @@ export function StaffDetailPanel({
           </div>
         </div>
 
-        {/* Editable body — nothing commits until the shared footer's Save is pressed. */}
+        {/* Editable body - nothing commits until the owning editor saves. */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-          <InlineEditEmployee
-            employee={employee}
-            orgId={orgId}
-            focusAreas={focusAreas}
-            certifications={certifications}
-            roles={roles}
-            roleLabel={roleLabel}
-            focusAreaLabel={focusAreaLabel}
-            certificationLabel={certificationLabel}
-            departments={departments}
-            departmentLabel={departmentLabel}
-            isManagementUser={hasManagementAccess}
-            ref={editorRef}
-            hideActions
-            onSave={onSave}
-            onCancel={handleRequestClose}
-            onDirtyChange={setHasUnsavedChanges}
-            onEmailConflictChange={setHasEmailConflict}
-            pendingInvitation={pendingInvitation}
-            onSaveWithReinvite={onSaveWithReinvite}
-          />
-          {showAccountAccessActions && (
-            <div
-              style={{
-                padding: "0 24px 24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              {pendingInvitation && onRevoke ? (
-                <PendingInvitationBanner
-                  pendingInvitation={pendingInvitation}
-                  onReinvite={handleReinvite}
-                  onRevoke={onRevoke}
-                  isInSandbox={isInSandbox}
-                />
-              ) : (
-                showInviteActions &&
-                onInvite && (
-                  <Button
-                    onClick={() => onInvite(employee)}
-                    disabled={isInSandbox}
-                    className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-                    title={
-                      isInSandbox
-                        ? "Sending invitations isn't available in sandbox mode."
-                        : undefined
-                    }
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    Send Invitation
-                  </Button>
-                )
-              )}
-              {showManagementAccessAction && onManageManagementAccess && (
-                <Button
-                  onClick={() => onManageManagementAccess(employee)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-                >
-                  {hasManagementAccess || hasPendingManagementInvite
-                    ? "Edit Management Access"
-                    : "Add to Management"}
-                </Button>
-              )}
-            </div>
-          )}
-          {canManageEmployees && !isSelf && (
-            <div
-              style={{
-                padding: "0 24px 24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <EmployeeStatusActions
+          {managementAccessEditor ? (
+            <div style={{ padding: 24 }}>{managementAccessEditor(setHasUnsavedChanges)}</div>
+          ) : (
+            <>
+              <InlineEditEmployee
                 employee={employee}
-                canEdit={canManageEmployees}
-                isSelf={false}
-                onDeactivate={onDeactivate}
-                onActivate={onActivate}
-                onRemove={onRemove}
-                variant="panel"
+                orgId={orgId}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                roles={roles}
+                roleLabel={roleLabel}
+                focusAreaLabel={focusAreaLabel}
+                certificationLabel={certificationLabel}
+                departments={departments}
+                departmentLabel={departmentLabel}
+                isManagementUser={hasManagementAccess}
+                ref={editorRef}
+                hideActions
+                onSave={onSave}
+                onCancel={handleRequestClose}
+                onDirtyChange={setHasUnsavedChanges}
+                onEmailConflictChange={setHasEmailConflict}
+                pendingInvitation={pendingInvitation}
+                onSaveWithReinvite={onSaveWithReinvite}
               />
-            </div>
+              {showAccountAccessActions && (
+                <div
+                  style={{
+                    padding: "0 24px 24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {pendingInvitation && onRevoke ? (
+                    <PendingInvitationBanner
+                      pendingInvitation={pendingInvitation}
+                      onReinvite={handleReinvite}
+                      onRevoke={onRevoke}
+                      isInSandbox={isInSandbox}
+                    />
+                  ) : (
+                    showInviteActions &&
+                    onInvite && (
+                      <Button
+                        onClick={() => onInvite(employee)}
+                        disabled={isInSandbox}
+                        className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+                        title={
+                          isInSandbox
+                            ? "Sending invitations isn't available in sandbox mode."
+                            : undefined
+                        }
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                          <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        Send Invitation
+                      </Button>
+                    )
+                  )}
+                  {showManagementAccessAction && onManageManagementAccess && (
+                    <Button
+                      onClick={() => onManageManagementAccess(employee)}
+                      className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+                    >
+                      {hasManagementAccess || hasPendingManagementInvite
+                        ? "Edit Management Access"
+                        : "Add to Management"}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {canManageEmployees && !isSelf && (
+                <div
+                  style={{
+                    padding: "0 24px 24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <EmployeeStatusActions
+                    employee={employee}
+                    canEdit={canManageEmployees}
+                    isSelf={false}
+                    onDeactivate={onDeactivate}
+                    onActivate={onActivate}
+                    onRemove={onRemove}
+                    variant="panel"
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div
-          style={{
-            flexShrink: 0,
-            padding: "16px 24px",
-            borderTop: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <EditorActionRow
-            secondaryAction={
-              <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
-                {canEditEmployee
-                  ? getEditorDismissLabel({ hasUnsavedChanges })
-                  : EDITOR_ACTION_LABELS.close}
-              </Button>
-            }
-            primaryAction={
-              canEditEmployee ? (
-                <Button
-                  onClick={handleFooterSave}
-                  disabled={!hasUnsavedChanges || hasEmailConflict}
-                  className="dg-btn dg-btn-primary"
-                >
-                  {EDITOR_ACTION_LABELS.save}
+        {!managementAccessEditor && (
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "16px 24px",
+              borderTop: "1px solid var(--dg-color-border-light)",
+            }}
+          >
+            <EditorActionRow
+              secondaryAction={
+                <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
+                  {canEditEmployee
+                    ? getEditorDismissLabel({ hasUnsavedChanges })
+                    : EDITOR_ACTION_LABELS.close}
                 </Button>
-              ) : undefined
-            }
-          />
-        </div>
+              }
+              primaryAction={
+                canEditEmployee ? (
+                  <Button
+                    onClick={handleFooterSave}
+                    disabled={!hasUnsavedChanges || hasEmailConflict}
+                    className="dg-btn dg-btn-primary"
+                  >
+                    {EDITOR_ACTION_LABELS.save}
+                  </Button>
+                ) : undefined
+              }
+            />
+          </div>
+        )}
       </SheetContent>
       {unsavedChangesDialog}
     </Sheet>

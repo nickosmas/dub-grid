@@ -3,9 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
-import { updateEmployee } from "@/features/employees/client";
+import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 
-vi.mock("@/features/employees/client", () => ({
+vi.mock("@/features/employees/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/employees/client")>()),
   updateEmployee: vi.fn(),
 }));
 
@@ -102,7 +103,10 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 
 describe("AddManagementUserToScheduleModal", () => {
   beforeEach(() => {
-    updateEmployeeMock.mockResolvedValue();
+    updateEmployeeMock.mockImplementation(async (employee) => ({
+      ...employee,
+      version: employee.version + 1,
+    }));
   });
 
   it("requires at least one focus area before patching the existing employee row", async () => {
@@ -218,5 +222,30 @@ describe("AddManagementUserToScheduleModal", () => {
 
     expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
+  });
+
+  it("replaces stale parent state with the authoritative employee on conflict", async () => {
+    const user = userEvent.setup();
+    const onAdded = vi.fn();
+    const latestEmployee = { ...makeEmployee(), firstName: "Server", version: 2 };
+    updateEmployeeMock.mockRejectedValueOnce(new EmployeeProfileConflictError(latestEmployee));
+
+    render(
+      <AddManagementUserToScheduleModal
+        orgId="org-1"
+        person={makePerson()}
+        employee={makeEmployee()}
+        focusAreas={focusAreas}
+        certifications={certifications}
+        roles={roles}
+        onClose={vi.fn()}
+        onAdded={onAdded}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "North" }));
+    await user.click(screen.getByRole("button", { name: /add to schedule/i }));
+
+    await waitFor(() => expect(onAdded).toHaveBeenCalledWith(latestEmployee));
   });
 });

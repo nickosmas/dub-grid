@@ -27,6 +27,7 @@ interface UseSelfProfileDataResult {
   auditNames: Map<string, string>;
   isLoading: boolean;
   error: string | null;
+  refetch: () => Promise<unknown>;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
   setManagementDepartmentIds: Dispatch<SetStateAction<number[]>>;
@@ -130,6 +131,7 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
           "We couldn't load your profile. Refresh and try again.",
         )
       : null,
+    refetch: selfQuery.refetch,
     setProfile,
     setEmployee,
     setManagementDepartmentIds,

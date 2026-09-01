@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import ProgressBar from "@/components/ProgressBar";
+import { Button } from "@/components/Button";
 import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { SettingsShell } from "@/components/settings/SettingsShell";
@@ -60,6 +61,9 @@ export function ProfilePage() {
     recurringShifts,
     shiftRequests,
     auditNames,
+    isLoading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
     setProfile,
     setEmployee,
     setManagementDepartmentIds,
@@ -86,8 +90,19 @@ export function ProfilePage() {
   // Wait for real permissions before rendering: canEditProfileDirectly
   // defaults to false while perms are loading, which would otherwise flash
   // the non-admin "request a name change" UI at admins for a moment.
-  if (permsLoading) {
+  if (permsLoading || profileLoading) {
     return <ProgressBar loading />;
+  }
+
+  if (profileError) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+        <p className="m-0 text-[var(--dg-color-text-muted)]">{profileError}</p>
+        <Button className="dg-btn dg-btn-secondary" onClick={() => void refetchProfile()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   return (

@@ -101,6 +101,24 @@ describe("PATCH /api/account/profile/phone", () => {
     expect(res.status).toBe(409);
   });
 
+  it("returns the authoritative employee on a typed version conflict", async () => {
+    const latestEmployee = { id: "employee-1", phone: "(555) 555-0101", version: 4 };
+    updateSelfLinkedEmployeePhone.mockRejectedValueOnce(
+      Object.assign(new Error("contact changed elsewhere"), {
+        code: "EMPLOYEE_CONFLICT",
+        employee: latestEmployee,
+      }),
+    );
+
+    const res = await PATCH(patch({ orgId: ORG_ID, phone: "+15555550100", expectedVersion: 1 }));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      code: "EMPLOYEE_CONFLICT",
+      employee: latestEmployee,
+    });
+  });
+
   it("rejects an invalid orgId with 400", async () => {
     const res = await PATCH(patch({ orgId: "not-a-uuid", phone: "+15555550100" }));
     expect(res.status).toBe(400);

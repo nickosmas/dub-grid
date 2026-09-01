@@ -633,7 +633,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
 
-  it("announces and blocks a role the person's certification does not satisfy", () => {
+  it("hides an incompatible role while keeping a selected legacy role removable", () => {
     useBootstrap.mockReturnValue({
       data: {
         currentOrg: {
@@ -671,7 +671,7 @@ describe("PersonDetailScreen", () => {
     fireEvent.click(screen.getByText("Edit"));
 
     expect(screen.getByRole("button", { name: "CN" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "CL. Requires RN" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "CL" })).not.toBeInTheDocument();
   });
 
   it("shows account found before asking to reconcile a different-name existing account", async () => {

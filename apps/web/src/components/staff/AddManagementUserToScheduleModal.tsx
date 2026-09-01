@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import { updateEmployee } from "@/features/employees/client";
+import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 /** Only the read-only prefill fields this modal actually needs — satisfied by
@@ -177,11 +177,16 @@ export function AddManagementUserToScheduleModal({
         roleIds,
         contactNotes: contactNotes.trim(),
       };
-      await updateEmployee(updated, orgId, employee.version);
+      const savedEmployee = await updateEmployee(updated, orgId, employee.version);
       toast.success("Added to the schedule");
-      onAdded(updated);
+      onAdded(savedEmployee);
       onClose();
     } catch (err) {
+      if (err instanceof EmployeeProfileConflictError) {
+        onAdded(err.latestEmployee);
+        toast.error("Staff details changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error(
         formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."),
       );

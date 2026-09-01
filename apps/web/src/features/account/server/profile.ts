@@ -515,27 +515,30 @@ export async function updateSelfLinkedEmployeePhone(input: {
     throw new Error("This account is not linked to a staff profile.");
   }
 
-  let query = serviceClient
+  const expectedVersion = input.expectedVersion ?? employee.version;
+  const query = serviceClient
     .from("employees")
     .update({
       phone: input.phone.trim(),
       updated_by: input.userId,
       updated_at: new Date().toISOString(),
+      version: expectedVersion + 1,
     })
     .eq("id", employee.id)
     .eq("org_id", input.orgId)
-    .eq("user_id", input.userId);
-
-  if (input.expectedVersion !== undefined) {
-    query = query.eq("version", input.expectedVersion);
-  }
+    .eq("user_id", input.userId)
+    .eq("version", expectedVersion);
 
   const { data, error } = await query.select(EMPLOYEE_COLS).maybeSingle();
   if (error) {
     throw error;
   }
   if (!data) {
-    throw new Error("Your staff profile changed elsewhere. Refresh and try again.");
+    const latestEmployee = await fetchLinkedEmployeeByUserId(input.userId, input.orgId);
+    throw Object.assign(new Error("Your staff profile changed elsewhere. Refresh and try again."), {
+      code: "EMPLOYEE_CONFLICT" as const,
+      employee: latestEmployee ?? employee,
+    });
   }
 
   const updatedEmployee = rowToEmployee(data as DbEmployee);

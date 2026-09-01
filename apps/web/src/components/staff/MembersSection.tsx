@@ -37,6 +37,7 @@ import type {
   Invitation,
   NamedItem,
   OrganizationRole,
+  OrganizationUser,
 } from "@/types";
 import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -883,6 +884,27 @@ export function MembersSection({
       );
       setManagementSchedulePerson((current) =>
         current?.personId === updatedPerson.personId ? updatedPerson : current,
+      );
+    },
+    [orgId, queryClient],
+  );
+
+  const syncMembershipInCaches = useCallback(
+    (membership: OrganizationUser) => {
+      if (!orgId) return;
+      queryClient.setQueryData(
+        queryKeys.org.directory(orgId),
+        (current: DirectoryPerson[] | undefined) =>
+          current?.map((person) =>
+            person.userId === membership.id
+              ? {
+                  ...person,
+                  orgRole: membership.orgRole,
+                  adminPermissions: membership.adminPermissions,
+                  membershipUpdatedAt: membership.updatedAt,
+                }
+              : person,
+          ),
       );
     },
     [orgId, queryClient],
@@ -2086,84 +2108,98 @@ export function MembersSection({
               ? (employee) => setManagementAccessEmployee(employee)
               : undefined
           }
+          managementAccessEditor={
+            managementAccessEmployee?.id === selectedEmployee.id && orgId
+              ? (onDirtyChange) => (
+                  <div className="flex flex-col gap-6">
+                    {selectedEmployeeDirectoryPerson?.orgRole ? (
+                      <MemberAccessControls
+                        orgRole={selectedEmployeeDirectoryPerson.orgRole}
+                        adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
+                        isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
+                        onRoleChange={
+                          canManageManagementAccess &&
+                          selectedEmployeeDirectoryPerson.userId &&
+                          selectedEmployeeDirectoryPerson.membershipUpdatedAt
+                            ? async (newRole) => {
+                                const person = selectedEmployeeDirectoryPerson;
+                                if (!person.userId || !person.membershipUpdatedAt) return;
+                                const membership = await updateOrganizationMembershipGuarded({
+                                  orgId,
+                                  userId: person.userId,
+                                  expectedUpdatedAt: person.membershipUpdatedAt,
+                                  orgRole: newRole,
+                                });
+                                syncMembershipInCaches(membership);
+                                await Promise.all([
+                                  queryClient.invalidateQueries({
+                                    queryKey: queryKeys.org.directory(orgId),
+                                  }),
+                                  queryClient.invalidateQueries({
+                                    queryKey: queryKeys.org.users(orgId),
+                                  }),
+                                ]);
+                              }
+                            : undefined
+                        }
+                        onPermissionsChange={
+                          canManageManagementAccess &&
+                          selectedEmployeeDirectoryPerson.userId &&
+                          selectedEmployeeDirectoryPerson.membershipUpdatedAt
+                            ? async (permissions) => {
+                                const person = selectedEmployeeDirectoryPerson;
+                                if (!person.userId || !person.membershipUpdatedAt) return;
+                                const membership = await updateOrganizationMembershipGuarded({
+                                  orgId,
+                                  userId: person.userId,
+                                  expectedUpdatedAt: person.membershipUpdatedAt,
+                                  adminPermissions: permissions,
+                                });
+                                syncMembershipInCaches(membership);
+                                await Promise.all([
+                                  queryClient.invalidateQueries({
+                                    queryKey: queryKeys.org.directory(orgId),
+                                  }),
+                                  queryClient.invalidateQueries({
+                                    queryKey: queryKeys.org.users(orgId),
+                                  }),
+                                ]);
+                              }
+                            : undefined
+                        }
+                      />
+                    ) : null}
+                    <EmployeeManagementAccessEditor
+                      employee={managementAccessEmployee}
+                      orgId={orgId}
+                      orgName={orgName || "your organization"}
+                      managementDepartments={managementDepts}
+                      directoryPerson={selectedEmployeeDirectoryPerson}
+                      pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+                      onDirtyChange={onDirtyChange}
+                      onClose={() => setManagementAccessEmployee(null)}
+                      onCompleted={async (updatedEmployee) => {
+                        syncExistingEmployeeInCaches(updatedEmployee);
+                        await refreshInvitations();
+                        await Promise.all([
+                          queryClient.invalidateQueries({
+                            queryKey: queryKeys.org.directory(orgId),
+                          }),
+                          queryClient.invalidateQueries({
+                            queryKey: queryKeys.org.users(orgId),
+                          }),
+                          queryClient.invalidateQueries({
+                            queryKey: queryKeys.employees.all(orgId),
+                          }),
+                        ]);
+                      }}
+                    />
+                  </div>
+                )
+              : undefined
+          }
           onRevoke={handleRevokeInvitation}
         />
-      )}
-
-      {managementAccessEmployee && orgId && (
-        <Modal title="Management Access" onClose={() => setManagementAccessEmployee(null)}>
-          <div className="mt-4 flex flex-col gap-6">
-            {selectedEmployeeDirectoryPerson?.orgRole ? (
-              <MemberAccessControls
-                orgRole={selectedEmployeeDirectoryPerson.orgRole}
-                adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
-                isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
-                onRoleChange={
-                  canManageManagementAccess &&
-                  selectedEmployeeDirectoryPerson.userId &&
-                  selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                    ? async (newRole) => {
-                        const person = selectedEmployeeDirectoryPerson;
-                        if (!orgId || !person.userId || !person.membershipUpdatedAt) return;
-                        await updateOrganizationMembershipGuarded({
-                          orgId,
-                          userId: person.userId,
-                          expectedUpdatedAt: person.membershipUpdatedAt,
-                          orgRole: newRole,
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.directory(orgId),
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.users(orgId),
-                        });
-                      }
-                    : undefined
-                }
-                onPermissionsChange={
-                  canManageManagementAccess &&
-                  selectedEmployeeDirectoryPerson.userId &&
-                  selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                    ? async (perms) => {
-                        const person = selectedEmployeeDirectoryPerson;
-                        if (!orgId || !person.userId || !person.membershipUpdatedAt) return;
-                        await updateOrganizationMembershipGuarded({
-                          orgId,
-                          userId: person.userId,
-                          expectedUpdatedAt: person.membershipUpdatedAt,
-                          adminPermissions: perms,
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.directory(orgId),
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.users(orgId),
-                        });
-                      }
-                    : undefined
-                }
-              />
-            ) : null}
-            <EmployeeManagementAccessEditor
-              employee={managementAccessEmployee}
-              orgId={orgId}
-              orgName={orgName || "your organization"}
-              managementDepartments={managementDepts}
-              directoryPerson={selectedEmployeeDirectoryPerson}
-              pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
-              onClose={() => setManagementAccessEmployee(null)}
-              onCompleted={async (updatedEmployee) => {
-                syncExistingEmployeeInCaches(updatedEmployee);
-                await refreshInvitations();
-                await Promise.all([
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
-                ]);
-              }}
-            />
-          </div>
-        </Modal>
       )}
 
       {selectedPerson && canSeeManagementUsers && (

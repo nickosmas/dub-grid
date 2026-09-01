@@ -53,7 +53,7 @@ describe("PrintOptionsModal", () => {
     expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
 
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledOnce();
