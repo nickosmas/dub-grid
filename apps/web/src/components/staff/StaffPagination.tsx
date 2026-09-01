@@ -25,6 +25,8 @@ export function StaffPagination({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: 8,
         padding: "12px 16px",
         fontSize: "var(--dg-fs-label)",
         color: "var(--dg-color-text-muted)",
@@ -33,7 +35,7 @@ export function StaffPagination({
       <span style={{ fontSize: "var(--dg-fs-caption)" }}>
         Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount}
       </span>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
         <Button
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}

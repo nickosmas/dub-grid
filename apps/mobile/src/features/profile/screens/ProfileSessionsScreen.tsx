@@ -138,7 +138,7 @@ export default function ProfileSessionsScreen() {
     }
   }
 
-  function confirmSessionAction() {
+  function confirmSessionAction(): Promise<void> | undefined {
     const action = pendingConfirmation;
     setPendingConfirmation(null);
     if (!action) return;
@@ -147,12 +147,14 @@ export default function ProfileSessionsScreen() {
       // Close the sheet in the same tick: a global sign-out tears the session
       // down underneath whatever is still mounted over it.
       setScopeSheetVisible(false);
-      void handleSessionAction(action.scope);
-      return;
+      return handleSessionAction(action.scope);
     }
 
     setOpenSession(null);
-    void revokeMutation.mutateAsync(action.session.refreshTokenHash);
+    return revokeMutation.mutateAsync(action.session.refreshTokenHash).then(
+      () => undefined,
+      () => undefined,
+    );
   }
 
   const isScopeConfirmation = pendingConfirmation?.kind === "scope";

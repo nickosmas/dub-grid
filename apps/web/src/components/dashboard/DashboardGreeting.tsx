@@ -236,10 +236,11 @@ export default function DashboardGreeting({
       <h1
         style={{
           margin: 0,
-          fontSize: "clamp(1.5rem, 2.2vw, 2rem)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-primary)",
-          letterSpacing: "-0.03em",
+          fontSize: "var(--dg-type-page-title-size)",
+          fontWeight: "var(--dg-type-page-title-weight)",
+          color: "var(--dg-type-page-title-color)",
+          letterSpacing: "var(--dg-type-page-title-letter-spacing)",
+          lineHeight: "var(--dg-type-page-title-line-height)",
         }}
       >
         {headline}

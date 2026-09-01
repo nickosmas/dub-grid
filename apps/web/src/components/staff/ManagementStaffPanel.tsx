@@ -424,9 +424,11 @@ export function ManagementStaffPanel({
 
   const labelStyle: React.CSSProperties = {
     display: "block",
-    fontSize: "var(--dg-fs-label)",
-    fontWeight: 600,
-    color: "var(--dg-color-text-secondary)",
+    fontSize: "var(--dg-type-field-title-size)",
+    fontWeight: "var(--dg-type-field-title-weight)",
+    color: "var(--dg-type-field-title-color)",
+    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+    lineHeight: "var(--dg-type-field-title-line-height)",
     marginBottom: 6,
   };
 
@@ -493,7 +495,7 @@ export function ManagementStaffPanel({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--dg-color-border-light)"
@@ -848,11 +850,11 @@ export function ManagementStaffPanel({
               <div>
                 <div
                   style={{
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 700,
-                    color: "var(--dg-color-text-subtle)",
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase" as const,
+                    fontSize: "var(--dg-type-field-title-size)",
+                    fontWeight: "var(--dg-type-field-title-weight)",
+                    color: "var(--dg-type-field-title-color)",
+                    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                    lineHeight: "var(--dg-type-field-title-line-height)",
                     marginBottom: 8,
                   }}
                 >
@@ -936,11 +938,11 @@ export function ManagementStaffPanel({
                 <div>
                   <div
                     style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 700,
-                      color: "var(--dg-color-text-subtle)",
-                      letterSpacing: "0.07em",
-                      textTransform: "uppercase" as const,
+                      fontSize: "var(--dg-type-field-title-size)",
+                      fontWeight: "var(--dg-type-field-title-weight)",
+                      color: "var(--dg-type-field-title-color)",
+                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                      lineHeight: "var(--dg-type-field-title-line-height)",
                       marginBottom: 10,
                     }}
                   >
@@ -957,11 +959,11 @@ export function ManagementStaffPanel({
                       <div>
                         <div
                           style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            color: "var(--dg-color-text-muted)",
-                            textTransform: "uppercase" as const,
-                            letterSpacing: "0.04em",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            color: "var(--dg-type-field-title-color)",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                            lineHeight: "var(--dg-type-field-title-line-height)",
                             marginBottom: 4,
                           }}
                         >
@@ -989,11 +991,11 @@ export function ManagementStaffPanel({
                       <div>
                         <div
                           style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            color: "var(--dg-color-text-muted)",
-                            textTransform: "uppercase" as const,
-                            letterSpacing: "0.04em",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            color: "var(--dg-type-field-title-color)",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                            lineHeight: "var(--dg-type-field-title-line-height)",
                             marginBottom: 4,
                           }}
                         >
@@ -1023,11 +1025,11 @@ export function ManagementStaffPanel({
                       <div>
                         <div
                           style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            color: "var(--dg-color-text-muted)",
-                            textTransform: "uppercase" as const,
-                            letterSpacing: "0.04em",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            color: "var(--dg-type-field-title-color)",
+                            textTransform: "none" as const,
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                             marginBottom: 4,
                           }}
                         >

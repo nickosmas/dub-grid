@@ -20,9 +20,11 @@ const ROLE_LABELS: Record<OrganizationRole, string> = {
 // fields read as part of the same form rather than a bare browser <label>.
 const DEFAULT_LABEL_STYLE: CSSProperties = {
   display: "block",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-secondary)",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   marginBottom: 6,
 };
 

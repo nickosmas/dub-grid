@@ -62,7 +62,7 @@ function getDraftBorderStyle(draftKind: DraftKind): string | undefined {
   return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
 }
 
-const GRID_COLS = "100px repeat(7, 1fr)";
+const GRID_COLS = "100px repeat(7, minmax(0, 1fr))";
 
 export default function MobileDayView({
   filteredEmployees,
@@ -317,7 +317,7 @@ export default function MobileDayView({
                     >
                       <div
                         style={{
-                          fontSize: 9,
+                          fontSize: "var(--dg-type-metadata-size)",
                           fontWeight: 500,
                           color: isToday
                             ? "var(--dg-color-today-text)"

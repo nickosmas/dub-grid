@@ -345,7 +345,7 @@ function ShiftPreviewPill({
           isNameMode
             ? {
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 lineHeight: 1.15,
                 maxWidth: "100%",
                 overflow: "hidden",
@@ -357,7 +357,7 @@ function ShiftPreviewPill({
               }
             : {
                 fontSize: "var(--dg-fs-title)",
-                fontWeight: 800,
+                fontWeight: 600,
                 lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
@@ -421,11 +421,11 @@ function SectionBlock({
     <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
       <div
         style={{
-          fontSize: "var(--dg-fs-label)",
-          fontWeight: 800,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: "var(--dg-color-text-secondary)",
+          fontSize: "var(--dg-type-field-title-size)",
+          fontWeight: "var(--dg-type-field-title-weight)",
+          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+          lineHeight: "var(--dg-type-field-title-line-height)",
+          color: "var(--dg-type-field-title-color)",
         }}
       >
         {title}
@@ -609,7 +609,7 @@ function EligibilityModeToggle({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
+        <div style={{ ...labelStyle, marginBottom: 0 }}>Matching rule</div>
         <div
           style={{
             fontSize: "var(--dg-fs-caption)",
@@ -1369,7 +1369,7 @@ function JobRow({
           <div
             style={{
               fontSize: "var(--dg-fs-body)",
-              fontWeight: 800,
+              fontWeight: 600,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -1435,7 +1435,7 @@ function JobRow({
                 }}
               >
                 <div>
-                  <label style={labelStyle}>JOB NAME</label>
+                  <label style={labelStyle}>Job name</label>
                   <input
                     value={form.name}
                     onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -1460,7 +1460,7 @@ function JobRow({
                 </div>
                 {!isNameMode && (
                   <div>
-                    <label style={labelStyle}>GRID ABBR</label>
+                    <label style={labelStyle}>Grid abbreviation</label>
                     <input
                       value={form.abbr}
                       onChange={(event) =>
@@ -1499,7 +1499,7 @@ function JobRow({
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <label style={labelStyle}>COLOR PRESET</label>
+                    <label style={labelStyle}>Color preset</label>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <PresetColorPicker
                         valueBg={form.color}
@@ -1528,7 +1528,7 @@ function JobRow({
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {hasGeneralJobDuration ? (
                       <>
-                        <label style={labelStyle}>DEFAULT DURATION</label>
+                        <label style={labelStyle}>Default duration</label>
                         <div
                           style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}
                         >
@@ -1633,7 +1633,7 @@ function JobRow({
                       </>
                     ) : hasGeneralJobFixedTime ? (
                       <>
-                        <label style={labelStyle}>DEFAULT START / END</label>
+                        <label style={labelStyle}>Default start / end</label>
                         <div
                           style={{
                             display: "flex",
@@ -1742,7 +1742,7 @@ function JobRow({
                       </>
                     ) : (
                       <>
-                        <label style={labelStyle}>DEFAULT TIMING</label>
+                        <label style={labelStyle}>Default timing</label>
                         <p
                           style={{
                             margin: 0,
@@ -2171,7 +2171,7 @@ function JobRow({
                           }}
                         >
                           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            <label style={labelStyle}>COLOR OVERRIDE</label>
+                            <label style={labelStyle}>Color override</label>
                             <div
                               style={{
                                 display: "flex",
@@ -2217,7 +2217,7 @@ function JobRow({
                           </div>
 
                           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            <label style={labelStyle}>TIME</label>
+                            <label style={labelStyle}>Time</label>
                             <label
                               style={{
                                 display: "inline-flex",
@@ -2261,7 +2261,7 @@ function JobRow({
                                 }}
                               >
                                 <div>
-                                  <label style={labelStyle}>START</label>
+                                  <label style={labelStyle}>Start</label>
                                   <TimeInput12h
                                     value={timeOverride.startTime}
                                     onChange={(value) =>
@@ -2283,7 +2283,7 @@ function JobRow({
                                   />
                                 </div>
                                 <div>
-                                  <label style={labelStyle}>END</label>
+                                  <label style={labelStyle}>End</label>
                                   <TimeInput12h
                                     value={timeOverride.endTime}
                                     onChange={(value) =>

@@ -214,7 +214,7 @@ export function StaffDetailPanel({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `2px solid ${avatarTone.borderColor}`,

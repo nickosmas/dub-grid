@@ -14,7 +14,10 @@ export function RecurringScheduleCard({ recurringShifts }: { recurringShifts: Re
           <div className="dg-card-title flex items-center gap-2">
             <CalendarClock className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
             Recurring schedule
-            <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
+            <Badge
+              variant="secondary"
+              className="ml-1 h-4 px-1.5 py-0 font-mono text-[length:var(--dg-type-badge-size)]"
+            >
               {recurringShifts.length}
             </Badge>
           </div>
@@ -45,11 +48,11 @@ export function RecurringScheduleCard({ recurringShifts }: { recurringShifts: Re
                         : "border-transparent bg-transparent"
                     }`}
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                    <span className="text-[length:var(--dg-type-badge-size)] font-medium uppercase tracking-normal text-[var(--dg-color-text-subtle)]">
                       {day}
                     </span>
                     <span
-                      className={`mt-1 max-w-full truncate px-0.5 text-[11px] font-semibold ${
+                      className={`mt-1 max-w-full truncate px-0.5 text-[length:var(--dg-type-badge-size)] font-medium ${
                         recurringShift
                           ? "text-[var(--dg-color-text-primary)]"
                           : "text-[var(--dg-color-text-faint)]"
@@ -62,7 +65,7 @@ export function RecurringScheduleCard({ recurringShifts }: { recurringShifts: Re
               })}
             </div>
             {recurringShifts.some((shift) => shift.effectiveUntil) && (
-              <p className="mt-3 text-center text-[10px] text-[var(--dg-color-text-muted)]">
+              <p className="mt-3 text-center text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
                 {recurringShifts
                   .filter((shift) => shift.effectiveUntil)
                   .map((shift) => `${DAY_LABELS[shift.dayOfWeek]}: until ${shift.effectiveUntil}`)

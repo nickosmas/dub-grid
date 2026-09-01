@@ -30,9 +30,7 @@ export function AccessStatusRow({
   return (
     <div className="flex items-center justify-between gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-4 py-3">
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-          {label}
-        </div>
+        <div className="dg-type-field-title">{label}</div>
         <div
           className={`mt-0.5 text-[13px] font-medium ${
             tone === "active"

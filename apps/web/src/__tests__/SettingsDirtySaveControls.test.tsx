@@ -242,9 +242,9 @@ describe("settings dirty save controls", () => {
       screen.queryByText("Scheduled only. Does not rename management departments."),
     ).not.toBeInTheDocument();
     // The other three labels remain customizable.
-    expect(screen.getByText("FOCUS AREAS LABEL")).toBeInTheDocument();
-    expect(screen.getByText("CERTIFICATIONS LABEL")).toBeInTheDocument();
-    expect(screen.getByText("ROLES LABEL")).toBeInTheDocument();
+    expect(screen.getByText("Focus areas label")).toBeInTheDocument();
+    expect(screen.getByText("Certifications label")).toBeInTheDocument();
+    expect(screen.getByText("Roles label")).toBeInTheDocument();
   });
 
   it("display mode uses Cancel while the mode selection is dirty", async () => {
@@ -2543,8 +2543,8 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByLabelText(/override time/i));
 
-    expect(screen.getByText("START")).toBeInTheDocument();
-    expect(screen.getByText("END")).toBeInTheDocument();
+    expect(screen.getByText("Start")).toBeInTheDocument();
+    expect(screen.getByText("End")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 

@@ -80,7 +80,13 @@ export default function OpenShiftsCard({
           <div className="dg-card-title">Open shifts</div>
           <div className="dg-card-subtitle">{subtitle}</div>
           {publishSummary && (
-            <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-type-metadata-size)",
+                color: "var(--dg-color-text-subtle)",
+                marginTop: 2,
+              }}
+            >
               {publishSummary}
             </div>
           )}
@@ -137,7 +143,7 @@ export default function OpenShiftsCard({
                   <div style={{ textAlign: "center", minWidth: 34 }}>
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: "var(--dg-type-metadata-size)",
                         color: "var(--dg-color-text-subtle)",
                         fontWeight: 500,
                       }}
@@ -178,7 +184,7 @@ export default function OpenShiftsCard({
                     {metaText ? (
                       <div
                         style={{
-                          fontSize: 10,
+                          fontSize: "var(--dg-type-metadata-size)",
                           color: "var(--dg-color-text-subtle)",
                           marginTop: 1,
                         }}
@@ -199,7 +205,7 @@ export default function OpenShiftsCard({
                   >
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: "var(--dg-type-control-size)",
                         fontWeight: 600,
                         padding: "3px 8px",
                         borderRadius: 5,
@@ -218,7 +224,7 @@ export default function OpenShiftsCard({
                           onVolunteer(shift);
                         }}
                         style={{
-                          fontSize: 10,
+                          fontSize: "var(--dg-type-control-size)",
                           fontWeight: 600,
                           padding: "3px 8px",
                           borderRadius: 5,
@@ -255,7 +261,7 @@ export default function OpenShiftsCard({
               <div
                 style={{
                   padding: "2px 2px 0",
-                  fontSize: 11,
+                  fontSize: "var(--dg-type-metadata-size)",
                   fontWeight: 600,
                   color: "var(--dg-color-text-subtle)",
                 }}

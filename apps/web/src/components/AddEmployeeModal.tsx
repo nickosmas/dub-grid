@@ -206,10 +206,11 @@ export default function AddEmployeeModal({
   const scrollMaxHeight = isMobile ? "calc(100dvh - 300px)" : "min(620px, calc(100vh - 250px))";
 
   const fieldLabelStyle: React.CSSProperties = {
-    fontSize: "var(--dg-fs-footnote)",
-    fontWeight: 600,
-    color: "var(--dg-color-text-muted)",
-    letterSpacing: "0.02em",
+    fontSize: "var(--dg-type-field-title-size)",
+    fontWeight: "var(--dg-type-field-title-weight)",
+    color: "var(--dg-type-field-title-color)",
+    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+    lineHeight: "var(--dg-type-field-title-line-height)",
   };
 
   return (

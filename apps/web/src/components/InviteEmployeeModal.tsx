@@ -763,9 +763,11 @@ function SandboxNotice({ message }: { message: string }) {
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-secondary, #334766)",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   marginBottom: 6,
 };
 

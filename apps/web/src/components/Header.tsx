@@ -181,7 +181,7 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
         background: colors.bg,
         color: colors.text,
         fontSize: "var(--dg-fs-caption)",
-        fontWeight: 800,
+        fontWeight: 600,
         lineHeight: 1.3,
         textDecoration: "none",
         whiteSpace: "nowrap",
@@ -528,7 +528,7 @@ export default function Header({ orgName }: HeaderProps) {
         {/* Logo + Org Anchor */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
           <DubGridLogo size={30} />
-          <DubGridWordmark fontSize={18} color="var(--dg-color-text-primary)" />
+          {!isTablet && <DubGridWordmark fontSize={18} color="var(--dg-color-text-primary)" />}
           {orgName && (
             <>
               <span
@@ -550,7 +550,7 @@ export default function Header({ orgName }: HeaderProps) {
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
-                    maxWidth: isTablet ? 160 : 200,
+                    maxWidth: isTablet ? 112 : 200,
                   }}
                 >
                   {orgName}
@@ -564,7 +564,7 @@ export default function Header({ orgName }: HeaderProps) {
         <div
           style={{
             display: "flex",
-            gap: 4,
+            gap: isTablet ? 2 : 4,
             alignItems: "center",
             flex: 1,
             justifyContent: "center",
@@ -578,6 +578,7 @@ export default function Header({ orgName }: HeaderProps) {
                 key={item.id}
                 href={item.href}
                 className={`dg-nav-tab${active ? " active" : ""}`}
+                style={{ paddingInline: isTablet ? 8 : 14 }}
               >
                 <Icon size={16} />
                 {item.label}
@@ -594,12 +595,13 @@ export default function Header({ orgName }: HeaderProps) {
                 gap: 4,
                 background: "transparent",
                 border: "1px solid var(--dg-color-border)",
-                color: "var(--dg-color-link)",
+                color: "var(--dg-type-navigation-color)",
                 borderRadius: "var(--dg-btn-radius)",
                 padding: "5px 14px",
-                fontSize: "var(--dg-fs-label)",
+                fontSize: "var(--dg-type-navigation-size)",
                 cursor: "pointer",
-                fontWeight: 600,
+                fontWeight: "var(--dg-type-navigation-weight)",
+                letterSpacing: "var(--dg-type-navigation-letter-spacing)",
                 marginLeft: 8,
                 fontFamily: "inherit",
                 transition: "background 150ms ease, border-color 150ms ease",
@@ -635,13 +637,15 @@ export default function Header({ orgName }: HeaderProps) {
         {/* Alerts */}
         {!isGridmaster && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} />}
+            {canShowBillingNotice && orgId && (
+              <HeaderBillingNotice orgId={orgId} compact={isTablet} />
+            )}
             <NotificationBell />
           </div>
         )}
         {isGridmaster && canShowBillingNotice && orgId && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            <HeaderBillingNotice orgId={orgId} />
+            <HeaderBillingNotice orgId={orgId} compact={isTablet} />
           </div>
         )}
         <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
@@ -657,7 +661,7 @@ export default function Header({ orgName }: HeaderProps) {
               background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
               border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
               borderRadius: "var(--dg-btn-radius)",
-              padding: "4px 8px 4px 4px",
+              padding: isTablet ? 4 : "4px 8px 4px 4px",
               minHeight: 44,
               cursor: "pointer",
               fontFamily: "inherit",
@@ -693,48 +697,52 @@ export default function Header({ orgName }: HeaderProps) {
             >
               {initials}
             </div>
-            <div style={{ textAlign: "left" }}>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-primary)",
-                  lineHeight: 1.2,
-                  maxWidth: 120,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {displayName}
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--dg-color-text-muted)",
-                  lineHeight: 1.2,
-                }}
-              >
-                {roleLabel}
-              </div>
-            </div>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--dg-color-text-muted)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                flexShrink: 0,
-                transition: "transform 150ms ease",
-                transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
-              }}
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            {!isTablet && (
+              <>
+                <div style={{ textAlign: "left" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 600,
+                      color: "var(--dg-color-text-primary)",
+                      lineHeight: 1.2,
+                      maxWidth: 120,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {displayName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--dg-color-text-muted)",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {roleLabel}
+                  </div>
+                </div>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--dg-color-text-muted)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    flexShrink: 0,
+                    transition: "transform 150ms ease",
+                    transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </>
+            )}
           </Button>
 
           {menuOpen && (
@@ -829,11 +837,11 @@ export default function Header({ orgName }: HeaderProps) {
               <div style={{ padding: "6px 10px 4px" }}>
                 <div
                   style={{
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    color: "var(--dg-color-text-subtle)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
+                    fontSize: "var(--dg-type-field-title-size)",
+                    fontWeight: "var(--dg-type-field-title-weight)",
+                    color: "var(--dg-type-field-title-color)",
+                    textTransform: "none",
+                    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                     marginBottom: 6,
                   }}
                 >

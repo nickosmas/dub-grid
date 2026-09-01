@@ -30,6 +30,7 @@ import {
   mobilePersonUpdateResponseSchema,
   mobilePushTokenResponseSchema,
   mobileShiftRequestsResponseSchema,
+  mobileShiftRequestHistoryResponseSchema,
   mobileShiftSwapOptionsResponseSchema,
   mobileUpdateShiftRequestResponseSchema,
   mobileOrganizationLookupResponseSchema,
@@ -642,6 +643,26 @@ export function getShiftRequests(accessToken: string, query?: MobileScheduleRang
     accessToken,
     { method: "GET" },
     (value) => mobileShiftRequestsResponseSchema.parse(value),
+  );
+}
+
+export function getShiftRequestHistory(
+  accessToken: string,
+  query?: {
+    limit?: number;
+    cursorCreatedAt?: string;
+    cursorId?: string;
+  },
+) {
+  return mobileApiRequest(
+    appendQueryParams("/api/mobile/v1/shift-requests/history", {
+      limit: query?.limit?.toString(),
+      cursorCreatedAt: query?.cursorCreatedAt,
+      cursorId: query?.cursorId,
+    }),
+    accessToken,
+    { method: "GET" },
+    (value) => mobileShiftRequestHistoryResponseSchema.parse(value),
   );
 }
 

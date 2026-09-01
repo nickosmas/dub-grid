@@ -61,7 +61,7 @@ export function StatusPill({
       aria-label={ariaLabel}
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium tracking-normal whitespace-nowrap",
         className,
       )}
       style={style}

@@ -162,11 +162,11 @@ function ShiftCellPopover({
           >
             <span
               style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
+                fontSize: "var(--dg-type-field-title-size)",
+                fontWeight: "var(--dg-type-field-title-weight)",
+                color: "var(--dg-type-field-title-color)",
+                textTransform: "none",
+                letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               }}
             >
               Select Shift
@@ -438,7 +438,7 @@ function RecurringShiftPill({
             isNameMode
               ? {
                   fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   lineHeight: 1.2,
                   textAlign: "center" as const,
                   maxWidth: "100%",
@@ -450,7 +450,7 @@ function RecurringShiftPill({
                 }
               : {
                   fontSize: "var(--dg-fs-title)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   lineHeight: 1.2,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -989,7 +989,7 @@ export function RecurringScheduleSection({
         <h1
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
@@ -1142,11 +1142,11 @@ export function RecurringScheduleSection({
             <div
               style={{
                 padding: "10px 12px",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
+                fontSize: "var(--dg-type-table-heading-size)",
+                fontWeight: "var(--dg-type-table-heading-weight)",
+                color: "var(--dg-type-table-heading-color)",
+                textTransform: "none",
+                letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
                 position: isMobile ? undefined : "sticky",
                 left: isMobile ? undefined : 0,
                 zIndex: isMobile ? undefined : 4,
@@ -1162,11 +1162,11 @@ export function RecurringScheduleSection({
                 key={day}
                 style={{
                   padding: "10px 4px",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+                  fontSize: "var(--dg-type-table-heading-size)",
+                  fontWeight: "var(--dg-type-table-heading-weight)",
+                  color: "var(--dg-type-table-heading-color)",
+                  textTransform: "none",
+                  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
                   textAlign: "center",
                 }}
               >

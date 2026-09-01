@@ -460,7 +460,7 @@ export default function OrganizationSetupWizard({
               }}
             >
               <div>
-                <label style={labelStyle}>Organization Name *</label>
+                <label style={labelStyle}>Organization name *</label>
                 <input
                   className="dg-input"
                   value={name}
@@ -518,7 +518,7 @@ export default function OrganizationSetupWizard({
               }}
             >
               <div>
-                <label style={labelStyle}>Focus Areas Label</label>
+                <label style={labelStyle}>Focus areas label</label>
                 <input
                   className="dg-input"
                   value={focusAreaLabel}
@@ -527,7 +527,7 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Certifications Label</label>
+                <label style={labelStyle}>Certifications label</label>
                 <input
                   className="dg-input"
                   value={certificationLabel}
@@ -536,7 +536,7 @@ export default function OrganizationSetupWizard({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Roles Label</label>
+                <label style={labelStyle}>Roles label</label>
                 <input
                   className="dg-input"
                   value={roleLabel}
@@ -1769,7 +1769,7 @@ export default function OrganizationSetupWizard({
               <span style={{ ...labelStyle, marginBottom: 0 }}>
                 First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
               </span>
-              <span style={{ ...labelStyle, marginBottom: 0 }}>Last Name</span>
+              <span style={{ ...labelStyle, marginBottom: 0 }}>Last name</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Email</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Phone</span>
               <span />

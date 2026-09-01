@@ -271,14 +271,17 @@ export default function PeopleScreen() {
     setManagementFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function confirmProfileRequestAction() {
+  function confirmProfileRequestAction(): Promise<void> | undefined {
     if (!profileRequestConfirmation) return;
 
-    resolveRequestMutation.mutate({
+    const input = {
       requestId: profileRequestConfirmation.request.id,
       action: profileRequestConfirmation.action,
-    });
+    };
     setProfileRequestConfirmation(null);
+    return new Promise<void>((resolve) => {
+      resolveRequestMutation.mutate(input, { onSettled: () => resolve() });
+    });
   }
 
   const focusAreaMap = useMemo(
@@ -987,7 +990,11 @@ export default function PeopleScreen() {
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowInviteManagementUser(false)}
-        onSubmit={(body) => inviteManagementUserMutation.mutate(body)}
+        onSubmit={(body) =>
+          new Promise<void>((resolve) => {
+            inviteManagementUserMutation.mutate(body, { onSettled: () => resolve() });
+          })
+        }
         visible={showInviteManagementUser}
       />
       <ConfirmationModal

@@ -58,7 +58,7 @@ export default function ScheduleOperationModal({
           <span
             style={{
               fontSize: "calc(var(--dg-fs-section-title) + 8px)",
-              fontWeight: 800,
+              fontWeight: 600,
               lineHeight: 1,
               color: "var(--dg-color-brand)",
             }}

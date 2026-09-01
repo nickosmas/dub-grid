@@ -626,16 +626,16 @@ export default function StringListSettings({
                 ? [
                     "",
                     "Name",
-                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showScheduleRoleToggle ? ["Schedule eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
                     ...(showCerts ? ["Requires"] : []),
                     "",
                   ]
                 : [
                     "",
-                    "Full Name",
+                    "Full name",
                     "Abbreviation",
-                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showScheduleRoleToggle ? ["Schedule eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
                     ...(showCerts ? ["Requires"] : []),
                     "",
@@ -643,14 +643,14 @@ export default function StringListSettings({
               : hideAbbrFields
                 ? [
                     "Name",
-                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showScheduleRoleToggle ? ["Schedule eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
                     ...(showCerts ? ["Requires"] : []),
                   ]
                 : [
-                    "Full Name",
+                    "Full name",
                     "Abbreviation",
-                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showScheduleRoleToggle ? ["Schedule eligibility"] : []),
                     ...(showDept ? ["Department"] : []),
                     ...(showCerts ? ["Requires"] : []),
                   ]
@@ -658,20 +658,20 @@ export default function StringListSettings({
               <div
                 key={i}
                 style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
+                  fontSize: "var(--dg-type-table-heading-size)",
+                  fontWeight: "var(--dg-type-table-heading-weight)",
+                  color: "var(--dg-type-table-heading-color)",
+                  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+                  lineHeight: "var(--dg-type-table-heading-line-height)",
                 }}
               >
-                {h === "Schedule Eligibility" && scheduleEligibilityHelpText ? (
+                {h === "Schedule eligibility" && scheduleEligibilityHelpText ? (
                   <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span>{h}</span>
                     <span
                       style={{
-                        fontSize: 10,
-                        fontWeight: 500,
+                        fontSize: "var(--dg-type-metadata-size)",
+                        fontWeight: "var(--dg-type-metadata-weight)",
                         letterSpacing: "normal",
                         textTransform: "none",
                         color: "var(--dg-color-text-muted)",

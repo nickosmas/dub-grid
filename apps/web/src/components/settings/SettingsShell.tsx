@@ -137,7 +137,8 @@ export function SettingsShell<TId extends string = string>({
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
           height: "calc(100dvh - var(--dg-app-shell-header-height))",
-          width: "100%",
+          flex: 1,
+          minWidth: 0,
           overflow: "hidden",
           position: "relative",
         }}
@@ -161,12 +162,12 @@ export function SettingsShell<TId extends string = string>({
                         <SidebarMenuButton
                           render={<Link href={leadingNavigation.href} />}
                           tooltip={leadingNavigation.label}
-                          className="h-9 text-[var(--dg-color-text-faint)] transition-all ease-in-out duration-150 hover:text-[var(--dg-color-text-primary)]"
+                          className="h-9 text-[var(--dg-type-navigation-color)] transition-all ease-in-out duration-150"
                         >
                           <span className="flex shrink-0 items-center justify-center">
                             <leadingNavigation.Icon />
                           </span>
-                          <span className="text-sm font-normal tracking-normal">
+                          <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
                             {leadingNavigation.label}
                           </span>
                         </SidebarMenuButton>
@@ -178,9 +179,7 @@ export function SettingsShell<TId extends string = string>({
               {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
                   {!hideContentGroupLabels && (
-                    <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
-                      {group.label}
-                    </SidebarGroupLabel>
+                    <SidebarGroupLabel className="px-3 pb-0">{group.label}</SidebarGroupLabel>
                   )}
                   <SidebarGroupContent>
                     <SidebarMenu>
@@ -192,18 +191,14 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)]"
                             >
-                              <span
-                                className={
-                                  isActive
-                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                                }
-                              >
+                              <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                                 <item.Icon />
                               </span>
-                              <span className="font-semibold">{item.label}</span>
+                              <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                                {item.label}
+                              </span>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -219,9 +214,7 @@ export function SettingsShell<TId extends string = string>({
               )}
               {footerGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
-                  <SidebarGroupLabel className="px-3 pt-2 pb-0 text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)]">
-                    {group.label}
-                  </SidebarGroupLabel>
+                  <SidebarGroupLabel className="px-3 pt-2 pb-0">{group.label}</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {group.items.map((item) => {
@@ -232,18 +225,14 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)]"
                             >
-                              <span
-                                className={
-                                  isActive
-                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                                }
-                              >
+                              <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                                 <item.Icon />
                               </span>
-                              <span className="font-semibold">{item.label}</span>
+                              <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                                {item.label}
+                              </span>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -257,7 +246,7 @@ export function SettingsShell<TId extends string = string>({
                   <SidebarMenuButton
                     onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                     tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                    className="h-9 text-[var(--dg-type-navigation-color)] transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
                       <svg
@@ -278,7 +267,9 @@ export function SettingsShell<TId extends string = string>({
                         <polyline points="6 17 11 12 6 7" />
                       </svg>
                     </span>
-                    <span className="font-semibold">Collapse Menu</span>
+                    <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                      Collapse Menu
+                    </span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -303,7 +294,7 @@ export function SettingsShell<TId extends string = string>({
             <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>
               <Link
                 href={leadingNavigation.href}
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-color-text-muted)] transition-colors hover:text-[var(--dg-color-text-primary)]"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-type-attention-secondary-color)] transition-colors hover:text-[var(--dg-type-attention-primary-color)]"
               >
                 <leadingNavigation.Icon />
                 {leadingNavigation.label}
@@ -314,9 +305,9 @@ export function SettingsShell<TId extends string = string>({
             <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
               <h1
                 style={{
-                  fontSize: "var(--dg-fs-page-title)",
+                  fontSize: "var(--dg-type-page-title-size)",
                   fontWeight: 700,
-                  color: "var(--dg-color-text-primary)",
+                  color: "var(--dg-type-attention-primary-color)",
                   margin: 0,
                 }}
               >
@@ -326,7 +317,7 @@ export function SettingsShell<TId extends string = string>({
                 <p
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
+                    color: "var(--dg-type-attention-secondary-color)",
                     margin: "5px 0 0",
                     lineHeight: 1.5,
                   }}

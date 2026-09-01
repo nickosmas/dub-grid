@@ -182,7 +182,7 @@ function StaffRowCells({
         <div className="flex items-center gap-3 min-w-0">
           <Avatar>
             <AvatarFallback
-              className="text-[11px] font-bold"
+              className="text-[length:var(--dg-type-badge-size)] font-semibold"
               style={{
                 background: avatarTone.backgroundColor,
                 color: avatarTone.textColor,
@@ -213,7 +213,7 @@ function StaffRowCells({
                 </span>
               )}
               {isYou && (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
+                <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                   You
                 </span>
               )}

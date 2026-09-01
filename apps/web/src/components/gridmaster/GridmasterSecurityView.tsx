@@ -19,7 +19,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color: "var(--dg-color-text-primary)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -186,11 +186,11 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     >
       <div
         style={{
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-subtle)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
+          fontSize: "var(--dg-type-field-title-size)",
+          fontWeight: "var(--dg-type-field-title-weight)",
+          color: "var(--dg-type-field-title-color)",
+          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+          lineHeight: "var(--dg-type-field-title-line-height)",
         }}
       >
         {label}
@@ -238,7 +238,7 @@ function SessionDetailPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -353,11 +353,11 @@ function SessionsTable({
                     style={{
                       padding: "8px 12px",
                       background: "var(--dg-color-bg-secondary)",
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 800,
-                      color: "var(--dg-color-text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
+                      fontSize: "var(--dg-type-table-heading-size)",
+                      fontWeight: "var(--dg-type-table-heading-weight)",
+                      color: "var(--dg-type-table-heading-color)",
+                      letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+                      lineHeight: "var(--dg-type-table-heading-line-height)",
                       borderTop: "1px solid var(--dg-color-border-light)",
                       borderBottom: "1px solid var(--dg-color-border-light)",
                     }}
@@ -506,7 +506,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -687,7 +687,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -748,7 +748,7 @@ export default function GridmasterSecurityView({
       <h2
         style={{
           margin: "0 0 16px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}
@@ -806,7 +806,7 @@ export default function GridmasterSecurityView({
                 padding: "12px 16px",
                 borderBottom: "1px solid var(--dg-color-border-light)",
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >

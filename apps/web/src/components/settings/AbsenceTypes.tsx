@@ -351,7 +351,7 @@ function AbsenceTypeRow({
           >
             {!isNameMode && (
               <div>
-                <label style={labelStyle}>CODE / LABEL</label>
+                <label style={labelStyle}>Code / label</label>
                 <input
                   value={form.label}
                   onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
@@ -376,7 +376,7 @@ function AbsenceTypeRow({
               </div>
             )}
             <div>
-              <label style={labelStyle}>{isNameMode ? "ABSENCE NAME" : "FULL NAME"}</label>
+              <label style={labelStyle}>{isNameMode ? "Absence name" : "Full name"}</label>
               <input
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -402,7 +402,7 @@ function AbsenceTypeRow({
           </div>
 
           <div>
-            <label style={labelStyle}>COLOR PRESET</label>
+            <label style={labelStyle}>Color preset</label>
             <PresetColorPicker
               valueBg={form.color}
               onChange={(color) =>

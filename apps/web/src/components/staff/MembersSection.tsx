@@ -999,7 +999,7 @@ export function MembersSection({
       <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
         <div className="space-y-8">
           <div>
-            <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+            <h1 className="text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
               Directory
             </h1>
             <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
@@ -1048,7 +1048,7 @@ export function MembersSection({
             />
           )}
 
-          <div className="flex items-center gap-3 overflow-x-auto overflow-y-visible py-1">
+          <div className="dg-toolbar-type flex items-center gap-3 overflow-x-auto overflow-y-visible py-1">
             <div className="flex min-w-0 items-center gap-2">
               {canSeeManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
@@ -1071,7 +1071,10 @@ export function MembersSection({
                     }
                   }}
                   style={{ minWidth: 180 }}
-                  fontSize={13}
+                  fontSize="var(--dg-fs-navigation-item)"
+                  fontWeight={400}
+                  activeFontWeight={400}
+                  letterSpacing="normal"
                 />
               )}
 
@@ -1290,7 +1293,6 @@ export function MembersSection({
                     height: 32,
                     paddingLeft: 32,
                     paddingRight: searchQuery ? 30 : 12,
-                    fontSize: 13,
                   }}
                 />
                 {searchQuery && (
@@ -1618,7 +1620,7 @@ export function MembersSection({
                       <TableHeader>
                         <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                            <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
                               <div className="flex items-center gap-1.5">
                                 {canManageEmployees && (
                                   <input
@@ -1648,7 +1650,7 @@ export function MembersSection({
                             </TableHead>
                           )}
                           <TableHead
-                            className="cursor-pointer select-none border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]"
+                            className="cursor-pointer select-none border-r border-[var(--dg-color-border-light)]"
                             onClick={() => handleSort("name")}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -1657,37 +1659,37 @@ export function MembersSection({
                             </span>
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[110px] border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                            <TableHead className="w-[110px] border-r border-[var(--dg-color-border-light)]">
                               Employment
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && activeTab === "all" && (
-                            <TableHead className="w-[110px] border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:border-r">
+                            <TableHead className="w-[110px] border-[var(--dg-color-border-light)] md:border-r">
                               Status
                             </TableHead>
                           )}
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell md:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] md:table-cell md:border-r">
                             {focusAreaLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell lg:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] md:table-cell lg:border-r">
                             {certificationLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                          <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
                             Roles
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
                               Account
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
                               Access
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell">
-                              Date Joined
+                            <TableHead className="hidden w-[140px] lg:table-cell">
+                              Date joined
                             </TableHead>
                           )}
                           <TableHead className="w-[40px] pr-6" />
@@ -1758,27 +1760,23 @@ export function MembersSection({
                 <Table>
                   <TableHeader>
                     <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
-                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
                         ID
                       </TableHead>
-                      <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Name
                       </TableHead>
                       {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--dg-color-border-light)]">
                           {managementDepartmentLabel}
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--dg-color-border-light)]">
                           Role
                         </TableHead>
                       )}
-                      {!isMobile && !isTablet && (
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
-                          Status
-                        </TableHead>
-                      )}
+                      {!isMobile && !isTablet && <TableHead>Status</TableHead>}
                       <TableHead className="w-[40px] pr-6" />
                     </UITableRow>
                   </TableHeader>
@@ -1866,7 +1864,7 @@ export function MembersSection({
                           <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--dg-type-badge-size)] font-semibold"
                                 style={{
                                   background: isPending
                                     ? "var(--dg-color-surface)"
@@ -1910,7 +1908,7 @@ export function MembersSection({
                                     </span>
                                   )}
                                   {isYou && (
-                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
+                                    <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                                       You
                                     </span>
                                   )}
@@ -1923,7 +1921,7 @@ export function MembersSection({
                                       has an employees row post-Flow-B. */}
                                   {person.focusAreaIds.length > 0 && (
                                     <span
-                                      className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                      className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
                                       style={{
                                         background: "var(--dg-color-today-bg)",
                                         color: "var(--dg-color-today-text)",
@@ -1966,7 +1964,7 @@ export function MembersSection({
                           {!isMobile && !isTablet && (
                             <TableCell className="py-4">
                               <span
-                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
                                 style={statusColors}
                               >
                                 {statusLabel}

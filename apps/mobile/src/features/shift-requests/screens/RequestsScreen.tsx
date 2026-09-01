@@ -3,11 +3,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileOpenShift,
   MobileScheduleEntrySegment,
   MobileShiftRequest,
+  MobileShiftRequestHistoryCursor,
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -20,7 +21,12 @@ import {
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
-import { getMySchedule, getShiftRequests, updateShiftRequest } from "../../../shared/lib/api";
+import {
+  getMySchedule,
+  getShiftRequestHistory,
+  getShiftRequests,
+  updateShiftRequest,
+} from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -65,6 +71,7 @@ import {
 import { createStyles } from "./requestsScreenStyles";
 
 const ACTIVE_REQUEST_STATUSES = new Set(["open", "pending_approval"]);
+const HISTORY_PAGE_SIZE = 25;
 
 type ShiftRequestsResponse = Awaited<ReturnType<typeof getShiftRequests>>;
 
@@ -448,6 +455,22 @@ export default function RequestsScreen() {
     // skeleton when the user changes it.
     placeholderData: keepPreviousData,
   });
+  const historyQueryKey = useMemo(
+    () => ["mobile", "requests", "history", accessToken] as const,
+    [accessToken],
+  );
+  const historyQuery = useInfiniteQuery({
+    queryKey: historyQueryKey,
+    enabled: Boolean(accessToken),
+    initialPageParam: null as MobileShiftRequestHistoryCursor | null,
+    queryFn: ({ pageParam }) =>
+      getShiftRequestHistory(accessToken!, {
+        limit: HISTORY_PAGE_SIZE,
+        cursorCreatedAt: pageParam?.createdAt,
+        cursorId: pageParam?.id,
+      }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
   // Named rather than inline so the content-state gate below can ask the same
   // question: a query that is never enabled is also never "resolved".
   const canLoadAvailabilitySchedule =
@@ -465,14 +488,20 @@ export default function RequestsScreen() {
     enabled: canLoadAvailabilitySchedule,
   });
   const refreshRequests = useCallback(() => {
-    const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
+    const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch(), historyQuery.refetch()];
 
     if (linkedEmployeeId && !canViewAllRequests) {
       refreshes.push(availabilityScheduleQuery.refetch());
     }
 
     return Promise.all(refreshes);
-  }, [availabilityScheduleQuery, canViewAllRequests, linkedEmployeeId, requestsQuery]);
+  }, [
+    availabilityScheduleQuery,
+    canViewAllRequests,
+    historyQuery,
+    linkedEmployeeId,
+    requestsQuery,
+  ]);
   const manualRefresh = useManualRefresh(refreshRequests);
   useMobileShiftRequestsRealtime({
     orgId: bootstrapQuery.data?.currentOrg.id ?? null,
@@ -518,6 +547,7 @@ export default function RequestsScreen() {
         await availabilityScheduleQuery.refetch();
       }
     },
+    invalidateKeys: [historyQueryKey],
   });
   const runRequestAction = useCallback(
     (requestId: string, body: RequestActionBody) => {
@@ -616,10 +646,19 @@ export default function RequestsScreen() {
         : [],
     [canViewAllRequests, now, requests, timeZone],
   );
-  const historyRequests = useMemo(
-    () => requests.filter((request) => !ACTIVE_REQUEST_STATUSES.has(request.status)),
-    [requests],
-  );
+  const historyRequests = useMemo(() => {
+    const requestById = new Map<string, MobileShiftRequest>();
+
+    for (const page of historyQuery.data?.pages ?? []) {
+      for (const request of page.requests) {
+        if (!requestById.has(request.id)) {
+          requestById.set(request.id, request);
+        }
+      }
+    }
+
+    return [...requestById.values()];
+  }, [historyQuery.data]);
   const contentState = useMobileContentState({
     // "The queries resolved", not "some derived bucket is non-empty". The old
     // form re-entered `loading` any time a refetch transiently emptied every
@@ -639,11 +678,16 @@ export default function RequestsScreen() {
       availableOpenShiftFeed.totalCount === 0 &&
       allRequests.length === 0 &&
       myRequests.length === 0 &&
-      approvalRequests.length === 0 &&
-      historyRequests.length === 0,
+      approvalRequests.length === 0,
     isLoading:
       requestsQuery.isLoading || bootstrapQuery.isLoading || availabilityScheduleQuery.isLoading,
     error: requestsQuery.error ?? bootstrapQuery.error ?? availabilityScheduleQuery.error,
+  });
+  const historyContentState = useMobileContentState({
+    hasData: historyQuery.data !== undefined,
+    isEmpty: historyRequests.length === 0,
+    isLoading: historyQuery.isLoading,
+    error: historyQuery.error,
   });
   const tabs = [
     {
@@ -701,9 +745,11 @@ export default function RequestsScreen() {
   const highlightedRequest = useMemo(
     () =>
       highlightedRequestId
-        ? (requests.find((request) => request.id === highlightedRequestId) ?? null)
+        ? ([...requests, ...historyRequests].find(
+            (request) => request.id === highlightedRequestId,
+          ) ?? null)
         : null,
-    [highlightedRequestId, requests],
+    [highlightedRequestId, historyRequests, requests],
   );
   const defaultTab = useMemo((): RequestTab => {
     if (routeTab && visibleTabs.some((tab) => tab.key === routeTab)) {
@@ -765,10 +811,8 @@ export default function RequestsScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      {/* Every tab here counts something, and those counts are 0 until the
-          queries land. Painting the real strip first meant each badge popped in
-          afterwards and shoved the pills along, so the strip waits for the same
-          data the list below it is waiting for. */}
+      {/* Active request counts wait for their shared data. History resolves
+          independently so a slow archive cannot hide active request actions. */}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ScrollableTabStripSkeleton tabs={visibleTabs.length} />
@@ -794,10 +838,10 @@ export default function RequestsScreen() {
           title="Could not load requests"
           variant="centered"
           onAction={() => {
-            void requestsQuery.refetch();
+            void refreshRequests();
           }}
         />
-      ) : contentState.kind === "empty" ? (
+      ) : contentState.kind === "empty" && activeTab !== "history" ? (
         <EmptyStateCard
           fillScreen
           body="Coverage and pickup requests will appear here when someone needs help."
@@ -919,7 +963,22 @@ export default function RequestsScreen() {
         </View>
       ) : (
         <View style={styles.section}>
-          {historyRequests.length === 0 ? (
+          {historyContentState.kind === "loading" ? (
+            historyContentState.showSkeleton ? (
+              <CardRowListSkeleton rows={4} />
+            ) : null
+          ) : historyContentState.kind === "error" ? (
+            <StatusBanner
+              actionLabel="Try again"
+              body={historyContentState.message}
+              fillScreen
+              title="Could not load history"
+              variant="centered"
+              onAction={() => {
+                void historyQuery.refetch();
+              }}
+            />
+          ) : historyContentState.kind === "empty" ? (
             <EmptyStateCard
               fillScreen
               body="Resolved, canceled, and expired requests appear here."
@@ -927,17 +986,28 @@ export default function RequestsScreen() {
               title="No history yet"
             />
           ) : (
-            historyRequests.map((request) => (
-              <RequestCard
-                key={request.id}
-                canApprove={canApprove}
-                linkedEmployeeId={linkedEmployeeId}
-                pendingAction={pendingAction}
-                onAction={(body) => runRequestAction(request.id, body)}
-                highlighted={highlightedRequestId === request.id}
-                request={request}
-              />
-            ))
+            <>
+              {historyRequests.map((request) => (
+                <RequestCard
+                  key={request.id}
+                  canApprove={canApprove}
+                  linkedEmployeeId={linkedEmployeeId}
+                  pendingAction={pendingAction}
+                  onAction={(body) => runRequestAction(request.id, body)}
+                  highlighted={highlightedRequestId === request.id}
+                  request={request}
+                />
+              ))}
+              {historyQuery.hasNextPage ? (
+                <Button
+                  compact
+                  label="Load more"
+                  loading={historyQuery.isFetchingNextPage}
+                  onPress={() => historyQuery.fetchNextPage()}
+                  tone="secondary"
+                />
+              ) : null}
+            </>
           )}
         </View>
       )}

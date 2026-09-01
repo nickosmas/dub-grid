@@ -29,9 +29,9 @@ export default function BillingRequiredPage() {
         <h1
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             lineHeight: 1.15,
-            fontWeight: 800,
+            fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
         >

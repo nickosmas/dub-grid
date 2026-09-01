@@ -273,7 +273,7 @@ export default function AllUsersView({
       <h2
         style={{
           margin: "0 0 16px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}
@@ -305,10 +305,10 @@ export default function AllUsersView({
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span
             style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-subtle)",
-              textTransform: "uppercase",
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              color: "var(--dg-type-field-title-color)",
+              textTransform: "none",
               whiteSpace: "nowrap",
             }}
           >
@@ -443,14 +443,14 @@ export default function AllUsersView({
               <thead>
                 <tr>
                   <th style={thStyle}>Email</th>
-                  <th style={thStyle}>Platform Role</th>
-                  <th style={thStyle}>Organization Role</th>
+                  <th style={thStyle}>Platform role</th>
+                  <th style={thStyle}>Organization role</th>
                   <th style={thStyle}>Organization</th>
                   <th style={thStyle}>Sessions</th>
                   <th style={thStyle}>Mobile</th>
                   <th style={thStyle}>Memberships</th>
-                  <th style={thStyle}>Last Login</th>
-                  <th style={thStyle}>Date Joined</th>
+                  <th style={thStyle}>Last login</th>
+                  <th style={thStyle}>Date joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -716,11 +716,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         Last Login
@@ -738,11 +738,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         Date Joined
@@ -765,11 +765,11 @@ export default function AllUsersView({
                       <div>
                         <span
                           style={{
-                            color: "var(--dg-color-text-muted)",
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
+                            color: "var(--dg-type-field-title-color)",
+                            fontSize: "var(--dg-type-field-title-size)",
+                            fontWeight: "var(--dg-type-field-title-weight)",
+                            textTransform: "none",
+                            letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                           }}
                         >
                           Current Org
@@ -800,11 +800,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         User ID
@@ -823,11 +823,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         Active Sessions
@@ -845,11 +845,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         Mobile Devices
@@ -867,11 +867,11 @@ export default function AllUsersView({
                     <div>
                       <span
                         style={{
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
+                          color: "var(--dg-type-field-title-color)",
+                          fontSize: "var(--dg-type-field-title-size)",
+                          fontWeight: "var(--dg-type-field-title-weight)",
+                          textTransform: "none",
+                          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
                         }}
                       >
                         Last Force Logout
@@ -907,7 +907,7 @@ export default function AllUsersView({
                             <tr>
                               <th style={thStyle}>Organization</th>
                               <th style={thStyle}>Role</th>
-                              <th style={thStyle}>Date Joined</th>
+                              <th style={thStyle}>Date joined</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -954,7 +954,7 @@ export default function AllUsersView({
                             <tr>
                               <th style={thStyle}>Organization</th>
                               <th style={thStyle}>Role</th>
-                              <th style={thStyle}>Date Joined</th>
+                              <th style={thStyle}>Date joined</th>
                             </tr>
                           </thead>
                           <tbody>

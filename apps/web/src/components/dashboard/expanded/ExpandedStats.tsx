@@ -209,7 +209,7 @@ export default function ExpandedStats({
                       {isCurrent && (
                         <span
                           style={{
-                            fontSize: 9,
+                            fontSize: "var(--dg-type-badge-size)",
                             color: "var(--dg-color-brand)",
                             marginLeft: 6,
                             fontWeight: 600,
@@ -239,7 +239,7 @@ export default function ExpandedStats({
                           {delta != null && delta !== 0 && (
                             <span
                               style={{
-                                fontSize: 10,
+                                fontSize: "var(--dg-type-metadata-size)",
                                 fontWeight: 600,
                                 marginLeft: 6,
                                 color:
@@ -280,11 +280,11 @@ const tableStyle = {
 
 const thStyle = {
   padding: "8px 12px",
-  fontSize: 11,
-  fontWeight: 600 as const,
-  color: "var(--dg-color-text-subtle)",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.04em",
+  fontSize: "var(--dg-type-table-heading-size)",
+  fontWeight: "var(--dg-type-table-heading-weight)",
+  color: "var(--dg-type-table-heading-color)",
+  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+  lineHeight: "var(--dg-type-table-heading-line-height)",
   textAlign: "center" as const,
   borderBottom: "2px solid var(--dg-color-border)",
 };

@@ -581,6 +581,27 @@ export const mobileShiftRequestsResponseSchema = z.object({
   openShifts: z.array(mobileOpenShiftSchema).default([]),
 });
 
+export const mobileShiftRequestHistoryCursorSchema = z.object({
+  createdAt: z.string().datetime({ offset: true }),
+  id: z.string().uuid(),
+});
+
+export const mobileShiftRequestHistoryQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    cursorCreatedAt: z.string().datetime({ offset: true }).optional(),
+    cursorId: z.string().uuid().optional(),
+  })
+  .refine((query) => Boolean(query.cursorCreatedAt) === Boolean(query.cursorId), {
+    message: "Both cursor fields are required",
+    path: ["cursorCreatedAt"],
+  });
+
+export const mobileShiftRequestHistoryResponseSchema = z.object({
+  requests: z.array(mobileShiftRequestSchema),
+  nextCursor: mobileShiftRequestHistoryCursorSchema.nullable(),
+});
+
 // ── Admin/super_admin dashboard (mobile home view) ──────────────────────────
 // Deliberately leaner than web's SuperAdminDashboard/AdminDashboard: coverage
 // is summarized as open-slot counts per section rather than a full
@@ -1138,6 +1159,11 @@ export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>
 export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
+export type MobileShiftRequestHistoryCursor = z.infer<typeof mobileShiftRequestHistoryCursorSchema>;
+export type MobileShiftRequestHistoryQuery = z.infer<typeof mobileShiftRequestHistoryQuerySchema>;
+export type MobileShiftRequestHistoryResponse = z.infer<
+  typeof mobileShiftRequestHistoryResponseSchema
+>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileDashboardResponse = z.infer<typeof mobileDashboardResponseSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;

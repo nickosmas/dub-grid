@@ -71,7 +71,7 @@ export function BillingMetric({
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -375,11 +375,11 @@ export function BillingTab({ organization }: { organization: Organization }) {
               label="Status"
               value={
                 billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt) ? (
-                  <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 800 }}>
+                  <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 600 }}>
                     Trial pending
                   </span>
                 ) : (
-                  <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>
+                  <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 600 }}>
                     {formatBillingStatusLabel(billingOrg.status)}
                   </span>
                 )

@@ -20,9 +20,7 @@ export function DirectorySummaryCards({
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
-              On schedule
-            </p>
+            <p className="dg-type-field-title">On schedule</p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{onScheduleCount}</p>
           </div>
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-brand-bg)]">
@@ -54,9 +52,7 @@ export function DirectorySummaryCards({
         >
           <CardContent className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
-                Full-time
-              </p>
+              <p className="dg-type-field-title">Full-time</p>
               <p className="text-2xl font-bold tracking-tight mt-0.5">{fullTimeCount}</p>
             </div>
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-bg-secondary)]">
@@ -94,9 +90,7 @@ export function DirectorySummaryCards({
         >
           <CardContent className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dg-color-text-subtle)]">
-                Part-time
-              </p>
+              <p className="dg-type-field-title">Part-time</p>
               <p className="text-2xl font-bold tracking-tight mt-0.5">{partTimeCount}</p>
             </div>
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--dg-color-warning-bg,#FEF3C7)]">

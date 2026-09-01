@@ -95,7 +95,7 @@ export default function SandboxBanner() {
             height: 18,
             borderRadius: 9,
             border: "1.5px solid currentColor",
-            fontSize: 11,
+            fontSize: "var(--dg-type-badge-size)",
             lineHeight: 1,
             flexShrink: 0,
           }}

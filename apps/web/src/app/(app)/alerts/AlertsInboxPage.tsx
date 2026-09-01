@@ -507,8 +507,8 @@ export function InboxView() {
           <h1
             style={{
               margin: 0,
-              fontSize: "var(--dg-fs-page-title)",
-              fontWeight: 800,
+              fontSize: "var(--dg-type-page-title-size)",
+              fontWeight: 700,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -729,11 +729,11 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
           >
             <span
               style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: 0.4,
+                fontSize: "var(--dg-type-field-title-size)",
+                fontWeight: "var(--dg-type-field-title-weight)",
+                color: "var(--dg-type-field-title-color)",
+                letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                lineHeight: "var(--dg-type-field-title-line-height)",
               }}
             >
               Details
@@ -1042,6 +1042,7 @@ function Toolbar({
 
   return (
     <div
+      className="dg-toolbar-type"
       style={{
         display: "flex",
         alignItems: "center",
@@ -1058,7 +1059,6 @@ function Toolbar({
           gap: 8,
           padding: "0 6px",
           color: "var(--dg-color-text-muted)",
-          fontSize: "var(--dg-fs-label)",
           cursor: hasNotifications ? "pointer" : "default",
         }}
       >
@@ -1115,6 +1115,10 @@ function Toolbar({
         options={categoryOptions}
         onChange={onCategoryChange}
         style={{ minWidth: 160 }}
+        fontSize="var(--dg-fs-navigation-item)"
+        fontWeight={400}
+        activeFontWeight={400}
+        letterSpacing="normal"
       />
 
       <CustomSelect
@@ -1123,6 +1127,10 @@ function Toolbar({
         options={priorityOptions}
         onChange={onPriorityChange}
         style={{ minWidth: 140 }}
+        fontSize="var(--dg-fs-navigation-item)"
+        fontWeight={400}
+        activeFontWeight={400}
+        letterSpacing="normal"
       />
 
       <Button

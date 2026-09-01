@@ -959,7 +959,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
       confirmDialog("Mark Inactive");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
         note: undefined,
@@ -978,7 +978,7 @@ describe("PersonDetailScreen", () => {
       expect(sheet.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
       confirmDialog("Remove");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "remove",
         expectedVersion: 7,
         note: undefined,
@@ -994,7 +994,7 @@ describe("PersonDetailScreen", () => {
       });
       confirmDialog("Mark Inactive");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
         note: "On leave until June",
@@ -1134,6 +1134,22 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByText("FAC"));
       fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
       expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
+    });
+
+    it("submits one removal when the destructive confirmation is pressed twice", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      fireEvent.click(screen.getByRole("button", { name: "Remove from Management" }));
+      const confirm = within(screen.getByRole("alert")).getByRole("button", {
+        name: "Remove Access",
+      });
+      fireEvent.click(confirm);
+      fireEvent.click(confirm);
+
+      expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
     });
 
     it("refuses to submit with no department selected", () => {

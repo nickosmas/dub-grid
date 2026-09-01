@@ -57,11 +57,11 @@ const SEARCH_ICON = (
 const TH_STYLE: React.CSSProperties = {
   textAlign: "left",
   padding: "8px 12px",
-  fontWeight: 600,
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-footnote)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
+  fontWeight: "var(--dg-type-table-heading-weight)",
+  color: "var(--dg-type-table-heading-color)",
+  fontSize: "var(--dg-type-table-heading-size)",
+  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+  lineHeight: "var(--dg-type-table-heading-line-height)",
   whiteSpace: "nowrap",
   borderBottom: "1px solid var(--dg-color-border)",
   borderRight: "1px solid var(--dg-color-border)",
@@ -99,6 +99,7 @@ function Toolbar({
 
   return (
     <div
+      className="dg-toolbar-type"
       style={{
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
@@ -131,7 +132,9 @@ function Toolbar({
             borderRadius: "var(--dg-radius-md, 8px)",
             border: "1px solid var(--dg-color-border)",
             background: "var(--dg-color-surface)",
-            fontSize: "var(--dg-fs-body-sm)",
+            fontSize: "var(--dg-fs-navigation-item)",
+            fontWeight: 400,
+            letterSpacing: "normal",
             color: "var(--dg-color-text-primary)",
             outline: "none",
           }}
@@ -150,7 +153,10 @@ function Toolbar({
         options={selectOptions}
         onChange={onCategoryChange}
         style={{ minWidth: isMobile ? undefined : 160 }}
-        fontSize="var(--dg-fs-body-sm)"
+        fontSize="var(--dg-fs-navigation-item)"
+        fontWeight={400}
+        activeFontWeight={400}
+        letterSpacing="normal"
       />
     </div>
   );
@@ -163,11 +169,11 @@ function DateGroupRow({ label, colSpan }: { label: string; colSpan: number }) {
         colSpan={colSpan}
         style={{
           padding: "14px 12px 6px",
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
+          fontSize: "var(--dg-type-table-heading-size)",
+          fontWeight: "var(--dg-type-table-heading-weight)",
+          color: "var(--dg-type-table-heading-color)",
+          letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+          lineHeight: "var(--dg-type-table-heading-line-height)",
           background: "var(--dg-color-bg)",
           borderBottom: "1px solid var(--dg-color-border-light)",
         }}
@@ -277,7 +283,7 @@ function ActivityDetailsDialog({
             style={{
               color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-card-title)",
-              fontWeight: 800,
+              fontWeight: 600,
             }}
           >
             {describeAction(entry)}
@@ -300,10 +306,11 @@ function ActivityDetailsDialog({
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div
             style={{
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 800,
-              textTransform: "uppercase",
+              color: "var(--dg-type-field-title-color)",
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+              lineHeight: "var(--dg-type-field-title-line-height)",
             }}
           >
             What changed
@@ -343,7 +350,7 @@ function DetailRows({ rows }: { rows: Array<[string, string]> }) {
             style={{
               color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-caption)",
-              fontWeight: 800,
+              fontWeight: 600,
             }}
           >
             {label}

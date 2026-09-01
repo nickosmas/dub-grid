@@ -17,6 +17,7 @@ import {
   mobileScheduleQuerySchema,
   mobileNotificationReadResponseSchema,
   mobileShiftRequestsResponseSchema,
+  mobileShiftRequestHistoryQuerySchema,
   mobileShiftRequestSchema,
   mobileShiftSwapOptionsQuerySchema,
   mobileShiftSwapOptionsResponseSchema,
@@ -74,6 +75,22 @@ describe("mobile contracts", () => {
       startDate: "2026-04-01",
       endDate: "2026-04-30",
     });
+  });
+
+  it("requires complete bounded cursors for mobile shift-request history", () => {
+    expect(mobileShiftRequestHistoryQuerySchema.parse({ limit: "25" })).toEqual({ limit: 25 });
+    expect(
+      mobileShiftRequestHistoryQuerySchema.safeParse({
+        cursorCreatedAt: "2026-04-01T10:00:00.000Z",
+      }).success,
+    ).toBe(false);
+    expect(
+      mobileShiftRequestHistoryQuerySchema.safeParse({
+        cursorCreatedAt: "2026-04-01T10:00:00.000Z",
+        cursorId: "00000000-0000-4000-8000-000000000001",
+        limit: 101,
+      }).success,
+    ).toBe(false);
   });
 
   it("normalizes mobile schedule ranges the same regardless of server timezone", () => {

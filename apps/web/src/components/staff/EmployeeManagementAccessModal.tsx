@@ -628,8 +628,10 @@ function FieldError({ message }: { message: string }) {
 
 const fieldLabelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-secondary)",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   marginBottom: 6,
 };

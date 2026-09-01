@@ -121,9 +121,7 @@ function formatFieldValue(field: string, value: unknown, references: RequestRefe
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title">{label}</div>
       <div className="mt-1 break-words text-[13px] text-[var(--dg-color-text-primary)]">
         {value || "Not recorded"}
       </div>
@@ -161,7 +159,7 @@ function ProfileUpdateDetails({
 
   return (
     <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)]">
-      <div className="grid grid-cols-[1fr_1fr_1fr] bg-[var(--dg-color-bg)] text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
+      <div className="dg-type-table-heading grid grid-cols-[1fr_1fr_1fr] bg-[var(--dg-color-bg)]">
         <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2">Field</div>
         <div className="border-r border-[var(--dg-color-border-light)] px-3 py-2">Current</div>
         <div className="px-3 py-2">Requested</div>
@@ -303,7 +301,7 @@ export function ProfileChangeRequestQueue({
   return (
     <div className="flex w-full flex-col gap-4">
       <div>
-        <h1 className="m-0 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+        <h1 className="m-0 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
           People requests
         </h1>
         <p className="mb-0 mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
@@ -332,7 +330,7 @@ export function ProfileChangeRequestQueue({
                 </div>
               </div>
               <span
-                className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${STATUS_STYLES[request.status].className}`}
+                className={`rounded-full px-2 py-1 text-[length:var(--dg-type-badge-size)] font-medium uppercase ${STATUS_STYLES[request.status].className}`}
               >
                 {STATUS_STYLES[request.status].label}
               </span>
@@ -352,9 +350,7 @@ export function ProfileChangeRequestQueue({
 
               {request.requestNote ? (
                 <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--dg-color-text-faint)]">
-                    Request note
-                  </div>
+                  <div className="dg-type-field-title">Request note</div>
                   <p className="m-0 mt-1 whitespace-pre-wrap text-[13px] leading-5 text-[var(--dg-color-text-muted)]">
                     {request.requestNote}
                   </p>

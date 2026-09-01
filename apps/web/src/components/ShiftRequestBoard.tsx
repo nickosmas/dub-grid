@@ -265,8 +265,8 @@ export default function ShiftRequestBoard({
             {isCalloff && (
               <span
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
+                  fontSize: "var(--dg-type-badge-size)",
+                  fontWeight: 500,
                   padding: "2px 7px",
                   borderRadius: 6,
                   background: "var(--dg-color-danger-bg, #FEF2F2)",

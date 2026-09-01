@@ -130,7 +130,7 @@ export function MentoredShiftBadge({
         alignItems: "center",
         justifyContent: "center",
         fontSize: compact ? 8 : 9,
-        fontWeight: 800,
+        fontWeight: 600,
         lineHeight: 1,
         pointerEvents: "auto",
         zIndex: 5,

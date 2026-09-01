@@ -220,18 +220,14 @@ export function OverviewTab({
             <div className="dg-card-body">
               <dl className="flex flex-col gap-3">
                 <div>
-                  <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-                    Employment
-                  </dt>
+                  <dt className="dg-type-field-title mb-0.5">Employment</dt>
                   <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                     {employmentLabel}
                   </dd>
                 </div>
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-                      {focusAreaLabel}
-                    </dt>
+                    <dt className="dg-type-field-title mb-0.5">{focusAreaLabel}</dt>
                     <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {assignedFocusAreaNames.join(", ")}
                     </dd>
@@ -239,9 +235,7 @@ export function OverviewTab({
                 )}
                 {certificationName && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-                      Certifications
-                    </dt>
+                    <dt className="dg-type-field-title mb-0.5">Certifications</dt>
                     <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {certificationName}
                     </dd>
@@ -249,9 +243,7 @@ export function OverviewTab({
                 )}
                 {roleNames.length > 0 && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-                      Roles
-                    </dt>
+                    <dt className="dg-type-field-title mb-0.5">Roles</dt>
                     <dd className="text-[13px] text-[var(--dg-color-text-primary)]">
                       {roleNames.join(", ")}
                     </dd>
@@ -259,9 +251,7 @@ export function OverviewTab({
                 )}
                 {employee.contactNotes && (
                   <div>
-                    <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-                      Notes
-                    </dt>
+                    <dt className="dg-type-field-title mb-0.5">Notes</dt>
                     <dd className="text-[13px] leading-relaxed text-[var(--dg-color-text-primary)]">
                       {employee.contactNotes}
                     </dd>
@@ -361,11 +351,9 @@ function MetricCell({
       >
         {value}
       </div>
-      <div className="mt-1.5 text-center text-[11px] font-bold uppercase tracking-[0.04em] text-[var(--dg-color-text-subtle)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title mt-1.5 text-center">{label}</div>
       {detail ? (
-        <div className="mt-1 text-center text-[11px] text-[var(--dg-color-text-muted)]">
+        <div className="mt-1 text-center text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
           {detail}
         </div>
       ) : null}

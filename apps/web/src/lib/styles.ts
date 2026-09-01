@@ -25,11 +25,12 @@ export const sectionBodyStyle: CSSProperties = { padding: 20 };
 /** Table header cell. */
 export const thStyle: CSSProperties = {
   padding: "10px 14px",
-  fontSize: "var(--dg-fs-footnote)",
-  fontWeight: 700,
-  color: "var(--dg-color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
+  fontSize: "var(--dg-type-table-heading-size)",
+  fontWeight: "var(--dg-type-table-heading-weight)",
+  color: "var(--dg-type-table-heading-color)",
+  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+  lineHeight: "var(--dg-type-table-heading-line-height)",
+  textTransform: "var(--dg-type-table-heading-transform)",
   textAlign: "left",
   whiteSpace: "nowrap",
 };
@@ -42,13 +43,14 @@ export const tdStyle: CSSProperties = {
   borderTop: "1px solid var(--dg-color-border-light)",
 };
 
-/** Form field label (uppercase, subtle). */
+/** Form field label. */
 export const labelStyle: CSSProperties = {
-  fontSize: "var(--dg-fs-footnote)",
-  fontWeight: 700,
-  color: "var(--dg-color-text-subtle)",
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
+  textTransform: "var(--dg-type-field-title-transform)",
   display: "block",
   marginBottom: 5,
 };

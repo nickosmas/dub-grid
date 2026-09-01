@@ -21,7 +21,7 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color: "var(--dg-color-text-primary)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -137,7 +137,7 @@ export default function GridmasterComplianceView({
         <h2
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
@@ -197,7 +197,7 @@ export default function GridmasterComplianceView({
                   padding: "12px 16px",
                   borderBottom: "1px solid var(--dg-color-border-light)",
                   fontSize: "var(--dg-fs-label)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   color: "var(--dg-color-text-primary)",
                 }}
               >
@@ -233,7 +233,7 @@ export default function GridmasterComplianceView({
                     <thead>
                       <tr>
                         <th style={thStyle}>Organization</th>
-                        <th style={thStyle}>Retention Days</th>
+                        <th style={thStyle}>Retention days</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -265,7 +265,7 @@ export default function GridmasterComplianceView({
                   padding: "12px 16px",
                   borderBottom: "1px solid var(--dg-color-border-light)",
                   fontSize: "var(--dg-fs-label)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   color: "var(--dg-color-text-primary)",
                 }}
               >

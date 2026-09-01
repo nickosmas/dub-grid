@@ -80,8 +80,8 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
               </div>
               <span
                 style={{
-                  fontSize: 11,
-                  fontWeight: isCurrent ? 700 : 500,
+                  fontSize: "var(--dg-type-field-title-size)",
+                  fontWeight: isCurrent ? 600 : 500,
                   color: isCurrent
                     ? "var(--dg-color-text-primary)"
                     : isCompleted

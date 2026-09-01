@@ -1589,7 +1589,7 @@ function MeHeroCard({
               style={{
                 color: "#fff",
                 fontSize: isCompact ? "1.55rem" : "1.9rem",
-                fontWeight: 750,
+                fontWeight: 600,
                 letterSpacing: 0,
                 lineHeight: 1.08,
                 margin: 0,
@@ -1620,8 +1620,8 @@ function MeHeroCard({
           <span
             style={{
               color: "rgba(255,255,255,0.72)",
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: "var(--dg-type-badge-size)",
+              fontWeight: 600,
               textTransform: "uppercase",
             }}
           >
@@ -1631,7 +1631,7 @@ function MeHeroCard({
             style={{
               color: "#fff",
               fontSize: 24,
-              fontWeight: 750,
+              fontWeight: 600,
               lineHeight: 1,
             }}
           >
@@ -1811,7 +1811,7 @@ function HeroPillRow({
           style={{
             color: inverse ? "#fff" : "var(--dg-color-text-primary)",
             fontSize: inverse ? 20 : 15,
-            fontWeight: 750,
+            fontWeight: 600,
             lineHeight: 1.1,
           }}
         >
@@ -1843,7 +1843,7 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
         color: segment.textColor,
         display: "inline-flex",
         fontSize: 12,
-        fontWeight: 750,
+        fontWeight: 600,
         lineHeight: 1.3,
         maxWidth: "100%",
         padding: "7px 10px",
@@ -1872,7 +1872,7 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
         color: inverse ? "#fff" : "var(--dg-color-text-secondary)",
         display: "inline-flex",
         fontSize: 12,
-        fontWeight: 750,
+        fontWeight: 600,
         lineHeight: 1,
         padding: "7px 10px",
       }}
@@ -1962,7 +1962,7 @@ function HeroSplitShiftSegment({
             style={{
               color: "#fff",
               fontSize: 20,
-              fontWeight: 750,
+              fontWeight: 600,
               lineHeight: 1.15,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -2579,12 +2579,12 @@ function ActionCardShell({
           <div
             style={{
               color: "var(--dg-color-text-muted)",
-              fontSize: 11,
-              fontWeight: 750,
-              letterSpacing: 0,
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               lineHeight: 1.2,
               marginBottom: 6,
-              textTransform: "uppercase",
+              textTransform: "none",
             }}
           >
             {eyebrow}
@@ -2767,7 +2767,7 @@ function WeekShiftRow({
               style={{
                 color: "var(--dg-color-text-primary)",
                 fontSize: 15,
-                fontWeight: 750,
+                fontWeight: 600,
                 minWidth: 0,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -2939,8 +2939,8 @@ function DateTile({
       <span
         style={{
           color: compact ? "var(--dg-color-text-muted)" : "var(--dg-color-text-subtle)",
-          fontSize: compact ? 10 : 11,
-          fontWeight: 750,
+          fontSize: "var(--dg-type-metadata-size)",
+          fontWeight: 600,
           textTransform: "uppercase",
         }}
       >
@@ -2950,7 +2950,7 @@ function DateTile({
         style={{
           color: compact ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
           fontSize: compact ? 17 : 20,
-          fontWeight: 800,
+          fontWeight: 600,
           lineHeight: compact ? 1 : "24px",
         }}
       >

@@ -993,9 +993,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title">{label}</div>
       <div className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--dg-color-text-primary)]">
         {value}
       </div>

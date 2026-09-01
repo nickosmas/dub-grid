@@ -74,8 +74,8 @@ export function ManagementAccessSheet({
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
-  onSubmit: (draft: ManagementAccessDraft) => void;
-  onRemove: () => void;
+  onSubmit: (draft: ManagementAccessDraft) => Promise<unknown>;
+  onRemove: () => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -234,7 +234,7 @@ export function ManagementAccessSheet({
         onCancel={() => setShowRemoveConfirmation(false)}
         onConfirm={() => {
           setShowRemoveConfirmation(false);
-          onRemove();
+          return onRemove();
         }}
         title="Remove management access?"
         visible={showRemoveConfirmation}

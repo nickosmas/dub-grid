@@ -356,8 +356,8 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
     >
       <div
         style={{
-          fontSize: 11,
-          fontWeight: 700,
+          fontSize: "var(--dg-type-badge-size)",
+          fontWeight: 600,
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -372,7 +372,7 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
       <div
         aria-hidden={!shift.jobName}
         style={{
-          fontSize: 9,
+          fontSize: "var(--dg-type-metadata-size)",
           fontWeight: 500,
           marginTop: 1,
           opacity: 0.8,
@@ -387,7 +387,7 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
       <div
         aria-hidden={!shift.timeRange}
         style={{
-          fontSize: 9,
+          fontSize: "var(--dg-type-metadata-size)",
           marginTop: 1,
           whiteSpace: "nowrap",
           overflow: "hidden",

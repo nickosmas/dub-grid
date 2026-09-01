@@ -118,9 +118,7 @@ export function FilterPanelShell({
 export function FilterSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-[var(--dg-color-border-light)] py-4 first:pt-1 last:border-b-0">
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
-        {title}
-      </div>
+      <div className="dg-type-field-title mb-2">{title}</div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </section>
   );
@@ -129,9 +127,7 @@ export function FilterSection({ title, children }: { title: string; children: Re
 export function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mb-3 w-full last:mb-0">
-      <div className="mb-1.5 text-[11px] font-semibold text-[var(--dg-color-text-muted)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title mb-1.5">{label}</div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

@@ -132,7 +132,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                 key={f.value}
                 onClick={() => setTypeFilter(f.value)}
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--dg-type-control-size)",
                   fontWeight: 600,
                   padding: "5px 12px",
                   borderRadius: 6,
@@ -150,7 +150,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
           })}
           <span
             style={{
-              fontSize: 11,
+              fontSize: "var(--dg-type-metadata-size)",
               color: "var(--dg-color-text-subtle)",
               marginLeft: "auto",
               alignSelf: "center",
@@ -194,7 +194,11 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                       {item.description}
                     </div>
                     <div
-                      style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 3 }}
+                      style={{
+                        fontSize: "var(--dg-type-metadata-size)",
+                        color: "var(--dg-color-text-subtle)",
+                        marginTop: 3,
+                      }}
                     >
                       {item.relativeTime}
                     </div>

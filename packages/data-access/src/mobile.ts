@@ -2,6 +2,7 @@ import type {
   MobileNotification,
   MobileNotificationPriority,
   MobileNotificationsCursor,
+  MobileShiftRequestHistoryCursor,
   ScheduleCellState,
 } from "@dubgrid/contracts";
 import type { AdminPermissions, PlatformRole } from "@dubgrid/domain";
@@ -39,9 +40,17 @@ const INVITATION_COLS =
   "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 
 const POSTGREST_UNSAFE = /[(),."\\]/;
+const ISO_TIMESTAMP_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function assertSafeFilterValue(value: string, label: string): void {
   if (POSTGREST_UNSAFE.test(value)) {
+    throw new Error(`Unsafe PostgREST filter value for ${label}`);
+  }
+}
+
+function assertSafeTimestampFilterValue(value: string, label: string): void {
+  if (!ISO_TIMESTAMP_WITH_OFFSET.test(value)) {
     throw new Error(`Unsafe PostgREST filter value for ${label}`);
   }
 }
@@ -1050,6 +1059,72 @@ export async function fetchMobileShiftRequestRows(
   if (error) throw error;
 
   return (data ?? []) as MobileShiftRequestQueryRow[];
+}
+
+const MOBILE_SHIFT_REQUEST_HISTORY_STATUSES = [
+  "approved",
+  "rejected",
+  "cancelled",
+  "expired",
+] as const;
+
+export async function fetchMobileShiftRequestHistoryRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId?: string;
+    limit: number;
+    cursor?: MobileShiftRequestHistoryCursor | null;
+  },
+): Promise<{
+  rows: MobileShiftRequestQueryRow[];
+  nextCursor: MobileShiftRequestHistoryCursor | null;
+}> {
+  const limit = Math.max(1, Math.min(input.limit, 100));
+  let query = serviceClient
+    .from("shift_requests")
+    .select(
+      `*,
+       requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
+       target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
+    )
+    .eq("org_id", input.orgId)
+    .in("status", [...MOBILE_SHIFT_REQUEST_HISTORY_STATUSES])
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit + 1);
+
+  if (input.employeeId) {
+    assertSafeFilterValue(input.employeeId, "employeeId");
+    query = query.or(
+      `requester_emp_id.eq.${input.employeeId},target_emp_id.eq.${input.employeeId}`,
+    );
+  }
+
+  if (input.cursor) {
+    assertSafeTimestampFilterValue(input.cursor.createdAt, "cursor.createdAt");
+    assertSafeFilterValue(input.cursor.id, "cursor.id");
+    query = query.or(
+      `created_at.lt.${input.cursor.createdAt},and(created_at.eq.${input.cursor.createdAt},id.lt.${input.cursor.id})`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const fetchedRows = (data ?? []) as MobileShiftRequestQueryRow[];
+  const rows = fetchedRows.slice(0, limit);
+  const last = fetchedRows.length > limit ? rows.at(-1) : null;
+
+  return {
+    rows,
+    nextCursor: last
+      ? {
+          createdAt: last.created_at,
+          id: last.id,
+        }
+      : null,
+  };
 }
 
 const MOBILE_PEOPLE_PAGE_SIZE = 500;

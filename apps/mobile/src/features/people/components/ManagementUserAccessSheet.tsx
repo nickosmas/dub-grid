@@ -56,7 +56,7 @@ export function ManagementUserAccessSheet({
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
-  onSubmit: (draft: Draft) => void;
+  onSubmit: (draft: Draft) => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);

@@ -51,7 +51,7 @@ export function InlineRoleSelect({
   if (!orgRole || !onChange) {
     return orgRole ? (
       <span
-        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
         style={getOrgRoleBadgeStyle(orgRole)}
       >
         {ORG_ROLE_LABELS[orgRole]}

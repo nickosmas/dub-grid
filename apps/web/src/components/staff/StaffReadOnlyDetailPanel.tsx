@@ -139,7 +139,7 @@ export function StaffReadOnlyDetailPanel({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 18,
-                fontWeight: 800,
+                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `2px solid ${avatarTone.borderColor}`,
@@ -331,11 +331,11 @@ function ReadOnlySection({ title, children }: { title: string; children: ReactNo
       <h3
         style={{
           margin: "0 0 10px 2px",
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-subtle)",
-          letterSpacing: "0.07em",
-          textTransform: "uppercase",
+          fontSize: "var(--dg-type-field-title-size)",
+          fontWeight: "var(--dg-type-field-title-weight)",
+          color: "var(--dg-type-field-title-color)",
+          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+          lineHeight: "var(--dg-type-field-title-line-height)",
         }}
       >
         {title}

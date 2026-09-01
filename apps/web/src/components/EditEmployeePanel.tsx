@@ -370,19 +370,21 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     );
 
     const sectionLabel: React.CSSProperties = {
-      fontSize: "var(--dg-fs-footnote)",
-      fontWeight: 700,
-      color: "var(--dg-color-text-subtle)",
-      letterSpacing: "0.04em",
+      fontSize: "var(--dg-type-field-title-size)",
+      fontWeight: "var(--dg-type-field-title-weight)",
+      color: "var(--dg-type-field-title-color)",
+      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+      lineHeight: "var(--dg-type-field-title-line-height)",
       display: "block",
       marginBottom: 8,
-      textTransform: "uppercase",
     };
 
     const fieldLabel: React.CSSProperties = {
-      fontSize: "var(--dg-fs-caption)",
-      fontWeight: 500,
-      color: "var(--dg-color-text-muted)",
+      fontSize: "var(--dg-type-field-title-size)",
+      fontWeight: "var(--dg-type-field-title-weight)",
+      color: "var(--dg-type-field-title-color)",
+      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+      lineHeight: "var(--dg-type-field-title-line-height)",
       display: "block",
       marginBottom: 4,
     };

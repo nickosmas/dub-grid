@@ -175,11 +175,11 @@ export function PresetColorPicker({
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <div
                   style={{
-                    fontSize: "var(--dg-fs-caption)",
-                    fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: "var(--dg-color-text-muted)",
+                    fontSize: "var(--dg-type-field-title-size)",
+                    fontWeight: "var(--dg-type-field-title-weight)",
+                    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                    lineHeight: "var(--dg-type-field-title-line-height)",
+                    color: "var(--dg-type-field-title-color)",
                   }}
                 >
                   Palette
@@ -212,11 +212,11 @@ export function PresetColorPicker({
                 <div key={group.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div
                     style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 800,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      color: "var(--dg-color-text-muted)",
+                      fontSize: "var(--dg-type-field-title-size)",
+                      fontWeight: "var(--dg-type-field-title-weight)",
+                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                      lineHeight: "var(--dg-type-field-title-line-height)",
+                      color: "var(--dg-type-field-title-color)",
                     }}
                   >
                     {group.label}

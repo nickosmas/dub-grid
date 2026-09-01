@@ -160,7 +160,7 @@ describe("shared chrome theming", () => {
     // highlight recipe lives on the shell now.
     for (const source of [settingsShell, gridmasterPortal, staffView]) {
       expect(source).toContain("data-[active=true]:bg-[var(--dg-color-nav-active-bg)]");
-      expect(source).toContain("data-[active=true]:text-[var(--dg-color-text-primary)]");
+      expect(source).toContain("data-[active=true]:text-[var(--dg-type-attention-primary-color)]");
       // No border/ring on the active item, matching the navbar tabs.
       expect(source).not.toMatch(/data-\[active=true\]:ring-/);
       // Active sidebar chrome is fully neutral: the icon wrapper follows the

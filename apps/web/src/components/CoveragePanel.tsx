@@ -209,7 +209,7 @@ export default function CoveragePanel({
                     borderRadius: "var(--dg-radius-sm)",
                     background: "var(--dg-color-bg)",
                     border: "1px dashed var(--dg-color-border)",
-                    fontSize: 11,
+                    fontSize: "var(--dg-type-metadata-size)",
                     color: "var(--dg-color-text-subtle)",
                   }}
                 >

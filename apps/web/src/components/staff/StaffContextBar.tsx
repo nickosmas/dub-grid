@@ -349,7 +349,7 @@ export function StaffContextBar({
               <span className="text-[13px] font-semibold text-[var(--dg-color-control-active-text)]">
                 Reorder Mode
               </span>
-              <p className="text-[11px] text-[var(--dg-color-text-muted)] mt-0.5">
+              <p className="mt-0.5 text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
                 Drag rows to change seniority order
               </p>
             </div>
@@ -372,7 +372,7 @@ export function StaffContextBar({
 // Applied-filter chip: matches <StatusPill>'s neutral tone + adds a close affordance.
 function FilterPill({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-2 py-0.5 text-[11px] font-medium text-[var(--dg-color-text-secondary)] whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-text-secondary)]">
       {label}
       <CloseButton size="xs" onClick={onClear} aria-label={`Clear ${label}`} className="ml-0.5" />
     </span>

@@ -647,16 +647,19 @@ export default function PersonDetailScreen() {
   const resolvedStatusAction =
     confirmAction === "deactivate" && deactivateRemoves ? "remove" : confirmAction;
 
-  function confirmStatusAction() {
+  function confirmStatusAction(): Promise<void> | undefined {
     if (!resolvedStatusAction || !person) return;
 
-    statusMutation.mutate({
+    const input = {
       action: resolvedStatusAction,
       expectedVersion: person.version,
       note:
         resolvedStatusAction === "deactivate" || resolvedStatusAction === "remove"
           ? inactiveNote.trim() || undefined
           : undefined,
+    };
+    return new Promise<void>((resolve) => {
+      statusMutation.mutate(input, { onSettled: () => resolve() });
     });
   }
 
@@ -668,9 +671,14 @@ export default function PersonDetailScreen() {
     setInactiveNote("");
   }
 
-  function confirmInvitationAction() {
+  function confirmInvitationAction(): Promise<void> | undefined {
     if (!invitationConfirmAction) return;
-    invitationMutation.mutate({ action: invitationConfirmAction });
+    return new Promise<void>((resolve) => {
+      invitationMutation.mutate(
+        { action: invitationConfirmAction },
+        { onSettled: () => resolve() },
+      );
+    });
   }
 
   const statusConfirmationTitle =
@@ -1107,8 +1115,16 @@ export default function PersonDetailScreen() {
         isPending={managementAccessMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowManagementAccess(false)}
-        onRemove={() => managementAccessMutation.mutate({ remove: true })}
-        onSubmit={(nextDraft) => managementAccessMutation.mutate({ draft: nextDraft })}
+        onRemove={() =>
+          new Promise<void>((resolve) => {
+            managementAccessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
+          })
+        }
+        onSubmit={(nextDraft) =>
+          new Promise<void>((resolve) => {
+            managementAccessMutation.mutate({ draft: nextDraft }, { onSettled: () => resolve() });
+          })
+        }
         person={person}
         visible={showManagementAccess}
       />

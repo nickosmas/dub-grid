@@ -88,8 +88,8 @@ export default function StaffHoursCard({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 10,
-                    fontWeight: 700,
+                    fontSize: "var(--dg-type-badge-size)",
+                    fontWeight: 600,
                     flexShrink: 0,
                     background: h.isOvertime
                       ? "var(--dg-color-danger-bg)"
@@ -116,7 +116,12 @@ export default function StaffHoursCard({
                   >
                     {emp.firstName.charAt(0)}. {emp.lastName}
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--dg-color-text-subtle)" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-type-metadata-size)",
+                      color: "var(--dg-color-text-subtle)",
+                    }}
+                  >
                     {fa?.name ?? ""}
                   </div>
                 </div>
@@ -137,7 +142,7 @@ export default function StaffHoursCard({
                   </div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: "var(--dg-type-metadata-size)",
                       color: h.isOvertime
                         ? "var(--dg-color-danger)"
                         : "var(--dg-color-text-subtle)",
@@ -170,7 +175,7 @@ export default function StaffHoursCard({
               style={{
                 padding: "10px 16px 16px",
                 margin: "0 16px",
-                fontSize: 11,
+                fontSize: "var(--dg-type-metadata-size)",
                 fontWeight: 600,
                 color: "var(--dg-color-text-subtle)",
               }}

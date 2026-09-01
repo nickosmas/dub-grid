@@ -35,7 +35,7 @@ export function PendingRequestsCard({
 }: {
   requests: MobileProfileChangeRequest[];
   cancellingId: string | null;
-  onCancel: (request: MobileProfileChangeRequest) => void;
+  onCancel: (request: MobileProfileChangeRequest) => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
