@@ -124,12 +124,11 @@ export default function ImpersonationBanner() {
           <circle cx="12" cy="7" r="4" />
         </svg>
         Impersonating <strong>{imp.targetEmail}</strong>
-        {imp.targetOrgName && <span style={{ opacity: 0.85 }}>({imp.targetOrgName})</span>}
+        {imp.targetOrgName && <span>({imp.targetOrgName})</span>}
         {imp.justification && (
           <MaybeHint content={imp.justification} side="bottom">
             <span
               style={{
-                opacity: 0.85,
                 fontSize: "var(--dg-fs-footnote, 11px)",
                 maxWidth: 300,
                 overflow: "hidden",

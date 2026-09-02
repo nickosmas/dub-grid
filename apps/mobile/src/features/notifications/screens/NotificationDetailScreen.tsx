@@ -197,7 +197,7 @@ export default function NotificationDetailScreen() {
 
   if (!id) {
     return (
-      <Screen>
+      <Screen scrollEnabled={false}>
         <StatusBanner
           body="The alert id is missing."
           fillScreen
@@ -218,7 +218,7 @@ export default function NotificationDetailScreen() {
 
   if (!notification) {
     return (
-      <Screen>
+      <Screen scrollEnabled={false}>
         <EmptyStateCard
           fillScreen
           body="That alert is no longer accessible."

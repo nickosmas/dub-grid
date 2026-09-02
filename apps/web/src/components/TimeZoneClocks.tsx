@@ -76,11 +76,11 @@ export default function TimeZoneClocks({
       }}
     >
       <span>
-        <span style={{ opacity: 0.7 }}>Local time</span> ·{" "}
+        <span style={{ color: "var(--dg-color-text-faint)" }}>Local time</span> ·{" "}
         {compact ? userClock : `${userDate} · ${userClock}`}
       </span>
       <span>
-        <span style={{ opacity: 0.7 }}>Organization time</span> ·{" "}
+        <span style={{ color: "var(--dg-color-text-faint)" }}>Organization time</span> ·{" "}
         {compact ? orgClock : `${orgDate} · ${orgClock}`}
       </span>
     </div>

@@ -129,6 +129,7 @@ export default function ProfileSecurityScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={contentState.kind !== "error"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

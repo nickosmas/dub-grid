@@ -79,7 +79,7 @@ export default function ExpandedOpenShifts({
                   borderRadius: "var(--dg-radius-sm)",
                   background: "var(--dg-color-bg)",
                   border: "1px dashed var(--dg-color-border)",
-                  fontSize: 11,
+                  fontSize: "var(--dg-type-metadata-size)",
                   color: "var(--dg-color-text-subtle)",
                 }}
               >
@@ -123,7 +123,7 @@ export default function ExpandedOpenShifts({
               />
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--dg-type-metadata-size)",
                   color: "var(--dg-color-text-subtle)",
                   marginLeft: "auto",
                 }}
@@ -175,7 +175,7 @@ export default function ExpandedOpenShifts({
                         <div style={{ textAlign: "center", minWidth: 40 }}>
                           <div
                             style={{
-                              fontSize: 10,
+                              fontSize: "var(--dg-type-metadata-size)",
                               color: "var(--dg-color-text-subtle)",
                               fontWeight: 500,
                             }}
@@ -213,7 +213,7 @@ export default function ExpandedOpenShifts({
                           {metaText ? (
                             <div
                               style={{
-                                fontSize: 11,
+                                fontSize: "var(--dg-type-metadata-size)",
                                 color: "var(--dg-color-text-subtle)",
                                 marginTop: 2,
                               }}
@@ -224,7 +224,7 @@ export default function ExpandedOpenShifts({
                         </div>
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: "var(--dg-type-control-size)",
                             fontWeight: 600,
                             padding: "3px 10px",
                             borderRadius: 5,
@@ -252,10 +252,10 @@ export default function ExpandedOpenShifts({
 const modalStyle = { maxWidth: 700, width: "90vw" };
 
 const filterLabelStyle = {
-  fontSize: 11,
-  fontWeight: 600 as const,
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: 500 as const,
   color: "var(--dg-color-text-subtle)",
-  textTransform: "uppercase" as const,
+  textTransform: "none" as const,
   letterSpacing: "0.04em",
 };
 

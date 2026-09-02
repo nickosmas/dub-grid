@@ -142,6 +142,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   if (!auth.permissions.canManageEmployees) {
+    // Self-service is owned by /profile. Keep the direct person endpoint from
+    // recreating a second, sanitized view of the signed-in user's own record.
+    if (person.userId === auth.user.id) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+
     if (person.status !== "active") {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }

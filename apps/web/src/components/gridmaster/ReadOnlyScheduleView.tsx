@@ -193,7 +193,7 @@ export default function ReadOnlyScheduleView({
                   <tr>
                     <th style={thStyle}>Employee</th>
                     <th style={thStyle}>Shift</th>
-                    <th style={thStyle}>Focus Area</th>
+                    <th style={thStyle}>Focus area</th>
                     <th style={thStyle}>Status</th>
                   </tr>
                 </thead>

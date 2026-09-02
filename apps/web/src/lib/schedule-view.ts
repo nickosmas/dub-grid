@@ -56,3 +56,16 @@ export function getScheduleStartForSpan(args: {
   );
   return parseLocalIsoDateKey(startIso);
 }
+
+export function realignTwoWeekScheduleStart(
+  currentStart: Date,
+  span: ScheduleSpan,
+  payPeriodStartDate: string | null | undefined,
+): Date {
+  if (span !== 2) return currentStart;
+  return getScheduleStartForSpan({
+    date: currentStart,
+    span: 2,
+    payPeriodStartDate,
+  });
+}

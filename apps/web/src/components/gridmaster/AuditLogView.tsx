@@ -175,7 +175,7 @@ export default function AuditLogView({
         <h2
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
@@ -516,7 +516,7 @@ function AuditEntryDetailsDialog({
             style={{
               color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-card-title)",
-              fontWeight: 800,
+              fontWeight: 600,
             }}
           >
             {describeAction(entry)}
@@ -538,16 +538,7 @@ function AuditEntryDetailsDialog({
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div
-            style={{
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 800,
-              textTransform: "uppercase",
-            }}
-          >
-            Event details
-          </div>
+          <div className="dg-type-content-group-heading">Event details</div>
           {detailItems.length > 0 ? (
             <AuditDetailRows rows={detailItems.map((item) => [item.label, item.value])} />
           ) : (
@@ -591,7 +582,7 @@ function AuditDetailRow({ label, value }: { label: string; value: string }) {
         style={{
           color: "var(--dg-color-text-muted)",
           fontSize: "var(--dg-fs-caption)",
-          fontWeight: 800,
+          fontWeight: 600,
         }}
       >
         {label}
@@ -600,7 +591,7 @@ function AuditDetailRow({ label, value }: { label: string; value: string }) {
         style={{
           color: "var(--dg-color-text-primary)",
           fontSize: "var(--dg-fs-label)",
-          fontWeight: 650,
+          fontWeight: 600,
           margin: 0,
           overflowWrap: "anywhere",
         }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useId, type CSSProperties, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
@@ -23,6 +23,51 @@ function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
   if (status === "removed") return "danger";
   return "success";
+}
+
+function AccountStatusIcon({ icon }: { icon: "linked" | "invited" | "not-linked" }) {
+  const reactId = useId();
+  const maskId = `account-status-${icon}-${reactId.replaceAll(":", "")}`;
+
+  return (
+    <svg
+      aria-hidden="true"
+      data-account-status-icon={icon}
+      viewBox="0 0 16 16"
+      className="size-3.5 shrink-0 fill-current"
+    >
+      <defs>
+        <mask id={maskId}>
+          <circle cx="8" cy="8" r="7" fill="white" />
+          {icon === "linked" ? (
+            <path
+              d="m4.5 8.1 2.2 2.2 4.9-5"
+              fill="none"
+              stroke="black"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          ) : icon === "invited" ? (
+            <path
+              d="M8 4.25v4l2.65 1.55"
+              fill="none"
+              stroke="black"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.6"
+            />
+          ) : (
+            <>
+              <path d="M7.25 3.75h1.5v5h-1.5z" fill="black" />
+              <circle cx="8" cy="11.25" r="0.85" fill="black" />
+            </>
+          )}
+        </mask>
+      </defs>
+      <circle cx="8" cy="8" r="7" mask={`url(#${maskId})`} />
+    </svg>
+  );
 }
 
 interface StaffRowSharedProps {
@@ -51,6 +96,8 @@ interface StaffRowSharedProps {
   orgRole?: OrganizationRole | null;
   /** Inline role-change handler. Omitted when the viewer can't manage access. */
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  /** Whether the pending-invitation lookup has settled for this organization. */
+  invitationStateReady?: boolean;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
@@ -106,6 +153,7 @@ function StaffRowCells({
   useCompactRoleCertificationLabels = false,
   orgRole,
   onRoleChange,
+  invitationStateReady = true,
   pendingInviteByEmployeeId,
   onToggleSelect,
   onRowClick,
@@ -140,7 +188,10 @@ function StaffRowCells({
           tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--dg-color-border-light)]"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex py-4"
         >
-          <div className="flex items-center gap-1" style={{ color: "var(--dg-color-text-faint)" }}>
+          <div
+            className="flex items-center gap-1"
+            style={{ color: "var(--dg-color-text-primary)" }}
+          >
             {isReordering && (
               <svg
                 width="12"
@@ -182,7 +233,7 @@ function StaffRowCells({
         <div className="flex items-center gap-3 min-w-0">
           <Avatar>
             <AvatarFallback
-              className="text-[11px] font-bold"
+              className="text-[length:var(--dg-type-badge-size)] font-semibold"
               style={{
                 background: avatarTone.backgroundColor,
                 color: avatarTone.textColor,
@@ -213,13 +264,13 @@ function StaffRowCells({
                 </span>
               )}
               {isYou && (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
+                <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                   You
                 </span>
               )}
             </div>
             {(emp.email || emp.phone) && (
-              <div className="text-[12px] text-[var(--dg-color-text-muted)] truncate mt-0.5">
+              <div className="mt-0.5 truncate text-[12px] text-[var(--dg-color-text-primary)]">
                 {emp.email || emp.phone}
               </div>
             )}
@@ -236,7 +287,7 @@ function StaffRowCells({
         >
           <span
             aria-label={employmentLabel}
-            className="text-[12px] text-[var(--dg-color-text-muted)] whitespace-nowrap"
+            className="text-[12px] whitespace-nowrap text-[var(--dg-color-text-primary)]"
           >
             {employmentLabel}
           </span>
@@ -250,7 +301,11 @@ function StaffRowCells({
           tableClassName="py-4 w-[110px] border-[var(--dg-color-border-light)] md:border-r"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
         >
-          <StatusPill tone={statusTone(emp.status)} aria-label={`Status: ${statusLabel}`}>
+          <StatusPill
+            tone={statusTone(emp.status)}
+            variant="category"
+            aria-label={`Status: ${statusLabel}`}
+          >
             {statusLabel}
           </StatusPill>
         </StaffCell>
@@ -259,8 +314,8 @@ function StaffRowCells({
       {/* Focus Areas — neutral StatusPills, cap at 2 visible + "+N more" overflow chip. */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] md:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
         <div className="flex gap-1">
           {(() => {
@@ -272,12 +327,16 @@ function StaffRowCells({
             return (
               <>
                 {visible.map((fa) => (
-                  <StatusPill key={fa.id} tone="neutral">
+                  <StatusPill key={fa.id} tone="neutral" variant="category">
                     {fa.name}
                   </StatusPill>
                 ))}
                 {overflow.length > 0 && (
-                  <StatusPill tone="neutral" title={overflow.map((fa) => fa.name).join(", ")}>
+                  <StatusPill
+                    tone="neutral"
+                    variant="category"
+                    title={overflow.map((fa) => fa.name).join(", ")}
+                  >
                     +{overflow.length} more
                   </StatusPill>
                 )}
@@ -290,8 +349,8 @@ function StaffRowCells({
       {/* Certification */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
         {(() => {
           const certAbbr = getCertAbbr(
@@ -302,7 +361,7 @@ function StaffRowCells({
           const certName = getCertName(emp.certificationId, certifications);
           return (
             <span
-              className="text-[12px] text-[var(--dg-color-text-muted)] whitespace-nowrap"
+              className="text-[12px] whitespace-nowrap text-[var(--dg-color-text-primary)]"
               title={certName || undefined}
             >
               {certAbbr || "None"}
@@ -314,10 +373,10 @@ function StaffRowCells({
       {/* Roles */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
-        <span className="text-[12px] text-[var(--dg-color-text-muted)]">
+        <span className="text-[12px] text-[var(--dg-color-text-primary)]">
           {emp.roleIds.length > 0
             ? getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")
             : "\u2014"}
@@ -328,19 +387,32 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+          gridClassName="dg-staff-directory-cell flex py-4"
         >
           {(() => {
-            const account: { label: string; tone: StatusPillTone } = emp.userId
-              ? { label: "Linked", tone: "success" }
+            if (!invitationStateReady && !emp.userId && emp.email) return null;
+
+            const account: {
+              label: string;
+              tone: StatusPillTone;
+              icon: "linked" | "invited" | "not-linked";
+            } = emp.userId
+              ? { label: "Linked", tone: "success", icon: "linked" }
               : pendingInviteByEmployeeId.has(emp.id)
-                ? { label: "Invited", tone: "warning" }
+                ? { label: "Invited", tone: "warning", icon: "invited" }
                 : emp.email
-                  ? { label: "Not invited", tone: "neutral" }
-                  : { label: "No email", tone: "danger" };
+                  ? { label: "Not invited", tone: "neutral", icon: "not-linked" }
+                  : { label: "No email", tone: "danger", icon: "not-linked" };
             return (
-              <StatusPill tone={account.tone} aria-label={`Account: ${account.label}`}>
+              <StatusPill
+                tone={account.tone}
+                variant="category"
+                bordered={false}
+                className="gap-1 rounded-full pr-2 pl-1"
+                aria-label={`Account: ${account.label}`}
+              >
+                <AccountStatusIcon icon={account.icon} />
                 {account.label}
               </StatusPill>
             );
@@ -352,10 +424,17 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+          gridClassName="dg-staff-directory-cell flex py-4"
         >
-          <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
+          {!invitationStateReady && !emp.userId ? null : (
+            <InlineRoleSelect
+              orgRole={orgRole}
+              onChange={onRoleChange}
+              isSelf={isYou}
+              pendingInvitationEmail={pendingInviteByEmployeeId.get(emp.id)?.email}
+            />
+          )}
         </StaffCell>
       )}
 
@@ -363,11 +442,11 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 w-[140px]"
-          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 w-[140px]"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined flex py-4"
         >
           <span
-            className="text-[12px] tabular-nums text-[var(--dg-color-text-muted)] whitespace-nowrap"
+            className="text-[12px] tabular-nums whitespace-nowrap text-[var(--dg-color-text-primary)]"
             title={emp.createdAt ?? undefined}
           >
             {joinedLabel}

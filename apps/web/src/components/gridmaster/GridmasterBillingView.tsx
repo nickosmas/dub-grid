@@ -52,7 +52,7 @@ function MiniCard({
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -402,7 +402,7 @@ export default function GridmasterBillingView({
           <h2
             style={{
               margin: 0,
-              fontSize: "var(--dg-fs-page-title)",
+              fontSize: "var(--dg-type-page-title-size)",
               fontWeight: 700,
               color: "var(--dg-color-text-primary)",
             }}
@@ -546,7 +546,7 @@ export default function GridmasterBillingView({
                           }}
                         >
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
-                          <td style={{ ...tdStyle, color: statusToneFor(org), fontWeight: 800 }}>
+                          <td style={{ ...tdStyle, color: statusToneFor(org), fontWeight: 600 }}>
                             {statusLabelFor(org)}
                           </td>
                           <td style={tdStyle}>

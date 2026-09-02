@@ -9,6 +9,7 @@ const requireAuthenticatedUser = vi.fn();
 const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
 const fetchMobilePendingInvitationRowByEmployeeId = vi.fn();
 const rowToEmployee = vi.fn();
+const employeeUpdatePayloads: unknown[] = [];
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -49,9 +50,13 @@ const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 
 function makeServiceClient() {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit", "update", "insert"]) {
+  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit", "insert"]) {
     chain[method] = vi.fn(() => chain);
   }
+  chain.update = vi.fn((payload: unknown) => {
+    employeeUpdatePayloads.push(payload);
+    return chain;
+  });
   chain.maybeSingle = vi.fn(() =>
     Promise.resolve({ data: { id: EMPLOYEE_ID, user_id: PERSON_USER_ID }, error: null }),
   );
@@ -140,6 +145,7 @@ function updateEmployeeRequest(overrides: Record<string, unknown> = {}) {
 describe("POST /api/employees/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    employeeUpdatePayloads.length = 0;
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
@@ -248,6 +254,7 @@ describe("POST /api/employees/manage", () => {
       const response = await POST(updateEmployeeRequest());
 
       expect(response.status).toBe(200);
+      expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
     });
   });
 });

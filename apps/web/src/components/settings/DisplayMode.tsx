@@ -143,7 +143,7 @@ function DisplayModePreviewPill({
           mode === "name"
             ? {
                 fontSize: "var(--dg-fs-caption)",
-                fontWeight: 800,
+                fontWeight: 600,
                 lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
@@ -154,7 +154,7 @@ function DisplayModePreviewPill({
               }
             : {
                 fontSize: "var(--dg-fs-title)",
-                fontWeight: 800,
+                fontWeight: 600,
                 lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
@@ -501,7 +501,7 @@ export default function DisplayMode({
                         borderRadius: "50%",
                         border: isActive
                           ? "2px solid var(--dg-color-brand)"
-                          : "2px solid var(--dg-color-border-strong, #94a3b8)",
+                          : "2px solid var(--dg-color-border-strong)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

@@ -8,6 +8,7 @@ import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsVi
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
@@ -19,7 +20,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color: "var(--dg-color-text-primary)",
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -186,11 +187,11 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     >
       <div
         style={{
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-subtle)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
+          fontSize: "var(--dg-type-field-title-size)",
+          fontWeight: "var(--dg-type-field-title-weight)",
+          color: "var(--dg-type-field-title-color)",
+          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+          lineHeight: "var(--dg-type-field-title-line-height)",
         }}
       >
         {label}
@@ -238,7 +239,7 @@ function SessionDetailPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -256,7 +257,7 @@ function SessionDetailPanel({
           </div>
           <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
         </div>
-        <div style={{ padding: "8px 20px 24px", overflowY: "auto" }}>
+        <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
           <DetailRow label="User name" value={session.userName ?? "—"} />
           <DetailRow label="User email" value={session.userEmail ?? "Unknown email"} />
@@ -277,6 +278,7 @@ function SessionDetailPanel({
           <DetailRow label="Last active" value={formatDateTime(session.lastActiveAt)} />
           <DetailRow label="Created" value={formatDateTime(session.createdAt)} />
         </div>
+        <ScrollOverflowCue />
       </div>
     </>
   );
@@ -353,11 +355,11 @@ function SessionsTable({
                     style={{
                       padding: "8px 12px",
                       background: "var(--dg-color-bg-secondary)",
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 800,
-                      color: "var(--dg-color-text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
+                      fontSize: "var(--dg-type-table-heading-size)",
+                      fontWeight: "var(--dg-type-table-heading-weight)",
+                      color: "var(--dg-type-table-heading-color)",
+                      letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+                      lineHeight: "var(--dg-type-table-heading-line-height)",
                       borderTop: "1px solid var(--dg-color-border-light)",
                       borderBottom: "1px solid var(--dg-color-border-light)",
                     }}
@@ -506,7 +508,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -687,7 +689,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             <div
               style={{
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >
@@ -748,7 +750,7 @@ export default function GridmasterSecurityView({
       <h2
         style={{
           margin: "0 0 16px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}
@@ -806,7 +808,7 @@ export default function GridmasterSecurityView({
                 padding: "12px 16px",
                 borderBottom: "1px solid var(--dg-color-border-light)",
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--dg-color-text-primary)",
               }}
             >

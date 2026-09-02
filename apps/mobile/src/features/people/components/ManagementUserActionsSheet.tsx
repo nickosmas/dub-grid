@@ -215,7 +215,11 @@ export function ManagementUserActionsSheet({
         managementDepartments={managementDepartments}
         managementUser={managementUser}
         onDismiss={() => setShowAccessSheet(false)}
-        onSubmit={(draft) => accessMutation.mutate(draft)}
+        onSubmit={(draft) =>
+          new Promise<void>((resolve) => {
+            accessMutation.mutate(draft, { onSettled: () => resolve() });
+          })
+        }
         visible={showAccessSheet}
       />
 
@@ -225,7 +229,11 @@ export function ManagementUserActionsSheet({
         confirmTone="danger"
         loading={accessMutation.isPending}
         onCancel={() => setShowRemoveConfirmation(false)}
-        onConfirm={() => accessMutation.mutate({ remove: true })}
+        onConfirm={() =>
+          new Promise<void>((resolve) => {
+            accessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
+          })
+        }
         title={`Remove ${fullName} from management?`}
         visible={showRemoveConfirmation}
       />

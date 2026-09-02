@@ -61,13 +61,13 @@ export function EmptyStateCard({
     [mobileColors, isDark],
   );
   const variant = compact ? compactStyles : styles;
-  // `Screen`'s scroll content stretches to fill the viewport when it's
-  // shorter than the screen (see its `flexGrow: 1`), so this only has to
-  // claim that space and center within it.
+  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
+  // reliably fills the non-scrolling container's remaining space and centers
+  // within it, with none of the viewport-height guessing a ScrollView forces.
   const fillStyle =
     !compact && fillScreen
       ? {
-          flexGrow: 1,
+          flex: 1,
           justifyContent: "center" as const,
         }
       : null;

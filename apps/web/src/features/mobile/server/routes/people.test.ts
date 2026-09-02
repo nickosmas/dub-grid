@@ -193,7 +193,7 @@ describe("mobile people route", () => {
     ]);
   });
 
-  it("returns only active non-admin directory data for regular users", async () => {
+  it("excludes self and returns only visible active directory data for regular users", async () => {
     requireMobileAuth.mockResolvedValue({
       currentOrg: {
         id: "org-1",
@@ -208,6 +208,27 @@ describe("mobile people route", () => {
       serviceClient: {},
     });
     fetchMobilePeople.mockResolvedValue([
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        employeeNumber: 1041,
+        firstName: "Current",
+        lastName: "User",
+        phone: "555-0000",
+        email: "current@dubgrid.com",
+        status: "active",
+        certificationId: null,
+        roleIds: [],
+        seniority: 0,
+        focusAreaIds: [1],
+        departmentIds: [],
+        deptAdminIds: [],
+        contactNotes: "",
+        statusChangedAt: null,
+        statusNote: "",
+        userId: "00000000-0000-0000-0000-00000000009a",
+        version: 1,
+        pendingInvitation: null,
+      },
       {
         id: "00000000-0000-0000-0000-000000000001",
         employeeNumber: 1042,
@@ -296,10 +317,12 @@ describe("mobile people route", () => {
       contactNotes: "",
       departmentIds: [],
       deptAdminIds: [],
+      email: "",
       managementDepartmentIds: [],
       managementDeptAdminIds: [],
       pendingInvitation: null,
-      roleIds: [],
+      phone: "",
+      roleIds: [3],
       status: "active",
       statusNote: "",
       userId: null,
@@ -312,9 +335,11 @@ describe("mobile people route", () => {
       contactNotes: "",
       departmentIds: [],
       deptAdminIds: [],
+      email: "",
       managementDepartmentIds: [6],
       managementDeptAdminIds: [],
       pendingInvitation: null,
+      phone: "",
       roleIds: [],
       status: "active",
       statusNote: "",

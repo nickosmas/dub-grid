@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import type {
   MobileFocusArea,
+  MobileBootstrapRole,
   MobileNamedItem,
   MobilePersonUpdateBody,
   MobileProfileResponse,
@@ -54,6 +55,7 @@ import {
   ProfileTextInput,
   formatProfileStatus,
 } from "../components/ProfilePrimitives";
+import { isRoleCertificationBlocked } from "../lib/role-certification";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
@@ -70,6 +72,7 @@ type ProfileDraft = {
   focusAreaIds: number[];
   roleIds: number[];
   departmentIds: number[];
+  contactNotes: string;
   requestNote: string;
 };
 
@@ -87,6 +90,7 @@ function makeDraft(
     focusAreaIds: linkedEmployee?.focusAreaIds ?? [],
     roleIds: linkedEmployee?.roleIds ?? [],
     departmentIds: linkedEmployee?.departmentIds ?? [],
+    contactNotes: linkedEmployee?.contactNotes ?? "",
     requestNote: "",
   };
 }
@@ -124,15 +128,18 @@ function profileDraftHasChanges(
         draft.employmentType !== saved.employmentType ||
         draft.certificationId !== saved.certificationId ||
         !arrayEqual(draft.focusAreaIds, saved.focusAreaIds) ||
-        !arrayEqual(draft.roleIds, saved.roleIds)))
+        !arrayEqual(draft.roleIds, saved.roleIds) ||
+        draft.contactNotes.trim() !== saved.contactNotes.trim()))
   );
 }
 
 export default function ProfileWorkScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
+  const seededIdentityRef = useRef<string | null>(null);
+  const draftTouchedRef = useRef(false);
   // Only the save confirmation now: the discard half belongs to the guard,
   // which has to answer to back navigation as well as to the Cancel button.
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -169,23 +176,6 @@ export default function ProfileWorkScreen() {
   const certifications = bootstrapQuery.data?.certifications ?? [];
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
-  const focusAreaNames =
-    linkedEmployee?.focusAreaIds
-      .map((id) => focusAreas.find((focusArea) => focusArea.id === id)?.name)
-      .filter((value): value is string => Boolean(value)) ?? [];
-  const roleNames =
-    linkedEmployee?.roleIds
-      .map((id) => {
-        const role = roles.find((item) => item.id === id);
-        return role
-          ? useCompactRoleCertificationLabels
-            ? role.abbr || role.name
-            : role.name
-          : undefined;
-      })
-      .filter((value): value is string => Boolean(value)) ?? [];
-  const employmentLabel =
-    linkedEmployee?.employmentType === "part_time" ? "Part-time" : "Full-time";
   const departmentNames = getScheduledDepartmentNames(
     linkedEmployee?.focusAreaIds ?? [],
     focusAreas,
@@ -195,26 +185,13 @@ export default function ProfileWorkScreen() {
     profile?.managementDepartmentIds ?? [],
     bootstrapQuery.data?.departments,
   );
-  const certificationName = linkedEmployee
-    ? linkedEmployee.certificationId == null
-      ? "None"
-      : (() => {
-          const certification = certifications.find(
-            (item) => item.id === linkedEmployee.certificationId,
-          );
-          return certification
-            ? useCompactRoleCertificationLabels
-              ? certification.abbr || certification.name
-              : certification.name
-            : "Not set";
-        })()
-    : "Not set";
-
   useEffect(() => {
-    if (profile && !editing) {
-      setDraft(makeDraft(profile, linkedEmployee));
-    }
-  }, [editing, profile, linkedEmployee?.id, linkedEmployee?.version]);
+    if (!profile) return;
+    const identityKey = `${accessToken ?? "anonymous"}:${profile.user.id}:${linkedEmployee?.id ?? "no-employee"}`;
+    if (seededIdentityRef.current === identityKey && draftTouchedRef.current) return;
+    seededIdentityRef.current = identityKey;
+    setDraft(makeDraft(profile, linkedEmployee));
+  }, [accessToken, profile, linkedEmployee]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -239,16 +216,8 @@ export default function ProfileWorkScreen() {
         (draft.employmentType !== linkedEmployee?.employmentType ||
           draft.certificationId !== linkedEmployee?.certificationId ||
           !arrayEqual(draft.focusAreaIds, linkedEmployee?.focusAreaIds ?? []) ||
-          !arrayEqual(draft.roleIds, linkedEmployee?.roleIds ?? []));
-
-      if (emailChanged) {
-        const result = await getSupabaseClient().auth.updateUser({
-          email: normalizedEmail,
-        });
-        if (result.error) {
-          throw result.error;
-        }
-      }
+          !arrayEqual(draft.roleIds, linkedEmployee?.roleIds ?? []) ||
+          draft.contactNotes.trim() !== (linkedEmployee?.contactNotes ?? "").trim());
 
       if (canEditProfileDirectly) {
         if (nameChanged) {
@@ -266,7 +235,7 @@ export default function ProfileWorkScreen() {
             employmentType: draft.employmentType,
             phone: normalizedPhone,
             email: linkedEmployee.email,
-            contactNotes: linkedEmployee.contactNotes,
+            contactNotes: normalizeStaffNotes(draft.contactNotes),
             certificationId: draft.certificationId,
             focusAreaIds: draft.focusAreaIds,
             roleIds: draft.roleIds,
@@ -298,8 +267,22 @@ export default function ProfileWorkScreen() {
         }
       }
 
+      let emailFailure: string | null = null;
+      if (emailChanged) {
+        const result = await getSupabaseClient().auth.updateUser({
+          email: normalizedEmail,
+        });
+        if (result.error) {
+          emailFailure =
+            nameChanged || phoneChanged || workChanged
+              ? "Your profile was saved, but we couldn't start the email change. Try the email again."
+              : "We couldn't start the email change. Try again.";
+        }
+      }
+
       return {
         emailChanged,
+        emailFailure,
         nameChanged,
         requestedNameChange: !canEditProfileDirectly && nameChanged,
       };
@@ -312,13 +295,24 @@ export default function ProfileWorkScreen() {
       });
     },
     onSuccess: async (result) => {
-      setEditing(false);
-      await Promise.all([
+      const [profileResult] = await Promise.all([
         profileQuery.refetch(),
         bootstrapQuery.refetch(),
         queryClient.invalidateQueries({ queryKey: ["mobile", "people"] }),
         queryClient.invalidateQueries({ queryKey: ["mobile", "person"] }),
       ]);
+      if (profileResult.data) {
+        draftTouchedRef.current = false;
+        setDraft(makeDraft(profileResult.data, profileResult.data.linkedEmployee ?? null));
+      }
+      if (result.emailFailure) {
+        pushToast({
+          tone: "warning",
+          title: result.emailChanged ? "Email not changed" : "Profile updated",
+          message: result.emailFailure,
+        });
+        return;
+      }
       const message = result.requestedNameChange
         ? "Your changes were saved and a name change request was sent."
         : result.emailChanged
@@ -332,13 +326,8 @@ export default function ProfileWorkScreen() {
     },
   });
 
-  function startEditing() {
-    if (!profile) return;
-    setDraft(makeDraft(profile, linkedEmployee));
-    setEditing(true);
-  }
-
   function discardChanges() {
+    draftTouchedRef.current = false;
     if (profile) {
       setDraft(makeDraft(profile, linkedEmployee));
     }
@@ -360,11 +349,15 @@ export default function ProfileWorkScreen() {
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
 
+  const isFillScreenState =
+    contentState.kind === "error" || (contentState.kind !== "loading" && !profile);
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
@@ -399,84 +392,8 @@ export default function ProfileWorkScreen() {
               profile hub's job, and printing it again above the editable fields
               made the first thing on "Profile details" the one thing on it that
               isn't a profile detail. */}
-          {editing && draft ? (
-            <EditPanel
-              canEditProfileDirectly={canEditProfileDirectly}
-              certificationLabel={profile.currentOrg.labels.certification}
-              certifications={certifications}
-              draft={draft}
-              focusAreaLabel={profile.currentOrg.labels.focusArea}
-              focusAreas={focusAreas}
-              hasLinkedEmployee={Boolean(linkedEmployee)}
-              isNameRequest={isNameRequest}
-              hasChanges={hasChanges}
-              onCancel={guard.requestClose}
-              onChange={setDraft}
-              onDiscard={discardChanges}
-              onSave={() => {
-                if (!profile || !draft) return;
-                const firstNameError = getStaffNameError(draft.firstName, "First name");
-                const lastNameError = getStaffNameError(draft.lastName, "Last name");
-                const emailError = getRequiredStaffEmailError(draft.email);
-                const phoneError = linkedEmployee ? getOptionalUsPhoneError(draft.phone) : null;
-                const requestNoteError = getStaffNotesError(draft.requestNote);
-                const focusAreaError =
-                  canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
-                    ? `Select at least one ${singularLabelNoun(profile.currentOrg.labels.focusArea)}.`
-                    : null;
-                const firstError =
-                  firstNameError ??
-                  lastNameError ??
-                  emailError ??
-                  phoneError ??
-                  requestNoteError ??
-                  focusAreaError;
-                if (firstError) {
-                  pushToast({
-                    tone: "warning",
-                    title: "Check profile",
-                    message: firstError,
-                  });
-                  return;
-                }
-                setShowSaveConfirmation(true);
-              }}
-              roleLabel={profile.currentOrg.labels.role}
-              roles={roles}
-              useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-              saving={saveMutation.isPending}
-            />
-          ) : (
+          {draft ? (
             <>
-              <ProfileSection title="Account">
-                <ProfileList>
-                  <ProfileInfoRow
-                    iconName="person-circle-outline"
-                    label="Name"
-                    value={
-                      [profile.user.firstName, profile.user.lastName]
-                        .filter(Boolean)
-                        .join(" ")
-                        .trim() || "Not set"
-                    }
-                  />
-                  <ProfileInfoRow
-                    iconName="mail-outline"
-                    isLast={!linkedEmployee}
-                    label="Email"
-                    value={profile.user.email || "Not set"}
-                  />
-                  {linkedEmployee ? (
-                    <ProfileInfoRow
-                      iconName="call-outline"
-                      isLast
-                      label="Phone"
-                      value={linkedEmployee.phone || "Not set"}
-                    />
-                  ) : null}
-                </ProfileList>
-              </ProfileSection>
-
               {linkedEmployee ? (
                 <ProfileSection title="Staff profile">
                   <ProfileList>
@@ -485,8 +402,6 @@ export default function ProfileWorkScreen() {
                       label="Status"
                       value={formatProfileStatus(linkedEmployee.status)}
                     />
-                    {/* The number web prints beside your name on a staff
-                        profile, and the one an admin will ask you for. */}
                     {linkedEmployee.employeeNumber != null ? (
                       <ProfileInfoRow
                         iconName="card-outline"
@@ -495,64 +410,71 @@ export default function ProfileWorkScreen() {
                       />
                     ) : null}
                     <ProfileInfoRow
-                      iconName="briefcase-outline"
-                      label="Employment"
-                      value={employmentLabel}
-                    />
-                    <ProfileInfoRow
-                      iconName="ribbon-outline"
-                      label={profile.currentOrg.labels.certification}
-                      value={certificationName}
-                    />
-                    <ProfileInfoRow
                       iconName="business-outline"
                       label={profile.currentOrg.labels.department}
                       value={departmentNames.length > 0 ? departmentNames.join(", ") : "Not set"}
                     />
-                    {/* Its own row beside the scheduled one: where you are
-                        scheduled and what you manage are different facts, and
-                        a management-only account has the second without the
-                        first. */}
                     {managementDepartmentNames.length > 0 ? (
                       <ProfileInfoRow
                         iconName="briefcase-outline"
+                        isLast
                         label={MANAGEMENT_DEPARTMENT_LABELS.plural}
                         value={managementDepartmentNames.join(", ")}
                       />
                     ) : null}
-                    <ProfileInfoRow
-                      iconName="albums-outline"
-                      label={profile.currentOrg.labels.focusArea}
-                      value={focusAreaNames.length > 0 ? focusAreaNames.join(", ") : "Not set"}
-                    />
-                    <ProfileInfoRow
-                      iconName="people-circle-outline"
-                      isLast
-                      label={profile.currentOrg.labels.role}
-                      value={roleNames.length > 0 ? roleNames.join(", ") : "Not set"}
-                    />
                   </ProfileList>
                 </ProfileSection>
-              ) : (
-                <ProfileSection title="Staff profile">
-                  <EmptyStateCard
-                    body={
-                      canEditProfileDirectly
-                        ? "Open the People tab to link your account to a staff profile."
-                        : "Ask an admin to link your account to a staff profile."
-                    }
-                    compact
-                    iconName="person-circle-outline"
-                    title="Not linked to a staff profile"
-                  />
-                </ProfileSection>
-              )}
-
-              <View style={styles.actionsRow}>
-                <Button compact label="Edit" onPress={startEditing} tone="secondary" />
-              </View>
+              ) : null}
+              <EditPanel
+                canEditProfileDirectly={canEditProfileDirectly}
+                certificationLabel={profile.currentOrg.labels.certification}
+                certifications={certifications}
+                draft={draft}
+                focusAreaLabel={profile.currentOrg.labels.focusArea}
+                focusAreas={focusAreas}
+                hasLinkedEmployee={Boolean(linkedEmployee)}
+                isNameRequest={isNameRequest}
+                hasChanges={hasChanges}
+                onChange={(nextDraft) => {
+                  draftTouchedRef.current = true;
+                  setDraft(nextDraft);
+                }}
+                onDiscard={discardChanges}
+                onSave={() => {
+                  if (!profile || !draft) return;
+                  const firstNameError = getStaffNameError(draft.firstName, "First name");
+                  const lastNameError = getStaffNameError(draft.lastName, "Last name");
+                  const emailError = getRequiredStaffEmailError(draft.email);
+                  const phoneError = linkedEmployee ? getOptionalUsPhoneError(draft.phone) : null;
+                  const requestNoteError = getStaffNotesError(draft.requestNote);
+                  const focusAreaError =
+                    canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
+                      ? `Select at least one ${singularLabelNoun(profile.currentOrg.labels.focusArea)}.`
+                      : null;
+                  const firstError =
+                    firstNameError ??
+                    lastNameError ??
+                    emailError ??
+                    phoneError ??
+                    requestNoteError ??
+                    focusAreaError;
+                  if (firstError) {
+                    pushToast({
+                      tone: "warning",
+                      title: "Check profile",
+                      message: firstError,
+                    });
+                    return;
+                  }
+                  setShowSaveConfirmation(true);
+                }}
+                roleLabel={profile.currentOrg.labels.role}
+                roles={roles}
+                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
+                saving={saveMutation.isPending}
+              />
             </>
-          )}
+          ) : null}
         </>
       )}
       <ConfirmationModal
@@ -590,7 +512,6 @@ function EditPanel({
   hasChanges,
   hasLinkedEmployee,
   isNameRequest,
-  onCancel,
   onChange,
   onDiscard,
   onSave,
@@ -608,17 +529,16 @@ function EditPanel({
   hasChanges: boolean;
   hasLinkedEmployee: boolean;
   isNameRequest: boolean;
-  onCancel: () => void;
   onChange: (draft: ProfileDraft) => void;
   onDiscard: () => void;
   onSave: () => void;
   roleLabel: string;
-  roles: MobileNamedItem[];
+  roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   saving: boolean;
 }) {
   const [focusedField, setFocusedField] = useState<
-    "firstName" | "lastName" | "email" | "phone" | "requestNote" | null
+    "firstName" | "lastName" | "email" | "phone" | "contactNotes" | "requestNote" | null
   >(null);
 
   const fieldErrors = {
@@ -626,6 +546,7 @@ function EditPanel({
     lastName: getStaffNameError(draft.lastName, "Last name"),
     email: getRequiredStaffEmailError(draft.email),
     phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
+    contactNotes: getStaffNotesError(draft.contactNotes),
     requestNote: getStaffNotesError(draft.requestNote),
     focusAreaIds:
       canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
@@ -755,13 +676,41 @@ function EditPanel({
                 onToggle={(id) => toggle("focusAreaIds", id)}
               />
               <ProfileChoiceGroup
-                items={roles.map((item) => ({
-                  id: item.id,
-                  name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-                }))}
+                items={roles
+                  .filter(
+                    (item) =>
+                      !isRoleCertificationBlocked({
+                        role: item,
+                        certificationId: draft.certificationId,
+                        selectedRoleIds: draft.roleIds,
+                        roleId: item.id,
+                      }),
+                  )
+                  .map((item) => ({
+                    id: item.id,
+                    name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+                  }))}
                 label={roleLabel}
                 selectedIds={draft.roleIds}
                 onToggle={(id) => toggle("roleIds", id)}
+              />
+            </ProfilePanel>
+          </ProfileSection>
+
+          <ProfileSection title="Notes">
+            <ProfilePanel>
+              <ProfileTextInput
+                accessibilityLabel="Contact notes"
+                editable={!saving}
+                error={fieldErrors.contactNotes}
+                focused={focusedField === "contactNotes"}
+                label="Contact notes"
+                multiline
+                placeholder="Add notes"
+                value={draft.contactNotes}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(value) => setField("contactNotes", value)}
+                onFocus={() => setFocusedField("contactNotes")}
               />
             </ProfilePanel>
           </ProfileSection>
@@ -799,14 +748,9 @@ function EditPanel({
           loading={saving}
           onPress={onSave}
         />
-        <Button
-          compact
-          disabled={saving || !hasChanges}
-          label="Discard"
-          onPress={onDiscard}
-          tone="neutral"
-        />
-        <Button compact disabled={saving} label="Cancel" onPress={onCancel} tone="ghost" />
+        {hasChanges ? (
+          <Button compact disabled={saving} label="Discard" onPress={onDiscard} tone="neutral" />
+        ) : null}
       </View>
     </>
   );

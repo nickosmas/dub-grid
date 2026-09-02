@@ -62,7 +62,7 @@ export function EmptyState({
       : size === "compact"
         ? "var(--dg-fs-body)"
         : "var(--dg-fs-label)";
-  const titleFontWeight = size === "default" ? 700 : 600;
+  const titleFontWeight = 600;
 
   return (
     <div

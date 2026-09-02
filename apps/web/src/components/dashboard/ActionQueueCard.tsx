@@ -266,7 +266,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           </div>
           <div
             style={{
-              fontSize: 10,
+              fontSize: "var(--dg-type-metadata-size)",
               color: "var(--dg-color-text-subtle)",
               marginTop: 1,
             }}
@@ -283,12 +283,12 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                 disabled={isRunning}
                 onClick={() => setPendingAction(item.action ?? null)}
                 style={{
-                  fontSize: 10,
+                  fontSize: "var(--dg-type-control-size)",
                   fontWeight: 600,
                   padding: "3px 8px",
                   borderRadius: 5,
                   background: "var(--dg-color-success)",
-                  color: "#fff",
+                  color: "var(--dg-color-text-inverse)",
                   border: "none",
                   cursor: isRunning ? "not-allowed" : "pointer",
                 }}
@@ -301,7 +301,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                 disabled={isRunning}
                 onClick={() => setPendingAction(item.secondaryAction ?? null)}
                 style={{
-                  fontSize: 10,
+                  fontSize: "var(--dg-type-control-size)",
                   fontWeight: 600,
                   padding: "3px 8px",
                   borderRadius: 5,
@@ -321,7 +321,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
         {item.href && !item.action && (
           <span
             style={{
-              fontSize: 11,
+              fontSize: "var(--dg-type-control-size)",
               color: "var(--dg-color-primary)",
               fontWeight: 500,
             }}
@@ -355,13 +355,9 @@ function GroupedItems({ items }: { items: ActionItem[] }) {
         <div key={group.type}>
           {/* Section header */}
           <div
+            className="dg-type-content-group-heading"
             style={{
               padding: "8px 18px 4px",
-              fontSize: "var(--dg-fs-micro)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-subtle)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
               borderTop: gi > 0 ? "1px solid var(--dg-color-border-light)" : "none",
             }}
           >

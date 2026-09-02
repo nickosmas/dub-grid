@@ -194,7 +194,7 @@ export function PillTimeEditor({
           </svg>
           Custom time
           {(defaultStart || defaultEnd) && (
-            <span style={{ opacity: 0.6 }}>
+            <span style={{ color: "var(--dg-color-text-muted)" }}>
               ·{" "}
               {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null]
                 .filter(Boolean)

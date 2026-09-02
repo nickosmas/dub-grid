@@ -30,7 +30,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
     >
       <div
         style={{
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
           color: "var(--dg-color-text-primary)",
@@ -41,11 +41,11 @@ function StatCard({ label, value }: { label: string; value: number }) {
       </div>
       <div
         style={{
-          fontSize: "var(--dg-fs-caption)",
-          fontWeight: 600,
-          color: "var(--dg-color-text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
+          fontSize: "var(--dg-type-field-title-size)",
+          fontWeight: "var(--dg-type-field-title-weight)",
+          color: "var(--dg-type-field-title-color)",
+          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+          lineHeight: "var(--dg-type-field-title-line-height)",
         }}
       >
         {label}
@@ -78,7 +78,7 @@ function OversightCard({
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           fontFamily: "var(--font-dm-mono), monospace",
         }}
@@ -208,7 +208,7 @@ export default function GridmasterDashboard({
         <h2
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
@@ -300,7 +300,7 @@ export default function GridmasterDashboard({
                   >
                     <thead>
                       <tr>
-                        {["Org", "Score", "Risk", "Active Users", "Open Requests", "Billing"].map(
+                        {["Org", "Score", "Risk", "Active users", "Open requests", "Billing"].map(
                           (h) => (
                             <th
                               key={h}
@@ -649,9 +649,9 @@ export default function GridmasterDashboard({
                   "Name",
                   "Slug",
                   "Status",
-                  "Org Users",
+                  "Org users",
                   "Employees",
-                  "Focus Areas",
+                  "Focus areas",
                   "Certifications",
                   "Roles",
                   "Timezone",

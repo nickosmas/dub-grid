@@ -52,6 +52,17 @@ export async function PATCH(req: NextRequest) {
       }),
     );
   } catch (error) {
+    const profileConflict = error as { code?: string; employee?: unknown };
+    if (profileConflict.code === "EMPLOYEE_CONFLICT" && profileConflict.employee) {
+      return NextResponse.json(
+        {
+          error: "Your staff profile changed elsewhere. Review the latest values and try again.",
+          code: "EMPLOYEE_CONFLICT",
+          employee: profileConflict.employee,
+        },
+        { status: 409 },
+      );
+    }
     const contactConflict = getEmployeeContactConflict(error);
     if (contactConflict) {
       return NextResponse.json(contactConflict, { status: 409 });

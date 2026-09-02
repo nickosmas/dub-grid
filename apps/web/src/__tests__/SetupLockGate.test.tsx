@@ -217,7 +217,7 @@ describe("OnboardingGate setup lock", () => {
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });
 
-  it("allows completed organizations through normally", async () => {
+  it("uses persisted onboarding completion after a hard refresh without the session guard", async () => {
     mockOrganizationData.setupStatus = {
       isComplete: true,
       missing: {

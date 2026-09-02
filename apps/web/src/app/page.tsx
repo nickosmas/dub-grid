@@ -303,8 +303,8 @@ export default function RootPage() {
       <nav className="landing-nav fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <DubGridLogo size={28} color="#ffffff" />
-            <DubGridWordmark fontSize={18} color="#ffffff" />
+            <DubGridLogo size={28} color="var(--dg-color-text-inverse)" />
+            <DubGridWordmark fontSize={18} color="var(--dg-color-text-inverse)" />
           </div>
 
           <div className="flex items-center gap-4">
@@ -605,20 +605,20 @@ export default function RootPage() {
           <div className="flex gap-6">
             <Link
               href="/privacy"
-              className="text-xs text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-muted)] transition-colors"
+              className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="text-xs text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-muted)] transition-colors"
+              className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"
             >
               Terms of Service
             </Link>
             <Button
               type="button"
               onClick={openConsentPreferences}
-              className="text-xs text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-muted)] transition-colors"
+              className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"
             >
               Cookie preferences
             </Button>

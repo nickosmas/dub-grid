@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
+const useInfiniteQuery = vi.fn();
 const useQuery = vi.fn();
 // `useOptimisticMutation` reaches for the client to patch and roll back the
 // cache. One shared stub so tests can assert what the lifecycle wrote.
@@ -30,6 +31,7 @@ vi.mock("@tanstack/react-query", () => ({
     isOnline: () => true,
   },
   keepPreviousData: (previousData: unknown) => previousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -57,6 +59,27 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 
 let RequestsScreen: (typeof import("./RequestsScreen"))["default"];
 
+function buildHistoryRequest(id: string, requesterName: string, requesterShiftDate: string) {
+  return {
+    id,
+    requesterName,
+    requesterShiftDate,
+    status: "approved",
+    type: "calloff",
+    requesterShiftLabel: "Day",
+    requesterEmpId: "emp-1",
+    targetEmpId: null,
+    requesterPresentation: {
+      label: "Day Shift",
+      segments: [],
+    },
+    requesterState: {
+      customStartTime: "07:00:00",
+      customEndTime: "15:00:00",
+    },
+  };
+}
+
 beforeAll(async () => {
   RequestsScreen = (await import("./RequestsScreen")).default;
 });
@@ -66,6 +89,7 @@ describe("RequestsScreen", () => {
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
 
     useMutation.mockReset();
+    useInfiniteQuery.mockReset();
     useQuery.mockReset();
     for (const stub of Object.values(queryClientStub)) {
       stub.mockReset();
@@ -103,6 +127,15 @@ describe("RequestsScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: { pages: [{ requests: [], nextCursor: null }] },
+      error: null,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
     });
   });
 
@@ -866,5 +899,207 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
+  });
+
+  it("shows terminal requests whose shift dates are older than the active window", () => {
+    useLocalSearchParams.mockReturnValue({ tab: "history" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            requests: [buildHistoryRequest("history-old", "Older Request", "2025-12-01")],
+            nextCursor: null,
+          },
+        ],
+      },
+      error: null,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Older Request")).toBeInTheDocument();
+    expect(screen.getByText(/2025-12-01/)).toBeInTheDocument();
+  });
+
+  it("shows a history-specific empty state", () => {
+    useLocalSearchParams.mockReturnValue({ tab: "history" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("No history yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Resolved, canceled, and expired requests appear here."),
+    ).toBeInTheDocument();
+  });
+
+  it("retries history after its first page fails", () => {
+    const historyRefetch = vi.fn();
+    useLocalSearchParams.mockReturnValue({ tab: "history" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: undefined,
+      error: new Error("History failed"),
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: historyRefetch,
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Could not load history")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Try again"));
+    expect(historyRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { label: "loading", error: null, isLoading: true },
+    { label: "failed", error: new Error("History failed"), isLoading: false },
+  ])("keeps active request actions available while history is $label", ({ error, isLoading }) => {
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "active-approval",
+            requesterName: "Active Request",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "calloff",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift", segments: [] },
+            requesterState: {
+              customStartTime: "07:00:00",
+              customEndTime: "15:00:00",
+            },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: undefined,
+      error,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Active Request")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.queryByText("Could not load history")).not.toBeInTheDocument();
+  });
+
+  it("loads another history page and deduplicates repeated boundary rows", () => {
+    const fetchNextPage = vi.fn();
+    const repeated = buildHistoryRequest("history-1", "Repeated Request", "2025-12-01");
+    useLocalSearchParams.mockReturnValue({ tab: "history" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            requests: [repeated],
+            nextCursor: {
+              createdAt: "2026-04-01T10:00:00.000Z",
+              id: "00000000-0000-4000-8000-000000000001",
+            },
+          },
+          {
+            requests: [repeated, buildHistoryRequest("history-2", "Next Request", "2025-11-01")],
+            nextCursor: null,
+          },
+        ],
+      },
+      error: null,
+      fetchNextPage,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getAllByText("Repeated Request")).toHaveLength(1);
+    expect(screen.getByText("Next Request")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Load more"));
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps loaded history available across tab transitions", () => {
+    useLocalSearchParams.mockReturnValue({ tab: "history" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            requests: [buildHistoryRequest("history-1", "Saved History", "2025-12-01")],
+            nextCursor: null,
+          },
+        ],
+      },
+      error: null,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("Saved History")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Available"));
+    expect(screen.getByText("No requests yet")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("History"));
+    expect(screen.getByText("Saved History")).toBeInTheDocument();
   });
 });

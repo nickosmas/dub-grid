@@ -438,7 +438,7 @@ function ShiftCategoriesSettings({
                 border: `1px solid ${borderColor(previewDisplay.text)}`,
                 color: previewDisplay.text,
                 fontSize: "var(--dg-fs-caption)",
-                fontWeight: 800,
+                fontWeight: 600,
                 lineHeight: 1,
                 overflowWrap: isNameMode ? "break-word" : undefined,
                 textAlign: "center",
@@ -539,7 +539,7 @@ function ShiftCategoriesSettings({
           }}
         >
           <div>
-            <label style={labelStyle}>NAME</label>
+            <label style={labelStyle}>Name</label>
             <input
               value={cat.name}
               onChange={(e) => handleNameChange(cat, e.target.value)}
@@ -567,7 +567,7 @@ function ShiftCategoriesSettings({
           </div>
           {!isNameMode && (
             <div>
-              <label style={labelStyle}>CODE</label>
+              <label style={labelStyle}>Code</label>
               <input
                 value={cat.abbr ?? ""}
                 onChange={(e) => handleAbbrChange(cat.id, e.target.value)}
@@ -596,7 +596,7 @@ function ShiftCategoriesSettings({
           )}
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>COLOR</label>
+          <label style={labelStyle}>Color</label>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <PresetColorPicker
               valueBg={previewColor}
@@ -619,7 +619,7 @@ function ShiftCategoriesSettings({
                 border: `1px solid ${borderColor(previewDisplay.text)}`,
                 color: previewDisplay.text,
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
                 overflowWrap: isNameMode ? "break-word" : undefined,
                 textAlign: "center",
               }}
@@ -639,7 +639,7 @@ function ShiftCategoriesSettings({
           }}
         >
           <div>
-            <label style={labelStyle}>START</label>
+            <label style={labelStyle}>Start</label>
             <TimeInput12h
               value={cat.startTime}
               onChange={(v) => handleChange(cat.id, "startTime", v)}
@@ -647,7 +647,7 @@ function ShiftCategoriesSettings({
             />
           </div>
           <div>
-            <label style={labelStyle}>END</label>
+            <label style={labelStyle}>End</label>
             <TimeInput12h
               value={cat.endTime}
               onChange={(v) => handleChange(cat.id, "endTime", v)}
@@ -655,7 +655,7 @@ function ShiftCategoriesSettings({
             />
           </div>
           <div>
-            <label style={labelStyle}>BREAK (MIN)</label>
+            <label style={labelStyle}>Break (min)</label>
             <input
               type="number"
               min={0}

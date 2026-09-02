@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CoverageRequirementsSettings from "@/components/settings/Coverage";
@@ -193,7 +193,11 @@ describe("settings panels guard navigation", () => {
     await dirtyTheCoveragePanel(user);
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
-    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Unsaved changes" })).getByRole("button", {
+        name: "Discard",
+      }),
+    );
 
     expect(navigate).toHaveBeenCalledTimes(1);
   });

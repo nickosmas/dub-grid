@@ -4,6 +4,7 @@ import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
   getContainingPayPeriodStart,
   getScheduleStartForSpan,
+  realignTwoWeekScheduleStart,
   resolveScheduleSpan,
 } from "@/lib/schedule-view";
 import { AUTO_ONE_WEEK } from "@/hooks";
@@ -59,6 +60,40 @@ describe("schedule view fallback", () => {
     });
 
     expect(formatDateKey(start)).toBe("2026-04-26");
+  });
+
+  it("realigns an open two-week grid when its anchor initially loads or changes", () => {
+    const unanchoredStart = new Date(2026, 4, 3);
+    const initiallyAnchored = realignTwoWeekScheduleStart(unanchoredStart, 2, "2026-04-20");
+    const changedAnchor = realignTwoWeekScheduleStart(initiallyAnchored, 2, "2026-04-27");
+
+    expect(formatDateKey(initiallyAnchored)).toBe("2026-04-20");
+    expect(formatDateKey(changedAnchor)).toBe("2026-04-13");
+  });
+
+  it("keeps previous and next navigation on anchored two-week boundaries", () => {
+    const currentStart = new Date(2026, 3, 20);
+    const previousStart = getScheduleStartForSpan({
+      date: new Date(2026, 3, 6),
+      span: 2,
+      payPeriodStartDate: "2026-04-20",
+    });
+    const nextStart = getScheduleStartForSpan({
+      date: new Date(2026, 4, 4),
+      span: 2,
+      payPeriodStartDate: "2026-04-20",
+    });
+
+    expect(formatDateKey(currentStart)).toBe("2026-04-20");
+    expect(formatDateKey(previousStart)).toBe("2026-04-06");
+    expect(formatDateKey(nextStart)).toBe("2026-05-04");
+  });
+
+  it("does not apply the biweekly anchor to one-week or month grids", () => {
+    const currentStart = new Date(2026, 4, 3);
+
+    expect(realignTwoWeekScheduleStart(currentStart, 1, "2026-04-20")).toBe(currentStart);
+    expect(realignTwoWeekScheduleStart(currentStart, "month", "2026-04-20")).toBe(currentStart);
   });
 });
 

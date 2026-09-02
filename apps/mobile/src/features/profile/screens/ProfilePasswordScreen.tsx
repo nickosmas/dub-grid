@@ -302,7 +302,7 @@ export default function ProfilePasswordScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "error"}>
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={3} sections={1} showHero={false} />

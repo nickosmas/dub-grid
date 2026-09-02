@@ -242,7 +242,7 @@ function IndicatorRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-primary)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -278,7 +278,7 @@ function IndicatorRow({
             onClick={(event) => event.stopPropagation()}
           >
             <div>
-              <label style={labelStyle}>INDICATOR NAME</label>
+              <label style={labelStyle}>Indicator name</label>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -316,7 +316,7 @@ function IndicatorRow({
             </div>
 
             <div>
-              <label style={labelStyle}>COLOR</label>
+              <label style={labelStyle}>Color</label>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <input
                   type="color"

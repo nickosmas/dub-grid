@@ -12,6 +12,7 @@ const useLocalSearchParams = vi.fn();
 // Every options object the screen hands the native header, in render order.
 const stackScreenOptions: { title?: string }[] = [];
 const pushToast = vi.fn();
+const routerReplace = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -33,6 +34,9 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("expo-router", () => ({
+  router: {
+    replace: routerReplace,
+  },
   Stack: {
     Screen: (props: { options?: { title?: string } }) => {
       stackScreenOptions.push(props.options ?? {});
@@ -108,6 +112,7 @@ describe("PersonDetailScreen", () => {
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
+    routerReplace.mockReset();
     emptyStateTitles.length = 0;
     stackScreenOptions.length = 0;
 
@@ -177,6 +182,46 @@ describe("PersonDetailScreen", () => {
       ...overrides,
     };
   }
+
+  it("redirects a direct self link without enabling the teammate query", async () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [],
+        roles: [],
+        certifications: [],
+        departments: [],
+        linkedEmployee: { id: "emp-1" },
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(useQuery).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/(tabs)/profile");
+    });
+    expect(emptyStateTitles).not.toContain("Person not found");
+  });
 
   // The tier used to hang off the status chip behind a "·", which read as a
   // caption on that chip and left the account chip alone on the next line. It
@@ -633,6 +678,47 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
 
+  it("hides an incompatible role while keeping a selected legacy role removable", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+          useCompactRoleCertificationLabels: true,
+        },
+        focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+        roles: [
+          { id: 3, name: "Charge Nurse", abbr: "CN", requiredCertificationIds: [] },
+          { id: 4, name: "Clinical Lead", abbr: "CL", requiredCertificationIds: [5] },
+        ],
+        certifications: [{ id: 5, name: "Registered Nurse", abbr: "RN" }],
+        departments: [{ id: 4, name: "North Wing" }],
+        permissions: { canManageEmployees: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ certificationId: null, roleIds: [3] }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    expect(screen.getByRole("button", { name: "CN" })).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: "CL" })).not.toBeInTheDocument();
+  });
+
   it("shows account found before asking to reconcile a different-name existing account", async () => {
     const mutationCalls: Array<{
       mutate: ReturnType<typeof vi.fn>;
@@ -873,7 +959,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
       confirmDialog("Mark Inactive");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
         note: undefined,
@@ -892,7 +978,7 @@ describe("PersonDetailScreen", () => {
       expect(sheet.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
       confirmDialog("Remove");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "remove",
         expectedVersion: 7,
         note: undefined,
@@ -908,7 +994,7 @@ describe("PersonDetailScreen", () => {
       });
       confirmDialog("Mark Inactive");
 
-      expect(mutate).toHaveBeenCalledWith({
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
         note: "On leave until June",
@@ -1034,6 +1120,35 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("asks before replacing a pending invitation's access level", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: {
+          orgRole: null,
+          managementDepartmentIds: [9],
+          pendingInvitation: {
+            id: "invite-1",
+            email: "mina@dubgrid.com",
+            expiresAt: "2099-05-01T00:00:00.000Z",
+            updatedAt: "2026-04-28T00:00:00.000Z",
+            roleToAssign: "user",
+          },
+        },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      fireEvent.click(screen.getByText("Admin"));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+      expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+      expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
+      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+
+      confirmDialog("Revoke and resend");
+      expect(allMutatePayloads(mutationCalls)).toContainEqual({
+        draft: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+    });
+
     // Save used to be live the moment the sheet opened, so the everyday
     // "opened it to check, closed it again" ended in a no-op write.
     it("holds Save until something actually changes", () => {
@@ -1048,6 +1163,22 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByText("FAC"));
       fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
       expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
+    });
+
+    it("submits one removal when the destructive confirmation is pressed twice", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      fireEvent.click(screen.getByRole("button", { name: "Remove from Management" }));
+      const confirm = within(screen.getByRole("alert")).getByRole("button", {
+        name: "Remove Access",
+      });
+      fireEvent.click(confirm);
+      fireEvent.click(confirm);
+
+      expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
     });
 
     it("refuses to submit with no department selected", () => {

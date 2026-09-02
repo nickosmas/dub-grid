@@ -11,11 +11,8 @@ type SelectableTagProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "childre
   fontSize?: CSSProperties["fontSize"];
   fontWeight?: CSSProperties["fontWeight"];
   selectedFontWeight?: CSSProperties["fontWeight"];
-  unselectedBackground?: string;
   selectedBackground?: string;
-  unselectedBorderColor?: string;
   selectedBorderColor?: string;
-  unselectedTextColor?: string;
   selectedTextColor?: string;
   disabledBackground?: string;
   disabledBorderColor?: string;
@@ -35,11 +32,8 @@ export function SelectableTag({
   fontSize = "var(--dg-fs-caption)",
   fontWeight = 600,
   selectedFontWeight = 700,
-  unselectedBackground = "var(--dg-color-surface)",
   selectedBackground = "var(--dg-color-brand)",
-  unselectedBorderColor = "var(--dg-color-border)",
   selectedBorderColor = "var(--dg-color-brand)",
-  unselectedTextColor = "var(--dg-color-text-secondary)",
   selectedTextColor = "var(--dg-color-text-inverse)",
   disabledBackground,
   disabledBorderColor,
@@ -54,19 +48,19 @@ export function SelectableTag({
       ? disabledBorderColor
       : selected
         ? selectedBorderColor
-        : unselectedBorderColor;
+        : "var(--dg-color-border)";
   const background =
     disabled && disabledBackground
       ? disabledBackground
       : selected
         ? selectedBackground
-        : unselectedBackground;
+        : "var(--dg-color-surface)";
   const textColor =
     disabled && disabledTextColor
       ? disabledTextColor
       : selected
         ? selectedTextColor
-        : unselectedTextColor;
+        : "var(--dg-color-text-secondary)";
 
   return (
     <button

@@ -11,7 +11,15 @@ const dispatchNotificationEvent = vi.fn();
 const buildInvitationChanges = vi.fn();
 const invitationSelectMaybeSingle = vi.fn();
 const invitationUpdateMaybeSingle = vi.fn();
+const invitationUpdateOperations: Array<{
+  values: Record<string, unknown>;
+  filters: Array<[string, unknown]>;
+}> = [];
+const organizationMaybeSingle = vi.fn();
+const serviceRpc = vi.fn();
 const auditInsert = vi.fn();
+const getInvitationEmailConfig = vi.fn();
+const sendInvitationEmail = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -22,6 +30,8 @@ vi.mock("@/lib/api-auth", () => ({
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
+  emailTargetLimiter: {},
+  hashEmail: (email: string) => email,
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 vi.mock("@/app/api/shared/permissions", () => ({
@@ -36,6 +46,10 @@ vi.mock("@/lib/access-management", () => ({
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+}));
+vi.mock("@/features/mobile/server/invitation-email", () => ({
+  getInvitationEmailConfig,
+  sendInvitationEmail,
 }));
 vi.mock("@/lib/staff-validation", () => ({
   getStaffFieldErrors: () => ({}),
@@ -65,9 +79,18 @@ vi.mock("@/lib/db/mappers", () => ({
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
+    rpc: (...args: unknown[]) => serviceRpc(...args),
     from: (table: string) => {
       if (table === "audit_log") {
         return { insert: (...args: unknown[]) => auditInsert(...args) };
+      }
+      if (table === "organizations") {
+        const organizationChain: Record<string, unknown> = {
+          select: () => organizationChain,
+          eq: () => organizationChain,
+          maybeSingle: () => organizationMaybeSingle(),
+        };
+        return organizationChain;
       }
       // invitations table: fetchInvitation's select().eq().eq().maybeSingle()
       // vs. the PATCH update().eq().eq().eq().select().maybeSingle() chain.
@@ -75,12 +98,20 @@ vi.mock("@/lib/supabase-service", () => ({
         select: () => chain,
         eq: () => chain,
         maybeSingle: () => invitationSelectMaybeSingle(),
-        update: () => updateChain,
-      };
-      const updateChain: Record<string, unknown> = {
-        eq: () => updateChain,
-        select: () => updateChain,
-        maybeSingle: () => invitationUpdateMaybeSingle(),
+        update: (values: Record<string, unknown>) => {
+          const operation = { values, filters: [] as Array<[string, unknown]> };
+          invitationUpdateOperations.push(operation);
+          const updateChain: Record<string, unknown> = {
+            eq: (column: string, value: unknown) => {
+              operation.filters.push([column, value]);
+              return updateChain;
+            },
+            is: () => updateChain,
+            select: () => updateChain,
+            maybeSingle: () => invitationUpdateMaybeSingle(),
+          };
+          return updateChain;
+        },
       };
       return chain;
     },
@@ -97,6 +128,7 @@ const CURRENT_INVITATION_ROW = {
   invited_by: null,
   email: "old@test.com",
   role_to_assign: "user",
+  token: "original-token",
   expires_at: "2026-02-01T00:00:00.000Z",
   accepted_at: null,
   revoked_at: null,
@@ -117,12 +149,20 @@ function makePatchRequest(body: unknown): NextRequest {
   });
 }
 
+function makePostRequest(body: unknown): NextRequest {
+  return new NextRequest("https://app.test/api/organizations/invitations", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 async function importRoute() {
   return import("./route");
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  invitationUpdateOperations.length = 0;
   validateCsrfOrigin.mockReturnValue(null);
   forbidIfSandboxCookie.mockReturnValue(null);
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1", email: "actor@test.com" } });
@@ -132,7 +172,176 @@ beforeEach(() => {
     { key: "email", label: "Email", previousValue: "old@test.com", nextValue: "new@test.com" },
   ]);
   invitationSelectMaybeSingle.mockResolvedValue({ data: CURRENT_INVITATION_ROW, error: null });
+  organizationMaybeSingle.mockResolvedValue({ data: { name: "Calm Haven" }, error: null });
+  getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
+  sendInvitationEmail.mockResolvedValue(undefined);
   auditInsert.mockResolvedValue({ error: null });
+});
+
+describe("POST /api/organizations/invitations", () => {
+  const replacementId = "33333333-3333-4333-8333-333333333333";
+  const pendingInvitation = {
+    ...CURRENT_INVITATION_ROW,
+    expires_at: "2099-02-01T00:00:00.000Z",
+  };
+  const replacementInvitation = {
+    ...pendingInvitation,
+    id: replacementId,
+    role_to_assign: "admin",
+    token: "replacement-token",
+    updated_at: "2026-01-01T00:00:01.000Z",
+  };
+
+  it("revokes the old invite, creates a replacement, and sends its token", async () => {
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pendingInvitation, error: null })
+      .mockResolvedValueOnce({ data: replacementInvitation, error: null });
+    serviceRpc.mockResolvedValue({
+      data: {
+        previous_invitation_id: INVITATION_ID,
+        invitation_id: replacementId,
+        token: "replacement-token",
+        expires_at: "2099-02-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "admin",
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(serviceRpc).toHaveBeenCalledWith("replace_pending_invitation_access", {
+      p_org_id: ORG_ID,
+      p_invitation_id: INVITATION_ID,
+      p_expected_updated_at: EXPECTED_UPDATED_AT,
+      p_role: "admin",
+      p_invited_by: "actor-1",
+    });
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "old@test.com",
+        token: "replacement-token",
+      }),
+    );
+    expect(payload.previousInvitationId).toBe(INVITATION_ID);
+    expect(payload.invitation.id).toBe(replacementId);
+  });
+
+  it("restores the old invite when the replacement email cannot be sent", async () => {
+    invitationSelectMaybeSingle
+      .mockResolvedValueOnce({ data: pendingInvitation, error: null })
+      .mockResolvedValueOnce({ data: replacementInvitation, error: null });
+    serviceRpc
+      .mockResolvedValueOnce({
+        data: {
+          previous_invitation_id: INVITATION_ID,
+          invitation_id: replacementId,
+          token: "replacement-token",
+          expires_at: "2099-02-01T00:00:00.000Z",
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: true, error: null });
+    sendInvitationEmail.mockRejectedValue(new Error("provider down"));
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "replace_access",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "admin",
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    expect(serviceRpc).toHaveBeenNthCalledWith(
+      2,
+      "rollback_pending_invitation_access_replacement",
+      {
+        p_org_id: ORG_ID,
+        p_previous_invitation_id: INVITATION_ID,
+        p_replacement_invitation_id: replacementId,
+      },
+    );
+  });
+
+  it("emails the new token when an unchanged invitation is resent", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...pendingInvitation, token: "fresh-token" },
+      error: null,
+    });
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ token: expect.any(String), email: "old@test.com" }),
+    );
+  });
+
+  it("restores the previous token and expiry when a resend email cannot be delivered", async () => {
+    const refreshedAt = "2026-01-01T00:01:00.000Z";
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    invitationUpdateMaybeSingle
+      .mockResolvedValueOnce({
+        data: { ...pendingInvitation, token: "fresh-token", updated_at: refreshedAt },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: INVITATION_ID }, error: null });
+    sendInvitationEmail.mockRejectedValue(new Error("provider down"));
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    expect(invitationUpdateOperations).toHaveLength(2);
+    const rotatedToken = invitationUpdateOperations[0].values.token;
+    expect(rotatedToken).toEqual(expect.any(String));
+    expect(invitationUpdateOperations[1]).toEqual({
+      values: {
+        token: "original-token",
+        expires_at: pendingInvitation.expires_at,
+        revoked_at: null,
+      },
+      filters: expect.arrayContaining([
+        ["org_id", ORG_ID],
+        ["id", INVITATION_ID],
+        ["updated_at", refreshedAt],
+        ["token", rotatedToken],
+      ]),
+    });
+    expect(dispatchNotificationEvent).not.toHaveBeenCalledWith(
+      "actor-1",
+      expect.objectContaining({ action: "invitation_resent" }),
+    );
+  });
 });
 
 describe("PATCH /api/organizations/invitations", () => {

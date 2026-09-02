@@ -41,7 +41,10 @@ vi.mock("@/lib/sentry", () => ({
 const cacheDel = vi.fn();
 vi.mock("@/lib/cache", () => ({
   cacheDel: (...args: unknown[]) => cacheDel(...args),
-  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+  CacheKey: {
+    organization: (orgId: string) => `dg:org:${orgId}:organization`,
+    orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
+  },
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -333,7 +336,10 @@ describe("PUT /api/organizations/settings", () => {
     expect(loggerError).not.toHaveBeenCalled();
     // Renaming invalidates the subdomain-lookup cache (keyed by slug, which
     // doesn't change) so the cached display name isn't stale for the TTL.
-    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme-health");
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:org:${currentRow.id}:organization`,
+      "dg:org:slug:acme-health",
+    );
   });
 
   it("does not touch the subdomain-lookup cache when name doesn't change", async () => {
@@ -357,7 +363,41 @@ describe("PUT /api/organizations/settings", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(cacheDel).not.toHaveBeenCalled();
+    expect(cacheDel).toHaveBeenCalledWith(`dg:org:${currentRow.id}:organization`);
+  });
+
+  it("waits for cache invalidation before returning a successful save", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
+    const updatedRow = makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+      timezone: "America/Denver",
+    });
+    let releaseCache: (() => void) | undefined;
+    cacheDel.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseCache = resolve;
+        }),
+    );
+    organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+    organizationUpdateMaybeSingle.mockResolvedValueOnce({ data: updatedRow, error: null });
+
+    const pendingResponse = PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        timezone: "America/Denver",
+      }),
+    );
+    let responseSettled = false;
+    void pendingResponse.then(() => {
+      responseSettled = true;
+    });
+    await vi.waitFor(() => {
+      expect(cacheDel).toHaveBeenCalledWith(`dg:org:${currentRow.id}:organization`);
+    });
+    expect(responseSettled).toBe(false);
+    releaseCache?.();
+    await expect(pendingResponse).resolves.toMatchObject({ status: 200 });
   });
 
   it("persists the shift detail hover-card setting", async () => {

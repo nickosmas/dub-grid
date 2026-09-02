@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InlineRoleSelect } from "@/components/staff/InlineRoleSelect";
 
@@ -16,5 +16,26 @@ describe("InlineRoleSelect self-guard", () => {
     const trigger = screen.getByRole("button");
     expect(trigger.getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByText(/admin/i)).toBeTruthy();
+  });
+
+  it("asks before replacing a pending invitation's access", async () => {
+    const onChange = vi.fn().mockResolvedValue(undefined);
+    render(
+      <InlineRoleSelect
+        orgRole="user"
+        onChange={onChange}
+        pendingInvitationEmail="mina@example.com"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    fireEvent.click(screen.getByRole("option", { name: "Admin" }));
+
+    expect(screen.getByText("Replace invitation access?")).toBeTruthy();
+    expect(screen.getByText(/current invitation will be revoked/i)).toBeTruthy();
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke and resend" }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("admin"));
   });
 });

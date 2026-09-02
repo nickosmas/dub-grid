@@ -214,17 +214,7 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count:
         borderBottom: "1px solid var(--dg-color-border-light)",
       }}
     >
-      <span
-        style={{
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-subtle)",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {children}
-      </span>
+      <span className="dg-type-content-group-heading">{children}</span>
       <span
         style={{
           fontSize: "var(--dg-fs-footnote)",

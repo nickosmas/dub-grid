@@ -889,6 +889,7 @@ function ReportsContent() {
             justifyContent: "space-between",
             gap: 16,
             alignItems: "flex-start",
+            flexWrap: "wrap",
             marginBottom: 20,
           }}
         >
@@ -896,8 +897,8 @@ function ReportsContent() {
             <h1
               style={{
                 color: "var(--dg-color-text-primary)",
-                fontSize: "var(--dg-fs-page-title)",
-                fontWeight: 800,
+                fontSize: "var(--dg-type-page-title-size)",
+                fontWeight: 700,
                 lineHeight: 1.1,
                 margin: 0,
               }}
@@ -911,6 +912,8 @@ function ReportsContent() {
               gap: 8,
               flexWrap: "wrap",
               justifyContent: "flex-end",
+              maxWidth: "100%",
+              minWidth: 0,
             }}
           >
             <div data-testid="reports-run-actions" style={reportsRunActionsStyle}>
@@ -1248,9 +1251,11 @@ function ReportsContent() {
 const controlLabelStyle: CSSProperties = {
   display: "grid",
   gap: 6,
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 700,
+  color: "var(--dg-type-field-title-color)",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   minWidth: 0,
 };
 
@@ -1322,7 +1327,7 @@ const calendarPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
+  boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   padding: 12,
   width: 292,
 };
@@ -1350,14 +1355,14 @@ const calendarMonthLabelStyle: CSSProperties = {
   color: "var(--dg-color-text-primary)",
   flex: 1,
   fontSize: "var(--dg-fs-body)",
-  fontWeight: 800,
+  fontWeight: 600,
   textAlign: "center",
 };
 
 const calendarInstructionStyle: CSSProperties = {
   color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-caption)",
-  fontWeight: 800,
+  fontWeight: 600,
   marginBottom: 10,
 };
 
@@ -1365,7 +1370,7 @@ const calendarWeekdayGridStyle: CSSProperties = {
   color: "var(--dg-color-text-muted)",
   display: "grid",
   fontSize: "var(--dg-fs-caption)",
-  fontWeight: 800,
+  fontWeight: 600,
   gap: 4,
   gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
   textAlign: "center",
@@ -1431,7 +1436,7 @@ const metricLabelStyle: CSSProperties = {
 
 const metricValueStyle: CSSProperties = {
   fontSize: "var(--dg-fs-title)",
-  fontWeight: 800,
+  fontWeight: 700,
 };
 
 const targetDropdownButtonStyle: CSSProperties = {
@@ -1450,7 +1455,7 @@ const targetDropdownButtonStyle: CSSProperties = {
 const targetDropdownTitleStyle: CSSProperties = {
   color: "var(--dg-color-text-primary)",
   fontSize: "var(--dg-fs-body)",
-  fontWeight: 800,
+  fontWeight: 600,
 };
 
 const targetDropdownSummaryStyle: CSSProperties = {
@@ -1468,7 +1473,7 @@ const targetDropdownPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
+  boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   maxHeight: "min(420px, calc(100vh - 80px))",
   overflowY: "auto",
   padding: 12,
@@ -1526,9 +1531,11 @@ const thStyle: CSSProperties = {
   textAlign: "left",
   padding: "12px 14px",
   borderBottom: "1px solid var(--dg-color-border)",
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 800,
+  color: "var(--dg-type-table-heading-color)",
+  fontSize: "var(--dg-type-table-heading-size)",
+  fontWeight: "var(--dg-type-table-heading-weight)",
+  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+  lineHeight: "var(--dg-type-table-heading-line-height)",
   whiteSpace: "nowrap",
 };
 

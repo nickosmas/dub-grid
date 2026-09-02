@@ -10,7 +10,7 @@ import {
 } from "@/features/account/client";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
-import type { Employee, RecurringShift, ShiftMap, ShiftRequest } from "@/types";
+import type { Employee, RecurringShift, ShiftMap } from "@/types";
 
 interface UseSelfProfileDataOptions {
   orgId: string | null;
@@ -23,10 +23,9 @@ interface UseSelfProfileDataResult {
   managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
-  shiftRequests: ShiftRequest[];
-  auditNames: Map<string, string>;
   isLoading: boolean;
   error: string | null;
+  refetch: () => Promise<unknown>;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
   setManagementDepartmentIds: Dispatch<SetStateAction<number[]>>;
@@ -52,8 +51,6 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
   const managementDepartmentIds = data?.managementDepartmentIds ?? [];
   const shifts = data?.shifts ?? {};
   const recurringShifts = data?.recurringShifts ?? [];
-  const shiftRequests = data?.shiftRequests ?? [];
-  const auditNames = new Map(data?.auditNames ?? []);
 
   const setProfile = useCallback<Dispatch<SetStateAction<SelfProfileRecord | null>>>(
     (nextValue) => {
@@ -121,8 +118,6 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
     managementDepartmentIds,
     shifts,
     recurringShifts,
-    shiftRequests,
-    auditNames,
     isLoading: authLoading || (!!user && selfQuery.isLoading),
     error: selfQuery.error
       ? extractErrorMessage(
@@ -130,6 +125,7 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
           "We couldn't load your profile. Refresh and try again.",
         )
       : null,
+    refetch: selfQuery.refetch,
     setProfile,
     setEmployee,
     setManagementDepartmentIds,

@@ -17,11 +17,12 @@ import {
 
 const labelStyle: CSSProperties = {
   display: "block",
-  fontSize: "var(--dg-fs-footnote)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-muted)",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
+  textTransform: "var(--dg-type-field-title-transform)",
   marginBottom: 5,
 };
 

@@ -6,7 +6,9 @@ import {
 } from "@dubgrid/contracts";
 import {
   insertMobileAuditLogEntry,
+  replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
+  rollbackMobilePendingInvitationAccessReplacement,
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
 } from "@dubgrid/data-access";
@@ -18,6 +20,12 @@ import {
   managementConflictResponse,
   requireManagementRosterActor,
 } from "@/features/mobile/server/management-roster";
+import {
+  createInvitationEmailUnavailableResponse,
+  getInvitationEmailConfig,
+  sendInvitationEmail,
+} from "@/features/mobile/server/invitation-email";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +85,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
     departmentIds.includes(id),
   );
 
+  let replacementIds: {
+    previousInvitationId: string;
+    replacementInvitationId: string;
+  } | null = null;
+
   if (managementUser.source === "member" && managementUser.userId) {
     const updated = await updateMobileMembershipAccessRow(auth.serviceClient, {
       orgId: auth.currentOrg.id,
@@ -88,28 +101,85 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
     });
     if (!updated) return managementConflictResponse();
   } else if (managementUser.invitationId) {
-    const updated = await updateMobileInvitationAssignmentsRow(auth.serviceClient, {
-      orgId: auth.currentOrg.id,
-      invitationId: managementUser.invitationId,
-      expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-      roleToAssign: parsed.data.orgRole,
-      departmentIds,
-      deptAdminIds: keptDeptAdminIds,
-    });
-    if (!updated) return managementConflictResponse();
+    if (managementUser.orgRole !== parsed.data.orgRole) {
+      const emailConfig = getInvitationEmailConfig();
+      if (!emailConfig) return createInvitationEmailUnavailableResponse();
+
+      const replacement = await replaceMobilePendingInvitationAccessRow(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        invitationId: managementUser.invitationId,
+        expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+        roleToAssign: parsed.data.orgRole,
+        invitedBy: auth.user.id,
+        departmentIds,
+        deptAdminIds: keptDeptAdminIds,
+      });
+      replacementIds = {
+        previousInvitationId: replacement.previousInvitationId,
+        replacementInvitationId: replacement.invitation.id,
+      };
+
+      try {
+        await sendInvitationEmail({
+          config: emailConfig,
+          token: replacement.invitation.token,
+          email: replacement.invitation.email,
+          orgName: auth.currentOrg.name || "your organization",
+          inviterName: auth.user.email ?? null,
+        });
+      } catch (error) {
+        await rollbackMobilePendingInvitationAccessReplacement(auth.serviceClient, {
+          orgId: auth.currentOrg.id,
+          previousInvitationId: replacement.previousInvitationId,
+          replacementInvitationId: replacement.invitation.id,
+        }).catch((rollbackError) => {
+          logger.error(
+            { err: rollbackError, personId, ...replacementIds },
+            "Failed to roll back management-roster invitation replacement",
+          );
+        });
+        logger.error(
+          { err: error, personId, invitationId: replacement.invitation.id },
+          "Failed to send replacement management invitation",
+        );
+        return NextResponse.json(
+          {
+            error:
+              "We couldn't send the replacement invitation. The original invitation is still active.",
+          },
+          { status: 502 },
+        );
+      }
+    } else {
+      const updated = await updateMobileInvitationAssignmentsRow(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        invitationId: managementUser.invitationId,
+        expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+        roleToAssign: parsed.data.orgRole,
+        departmentIds,
+        deptAdminIds: keptDeptAdminIds,
+      });
+      if (!updated) return managementConflictResponse();
+    }
   }
 
   await insertMobileAuditLogEntry(auth.serviceClient, {
     org_id: auth.currentOrg.id,
     actor_id: auth.user.id,
     actor_email: auth.user.email ?? null,
-    action: managementUser.source === "member" ? "membership.updated" : "invitation.updated",
+    action:
+      managementUser.source === "member"
+        ? "membership.updated"
+        : replacementIds
+          ? "invitation.access_replaced"
+          : "invitation.updated",
     resource_type: managementUser.source === "member" ? "organization_membership" : "invitation",
     resource_id: managementUser.userId ?? managementUser.invitationId ?? personId,
     details: {
       changedFields: ["orgRole", "departmentIds"],
       orgRole: parsed.data.orgRole,
       departmentIds,
+      ...(replacementIds ?? {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

@@ -72,8 +72,10 @@
   `tailwind.config.js`
 - No inline styles
 - Dark mode first, light mode as an option
-- Neutral grays carry a tint: light-mode slate (blue-tinted), dark-mode
-  zinc - any new gray must match
+- Neutral grays use one consistent family: light mode is hue-neutral and dark
+  mode uses zinc. Brand and status colors retain their semantic hue. New
+  interface grays must use the existing semantic tokens instead of introducing
+  local hex values or slate/gray/zinc utility classes.
 - Never hardcode a default English term for an org-customizable label
   (Wings/Focus Areas, Skill Levels/Certifications, etc.) - read it
   through the org's terminology config

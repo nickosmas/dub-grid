@@ -6,8 +6,8 @@ body {
 
 .dg-fatal {
   --bg: #ffffff;
-  --fg: #0f172a;
-  --muted: #475569;
+  --fg: #171717;
+  --muted: #525252;
   --brand: #2563eb;
   min-height: 100vh;
   display: flex;

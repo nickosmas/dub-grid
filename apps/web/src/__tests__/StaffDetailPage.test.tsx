@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
@@ -12,7 +13,8 @@ import {
 } from "@/features/employees/client";
 import { toast } from "sonner";
 import { createOrganizationInvitation } from "@/features/organization/client";
-import { fetchRecurringShifts, fetchShiftRequests } from "@/features/schedule/client";
+import { fetchRecurringShifts } from "@/features/schedule/client";
+import { getProfileOverviewDateRange } from "@/features/account/shared/profile-schedule";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -24,10 +26,11 @@ const mockInvalidateQueries = vi.fn();
 // and StaffDetailPage lists it in effect deps, so a fresh object per render
 // would re-run the fetch effect forever.
 const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
+let mockSearchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 vi.mock("sonner", () => ({
@@ -56,16 +59,34 @@ vi.mock("@/components/AuthProvider", () => ({
 // `mockInvalidateQueries` is retained for compatibility but is unused.
 void mockInvalidateQueries;
 
-vi.mock("@/features/employees/client", () => ({
-  fetchEmployeeById: vi.fn(),
-  fetchEmployeeShifts: vi.fn(),
-  fetchEmployeeInvitations: vi.fn(),
-  fetchEmployeeRoleHistory: vi.fn(),
-  updateEmployee: vi.fn(),
-  deactivateEmployee: vi.fn(),
-  activateEmployee: vi.fn(),
-  removeEmployee: vi.fn(),
-}));
+vi.mock("@/features/employees/client", () => {
+  class MockEmployeeProfileConflictError extends Error {
+    constructor(public readonly latestEmployee: unknown) {
+      super("Employee details changed elsewhere.");
+    }
+  }
+  class MockEmployeeContactConflictError extends Error {}
+  class MockEmployeeStatusConflictError extends Error {
+    constructor(public readonly latestEmployee: unknown) {
+      super("Employee status changed elsewhere.");
+    }
+  }
+  class MockEmployeeAccessDeniedError extends Error {}
+  return {
+    EmployeeAccessDeniedError: MockEmployeeAccessDeniedError,
+    EmployeeContactConflictError: MockEmployeeContactConflictError,
+    EmployeeProfileConflictError: MockEmployeeProfileConflictError,
+    EmployeeStatusConflictError: MockEmployeeStatusConflictError,
+    fetchEmployeeById: vi.fn(),
+    fetchEmployeeShifts: vi.fn(),
+    fetchEmployeeInvitations: vi.fn(),
+    fetchEmployeeRoleHistory: vi.fn(),
+    updateEmployee: vi.fn(),
+    deactivateEmployee: vi.fn(),
+    activateEmployee: vi.fn(),
+    removeEmployee: vi.fn(),
+  };
+});
 
 vi.mock("@/features/organization/client", () => ({
   revokeInvitation: vi.fn(),
@@ -75,8 +96,6 @@ vi.mock("@/features/organization/client", () => ({
 
 vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(),
-  fetchShiftRequests: vi.fn(),
-  fetchScheduleActorNames: vi.fn().mockResolvedValue({ names: {} }),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
@@ -88,17 +107,18 @@ vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
 }));
 
 vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
-  OverviewTab: () => (
+  OverviewTab: ({ scheduleOverview }: { scheduleOverview?: ReactNode }) => (
     <div>
       <div>Overview content</div>
       <div>Account summary</div>
       <div>Employment summary</div>
+      {scheduleOverview}
     </div>
   ),
 }));
 
-vi.mock("@/components/staff-detail/tabs/ScheduleTab", () => ({
-  ScheduleTab: () => <div>Schedule panel</div>,
+vi.mock("@/components/staff-detail/RecurringScheduleCard", () => ({
+  RecurringScheduleCard: () => <div>Recurring schedule card</div>,
 }));
 
 vi.mock("@/components/staff-detail/tabs/ActivityTab", () => ({
@@ -109,16 +129,19 @@ let lastEditEmployeePanelSave: ((updatedEmployee: unknown) => void | Promise<voi
 let lastEditEmployeePanelSaveWithReinvite:
   ((updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>) | null = null;
 let lastEditEmployeePanelPendingInvitation: unknown = undefined;
+let lastEditEmployeePanelPersistent = false;
 
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: (props: {
     onSave: (updatedEmployee: unknown) => void | Promise<void>;
     onSaveWithReinvite?: (updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>;
     pendingInvitation?: unknown;
+    persistent?: boolean;
   }) => {
     lastEditEmployeePanelSave = props.onSave;
     lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
     lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
+    lastEditEmployeePanelPersistent = props.persistent ?? false;
     return <div>Edit details form</div>;
   },
 }));
@@ -138,7 +161,6 @@ const mockedFetchEmployeeShifts = vi.mocked(fetchEmployeeShifts);
 const mockedFetchRecurringShifts = vi.mocked(fetchRecurringShifts);
 const mockedFetchEmployeeInvitations = vi.mocked(fetchEmployeeInvitations);
 const mockedFetchEmployeeRoleHistory = vi.mocked(fetchEmployeeRoleHistory);
-const mockedFetchShiftRequests = vi.mocked(fetchShiftRequests);
 
 const mockEmployee = makeEmployee({
   id: "emp-1",
@@ -152,6 +174,7 @@ const mockEmployee = makeEmployee({
 describe("StaffDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
 
     // SettingsShell reads a sidebar-collapse preference from localStorage on
     // mount; jsdom in this project doesn't provide it by default.
@@ -171,6 +194,7 @@ describe("StaffDetailPage", () => {
         focusAreaLabel: "Focus Areas",
         certificationLabel: "Certification",
         roleLabel: "Roles",
+        timezone: "Pacific/Honolulu",
       },
       focusAreas: [],
       assignments: [],
@@ -218,8 +242,10 @@ describe("StaffDetailPage", () => {
       },
     ]);
     mockedFetchEmployeeRoleHistory.mockResolvedValue([]);
-    mockedFetchShiftRequests.mockResolvedValue([]);
-    mockedUpdateEmployee.mockResolvedValue(undefined);
+    mockedUpdateEmployee.mockImplementation(async (employee) => ({
+      ...employee,
+      version: employee.version + 1,
+    }));
   });
 
   afterEach(() => {
@@ -243,6 +269,7 @@ describe("StaffDetailPage", () => {
       expect(mockToastInfo).toHaveBeenCalledWith("You don't have access to employee details.");
       expect(mockReplace).toHaveBeenCalledWith("/people");
     });
+    expect(mockedFetchEmployeeInvitations).not.toHaveBeenCalled();
   });
 
   it("defaults to the overview section", async () => {
@@ -250,29 +277,65 @@ describe("StaffDetailPage", () => {
 
     expect(await screen.findByText("Work details")).toBeInTheDocument();
     expect(screen.getByText("Personal details header")).toBeInTheDocument();
-    expect(screen.queryByText("Schedule panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
   });
 
-  it("uses the same account and work navigation structure as My Profile", async () => {
+  it("bounds the staff Overview shift load to the shared twelve-week metrics window", async () => {
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await screen.findByText("Work details");
+    const range = getProfileOverviewDateRange(new Date(), "Pacific/Honolulu");
+    expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
+      "emp-1",
+      "org-1",
+      expect.any(Map),
+      expect.any(Map),
+      range.startDate,
+      range.endDate,
+    );
+  });
+
+  it("uses a flat primary profile navigation with Activity in the footer", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Work details")).toBeInTheDocument();
-    expect(screen.getByText("Account")).toBeInTheDocument();
-    expect(screen.getByText("My work")).toBeInTheDocument();
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByText("My work")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "href",
       "/people/emp-1?section=overview",
     );
-    expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute(
-      "href",
-      "/people/emp-1?section=schedule",
-    );
+    expect(screen.queryByRole("link", { name: "Schedule" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute(
       "href",
       "/people/emp-1?section=activity",
     );
+  });
+
+  it("maps a legacy Schedule link to Overview", async () => {
+    mockSearchParams = new URLSearchParams("section=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByText("Overview content")).toBeInTheDocument();
+  });
+
+  it("shows recurring schedules in Overview only when permitted", async () => {
+    mockUsePermissions.mockReturnValue({
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: true,
+      canManageEmployees: true,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockSearchParams = new URLSearchParams("section=overview");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByText("Recurring schedule card")).toBeInTheDocument();
   });
 
   it("uses a focused sidebar instead of an actions menu", async () => {
@@ -386,6 +449,7 @@ describe("StaffDetailPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
     expect(screen.getByText("Management access editor")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("keeps the work-details form focused on biodata, without invite UI leaking in", async () => {
@@ -393,6 +457,8 @@ describe("StaffDetailPage", () => {
     await screen.findByText("Work details");
 
     expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    expect(lastEditEmployeePanelPersistent).toBe(true);
+    expect(screen.getByRole("link", { name: "Back to People" })).toHaveAttribute("href", "/people");
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();
   });

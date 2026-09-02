@@ -6,6 +6,8 @@ const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
+const replaceMobilePendingInvitationAccessRow = vi.fn();
+const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
 const updateMobileInvitationAssignmentsRow = vi.fn();
 const updateMobileMembershipAccessRow = vi.fn();
 const insertMobileAuditLogEntry = vi.fn();
@@ -20,7 +22,9 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileManagementRosterRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
+  rollbackMobilePendingInvitationAccessReplacement,
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
 }));
@@ -105,6 +109,7 @@ describe("mobile management-users routes", () => {
     getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
     sendInvitationEmail.mockResolvedValue(undefined);
     revokeMobileEmployeeInvitationRow.mockResolvedValue(null);
+    rollbackMobilePendingInvitationAccessReplacement.mockResolvedValue(true);
     fetchMobileDepartmentRows.mockResolvedValue([
       { id: 9, name: "Operations", abbr: "OPS", type: "management" },
       { id: 4, name: "North Wing", abbr: "NW", type: "scheduled" },
@@ -280,8 +285,15 @@ describe("mobile management-users routes", () => {
       );
     });
 
-    it("re-points a pending invitation rather than the membership", async () => {
-      updateMobileInvitationAssignmentsRow.mockResolvedValue({ id: INVITATION_ID });
+    it("revokes and replaces a pending invitation when its role changes", async () => {
+      replaceMobilePendingInvitationAccessRow.mockResolvedValue({
+        previousInvitationId: INVITATION_ID,
+        invitation: makeInvitationRow({
+          id: "99999999-9999-4999-8999-999999999999",
+          role_to_assign: "super_admin",
+          token: "replacement-token",
+        }),
+      });
 
       const { PUT } = await import("./management-user");
       const response = await PUT(
@@ -297,11 +309,50 @@ describe("mobile management-users routes", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(updateMobileInvitationAssignmentsRow).toHaveBeenCalledWith(
+      expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
         {},
         expect.objectContaining({ invitationId: INVITATION_ID, roleToAssign: "super_admin" }),
       );
+      expect(updateMobileInvitationAssignmentsRow).not.toHaveBeenCalled();
       expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();
+      expect(sendInvitationEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ token: "replacement-token" }),
+      );
+    });
+
+    it("restores the old management invitation when replacement delivery fails", async () => {
+      replaceMobilePendingInvitationAccessRow.mockResolvedValue({
+        previousInvitationId: INVITATION_ID,
+        invitation: makeInvitationRow({
+          id: "99999999-9999-4999-8999-999999999999",
+          role_to_assign: "super_admin",
+          token: "replacement-token",
+        }),
+      });
+      sendInvitationEmail.mockRejectedValue(new Error("resend down"));
+
+      const { PUT } = await import("./management-user");
+      const response = await PUT(
+        makeRequest(
+          {
+            orgRole: "super_admin",
+            managementDepartmentIds: [9],
+            expectedUpdatedAt: "2026-05-01T00:00:00Z",
+          },
+          "PUT",
+        ),
+        makeContext(`inv:${INVITATION_ID}`),
+      );
+
+      expect(response.status).toBe(502);
+      expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
+        {},
+        {
+          orgId: "44444444-4444-4444-8444-444444444444",
+          previousInvitationId: INVITATION_ID,
+          replacementInvitationId: "99999999-9999-4999-8999-999999999999",
+        },
+      );
     });
 
     it("409s on a stale expectedUpdatedAt", async () => {

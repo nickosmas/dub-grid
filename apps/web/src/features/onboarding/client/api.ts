@@ -37,8 +37,13 @@ export function fetchOnboardingStatus(orgId: string): Promise<OnboardingStatus> 
   return requestOnboardingJson<OnboardingStatus>(`/api/onboarding?${params}`);
 }
 
-export function completeOnboarding(orgId: string): Promise<{ success: true }> {
-  return requestOnboardingJson<{ success: true }>("/api/onboarding", {
+export interface OnboardingCompletion {
+  success: true;
+  completedAt: string;
+}
+
+export function completeOnboarding(orgId: string): Promise<OnboardingCompletion> {
+  return requestOnboardingJson<OnboardingCompletion>("/api/onboarding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ orgId }),

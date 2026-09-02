@@ -100,7 +100,7 @@ function StatusBadge({ status }: { status: string | null }) {
         background: tone.bg,
         color: tone.text,
         fontSize: "var(--dg-fs-caption)",
-        fontWeight: 800,
+        fontWeight: 600,
         textTransform: "capitalize",
       }}
     >
@@ -154,9 +154,9 @@ function BillingMetric({
         <div
           style={{
             minWidth: 0,
-            fontSize: "11px",
-            color: "var(--dg-color-text-muted)",
-            fontWeight: 700,
+            fontSize: "var(--dg-type-metadata-size)",
+            color: "var(--dg-type-metadata-color)",
+            fontWeight: 500,
           }}
         >
           {label}
@@ -301,7 +301,7 @@ function BillingOperationDetailsDialog({
             style={{
               color: "var(--dg-color-text-primary)",
               fontSize: "var(--dg-fs-card-title)",
-              fontWeight: 800,
+              fontWeight: 600,
             }}
           >
             {operation.label}
@@ -327,16 +327,7 @@ function BillingOperationDetailsDialog({
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div
-            style={{
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 800,
-              textTransform: "uppercase",
-            }}
-          >
-            Event details
-          </div>
+          <div className="dg-type-content-group-heading">Event details</div>
           {details.length > 0 ? (
             <DetailRows rows={details.map((item) => [item.label, item.value])} />
           ) : (
@@ -380,7 +371,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
         style={{
           color: "var(--dg-color-text-muted)",
           fontSize: "var(--dg-fs-caption)",
-          fontWeight: 800,
+          fontWeight: 600,
         }}
       >
         {label}
@@ -389,7 +380,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
         style={{
           color: "var(--dg-color-text-primary)",
           fontSize: "var(--dg-fs-label)",
-          fontWeight: 650,
+          fontWeight: 600,
           margin: 0,
           overflowWrap: "anywhere",
         }}

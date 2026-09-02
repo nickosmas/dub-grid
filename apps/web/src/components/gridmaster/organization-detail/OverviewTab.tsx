@@ -336,7 +336,7 @@ export function OverviewTab({
                 }}
               >
                 <div>
-                  <label style={labelStyle}>Shift Display</label>
+                  <label style={labelStyle}>Shift display</label>
                   <CustomSelect
                     value={editShiftDisplayMode}
                     options={[
@@ -361,7 +361,7 @@ export function OverviewTab({
                   </label>
                 </div>
                 <div>
-                  <label style={labelStyle}>Data Retention (days)</label>
+                  <label style={labelStyle}>Data retention (days)</label>
                   <input
                     className="dg-input"
                     type="number"
@@ -449,7 +449,7 @@ export function OverviewTab({
           {editing ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               <div>
-                <label style={labelStyle}>Focus Areas</label>
+                <label style={labelStyle}>Focus areas</label>
                 <input
                   className="dg-input"
                   value={editFocusAreaLabel}

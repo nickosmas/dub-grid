@@ -35,7 +35,7 @@ export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChange
           Keep editing
         </Button>
         <Button className="dg-btn dg-btn-danger" onClick={onDiscard}>
-          Discard changes
+          Discard
         </Button>
       </div>
     </Modal>

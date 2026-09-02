@@ -32,6 +32,12 @@ export interface ShellNavGroup<TId extends string = string> {
   items: ShellNavItem<TId>[];
 }
 
+export interface ShellLeadingNavigation {
+  href: string;
+  label: string;
+  Icon: NavIconComponent;
+}
+
 export interface SettingsShellProps<TId extends string = string> {
   /** URL base for sidebar links — e.g. "/settings" or "/account". */
   basePath: string;
@@ -39,6 +45,8 @@ export interface SettingsShellProps<TId extends string = string> {
   navGroups: ShellNavGroup<TId>[];
   /** Group IDs that pin to the sidebar footer instead of scrolling. */
   footerGroupIds?: string[];
+  /** Hide labels for the scrolling groups while retaining footer group labels. */
+  hideContentGroupLabels?: boolean;
   /** Section to load when the URL has no `?section=` param. */
   defaultSection: TId;
   /** The active section ID — usually resolved upstream from the URL. */
@@ -47,6 +55,8 @@ export interface SettingsShellProps<TId extends string = string> {
   maxWidth?: number;
   /** Optional banner above the active panel (e.g. permission notice). */
   banner?: React.ReactNode;
+  /** Optional return navigation rendered first in the desktop sidebar and above content on mobile. */
+  leadingNavigation?: ShellLeadingNavigation;
   /** The active panel itself. Caller owns the switch on activeSection. */
   children: React.ReactNode;
 }
@@ -60,10 +70,12 @@ export function SettingsShell<TId extends string = string>({
   basePath,
   navGroups,
   footerGroupIds = [],
+  hideContentGroupLabels = false,
   defaultSection,
   activeSection,
   maxWidth = 1120,
   banner,
+  leadingNavigation,
   children,
 }: SettingsShellProps<TId>) {
   const isMobile = useMediaQuery(MOBILE);
@@ -107,11 +119,14 @@ export function SettingsShell<TId extends string = string>({
             icon: <item.Icon />,
             href: hrefFor(item.id),
             active: isActive,
-            group: group.label,
+            group:
+              hideContentGroupLabels && !footerGroupIds.includes(group.id)
+                ? undefined
+                : group.label,
           };
         }),
       ),
-    [navGroups, activeSection, hrefFor],
+    [activeSection, footerGroupIds, hideContentGroupLabels, hrefFor, navGroups],
   );
   useSetMobileSubNav(subNavItems);
 
@@ -122,7 +137,8 @@ export function SettingsShell<TId extends string = string>({
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
           height: "calc(100dvh - var(--dg-app-shell-header-height))",
-          width: "100%",
+          flex: 1,
+          minWidth: 0,
           overflow: "hidden",
           position: "relative",
         }}
@@ -138,11 +154,33 @@ export function SettingsShell<TId extends string = string>({
             }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
+              {leadingNavigation && (
+                <SidebarGroup className="pb-0">
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          render={<Link href={leadingNavigation.href} />}
+                          tooltip={leadingNavigation.label}
+                          className="h-9 text-[var(--dg-type-navigation-color)] transition-all ease-in-out duration-150"
+                        >
+                          <span className="flex shrink-0 items-center justify-center">
+                            <leadingNavigation.Icon />
+                          </span>
+                          <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                            {leadingNavigation.label}
+                          </span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
               {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
-                  <SidebarGroupLabel className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0">
-                    {group.label}
-                  </SidebarGroupLabel>
+                  {!hideContentGroupLabels && (
+                    <SidebarGroupLabel className="px-3 pb-0">{group.label}</SidebarGroupLabel>
+                  )}
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {group.items.map((item) => {
@@ -153,18 +191,14 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)]"
                             >
-                              <span
-                                className={
-                                  isActive
-                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                                }
-                              >
+                              <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                                 <item.Icon />
                               </span>
-                              <span className="font-semibold">{item.label}</span>
+                              <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                                {item.label}
+                              </span>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -180,9 +214,7 @@ export function SettingsShell<TId extends string = string>({
               )}
               {footerGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
-                  <SidebarGroupLabel className="px-3 pt-2 pb-0 text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)]">
-                    {group.label}
-                  </SidebarGroupLabel>
+                  <SidebarGroupLabel className="px-3 pt-2 pb-0">{group.label}</SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {group.items.map((item) => {
@@ -193,18 +225,14 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                              className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)]"
                             >
-                              <span
-                                className={
-                                  isActive
-                                    ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                    : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                                }
-                              >
+                              <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                                 <item.Icon />
                               </span>
-                              <span className="font-semibold">{item.label}</span>
+                              <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                                {item.label}
+                              </span>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -218,7 +246,7 @@ export function SettingsShell<TId extends string = string>({
                   <SidebarMenuButton
                     onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                     tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--dg-color-text-faint)] hover:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150"
+                    className="h-9 text-[var(--dg-type-navigation-color)] transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
                       <svg
@@ -239,7 +267,9 @@ export function SettingsShell<TId extends string = string>({
                         <polyline points="6 17 11 12 6 7" />
                       </svg>
                     </span>
-                    <span className="font-semibold">Collapse Menu</span>
+                    <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                      Collapse Menu
+                    </span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -260,13 +290,24 @@ export function SettingsShell<TId extends string = string>({
             alignItems: "center",
           }}
         >
+          {isMobile && leadingNavigation && (
+            <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>
+              <Link
+                href={leadingNavigation.href}
+                className="inline-flex items-center gap-1.5 text-[length:var(--dg-type-navigation-size)] font-medium text-[var(--dg-type-navigation-color)] transition-colors hover:text-[var(--dg-color-text-secondary)]"
+              >
+                <leadingNavigation.Icon />
+                {leadingNavigation.label}
+              </Link>
+            </div>
+          )}
           {activeItem && (
             <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
               <h1
                 style={{
-                  fontSize: "var(--dg-fs-page-title)",
+                  fontSize: "var(--dg-type-page-title-size)",
                   fontWeight: 700,
-                  color: "var(--dg-color-text-primary)",
+                  color: "var(--dg-type-attention-primary-color)",
                   margin: 0,
                 }}
               >
@@ -276,7 +317,7 @@ export function SettingsShell<TId extends string = string>({
                 <p
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
+                    color: "var(--dg-type-attention-secondary-color)",
                     margin: "5px 0 0",
                     lineHeight: 1.5,
                   }}

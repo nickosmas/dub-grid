@@ -450,6 +450,42 @@ describe("ProfileScreen", () => {
     expect(screen.getByText("Name change")).toBeInTheDocument();
   });
 
+  it("submits one cancellation when Cancel request is pressed twice in the same tick", () => {
+    const mutate = vi.fn();
+    useMutation.mockReturnValue({ mutate, isPending: false, variables: undefined });
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("change-requests")) {
+        return {
+          data: {
+            requests: [
+              {
+                id: "11111111-1111-1111-1111-111111111111",
+                type: "profile_update",
+                status: "pending",
+                createdAt: "2024-02-01T15:30:00.000Z",
+              },
+            ],
+          },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+      if (key.includes("profile")) {
+        return { data: profileData, error: null, isLoading: false, refetch: vi.fn() };
+      }
+      return { data: bootstrapData, error: null, isLoading: false, refetch: vi.fn() };
+    });
+
+    render(<ProfileScreen />);
+    const cancel = screen.getByRole("button", { name: "Cancel request" });
+    fireEvent.click(cancel);
+    fireEvent.click(cancel);
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
   it("shows pending account deletion request review state", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");

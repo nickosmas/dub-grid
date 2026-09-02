@@ -7,6 +7,9 @@ import {
   markOnboardingComplete,
   clearOnboardingPhase,
 } from "@/features/onboarding/client";
+import type { OrganizationBootstrap } from "@/features/organization/client";
+import { broadcastInvalidation } from "@/lib/cache-broadcast";
+import { queryKeys } from "@/lib/query-keys";
 
 export interface StepConfig {
   id: string;
@@ -83,17 +86,26 @@ export function useOnboardingState(
   );
 
   const completeOnboarding = useCallback(async () => {
-    await completeOnboardingRequest(orgId);
+    const completion = await completeOnboardingRequest(orgId);
     localStorage.removeItem(key);
-    // Synchronously update cache (not invalidate) to avoid async refetch race
-    // that flashes the underlying route before navigation completes
-    queryClient.setQueryData(["onboarding-status", userId, orgId], {
+    const statusQueryKey = ["onboarding-status", userId, orgId] as const;
+    const bootstrapQueryKey = queryKeys.org.bootstrap();
+
+    await queryClient.cancelQueries({ queryKey: bootstrapQueryKey });
+    queryClient.setQueryData(statusQueryKey, {
       completed: true,
-      completedAt: new Date().toISOString(),
+      completedAt: completion.completedAt,
       tooltipToursCompleted: {},
     });
-    // Session guard: survives remounts/refetches so no wizard re-appears after
-    // completion this session (e.g. the config→orientation double-show).
+    queryClient.setQueryData<OrganizationBootstrap>(bootstrapQueryKey, (current) => {
+      if (!current?.org || current.org.id !== orgId) return current;
+      return {
+        ...current,
+        entryGate: { ...current.entryGate, onboardingCompleted: true },
+      };
+    });
+    broadcastInvalidation(statusQueryKey);
+    broadcastInvalidation(bootstrapQueryKey);
     markOnboardingComplete(userId, orgId);
     clearOnboardingPhase(userId, orgId);
   }, [userId, orgId, key, queryClient]);

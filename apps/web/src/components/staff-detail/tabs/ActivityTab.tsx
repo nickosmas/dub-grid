@@ -106,7 +106,10 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
           <div className="dg-card-title flex items-center gap-2">
             <History className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
             History
-            <Badge variant="secondary" className="ml-1 h-4 px-1.5 py-0 font-mono text-[10px]">
+            <Badge
+              variant="secondary"
+              className="ml-1 h-4 px-1.5 py-0 font-mono text-[length:var(--dg-type-badge-size)]"
+            >
               {timeline.length}
             </Badge>
           </div>
@@ -161,7 +164,9 @@ export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabP
                         {event.fromRole && event.toRole ? (
                           <>
                             <RoleBadge role={event.fromRole} />
-                            <span className="text-[11px] text-[var(--dg-color-text-muted)]">→</span>
+                            <span className="text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
+                              →
+                            </span>
                             <RoleBadge role={event.toRole} />
                           </>
                         ) : null}
@@ -209,7 +214,7 @@ function EventBadge({ event }: { event: TimelineEvent }) {
   return (
     <Badge
       variant="outline"
-      className="h-5 px-2 py-0 text-[11px] font-semibold"
+      className="h-5 px-2 py-0 text-[length:var(--dg-type-badge-size)] font-medium"
       style={{
         backgroundColor: tone.bg,
         borderColor: tone.border,
@@ -255,7 +260,7 @@ function RoleBadge({ role }: { role: string }) {
   return (
     <Badge
       variant="outline"
-      className="h-4 px-1.5 py-0 text-[10px] capitalize"
+      className="h-4 px-1.5 py-0 text-[length:var(--dg-type-badge-size)] capitalize"
       style={{
         backgroundColor: colors.bg,
         color: colors.text,

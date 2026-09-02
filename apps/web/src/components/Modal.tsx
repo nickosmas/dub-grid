@@ -4,6 +4,7 @@ import { useCallback, useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import React from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -135,7 +136,8 @@ export default function Modal({
             <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
           ) : null}
         </div>
-        {children}
+        <div className="dg-modal-scroll-region">{children}</div>
+        <ScrollOverflowCue />
       </div>
     </div>,
     document.body,

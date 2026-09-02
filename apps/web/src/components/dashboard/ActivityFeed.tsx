@@ -144,7 +144,7 @@ export default function ActivityFeed({
             {defaultCollapsed && (
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: "var(--dg-type-metadata-size)",
                   color: "var(--dg-color-text-subtle)",
                   transition: "transform 0.15s",
                   transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
@@ -200,10 +200,9 @@ export default function ActivityFeed({
                       </div>
                       <div
                         style={{
-                          fontSize: 10,
+                          fontSize: "var(--dg-type-metadata-size)",
                           color: "var(--dg-color-text-subtle)",
                           marginTop: 3,
-                          textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}
                       >
@@ -217,7 +216,7 @@ export default function ActivityFeed({
                 <div
                   style={{
                     paddingTop: 10,
-                    fontSize: 11,
+                    fontSize: "var(--dg-type-metadata-size)",
                     fontWeight: 600,
                     color: "var(--dg-color-text-subtle)",
                   }}

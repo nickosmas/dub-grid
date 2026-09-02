@@ -76,7 +76,7 @@ export function ManagementUserInviteSheet({
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
-  onSubmit: (body: MobileManagementUserInviteBody) => void;
+  onSubmit: (body: MobileManagementUserInviteBody) => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -121,12 +121,12 @@ export function ManagementUserInviteSheet({
     onClose: onDismiss,
   });
 
-  function submit() {
+  function submit(): Promise<unknown> | undefined {
     if (!isValid) {
       setShowErrors(true);
       return;
     }
-    onSubmit({
+    return onSubmit({
       firstName: normalizeStaffName(draft.firstName),
       lastName: normalizeStaffName(draft.lastName),
       email: draft.email.trim(),

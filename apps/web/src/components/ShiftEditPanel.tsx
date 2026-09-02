@@ -36,6 +36,7 @@ import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
@@ -1025,11 +1026,11 @@ export default function ShiftEditPanel({
 
   const sectionLabel: React.CSSProperties = {
     marginBottom: 8,
-    fontSize: "var(--dg-fs-badge)",
-    fontWeight: 700,
-    color: "var(--dg-color-text-subtle)",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    fontSize: "var(--dg-type-content-group-heading-size)",
+    fontWeight: "var(--dg-type-content-group-heading-weight)",
+    color: "var(--dg-type-content-group-heading-color)",
+    letterSpacing: "var(--dg-type-content-group-heading-letter-spacing)",
+    lineHeight: "var(--dg-type-content-group-heading-line-height)",
   };
 
   const hasSwapTimeConflict = useCallback(
@@ -1984,11 +1985,11 @@ export default function ShiftEditPanel({
         >
           <div
             style={{
-              fontSize: "var(--dg-fs-badge)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-subtle)",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              color: "var(--dg-type-field-title-color)",
+              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+              lineHeight: "var(--dg-type-field-title-line-height)",
             }}
           >
             Your shift
@@ -2043,11 +2044,11 @@ export default function ShiftEditPanel({
             <div>
               <div
                 style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
+                  fontSize: "var(--dg-type-field-title-size)",
+                  fontWeight: "var(--dg-type-field-title-weight)",
+                  color: "var(--dg-type-field-title-color)",
+                  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                  lineHeight: "var(--dg-type-field-title-line-height)",
                   marginBottom: 4,
                 }}
               >
@@ -2093,11 +2094,11 @@ export default function ShiftEditPanel({
             <div style={{ borderTop: "1px solid var(--dg-color-border)", paddingTop: 12 }}>
               <div
                 style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
+                  fontSize: "var(--dg-type-field-title-size)",
+                  fontWeight: "var(--dg-type-field-title-weight)",
+                  color: "var(--dg-type-field-title-color)",
+                  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                  lineHeight: "var(--dg-type-field-title-line-height)",
                   marginBottom: 4,
                 }}
               >
@@ -2222,7 +2223,7 @@ export default function ShiftEditPanel({
                     textAlign: "center",
                     color: "var(--dg-color-text-primary)",
                     fontSize: "var(--dg-fs-body-sm)",
-                    fontWeight: 800,
+                    fontWeight: 600,
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -2301,7 +2302,7 @@ export default function ShiftEditPanel({
                     <span
                       style={{
                         fontSize: "var(--dg-fs-label)",
-                        fontWeight: 800,
+                        fontWeight: 600,
                       }}
                     >
                       {new Date(`${date}T00:00:00`).getDate()}
@@ -2353,7 +2354,7 @@ export default function ShiftEditPanel({
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       marginTop: 4,
-                      color: "var(--dg-color-text-faint)",
+                      color: "var(--dg-color-text-label)",
                     }}
                   >
                     Try another day.
@@ -2675,7 +2676,7 @@ export default function ShiftEditPanel({
           top: -10,
           left: 12,
           fontSize: "var(--dg-fs-badge)",
-          fontWeight: 800,
+          fontWeight: 600,
           letterSpacing: "0.05em",
           background: getPanelDiffBadgeBackground(badge.kind),
           color: "var(--dg-color-text-inverse)",
@@ -2735,7 +2736,7 @@ export default function ShiftEditPanel({
           <MaybeHint content={absenceLabel} side="top">
             <span
               style={{
-                fontWeight: 800,
+                fontWeight: 600,
                 fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
                 color: atResolved.text,
                 lineHeight: isNameMode ? 1.3 : 1.2,
@@ -2796,7 +2797,7 @@ export default function ShiftEditPanel({
           <MaybeHint content={previewLabel} side="top">
             <span
               style={{
-                fontWeight: 800,
+                fontWeight: 600,
                 fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
                 color: s.text,
                 lineHeight: isNameMode ? 1.3 : 1.2,
@@ -2919,7 +2920,7 @@ export default function ShiftEditPanel({
                   <MaybeHint content={previewLabel} side="top">
                     <span
                       style={{
-                        fontWeight: 800,
+                        fontWeight: 600,
                         fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
                         color: s.text,
                         lineHeight: isNameMode ? 1.3 : 1.2,
@@ -3340,6 +3341,7 @@ export default function ShiftEditPanel({
               </Button>
             </div>
           </div>
+          <ScrollOverflowCue />
         </div>
         {renderPendingRequestConfirmation()}
       </>
@@ -3442,7 +3444,14 @@ export default function ShiftEditPanel({
         </div>
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: isMobile ? "16px" : "20px 24px",
+          }}
+        >
           {showStandaloneRequestFlow ? (
             renderRequestControls({ standalone: true })
           ) : showRepeatForm && onRepeatConfirm && empId ? (
@@ -3781,11 +3790,11 @@ export default function ShiftEditPanel({
                 >
                   <div
                     style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "var(--dg-color-text-subtle)",
+                      fontSize: "var(--dg-type-field-title-size)",
+                      fontWeight: "var(--dg-type-field-title-weight)",
+                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                      lineHeight: "var(--dg-type-field-title-line-height)",
+                      color: "var(--dg-type-field-title-color)",
                       marginBottom: 2,
                     }}
                   >
@@ -4092,6 +4101,7 @@ export default function ShiftEditPanel({
             </div>
           </div>
         )}
+        <ScrollOverflowCue />
       </div>
 
       {renderPendingRequestConfirmation()}

@@ -13,6 +13,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function PersonDetailRouteContent({ employeeId }: { employeeId: string }) {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const { orgId, isLoading: permsLoading } = usePermissions();
   const [selfCheckResolved, setSelfCheckResolved] = useState(false);
   const [isSelfRoute, setIsSelfRoute] = useState(false);
@@ -25,7 +26,7 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
         cancelled = true;
       };
 
-    if (!user || !orgId) {
+    if (!userId || !orgId) {
       setIsSelfRoute(false);
       setSelfCheckResolved(true);
       return () => {
@@ -38,7 +39,7 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
 
     void (async () => {
       try {
-        const selfEmployee = await fetchEmployeeByUserId(user.id, orgId);
+        const selfEmployee = await fetchEmployeeByUserId(userId, orgId);
         if (cancelled) return;
         if (selfEmployee?.id === employeeId) {
           setIsSelfRoute(true);
@@ -57,7 +58,7 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
     return () => {
       cancelled = true;
     };
-  }, [authLoading, employeeId, orgId, permsLoading, router, user]);
+  }, [authLoading, employeeId, orgId, permsLoading, router, userId]);
 
   if (!selfCheckResolved || isSelfRoute) return null;
 

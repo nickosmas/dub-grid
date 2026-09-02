@@ -243,7 +243,7 @@ export default function ProfileTwoFactorScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "error"}>
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={1} sections={1} showHero={false} />

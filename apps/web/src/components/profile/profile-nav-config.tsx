@@ -6,19 +6,12 @@ import {
   NotificationsIcon,
   DataPrivacyIcon,
   DashboardIcon,
-  ScheduleIcon,
   DisplayIcon,
 } from "@/components/icons/NavIcons";
 import type { ShellNavGroup, ShellNavItem } from "@/components/settings/SettingsShell";
 
 export type ProfileSectionId =
-  | "profile"
-  | "security"
-  | "notifications"
-  | "appearance"
-  | "data-privacy"
-  | "overview"
-  | "schedule";
+  "profile" | "security" | "notifications" | "appearance" | "data-privacy" | "overview";
 
 export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "profile",
@@ -27,11 +20,11 @@ export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "appearance",
   "data-privacy",
   "overview",
-  "schedule",
 ];
 
 export function resolveProfileSection(raw: string | null): ProfileSectionId | null {
   if (!raw) return null;
+  if (raw === "schedule") return "overview";
   return VALID_PROFILE_SECTIONS.includes(raw as ProfileSectionId)
     ? (raw as ProfileSectionId)
     : null;
@@ -47,7 +40,7 @@ export interface ProfileNavContext {
 }
 
 export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<ProfileSectionId>[] {
-  const accountItems: ShellNavItem<ProfileSectionId>[] = [
+  const primaryItems: ShellNavItem<ProfileSectionId>[] = [
     {
       id: "profile",
       label: "Profile",
@@ -75,47 +68,32 @@ export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<Pro
     },
   ];
 
-  const groups: ShellNavGroup<ProfileSectionId>[] = [
-    { id: "account", label: "Account", items: accountItems },
-  ];
-
   if (ctx.isOnSchedule) {
-    groups.push({
-      id: "work",
-      label: "My work",
-      items: [
-        {
-          id: "overview",
-          label: "Overview",
-          Icon: DashboardIcon,
-          description: "Your role, focus areas, certifications, and what you're working this week.",
-        },
-        {
-          id: "schedule",
-          label: "Schedule",
-          Icon: ScheduleIcon,
-          description: "Your upcoming shifts, recurring schedule, and a calendar subscription URL.",
-        },
-      ],
+    primaryItems.push({
+      id: "overview",
+      label: "Overview",
+      Icon: DashboardIcon,
+      description:
+        "Your role, focus areas, certifications, recurring schedule, and calendar subscription.",
     });
   }
 
-  // Pinned to the sidebar footer by ProfilePage via footerGroupIds.
-  groups.push({
-    id: "legal",
-    label: "Data & privacy",
-    items: [
-      {
-        id: "data-privacy",
-        label: "Data & privacy",
-        Icon: DataPrivacyIcon,
-        description:
-          "Cookie preferences for this device, plus our privacy, terms, and cookie policies.",
-      },
-    ],
-  });
-
-  return groups;
+  return [
+    { id: "primary", label: "Profile", items: primaryItems },
+    {
+      id: "legal",
+      label: "Data & privacy",
+      items: [
+        {
+          id: "data-privacy",
+          label: "Data & privacy",
+          Icon: DataPrivacyIcon,
+          description:
+            "Cookie preferences for this device, plus our privacy, terms, and cookie policies.",
+        },
+      ],
+    },
+  ];
 }
 
 /** Nav group IDs that ProfilePage pins to the sidebar footer. */

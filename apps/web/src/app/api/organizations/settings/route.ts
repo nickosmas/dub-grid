@@ -453,12 +453,12 @@ export async function PUT(req: NextRequest) {
 
     const updatedOrg = rowToOrganization(updatedRow as DbOrganization);
 
-    // The public subdomain lookup caches {id, name} by slug with a long TTL
-    // (organizations.slug is write-once, but name isn't) — invalidate on
-    // rename so the cached display name doesn't linger stale for a day.
-    if (changeKeys.has("name") && updatedOrg.slug) {
-      void cacheDel(CacheKey.orgBySlug(updatedOrg.slug));
-    }
+    // The organization key also invalidates the aggregate bootstrap cache.
+    // Await it so the client's immediate post-save refetch cannot race stale Redis data.
+    await cacheDel(
+      CacheKey.organization(orgId),
+      ...(changeKeys.has("name") && updatedOrg.slug ? [CacheKey.orgBySlug(updatedOrg.slug)] : []),
+    );
 
     const auditPayload = {
       org_id: orgId,

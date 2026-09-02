@@ -302,7 +302,7 @@ describe("AddEmployeeModal", () => {
       expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Close modal" }));
-      await user.click(screen.getByRole("button", { name: /discard changes/i }));
+      await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
       expect(onClose).toHaveBeenCalledOnce();
     });

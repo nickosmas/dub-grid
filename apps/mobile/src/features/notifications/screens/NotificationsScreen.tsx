@@ -292,6 +292,7 @@ export default function NotificationsScreen() {
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={contentState.kind !== "error" && contentState.kind !== "empty"}
     >
       <View style={styles.headerArea}>
         <SearchBar

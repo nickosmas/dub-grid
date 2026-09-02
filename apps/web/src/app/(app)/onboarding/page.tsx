@@ -94,7 +94,7 @@ export default function OnboardingPage() {
           background: "rgba(255, 255, 255, 0.95)",
           backdropFilter: "blur(16px)",
           borderRadius: "24px",
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)",
+          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.1)",
           textAlign: "center",
           border: "1px solid rgba(255, 255, 255, 0.5)",
         }}
@@ -115,7 +115,7 @@ export default function OnboardingPage() {
         <h1
           style={{
             fontSize: "var(--dg-fs-page-title)",
-            fontWeight: 800,
+            fontWeight: "var(--dg-type-page-title-weight)",
             marginBottom: "16px",
             color: "var(--dg-color-text-primary)",
             letterSpacing: "-0.03em",

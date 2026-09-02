@@ -321,7 +321,7 @@ export default function ShiftPicker({
               justifyContent: "center",
             }}
           >
-            <Check size={10} color="#fff" strokeWidth={3.5} />
+            <Check size={10} color="var(--dg-color-text-inverse)" strokeWidth={3.5} />
           </div>
         )}
 
@@ -369,7 +369,7 @@ export default function ShiftPicker({
   }
 
   const primaryTextStyle: React.CSSProperties = {
-    fontWeight: 900,
+    fontWeight: 600,
     fontSize: "var(--dg-fs-label)",
     letterSpacing: "0.01em",
     textShadow: "0 1px 0 rgba(255,255,255,0.18)",
@@ -578,7 +578,7 @@ export default function ShiftPicker({
                           justifyContent: "center",
                         }}
                       >
-                        <Check size={10} color="#fff" strokeWidth={3.5} />
+                        <Check size={10} color="var(--dg-color-text-inverse)" strokeWidth={3.5} />
                       </div>
                     )}
                     <MaybeHint content={at.name || at.label} side="left">

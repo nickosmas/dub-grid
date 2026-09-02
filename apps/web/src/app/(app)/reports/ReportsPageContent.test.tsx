@@ -319,8 +319,8 @@ describe("ReportsPageContent", () => {
     const payPeriodOptionLabel = getCurrentPayPeriodOptionLabel("2026-04-19");
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toHaveStyle({
-      fontSize: "var(--dg-fs-page-title)",
-      fontWeight: "800",
+      fontSize: "var(--dg-type-page-title-size)",
+      fontWeight: "700",
     });
     expect(screen.queryByRole("heading", { name: "Configure report" })).not.toBeInTheDocument();
     expect(screen.queryByText("Acme")).not.toBeInTheDocument();

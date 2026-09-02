@@ -105,6 +105,22 @@ describe("shared chrome theming", () => {
     expect(buttonVariants({ variant: "dangerFilled" })).toContain("bg-[var(--dg-color-danger)]");
   });
 
+  it("keeps secondary actions distinct from neutral footers and visibly interactive", () => {
+    const secondary = buttonVariants({ variant: "secondary" });
+
+    expect(secondary).toContain("bg-[var(--dg-color-surface)]");
+    expect(secondary).toContain("border-[var(--dg-color-control-active-border)]");
+    expect(secondary).toContain("hover:bg-[var(--dg-color-surface-hover)]");
+    expect(secondary).toContain("hover:border-[var(--dg-color-border-strong)]");
+    expect(secondary).toContain("active:bg-[var(--dg-color-control-active-border)]");
+    expect(globalsCss).toMatch(
+      /\.dg-btn-secondary\s*\{[\s\S]*background: var\(--dg-color-surface\);[\s\S]*border: 1px solid var\(--dg-color-control-active-border\);[\s\S]*\}/,
+    );
+    expect(globalsCss).toMatch(
+      /\.dg-btn-secondary:hover\s*\{[\s\S]*background: var\(--dg-color-surface-hover\);[\s\S]*border-color: var\(--dg-color-border-strong\);[\s\S]*\}/,
+    );
+  });
+
   it("uses the shared toolbar height and radius for tabs and toolbar controls", () => {
     expect(globalsCss).toMatch(
       /\.dg-span-tabs\s*\{[\s\S]*height: var\(--dg-toolbar-h\);[\s\S]*border-radius: var\(--dg-tab-shell-radius\);[\s\S]*\}/,
@@ -160,7 +176,7 @@ describe("shared chrome theming", () => {
     // highlight recipe lives on the shell now.
     for (const source of [settingsShell, gridmasterPortal, staffView]) {
       expect(source).toContain("data-[active=true]:bg-[var(--dg-color-nav-active-bg)]");
-      expect(source).toContain("data-[active=true]:text-[var(--dg-color-text-primary)]");
+      expect(source).toContain("data-[active=true]:text-[var(--dg-type-attention-primary-color)]");
       // No border/ring on the active item, matching the navbar tabs.
       expect(source).not.toMatch(/data-\[active=true\]:ring-/);
       // Active sidebar chrome is fully neutral: the icon wrapper follows the
@@ -174,6 +190,10 @@ describe("shared chrome theming", () => {
     // not the active highlight.
     expect(sidebarPrimitive).not.toMatch(/data-active:ring-/);
     expect(sidebarPrimitive).toContain("focus-visible:ring-2");
+    expect(sidebarPrimitive).toContain("data-active:font-semibold");
+    expect(sidebarPrimitive).not.toContain("data-active:before:scale-y-100");
+    expect(sidebarPrimitive).toContain('"aria-current": isActive && rendersAsLink');
+    expect(sidebarPrimitive).toContain('"aria-pressed": isActive && !rendersAsLink');
   });
 
   it("keeps audited primary buttons and selectors on theme blue", () => {
@@ -186,12 +206,25 @@ describe("shared chrome theming", () => {
     );
   });
 
-  it("limits neutral control tokens to structural row and drag chrome", () => {
+  it("preserves primary action contrast inside toolbars", () => {
+    const toolbarControlRule =
+      globalsCss.match(
+        /\.dg-toolbar-type \.dg-btn,\s*\.dg-toolbar-type \.dg-input\s*\{([\s\S]*?)\}/,
+      )?.[1] ?? "";
+
+    expect(toolbarControlRule).not.toContain("color:");
+    expect(globalsCss).toMatch(/\.dg-toolbar-type \.dg-input\s*\{[\s\S]*color: inherit;[\s\S]*\}/);
+    expect(membersSection).toContain("<Plus size={14} />");
+    expect(membersSection).not.toContain("+ Add");
+  });
+
+  it("limits neutral control tokens to shared controls, structural rows, and drag chrome", () => {
     const allowedFiles = [
       "apps/web/src/app/globals.css",
       "apps/web/src/components/staff/MembersSection.tsx",
       "apps/web/src/components/staff/StaffContextBar.tsx",
       "apps/web/src/components/staff/StaffTableRow.tsx",
+      "apps/web/src/components/ui/button.tsx",
     ].sort();
 
     const matchingFiles = [

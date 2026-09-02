@@ -5,6 +5,8 @@ import type {
   MobileOpenShift,
   MobileScheduleEntry,
   MobileShiftRequest,
+  MobileShiftRequestHistoryCursor,
+  MobileShiftRequestHistoryResponse,
   MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
 import { hasShiftRequestStarted, timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
@@ -45,6 +47,16 @@ type FetchMobileShiftRequests = (
     endDate?: string;
   },
 ) => Promise<MobileShiftRequest[]>;
+
+type FetchMobileShiftRequestHistory = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId?: string;
+    limit: number;
+    cursor?: MobileShiftRequestHistoryCursor | null;
+  },
+) => Promise<MobileShiftRequestHistoryResponse>;
 
 type FetchMobileOpenShifts<TEmployee extends MobileShiftRequestEmployee> = (
   serviceClient: SupabaseClient,
@@ -310,6 +322,44 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
         : requests,
     openShifts,
   };
+}
+
+export async function loadMobileShiftRequestHistoryPayload<
+  TEmployee extends MobileShiftRequestEmployee,
+>(
+  auth: MobileShiftRequestsContext,
+  input: {
+    limit?: number;
+    cursorCreatedAt?: string;
+    cursorId?: string;
+  },
+  deps: {
+    fetchLinkedEmployeeForUser: FetchLinkedEmployeeForUser<TEmployee>;
+    fetchMobileShiftRequestHistory: FetchMobileShiftRequestHistory;
+  },
+): Promise<MobileShiftRequestHistoryResponse> {
+  const linkedEmployee = await deps.fetchLinkedEmployeeForUser(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    auth.user.id,
+  );
+  const canViewAllRequests =
+    auth.permissions.canApproveShiftRequests ||
+    auth.permissions.canEditShifts ||
+    auth.permissions.canManageEmployees;
+
+  if (!canViewAllRequests && !linkedEmployee) {
+    return { requests: [], nextCursor: null };
+  }
+
+  return deps.fetchMobileShiftRequestHistory(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    ...(!canViewAllRequests && linkedEmployee ? { employeeId: linkedEmployee.id } : {}),
+    limit: input.limit ?? 25,
+    ...(input.cursorCreatedAt && input.cursorId
+      ? { cursor: { createdAt: input.cursorCreatedAt, id: input.cursorId } }
+      : {}),
+  });
 }
 
 export async function createMobileShiftRequest(

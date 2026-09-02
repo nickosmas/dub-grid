@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { MembersSection, type MembersSectionProps } from "@/components/staff/Mem
 import type { DirectoryPerson, Employee, Invitation } from "@/types";
 import {
   fetchOrganizationInvitations,
+  replaceOrganizationInvitationAccessGuarded,
   updatePendingInvitation,
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
@@ -35,6 +36,7 @@ vi.mock("@/lib/sentry", () => ({
 
 vi.mock("@/features/organization/client", () => ({
   fetchOrganizationInvitations: vi.fn().mockResolvedValue([]),
+  replaceOrganizationInvitationAccessGuarded: vi.fn(),
   resendInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   updateAppOnlyUser: vi.fn(),
@@ -115,6 +117,10 @@ let lastManagementStaffPanelSave:
       managementDepartmentIds: number[];
     }) => Promise<void>)
   | null = null;
+let lastStaffDetailPanelProps: {
+  employee: Employee;
+  onManageManagementAccess?: (employee: Employee) => void;
+} | null = null;
 
 vi.mock("@/components/staff/ManagementStaffPanel", () => ({
   ManagementStaffPanel: (props: {
@@ -147,7 +153,13 @@ vi.mock("@/components/staff/ManagementStaffPanel", () => ({
 }));
 
 vi.mock("@/components/staff/StaffDetailPanel", () => ({
-  StaffDetailPanel: () => <div data-testid="staff-detail-panel" />,
+  StaffDetailPanel: (props: {
+    employee: Employee;
+    onManageManagementAccess?: (employee: Employee) => void;
+  }) => {
+    lastStaffDetailPanelProps = props;
+    return <div data-testid="staff-detail-panel" />;
+  },
 }));
 
 vi.mock("@/components/staff/StaffReadOnlyDetailPanel", () => ({
@@ -230,6 +242,7 @@ const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementU
 };
 
 function renderMembersSection(props: Partial<MembersSectionProps> = {}) {
+  lastStaffDetailPanelProps = null;
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -308,7 +321,7 @@ describe("MembersSection — management-only view access", () => {
     await user.click(screen.getByRole("option", { name: /Management/i }));
 
     expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^\+ Add$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Add$/ })).toBeInTheDocument();
   });
 
   it("opens the same StaffDetailPanel as the People table for an on-schedule management member, not ManagementStaffPanel", async () => {
@@ -339,6 +352,41 @@ describe("MembersSection — management-only view access", () => {
 
     expect(screen.getByTestId("staff-detail-panel")).toBeInTheDocument();
     expect(screen.queryByTestId("management-staff-panel")).not.toBeInTheDocument();
+  });
+
+  it("opens Add to management in a modal without replacing the People detail sheet", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({
+        employeeId: "emp-1",
+        managementDepartmentIds: [],
+        departmentIds: [],
+        isManagementUser: false,
+      }),
+    ];
+    const employee = makeEmployee({ id: "emp-1", email: "jamie@example.com" });
+
+    renderMembersSection({
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      employees: [employee],
+    });
+
+    const row = screen.getByText("Pat Doe").closest("tr");
+    if (!row) throw new Error("Expected to find the employee row");
+    await user.click(row);
+
+    if (!lastStaffDetailPanelProps?.onManageManagementAccess) {
+      throw new Error("Expected StaffDetailPanel to receive the management access action");
+    }
+    act(() => {
+      lastStaffDetailPanelProps?.onManageManagementAccess?.(employee);
+    });
+
+    expect(screen.getByTestId("staff-detail-panel")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add to management" })).toBeInTheDocument();
+    expect(screen.getByTestId("employee-management-access-editor")).toBeInTheDocument();
+    expect(lastStaffDetailPanelProps).not.toHaveProperty("managementAccessEditor");
   });
 
   it("keeps a management-only member (not on the schedule) on ManagementStaffPanel", async () => {
@@ -514,6 +562,137 @@ describe("MembersSection — ManagementStaffPanel email/invitation wiring", () =
     });
 
     expect(vi.mocked(toast.error)).toHaveBeenCalled();
+  });
+});
+
+describe("MembersSection — pending invitation access", () => {
+  it("waits for invitation state instead of flashing a gray Not invited pill", async () => {
+    let resolveInvitations!: (invitations: Invitation[]) => void;
+    const invitationRequest = new Promise<Invitation[]>((resolve) => {
+      resolveInvitations = resolve;
+    });
+    const invitation: Invitation = {
+      id: "inv-loading",
+      orgId: "org-1",
+      invitedBy: null,
+      email: "mina@example.com",
+      roleToAssign: "user",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      acceptedAt: null,
+      revokedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      employeeId: "emp-loading",
+      firstName: "Mina",
+      lastName: "Diaz",
+      phone: null,
+      departmentIds: [],
+      deptAdminIds: [],
+    };
+    vi.mocked(fetchOrganizationInvitations).mockReset();
+    vi.mocked(fetchOrganizationInvitations)
+      .mockReturnValueOnce(invitationRequest)
+      .mockResolvedValue([]);
+
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: [
+        makeEmployee({
+          id: "emp-loading",
+          firstName: "Mina",
+          lastName: "Diaz",
+          email: "mina@example.com",
+        }),
+      ],
+    });
+
+    const row = screen.getByText("Mina Diaz").closest("tr");
+    if (!row) throw new Error("Expected to find Mina's staff row");
+    expect(within(row).queryByLabelText(/^Account:/)).toBeNull();
+
+    await act(async () => resolveInvitations([invitation]));
+
+    await waitFor(() => expect(within(row).getByLabelText("Account: Invited")).toBeInTheDocument());
+    expect(within(row).queryByLabelText("Account: Not invited")).toBeNull();
+  });
+
+  it("keeps Staff access editable and confirms before revoking and replacing the invite", async () => {
+    const user = userEvent.setup();
+    const invitation: Invitation = {
+      id: "inv-pending",
+      orgId: "org-1",
+      invitedBy: null,
+      email: "mina@example.com",
+      roleToAssign: "user",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      acceptedAt: null,
+      revokedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      employeeId: "emp-pending",
+      firstName: "Mina",
+      lastName: "Diaz",
+      phone: null,
+      departmentIds: [],
+      deptAdminIds: [],
+    };
+    const replacement = {
+      ...invitation,
+      id: "inv-replacement",
+      roleToAssign: "admin" as const,
+      updatedAt: "2026-01-01T00:00:01.000Z",
+    };
+    vi.mocked(fetchOrganizationInvitations).mockReset();
+    vi.mocked(fetchOrganizationInvitations).mockResolvedValue([invitation]);
+    vi.mocked(replaceOrganizationInvitationAccessGuarded).mockReset();
+    vi.mocked(replaceOrganizationInvitationAccessGuarded).mockResolvedValueOnce({
+      invitation: replacement,
+      previousInvitationId: invitation.id,
+    });
+    mockDirectory = [
+      makePerson({
+        personId: "inv:inv-pending",
+        employeeId: "emp-pending",
+        userId: null,
+        firstName: "Mina",
+        lastName: "Diaz",
+        email: "mina@example.com",
+        // The pending invitation is the source of truth before the directory
+        // has a linked membership role to return.
+        orgRole: null,
+        hasAppAccess: false,
+        invitationStatus: "pending",
+        membershipUpdatedAt: null,
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: [makeEmployee({ id: "emp-pending", firstName: "Mina", lastName: "Diaz" })],
+    });
+
+    const row = await screen.findByText("Mina Diaz").then((name) => name.closest("tr"));
+    if (!row) throw new Error("Expected to find Mina's staff row");
+    await waitFor(() => expect(within(row).getByRole("button", { name: "User" })).toBeEnabled());
+    await user.click(within(row).getByRole("button", { name: "User" }));
+    await user.click(screen.getByRole("option", { name: "Admin" }));
+
+    expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+    expect(replaceOrganizationInvitationAccessGuarded).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Revoke and resend" }));
+    await waitFor(() =>
+      expect(replaceOrganizationInvitationAccessGuarded).toHaveBeenCalledWith({
+        orgId: "org-1",
+        invitationId: "inv-pending",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+        roleToAssign: "admin",
+      }),
+    );
   });
 });
 

@@ -2,6 +2,8 @@
  * Shared role-certification requirement semantics.
  */
 
+export { satisfiesCertificationRequirement } from "@dubgrid/domain";
+
 export type RequirementItem = {
   id: number;
   name: string;
@@ -10,30 +12,6 @@ export type RequirementItem = {
 
 function label(item: RequirementItem): string {
   return item.abbr || item.name || "";
-}
-
-/**
- * Does something the person holds satisfy this requirement?
- *
- * Note there is deliberately no "and" mode. `employees.certification_id` is
- * singular, so a conjunction over required certifications is unsatisfiable.
- * (`jobs.eligibility_mode` is a different thing: it combines the role gate with
- * the certification gate, not members within one gate.)
- */
-export function satisfiesCertificationRequirement({
-  heldIds,
-  requiredIds,
-}: {
-  heldIds: Array<number | null | undefined>;
-  requiredIds: number[];
-}): boolean {
-  // An empty requirement means "anyone", whatever the mode says.
-  if (requiredIds.length === 0) return true;
-
-  const held = heldIds.filter((id): id is number => typeof id === "number");
-  if (held.length === 0) return false;
-
-  return held.some((id) => requiredIds.includes(id));
 }
 
 /**

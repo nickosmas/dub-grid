@@ -6,10 +6,12 @@ import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucid
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { thStyle } from "@/lib/styles";
 import { MOBILE, useEmployees, useMediaQuery } from "@/hooks";
 import {
   classifyRowAgainstExisting,
@@ -558,12 +560,9 @@ export function BulkImportModal({
                             <th
                               key={header}
                               style={{
+                                ...thStyle,
                                 padding: "6px 10px",
-                                textAlign: "left",
-                                fontWeight: 600,
-                                color: "var(--dg-color-text-muted)",
                                 borderBottom: "1px solid var(--dg-color-border)",
-                                whiteSpace: "nowrap",
                               }}
                             >
                               {header}
@@ -719,22 +718,18 @@ export function BulkImportModal({
                       <tr style={{ background: "var(--dg-color-bg)" }}>
                         <th
                           style={{
+                            ...thStyle,
                             padding: "8px 12px",
-                            textAlign: "left",
                             borderBottom: "1px solid var(--dg-color-border)",
-                            fontWeight: 600,
-                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           #
                         </th>
                         <th
                           style={{
+                            ...thStyle,
                             padding: "8px 12px",
-                            textAlign: "left",
                             borderBottom: "1px solid var(--dg-color-border)",
-                            fontWeight: 600,
-                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           Status
@@ -743,11 +738,9 @@ export function BulkImportModal({
                           <th
                             key={col.key}
                             style={{
+                              ...thStyle,
                               padding: "8px 12px",
-                              textAlign: "left",
                               borderBottom: "1px solid var(--dg-color-border)",
-                              fontWeight: 600,
-                              color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -966,6 +959,7 @@ export function BulkImportModal({
             </Button>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
       {unsavedChangesDialog}
     </div>,

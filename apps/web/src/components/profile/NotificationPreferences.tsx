@@ -235,11 +235,11 @@ export function NotificationPreferences({
       >
         <span
           style={{
-            fontSize: "var(--dg-fs-footnote)",
-            fontWeight: 600,
-            color: "var(--dg-color-text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
+            fontSize: "var(--dg-type-table-heading-size)",
+            fontWeight: "var(--dg-type-table-heading-weight)",
+            color: "var(--dg-type-table-heading-color)",
+            letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+            lineHeight: "var(--dg-type-table-heading-line-height)",
           }}
         >
           Category
@@ -248,11 +248,11 @@ export function NotificationPreferences({
           <Bell size={13} style={{ color: "var(--dg-color-text-muted)" }} />
           <span
             style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              fontSize: "var(--dg-type-table-heading-size)",
+              fontWeight: "var(--dg-type-table-heading-weight)",
+              color: "var(--dg-type-table-heading-color)",
+              letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+              lineHeight: "var(--dg-type-table-heading-line-height)",
             }}
           >
             In-App
@@ -262,11 +262,11 @@ export function NotificationPreferences({
           <Mail size={13} style={{ color: "var(--dg-color-text-muted)" }} />
           <span
             style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              fontSize: "var(--dg-type-table-heading-size)",
+              fontWeight: "var(--dg-type-table-heading-weight)",
+              color: "var(--dg-type-table-heading-color)",
+              letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+              lineHeight: "var(--dg-type-table-heading-line-height)",
             }}
           >
             Email

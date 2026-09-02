@@ -19,11 +19,7 @@ import {
 } from "@dubgrid/contracts";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { MaybeHint } from "@/components/ui/hint";
-import {
-  describeCertificationRequirement,
-  satisfiesCertificationRequirement,
-} from "@/lib/credential-requirements";
+import { satisfiesCertificationRequirement } from "@/lib/credential-requirements";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { AccessStatusRow } from "@/components/staff/AccessStatusRow";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
@@ -56,9 +52,12 @@ export interface EditEmployeePanelProps {
    *  somewhere those are already editable elsewhere (the self-profile page's
    *  own Account details section), so they aren't shown twice. */
   hideIdentityFields?: boolean;
-  onSave: (updatedEmployee: Employee) => void;
+  onSave: (updatedEmployee: Employee) => void | Promise<void>;
   onCancel: () => void;
   onDirtyChange?: (hasUnsavedChanges: boolean) => void;
+  /** Reports whether any current form value blocks saving. Hosts using
+   *  `hideActions` use this alongside dirty state to disable their own Save. */
+  onSaveBlockedChange?: (isBlocked: boolean) => void;
   /** Fires whenever the real-time duplicate-email check's result changes.
    *  In `hideActions` mode the host renders its own Save button driven off
    *  `onDirtyChange` alone, which doesn't know about this or any other
@@ -82,10 +81,12 @@ export interface EditEmployeePanelProps {
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
+  /** Persistent page editors have no meaningful pristine Close action. */
+  persistent?: boolean;
 }
 
 export interface EditEmployeePanelHandle {
-  save: () => void;
+  save: () => Promise<boolean>;
   requestDismiss: () => void;
 }
 
@@ -133,12 +134,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onSave,
       onCancel,
       onDirtyChange,
+      onSaveBlockedChange,
       onEmailConflictChange,
       onInvite,
       pendingInvitation,
       onRevoke,
       onSaveWithReinvite,
       hideActions,
+      persistent = false,
     }: EditEmployeePanelProps,
     ref,
   ) {
@@ -250,7 +253,27 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onDirtyChange?.(isModified);
     }, [isModified, onDirtyChange]);
 
-    const handleSave = useCallback(() => {
+    const isSaveBlocked = useMemo(
+      () =>
+        Boolean(
+          !form.firstName.trim() ||
+          !form.lastName.trim() ||
+          (form.focusAreaIds.length === 0 && !isManagementUser) ||
+          validateRequired(form.firstName, "First name") ||
+          validateRequired(form.lastName, "Last name") ||
+          validateEmail(form.email) ||
+          validatePhone(form.phone) ||
+          validateNotes(form.contactNotes) ||
+          emailConflict,
+        ),
+      [form, isManagementUser, emailConflict],
+    );
+
+    useEffect(() => {
+      onSaveBlockedChange?.(isSaveBlocked);
+    }, [isSaveBlocked, onSaveBlockedChange]);
+
+    const handleSave = useCallback(async (): Promise<boolean> => {
       if (
         !form.firstName.trim() ||
         !form.lastName.trim() ||
@@ -263,7 +286,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           email: true,
           phone: true,
         });
-        return;
+        return false;
       }
       if (
         validateRequired(form.firstName, "First name") ||
@@ -281,7 +304,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           phone: true,
           contactNotes: true,
         });
-        return;
+        return false;
       }
       const nextEmployee: Employee = {
         ...employee,
@@ -304,10 +327,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       const emailChanged = (nextEmployee.email || "") !== (employee.email || "");
       if (emailChanged && pendingInvitation && onSaveWithReinvite) {
         setPendingReinviteSave(nextEmployee);
-        return;
+        return false;
       }
 
-      onSave(nextEmployee);
+      await onSave(nextEmployee);
+      return true;
     }, [
       form,
       employee,
@@ -346,11 +370,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     // Recomputed from props and form state on every render, so it answers to a
     // change of either the selected certification or the org's role config.
-    const certificationsById = useMemo(
-      () => new Map(certifications.map((c) => [c.id, c])),
-      [certifications],
-    );
-
     const isRoleBlocked = useCallback(
       (roleId: number) => {
         const role = roles.find((r) => r.id === roleId);
@@ -360,17 +379,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           requiredIds: role.requiredCertificationIds ?? [],
         });
       },
-      [roles, form.certificationId, certificationsById],
-    );
-
-    const describeRoleRequirement = useCallback(
-      (role: NamedItem) =>
-        describeCertificationRequirement({
-          requiredIds: role.requiredCertificationIds ?? [],
-          itemsById: certificationsById,
-          emptyText: `a ${certificationLabel.toLowerCase()}`,
-        }),
-      [certificationsById, certificationLabel],
+      [roles, form.certificationId],
     );
 
     const toggleFocusArea = useCallback(
@@ -384,20 +393,12 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       [],
     );
 
-    const sectionLabel: React.CSSProperties = {
-      fontSize: "var(--dg-fs-footnote)",
-      fontWeight: 700,
-      color: "var(--dg-color-text-subtle)",
-      letterSpacing: "0.04em",
-      display: "block",
-      marginBottom: 8,
-      textTransform: "uppercase",
-    };
-
     const fieldLabel: React.CSSProperties = {
-      fontSize: "var(--dg-fs-caption)",
-      fontWeight: 500,
-      color: "var(--dg-color-text-muted)",
+      fontSize: "var(--dg-type-field-title-size)",
+      fontWeight: "var(--dg-type-field-title-weight)",
+      color: "var(--dg-type-field-title-color)",
+      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+      lineHeight: "var(--dg-type-field-title-line-height)",
       display: "block",
       marginBottom: 4,
     };
@@ -407,7 +408,17 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     return (
       <>
-        <div style={{ padding: isMobile ? "16px 16px 24px" : "0 24px 28px" }}>
+        <div
+          style={{
+            padding: isMobile
+              ? hideActions
+                ? "16px 16px 0"
+                : "16px 16px 24px"
+              : hideActions
+                ? "0 24px"
+                : "0 24px 28px",
+          }}
+        >
           <div
             style={{
               display: "flex",
@@ -448,7 +459,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
             {/* ── Details section ── */}
             <div style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <div style={sectionLabel}>Details</div>
+              <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                Details
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {!hideIdentityFields && (
                   <div
@@ -677,7 +690,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 paddingBottom: 20,
               }}
             >
-              <div style={sectionLabel}>Assignments</div>
+              <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                Assignments
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
                   <label style={fieldLabel}>{certificationLabel}</label>
@@ -721,9 +736,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           }}
                           disabled={readOnly}
                           padding="5px 12px"
-                          unselectedBackground="var(--dg-color-bg-secondary)"
-                          unselectedBorderColor="transparent"
-                          unselectedTextColor="var(--dg-color-text-faint)"
                         >
                           {focusArea.name}
                         </SelectableTag>
@@ -747,40 +759,22 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 <div>
                   <label style={fieldLabel}>{roleLabel}</label>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {roles.map((role) => {
-                      const active = form.roleIds.includes(role.id);
-                      // An already-assigned role stays toggleable so changing the
-                      // certification mid-edit cannot strand a selection the user
-                      // can no longer clear. The API is the real gate either way.
-                      const blocked = !active && isRoleBlocked(role.id);
-                      const requirementHint = blocked
-                        ? `Requires ${describeRoleRequirement(role)}`
-                        : undefined;
-                      return (
-                        <MaybeHint key={role.id} content={requirementHint} side="top">
+                    {roles
+                      .filter((role) => form.roleIds.includes(role.id) || !isRoleBlocked(role.id))
+                      .map((role) => {
+                        const active = form.roleIds.includes(role.id);
+                        return (
                           <SelectableTag
+                            key={role.id}
                             selected={active}
                             onClick={() => toggleRole(role.id)}
-                            disabled={readOnly || blocked}
+                            disabled={readOnly}
                             padding="5px 12px"
-                            unselectedBackground="var(--dg-color-bg-secondary)"
-                            unselectedBorderColor="transparent"
-                            unselectedTextColor="var(--dg-color-text-faint)"
-                            disabledBackground={blocked ? "var(--dg-color-surface-alt)" : undefined}
-                            disabledBorderColor={
-                              blocked ? "var(--dg-color-border-strong)" : undefined
-                            }
-                            disabledTextColor={blocked ? "var(--dg-color-text-subtle)" : undefined}
-                            disabledOpacity={blocked ? 1 : undefined}
-                            style={
-                              blocked ? { borderStyle: "dashed", cursor: "not-allowed" } : undefined
-                            }
                           >
                             {role.name}
                           </SelectableTag>
-                        </MaybeHint>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               </div>
@@ -848,55 +842,48 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             )}
 
           {/* ── Actions ── */}
-          <div
-            style={{
-              paddingTop: 16,
-              borderTop: "1px solid var(--dg-color-border-light)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {/* Primary actions */}
-            {!hideActions && canEdit && (
-              <EditorActionRow
-                secondaryAction={
-                  <Button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
-                    {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
-                  </Button>
-                }
-                primaryAction={
-                  <Button
-                    onClick={handleSave}
-                    disabled={
-                      !isModified ||
-                      !form.firstName.trim() ||
-                      !form.lastName.trim() ||
-                      (form.focusAreaIds.length === 0 && !isManagementUser) ||
-                      Boolean(validateRequired(form.firstName, "First name")) ||
-                      Boolean(validateRequired(form.lastName, "Last name")) ||
-                      Boolean(validateEmail(form.email)) ||
-                      Boolean(validatePhone(form.phone)) ||
-                      Boolean(validateNotes(form.contactNotes)) ||
-                      emailConflict
-                    }
-                    className="dg-btn dg-btn-primary"
-                  >
-                    {EDITOR_ACTION_LABELS.save}
-                  </Button>
-                }
-              />
-            )}
-            {!hideActions && !canEdit && (
-              <EditorActionRow
-                secondaryAction={
-                  <Button onClick={onCancel} className="dg-btn dg-btn-secondary">
-                    {EDITOR_ACTION_LABELS.close}
-                  </Button>
-                }
-              />
-            )}
-          </div>
+          {!hideActions && (
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: "1px solid var(--dg-color-border-light)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {/* Primary actions */}
+              {canEdit && (
+                <EditorActionRow
+                  secondaryAction={
+                    !persistent || isModified ? (
+                      <Button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
+                        {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
+                      </Button>
+                    ) : undefined
+                  }
+                  primaryAction={
+                    <Button
+                      onClick={handleSave}
+                      disabled={!isModified || isSaveBlocked}
+                      className="dg-btn dg-btn-primary"
+                    >
+                      {EDITOR_ACTION_LABELS.save}
+                    </Button>
+                  }
+                />
+              )}
+              {!canEdit && (
+                <EditorActionRow
+                  secondaryAction={
+                    <Button onClick={onCancel} className="dg-btn dg-btn-secondary">
+                      {EDITOR_ACTION_LABELS.close}
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+          )}
         </div>
         {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && (
           <ConfirmDialog
