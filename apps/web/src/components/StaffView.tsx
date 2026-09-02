@@ -273,18 +273,14 @@ export default function StaffView({
                         }
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)]"
+                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)]"
                       >
-                        <span
-                          className={
-                            activeSection === link.id
-                              ? "flex shrink-0 items-center justify-center text-[var(--dg-color-text-primary)] transition-colors"
-                              : "flex shrink-0 items-center justify-center text-[var(--dg-color-text-faint)] transition-colors"
-                          }
-                        >
+                        <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                           {link.icon}
                         </span>
-                        <span className="font-semibold">{link.label}</span>
+                        <span className="text-[length:var(--dg-type-navigation-size)] font-medium tracking-normal">
+                          {link.label}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -298,7 +294,7 @@ export default function StaffView({
                 <SidebarMenuButton
                   onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                   tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                  className="h-9 text-[var(--dg-color-text-faint)] transition-all duration-150 ease-in-out hover:text-black"
+                  className="h-9 text-[var(--dg-type-navigation-color)] transition-all duration-150 ease-in-out"
                 >
                   <span className="flex shrink-0 items-center justify-center">
                     <svg
@@ -319,7 +315,9 @@ export default function StaffView({
                       <polyline points="6 17 11 12 6 7" />
                     </svg>
                   </span>
-                  <span className="ml-2 font-semibold">Collapse Menu</span>
+                  <span className="ml-2 text-[length:var(--dg-type-navigation-size)] font-medium tracking-normal">
+                    Collapse Menu
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

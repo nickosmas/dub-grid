@@ -4,6 +4,7 @@ import type {
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
+  MobileBootstrapRole,
   MobileNotification,
   MobileNotificationPriority,
   MobileNotificationsCursor,
@@ -145,6 +146,11 @@ type FetchMobileNamedItems = (
   orgId: string,
 ) => Promise<MobileNamedItem[]>;
 
+type FetchMobileRoles = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileBootstrapRole[]>;
+
 type FetchMobileDepartments = (
   serviceClient: SupabaseClient,
   orgId: string,
@@ -234,7 +240,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileUnreadNotificationCount: FetchMobileUnreadNotificationCount;
     fetchMobileAbsenceTypes: FetchMobileAbsenceTypes;
     fetchMobileFocusAreas: FetchMobileFocusAreas;
-    fetchMobileRoles: FetchMobileNamedItems;
+    fetchMobileRoles: FetchMobileRoles;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
     fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
@@ -391,7 +397,7 @@ export async function loadMobilePeoplePayload(
   const people = await deps.fetchMobilePeople(auth.serviceClient, auth.currentOrg.id);
   const visiblePeople = auth.permissions.canManageEmployees
     ? people
-    : people.filter((person) => person.status === "active");
+    : people.filter((person) => person.status === "active" && person.userId !== auth.user.id);
 
   return {
     people: visiblePeople.map((person) => {
@@ -401,24 +407,20 @@ export async function loadMobilePeoplePayload(
         return mobilePerson;
       }
 
-      // Preserve userId on the caller's own row so the mobile app can find
-      // its own employee record (for /me/schedule lookup, "You" badge, etc.).
-      // The caller already knows their own auth id; nulling it here just
-      // breaks self-lookup. Other rows still get the link stripped so
-      // view-only callers can't map employee → auth account.
-      // managementDepartmentIds stays: the app uses it to tell management
-      // users apart, since their full profile view is manager-only.
-      const isSelf = mobilePerson.userId === auth.user.id;
+      // Regular users get a directory payload, not an account or contact
+      // export. Keep the visible scheduling qualifications used by the list
+      // while removing hidden fields and auth-account links.
       return {
         ...mobilePerson,
         contactNotes: "",
         deptAdminIds: [],
         departmentIds: [],
+        email: "",
         managementDeptAdminIds: [],
         pendingInvitation: null,
-        roleIds: [],
+        phone: "",
         statusNote: "",
-        userId: isSelf ? mobilePerson.userId : null,
+        userId: null,
       };
     }),
   };

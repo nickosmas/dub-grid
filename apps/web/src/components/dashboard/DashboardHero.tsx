@@ -158,7 +158,7 @@ export default function DashboardHero({
           <h2
             style={{
               margin: 0,
-              fontSize: "var(--dg-fs-page-title)",
+              fontSize: "var(--dg-type-page-title-size)",
               fontWeight: 700,
               color: "var(--dg-color-text-primary)",
               letterSpacing: "-0.03em",
@@ -228,8 +228,9 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
         <div
           style={{
             minWidth: 0,
-            fontSize: "11px",
-            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-type-metadata-size)",
+            fontWeight: 500,
+            color: "var(--dg-type-metadata-color)",
           }}
         >
           {metric.label}
@@ -263,8 +264,9 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
         <div
           style={{
             marginTop: 4,
-            fontSize: "11px",
-            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-type-metadata-size)",
+            fontWeight: "var(--dg-type-metadata-weight)",
+            color: "var(--dg-type-metadata-color)",
             lineHeight: 1.4,
           }}
         >

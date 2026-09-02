@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Employee, FocusArea } from "@/types";
+import type { Employee, FocusArea, NamedItem } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
 export type EmployeeTab = "all" | "active" | "inactive" | "removed";
@@ -24,6 +24,9 @@ interface UseStaffFiltersOptions {
   inactiveEmployees?: Employee[];
   removedEmployees?: Employee[];
   focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  regularUserMode?: boolean;
 }
 
 export function useStaffFilters({
@@ -31,6 +34,9 @@ export function useStaffFilters({
   inactiveEmployees = [],
   removedEmployees = [],
   focusAreas,
+  certifications,
+  roles,
+  regularUserMode = false,
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,15 +53,15 @@ export function useStaffFilters({
   const [page, setPage] = useState(1);
 
   const activeFilterCount = [
-    filterEmploymentType !== "all",
-    filterDepartment !== null,
-    filterDepartmentAdminOnly,
+    !regularUserMode && filterEmploymentType !== "all",
+    !regularUserMode && filterDepartment !== null,
+    !regularUserMode && filterDepartmentAdminOnly,
     filterFocusArea !== null,
     filterCertification !== null,
     filterRole !== null,
-    filterAccountLink !== "all",
-    filterEmailPresence !== "all",
-    filterPhonePresence !== "all",
+    !regularUserMode && filterAccountLink !== "all",
+    !regularUserMode && filterEmailPresence !== "all",
+    !regularUserMode && filterPhonePresence !== "all",
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -118,6 +124,25 @@ export function useStaffFilters({
     return map;
   }, [focusAreas]);
 
+  const focusAreaNameById = useMemo(
+    () => new Map(focusAreas.map((focusArea) => [focusArea.id, focusArea.name.toLowerCase()])),
+    [focusAreas],
+  );
+  const certificationSearchTextById = useMemo(
+    () =>
+      new Map(
+        certifications.map((certification) => [
+          certification.id,
+          `${certification.name} ${certification.abbr}`.toLowerCase(),
+        ]),
+      ),
+    [certifications],
+  );
+  const roleSearchTextById = useMemo(
+    () => new Map(roles.map((role) => [role.id, `${role.name} ${role.abbr}`.toLowerCase()])),
+    [roles],
+  );
+
   const rawList = useMemo(() => {
     const list =
       activeTab === "all"
@@ -128,19 +153,36 @@ export function useStaffFilters({
             ? inactiveEmployees
             : removedEmployees;
 
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
     return list.filter((emp) => {
-      const matchesSearch =
-        !searchQuery ||
-        getEmployeeDisplayName(emp).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (emp.email && emp.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (emp.phone && emp.phone.includes(searchQuery));
+      const visibleDirectoryText = [
+        getEmployeeDisplayName(emp),
+        ...emp.focusAreaIds.map((id) => focusAreaNameById.get(id) ?? ""),
+        emp.certificationId == null
+          ? ""
+          : (certificationSearchTextById.get(emp.certificationId) ?? ""),
+        ...emp.roleIds.map((id) => roleSearchTextById.get(id) ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      const matchesSearch = regularUserMode
+        ? !normalizedSearch || visibleDirectoryText.includes(normalizedSearch)
+        : !normalizedSearch ||
+          getEmployeeDisplayName(emp).toLowerCase().includes(normalizedSearch) ||
+          emp.email.toLowerCase().includes(normalizedSearch) ||
+          emp.phone.toLowerCase().includes(normalizedSearch);
 
       const matchesEmploymentType =
-        filterEmploymentType === "all" || emp.employmentType === filterEmploymentType;
+        regularUserMode ||
+        filterEmploymentType === "all" ||
+        emp.employmentType === filterEmploymentType;
       const matchesDepartment =
+        regularUserMode ||
         !filterDepartment ||
         emp.focusAreaIds.some((id) => focusAreaDepartmentById.get(id) === filterDepartment);
       const matchesDepartmentAdmin =
+        regularUserMode ||
         !filterDepartmentAdminOnly ||
         (filterDepartment
           ? emp.deptAdminIds.includes(filterDepartment)
@@ -155,12 +197,15 @@ export function useStaffFilters({
             : emp.certificationId === filterCertification);
       const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
       const matchesAccountLink =
+        regularUserMode ||
         filterAccountLink === "all" ||
         (filterAccountLink === "linked" ? Boolean(emp.userId) : !emp.userId);
       const matchesEmailPresence =
+        regularUserMode ||
         filterEmailPresence === "all" ||
         (filterEmailPresence === "present" ? Boolean(emp.email) : !emp.email);
       const matchesPhonePresence =
+        regularUserMode ||
         filterPhonePresence === "all" ||
         (filterPhonePresence === "present" ? Boolean(emp.phone) : !emp.phone);
 
@@ -193,6 +238,10 @@ export function useStaffFilters({
     filterAccountLink,
     filterEmailPresence,
     filterPhonePresence,
+    regularUserMode,
+    focusAreaNameById,
+    certificationSearchTextById,
+    roleSearchTextById,
   ]);
 
   const sorted = useMemo(() => {

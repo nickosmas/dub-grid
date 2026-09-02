@@ -1652,11 +1652,24 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
+  // Mirrors the `fillScreen` branches below: every one of them is meant to be
+  // the whole page, not a card sharing a scroll with something else. The
+  // loading skeleton always wins first in that same ternary chain, so it has
+  // to win here too, or a still-loading blocked/unlinked screen would lose
+  // its scroll before the skeleton it's showing needs it.
+  const isFillScreenState =
+    contentState.kind !== "loading" &&
+    (contentState.kind === "error" ||
+      isBlockedTeamView ||
+      (!isTeamScope && !linkedEmployee) ||
+      (isTeamScope && shiftGroups.length === 0));
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}

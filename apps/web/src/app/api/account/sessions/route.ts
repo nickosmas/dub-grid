@@ -4,7 +4,7 @@ import {
   fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireAuthenticatedUser, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -17,12 +17,17 @@ const revokeSessionSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
       return auth.response;
     }
 
-    return NextResponse.json(await fetchUserSessionOverviewForUser(auth.user.id));
+    return NextResponse.json(
+      await fetchUserSessionOverviewForUser(auth.user.id, {
+        currentSupabaseSessionId:
+          typeof auth.claims.session_id === "string" ? auth.claims.session_id : null,
+      }),
+    );
   } catch (error) {
     logger.error({ error }, "account sessions GET failed");
     return NextResponse.json(

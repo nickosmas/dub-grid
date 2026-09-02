@@ -255,7 +255,7 @@ export function UsersTab({
             <thead>
               <tr>
                 <th style={thStyle}>Email</th>
-                <th style={thStyle}>Organization Role</th>
+                <th style={thStyle}>Organization role</th>
                 <th style={thStyle}>Permissions</th>
                 <th style={thStyle}>Actions</th>
               </tr>

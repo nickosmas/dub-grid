@@ -193,6 +193,10 @@ export const mobileNamedItemSchema = z.object({
   abbr: z.string(),
 });
 
+export const mobileBootstrapRoleSchema = mobileNamedItemSchema.extend({
+  requiredCertificationIds: z.array(z.number().int()).default([]),
+});
+
 export const mobileDepartmentSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -209,7 +213,7 @@ export const mobileBootstrapResponseSchema = z.object({
   linkedEmployee: mobileLinkedEmployeeSchema,
   absenceTypes: z.array(mobileAbsenceTypeSchema),
   focusAreas: z.array(mobileFocusAreaSchema),
-  roles: z.array(mobileNamedItemSchema).default([]),
+  roles: z.array(mobileBootstrapRoleSchema).default([]),
   certifications: z.array(mobileNamedItemSchema).default([]),
   departments: z.array(mobileDepartmentSchema).default([]),
   unreadNotificationCount: z.number().int().nonnegative(),
@@ -575,6 +579,27 @@ export const mobileOpenShiftSchema = z.object({
 export const mobileShiftRequestsResponseSchema = z.object({
   requests: z.array(mobileShiftRequestSchema),
   openShifts: z.array(mobileOpenShiftSchema).default([]),
+});
+
+export const mobileShiftRequestHistoryCursorSchema = z.object({
+  createdAt: z.string().datetime({ offset: true }),
+  id: z.string().uuid(),
+});
+
+export const mobileShiftRequestHistoryQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    cursorCreatedAt: z.string().datetime({ offset: true }).optional(),
+    cursorId: z.string().uuid().optional(),
+  })
+  .refine((query) => Boolean(query.cursorCreatedAt) === Boolean(query.cursorId), {
+    message: "Both cursor fields are required",
+    path: ["cursorCreatedAt"],
+  });
+
+export const mobileShiftRequestHistoryResponseSchema = z.object({
+  requests: z.array(mobileShiftRequestSchema),
+  nextCursor: mobileShiftRequestHistoryCursorSchema.nullable(),
 });
 
 // ── Admin/super_admin dashboard (mobile home view) ──────────────────────────
@@ -1128,11 +1153,17 @@ export type MobileAuthLoginBody = z.infer<typeof mobileAuthLoginBodySchema>;
 export type MobileAbsenceType = z.infer<typeof mobileAbsenceTypeSchema>;
 export type MobileFocusArea = z.infer<typeof mobileFocusAreaSchema>;
 export type MobileNamedItem = z.infer<typeof mobileNamedItemSchema>;
+export type MobileBootstrapRole = z.infer<typeof mobileBootstrapRoleSchema>;
 export type MobileDepartment = z.infer<typeof mobileDepartmentSchema>;
 export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>["range"];
 export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
+export type MobileShiftRequestHistoryCursor = z.infer<typeof mobileShiftRequestHistoryCursorSchema>;
+export type MobileShiftRequestHistoryQuery = z.infer<typeof mobileShiftRequestHistoryQuerySchema>;
+export type MobileShiftRequestHistoryResponse = z.infer<
+  typeof mobileShiftRequestHistoryResponseSchema
+>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileDashboardResponse = z.infer<typeof mobileDashboardResponseSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;

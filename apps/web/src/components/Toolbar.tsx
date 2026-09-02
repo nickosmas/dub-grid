@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
+import { Switch } from "@/components/ui/switch";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -104,37 +105,6 @@ function ClearSearchButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/* ── Toggle Switch ── */
-function ToggleSwitch({ on }: { on: boolean }) {
-  return (
-    <div
-      style={{
-        width: 32,
-        height: 18,
-        borderRadius: 9,
-        background: on ? "var(--dg-color-success)" : "var(--dg-color-border)",
-        position: "relative",
-        transition: "background 150ms ease",
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: "50%",
-          background: "var(--dg-color-surface)",
-          position: "absolute",
-          top: 2,
-          left: on ? 16 : 2,
-          transition: "left 150ms ease",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-        }}
-      />
-    </div>
-  );
-}
-
 /* ── Sort Menu Button ── */
 function SortMenuButton({
   sortBy,
@@ -161,8 +131,6 @@ function SortMenuButton({
             display: "flex",
             alignItems: "center",
             gap: 6,
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
             border: open
@@ -305,7 +273,7 @@ function ToolsMenu({
                 <circle cx="12" cy="7" r="4" />
               </svg>
               <span style={{ flex: 1 }}>Authors</span>
-              <ToggleSwitch on={!!showAudit} />
+              <Switch checked={!!showAudit} presentationOnly />
             </MenuItem>
           </Hint>
         )}
@@ -564,9 +532,19 @@ export default function Toolbar({
   /* ── Mobile Toolbar ─────────────────────────────────────── */
   if (isMobile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}>
+      <div
+        className="dg-toolbar-type"
+        style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}
+      >
         {/* Row 1: Time navigation — where in time */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "var(--dg-toolbar-h) minmax(0, 1fr) var(--dg-toolbar-h)",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           <Hint content={hint("Go to previous period")} side="bottom">
             <Button
               onClick={onPrev}
@@ -599,12 +577,12 @@ export default function Toolbar({
           </Hint>
           <span
             style={{
-              fontSize: "var(--dg-fs-body-sm)",
-              fontWeight: 600,
               color: "var(--dg-color-text-secondary)",
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               textAlign: "center",
-              flex: 1,
               userSelect: "none",
             }}
           >
@@ -640,33 +618,35 @@ export default function Toolbar({
               </svg>
             </Button>
           </Hint>
+        </div>
+
+        {/* Row 2: View controls — how to view */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <CustomSelect
+            value={String(spanWeeks)}
+            options={spanOptions}
+            onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
+            fontSize="var(--dg-fs-navigation-item)"
+            fontWeight="var(--dg-type-control-weight)"
+            activeFontWeight="var(--dg-type-control-weight)"
+            letterSpacing="normal"
+            style={{ minWidth: 0, flex: "1 1 110px" }}
+          />
           <Button
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
             style={{
               height: "var(--dg-toolbar-h)",
               padding: "0 14px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
               borderRadius: "var(--dg-btn-radius)",
               flexShrink: 0,
             }}
           >
             Today
           </Button>
-        </div>
-
-        {/* Row 2: View controls — how to view */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <CustomSelect
-            value={String(spanWeeks)}
-            options={spanOptions}
-            onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
-            fontSize="var(--dg-fs-caption)"
-          />
           {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
-            <div style={{ position: "relative", flex: 1 }}>
+            <div style={{ position: "relative", flex: "1 1 160px", minWidth: 0 }}>
               <svg
                 width="13"
                 height="13"
@@ -780,6 +760,7 @@ export default function Toolbar({
   /* ── Desktop / Tablet Toolbar ───────────────────────────── */
   return (
     <div
+      className="dg-toolbar-type"
       style={{
         display: "flex",
         alignItems: "center",
@@ -790,9 +771,17 @@ export default function Toolbar({
       }}
     >
       {/* ── NAV ZONE: Time navigation + span (stays as one unit) ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          minWidth: 0,
+          maxWidth: "100%",
+        }}
+      >
         {/* Chevrons + date label */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
             <Button
               onClick={onPrev}
@@ -825,11 +814,13 @@ export default function Toolbar({
           </Hint>
           <span
             style={{
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
               color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
-              minWidth: 120,
+              minWidth: 0,
+              width: 120,
+              flex: "1 1 120px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
               textAlign: "center",
               userSelect: "none",
             }}
@@ -875,8 +866,6 @@ export default function Toolbar({
           style={{
             height: "var(--dg-toolbar-h)",
             padding: "0 14px",
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
             borderRadius: "var(--dg-btn-radius)",
           }}
         >
@@ -888,6 +877,10 @@ export default function Toolbar({
           value={String(spanWeeks)}
           options={spanOptions}
           onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
+          fontSize="var(--dg-fs-navigation-item)"
+          fontWeight="var(--dg-type-control-weight)"
+          activeFontWeight="var(--dg-type-control-weight)"
+          letterSpacing="normal"
         />
       </div>
 
@@ -898,12 +891,17 @@ export default function Toolbar({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            ...(isTablet ? { order: 3, flexBasis: "100%" } : {}),
+            minWidth: 0,
+            maxWidth: "100%",
+            ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%", flexWrap: "wrap" } : {}),
           }}
         >
           {/* Focus area filter */}
           {focusAreaOptions.length > 1 && (
-            <div data-tour="schedule-focus-filter" style={{ flex: 1, minWidth: 0 }}>
+            <div
+              data-tour="schedule-focus-filter"
+              style={{ flex: isTablet ? "1 1 240px" : 1, minWidth: 0 }}
+            >
               <ScrollableTabs
                 className="dg-span-tabs dg-span-tabs--light"
                 style={{ flex: 1, minWidth: 0 }}
@@ -942,7 +940,13 @@ export default function Toolbar({
           <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
 
           {/* Staff search */}
-          <div style={{ position: "relative" }}>
+          <div
+            style={{
+              position: "relative",
+              minWidth: 0,
+              flex: isTablet ? "1 1 160px" : undefined,
+            }}
+          >
             <svg
               width="13"
               height="13"
@@ -972,7 +976,7 @@ export default function Toolbar({
               className="dg-input"
               style={{
                 paddingLeft: 30,
-                width: isTablet ? 180 : 160,
+                width: isTablet ? "100%" : 160,
                 borderRadius: "var(--dg-btn-radius)",
               }}
             />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUser = vi.fn();
+const requireAuthenticatedUserWithClaims = vi.fn();
 const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
 const dispatchNotificationEvent = vi.fn();
@@ -9,6 +10,7 @@ const sessionRowSnapshot = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -16,7 +18,8 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/features/account/server", () => ({
-  fetchUserSessionOverviewForUser: (userId: string) => fetchUserSessionOverviewForUser(userId),
+  fetchUserSessionOverviewForUser: (userId: string, options: unknown) =>
+    fetchUserSessionOverviewForUser(userId, options),
   revokeUserSessionForUser: (userId: string, refreshTokenHash: string) =>
     revokeUserSessionForUser(userId, refreshTokenHash),
 }));
@@ -47,6 +50,10 @@ describe("/api/account/sessions", () => {
     requireAuthenticatedUser.mockResolvedValue({
       user: { id: "user-id" },
     });
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "user-id" },
+      claims: { session_id: "current-session-id" },
+    });
     fetchUserSessionOverviewForUser.mockResolvedValue({ active: [], stale: [] });
     revokeUserSessionForUser.mockResolvedValue(undefined);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
@@ -59,12 +66,14 @@ describe("/api/account/sessions", () => {
     const response = await GET(new NextRequest("http://localhost/api/account/sessions"));
 
     expect(response.status).toBe(200);
-    expect(fetchUserSessionOverviewForUser).toHaveBeenCalledWith("user-id");
+    expect(fetchUserSessionOverviewForUser).toHaveBeenCalledWith("user-id", {
+      currentSupabaseSessionId: "current-session-id",
+    });
     await expect(response.json()).resolves.toEqual({ active: [], stale: [] });
   });
 
   it("rejects unauthenticated session reads", async () => {
-    requireAuthenticatedUser.mockResolvedValueOnce({
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce({
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
 

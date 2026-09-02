@@ -75,7 +75,14 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--dg-color-text-primary)" }}>
           {fa.total}
         </span>
-        <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>({pct}%)</span>
+        <span
+          style={{
+            fontSize: "var(--dg-type-metadata-size)",
+            color: "var(--dg-color-text-subtle)",
+          }}
+        >
+          ({pct}%)
+        </span>
       </div>
 
       {/* Donut + legend */}
@@ -126,7 +133,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                 </span>
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: "var(--dg-type-metadata-size)",
                     color: "var(--dg-color-text-subtle)",
                     flexShrink: 0,
                     minWidth: 30,

@@ -47,7 +47,7 @@ const basePublishDiffPillStyle: CSSProperties = {
   padding: "2px 6px",
   border: "1px solid rgba(255, 255, 255, 0.2)",
   borderRadius: 3,
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.18)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.18)",
   letterSpacing: "0.01em",
 };
 

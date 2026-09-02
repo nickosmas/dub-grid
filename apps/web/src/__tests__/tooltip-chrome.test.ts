@@ -33,7 +33,7 @@ describe("tooltip chrome", () => {
     expect(tooltipPrimitive).toContain("shadow-[var(--tooltip-shadow)]");
     expect(tooltipPrimitive).toContain("z-[11000]");
     expect(globalsCss).toContain(
-      "--tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);",
+      "--tooltip-shadow: 0 0 18px rgba(0, 0, 0, 0.14), 0 0 36px rgba(0, 0, 0, 0.1);",
     );
     expect(tooltipPrimitive).not.toContain("border-[var(--dg-color-border-light)]");
   });

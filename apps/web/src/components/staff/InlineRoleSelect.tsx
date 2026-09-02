@@ -25,10 +25,12 @@ export function InlineRoleSelect({
   orgRole,
   onChange,
   isSelf = false,
+  pendingInvitationEmail,
 }: {
   orgRole: OrganizationRole | null | undefined;
   onChange?: (newRole: OrganizationRole) => Promise<void>;
   isSelf?: boolean;
+  pendingInvitationEmail?: string;
 }) {
   const [pending, setPending] = useState<OrganizationRole | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,7 +53,7 @@ export function InlineRoleSelect({
   if (!orgRole || !onChange) {
     return orgRole ? (
       <span
-        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+        className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
         style={getOrgRoleBadgeStyle(orgRole)}
       >
         {ORG_ROLE_LABELS[orgRole]}
@@ -73,9 +75,13 @@ export function InlineRoleSelect({
       />
       {pending && (
         <ConfirmDialog
-          title="Change role"
-          message={`Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`}
-          confirmLabel="Change role"
+          title={pendingInvitationEmail ? "Replace invitation access?" : "Change role"}
+          message={
+            pendingInvitationEmail
+              ? `Change access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}? The current invitation will be revoked and a replacement will be sent to ${pendingInvitationEmail}.`
+              : `Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`
+          }
+          confirmLabel={pendingInvitationEmail ? "Revoke and resend" : "Change role"}
           variant="warning"
           isLoading={saving}
           onCancel={() => {
@@ -87,7 +93,11 @@ export function InlineRoleSelect({
             setSaving(true);
             try {
               await onChange(next);
-              toast.success(`Role updated to ${ORG_ROLE_LABELS[next]}.`);
+              toast.success(
+                pendingInvitationEmail
+                  ? `Invitation replaced with ${ORG_ROLE_LABELS[next]} access.`
+                  : `Role updated to ${ORG_ROLE_LABELS[next]}.`,
+              );
               setPending(null);
             } catch (error) {
               toast.error(

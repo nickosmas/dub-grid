@@ -103,14 +103,16 @@ export default function ExpandedStaffHours({
                   key={key}
                   onClick={() => setSort(key)}
                   style={{
-                    fontSize: 11,
+                    fontSize: "var(--dg-type-control-size)",
                     fontWeight: 600,
                     padding: "5px 10px",
                     borderRadius: 6,
                     border: "1px solid",
                     borderColor: active ? "var(--dg-color-brand)" : "var(--dg-color-border)",
                     background: active ? "var(--dg-color-brand)" : "transparent",
-                    color: active ? "#fff" : "var(--dg-color-text-secondary)",
+                    color: active
+                      ? "var(--dg-color-text-inverse)"
+                      : "var(--dg-color-text-secondary)",
                     cursor: "pointer",
                   }}
                 >
@@ -130,7 +132,13 @@ export default function ExpandedStaffHours({
             fontSize="var(--dg-fs-label)"
           />
 
-          <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginLeft: "auto" }}>
+          <span
+            style={{
+              fontSize: "var(--dg-type-metadata-size)",
+              color: "var(--dg-color-text-subtle)",
+              marginLeft: "auto",
+            }}
+          >
             {sorted.length} staff &middot; {otCount} OT &middot; {otThreshold}h limit
           </span>
         </div>
@@ -173,8 +181,8 @@ export default function ExpandedStaffHours({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 11,
-                      fontWeight: 700,
+                      fontSize: "var(--dg-type-badge-size)",
+                      fontWeight: 600,
                       flexShrink: 0,
                       background: h.isOvertime
                         ? "var(--dg-color-danger-bg)"
@@ -198,7 +206,12 @@ export default function ExpandedStaffHours({
                     >
                       {emp.firstName} {emp.lastName}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-type-metadata-size)",
+                        color: "var(--dg-color-text-subtle)",
+                      }}
+                    >
                       {fa?.name ?? ""}
                     </div>
                   </div>
@@ -207,7 +220,7 @@ export default function ExpandedStaffHours({
                   {delta !== 0 && (
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: "var(--dg-type-metadata-size)",
                         fontWeight: 600,
                         color: delta > 0 ? "var(--dg-color-danger)" : "var(--dg-color-success)",
                       }}
@@ -232,7 +245,7 @@ export default function ExpandedStaffHours({
                     </div>
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: "var(--dg-type-metadata-size)",
                         color: h.isOvertime
                           ? "var(--dg-color-danger)"
                           : "var(--dg-color-text-subtle)",

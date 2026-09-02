@@ -1,5 +1,5 @@
 import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
-import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
+import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, thStyle } from "@/lib/styles";
 import {
   type AbsenceType,
   type FocusArea,
@@ -124,18 +124,12 @@ export function ConfigTab({
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Shift", "Short Code", "Times", "Focus Area"].map((h) => (
+                  {["Shift", "Short code", "Times", "Focus area"].map((h) => (
                     <th
                       key={h}
                       style={{
+                        ...thStyle,
                         padding: "8px 14px",
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        color: "var(--dg-color-text-subtle)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        textAlign: "left",
-                        whiteSpace: "nowrap",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
@@ -251,18 +245,12 @@ export function ConfigTab({
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Job", "Short Code", "Assignment", "Grid Display"].map((h) => (
+                  {["Job", "Short code", "Assignment", "Grid display"].map((h) => (
                     <th
                       key={h}
                       style={{
+                        ...thStyle,
                         padding: "8px 14px",
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        color: "var(--dg-color-text-subtle)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        textAlign: "left",
-                        whiteSpace: "nowrap",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >
@@ -363,14 +351,8 @@ export function ConfigTab({
                     <th
                       key={h}
                       style={{
+                        ...thStyle,
                         padding: "8px 14px",
-                        fontSize: "var(--dg-fs-badge)",
-                        fontWeight: 700,
-                        color: "var(--dg-color-text-subtle)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        textAlign: "left",
-                        whiteSpace: "nowrap",
                         borderBottom: "1px solid var(--dg-color-border-light)",
                       }}
                     >

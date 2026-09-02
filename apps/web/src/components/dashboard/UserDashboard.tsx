@@ -1530,7 +1530,7 @@ function MeHeroCard({
         background: isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT,
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-md)",
-        color: "#fff",
+        color: "var(--dg-color-text-inverse)",
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
@@ -1587,9 +1587,9 @@ function MeHeroCard({
           >
             <h2
               style={{
-                color: "#fff",
+                color: "var(--dg-color-text-inverse)",
                 fontSize: isCompact ? "1.55rem" : "1.9rem",
-                fontWeight: 750,
+                fontWeight: 600,
                 letterSpacing: 0,
                 lineHeight: 1.08,
                 margin: 0,
@@ -1620,8 +1620,8 @@ function MeHeroCard({
           <span
             style={{
               color: "rgba(255,255,255,0.72)",
-              fontSize: 11,
-              fontWeight: 700,
+              fontSize: "var(--dg-type-badge-size)",
+              fontWeight: 600,
               textTransform: "uppercase",
             }}
           >
@@ -1629,9 +1629,9 @@ function MeHeroCard({
           </span>
           <span
             style={{
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               fontSize: 24,
-              fontWeight: 750,
+              fontWeight: 600,
               lineHeight: 1,
             }}
           >
@@ -1693,7 +1693,7 @@ function MeHeroCard({
           >
             <div
               style={{
-                background: "#fff",
+                background: "var(--dg-color-text-inverse)",
                 borderRadius: 999,
                 height: "100%",
                 width: `${Math.round(timing.progress * 100)}%`,
@@ -1775,7 +1775,7 @@ function HeroInfoRow({ icon, text }: { icon: ReactNode; text: string }) {
       <span
         style={{
           fontSize: 15,
-          fontWeight: 650,
+          fontWeight: 600,
           minWidth: 0,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -1809,9 +1809,9 @@ function HeroPillRow({
       {showTypeLabel ? (
         <div
           style={{
-            color: inverse ? "#fff" : "var(--dg-color-text-primary)",
+            color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-primary)",
             fontSize: inverse ? 20 : 15,
-            fontWeight: 750,
+            fontWeight: 600,
             lineHeight: 1.1,
           }}
         >
@@ -1843,7 +1843,7 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
         color: segment.textColor,
         display: "inline-flex",
         fontSize: 12,
-        fontWeight: 750,
+        fontWeight: 600,
         lineHeight: 1.3,
         maxWidth: "100%",
         padding: "7px 10px",
@@ -1869,10 +1869,10 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
         background: inverse ? "rgba(255,255,255,0.16)" : "var(--dg-color-bg-secondary)",
         border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--dg-color-border)",
         borderRadius: 7,
-        color: inverse ? "#fff" : "var(--dg-color-text-secondary)",
+        color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-secondary)",
         display: "inline-flex",
         fontSize: 12,
-        fontWeight: 750,
+        fontWeight: 600,
         lineHeight: 1,
         padding: "7px 10px",
       }}
@@ -1898,7 +1898,7 @@ function SplitShiftBadge({ inverse = false, label }: { inverse?: boolean; label:
           ? "1px solid rgba(255,255,255,0.28)"
           : "1px solid var(--dg-color-brand-border)",
         borderRadius: 999,
-        color: inverse ? "#fff" : "var(--dg-color-brand)",
+        color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-brand)",
         display: "inline-flex",
         flexShrink: 0,
         fontSize: 13,
@@ -1960,9 +1960,9 @@ function HeroSplitShiftSegment({
         >
           <span
             style={{
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               fontSize: 20,
-              fontWeight: 750,
+              fontWeight: 600,
               lineHeight: 1.15,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -1978,7 +1978,7 @@ function HeroSplitShiftSegment({
             {timeRange ? (
               <span
                 style={{
-                  color: "#fff",
+                  color: "var(--dg-color-text-inverse)",
                   fontSize: 16,
                   fontWeight: 700,
                   textAlign: "right",
@@ -2579,12 +2579,12 @@ function ActionCardShell({
           <div
             style={{
               color: "var(--dg-color-text-muted)",
-              fontSize: 11,
-              fontWeight: 750,
-              letterSpacing: 0,
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               lineHeight: 1.2,
               marginBottom: 6,
-              textTransform: "uppercase",
+              textTransform: "none",
             }}
           >
             {eyebrow}
@@ -2767,7 +2767,7 @@ function WeekShiftRow({
               style={{
                 color: "var(--dg-color-text-primary)",
                 fontSize: 15,
-                fontWeight: 750,
+                fontWeight: 600,
                 minWidth: 0,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -2790,7 +2790,7 @@ function WeekShiftRow({
                 display: "flex",
                 flexShrink: 0,
                 fontSize: 12,
-                fontWeight: 650,
+                fontWeight: 600,
                 gap: 5,
               }}
             >
@@ -2939,8 +2939,8 @@ function DateTile({
       <span
         style={{
           color: compact ? "var(--dg-color-text-muted)" : "var(--dg-color-text-subtle)",
-          fontSize: compact ? 10 : 11,
-          fontWeight: 750,
+          fontSize: "var(--dg-type-metadata-size)",
+          fontWeight: 600,
           textTransform: "uppercase",
         }}
       >
@@ -2950,7 +2950,7 @@ function DateTile({
         style={{
           color: compact ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
           fontSize: compact ? 17 : 20,
-          fontWeight: 800,
+          fontWeight: 600,
           lineHeight: compact ? 1 : "24px",
         }}
       >

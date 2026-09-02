@@ -28,9 +28,9 @@ const ORG_SIZE_OPTIONS = ["1-25", "26-50", "51-100", "101-250", "250+"];
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-label)",
-  fontWeight: 600,
+  fontWeight: "var(--dg-type-field-title-weight)",
   marginBottom: "6px",
-  color: "var(--dg-color-text-secondary)",
+  color: "var(--dg-color-text-label)",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -39,6 +39,7 @@ const inputStyle: React.CSSProperties = {
   border: "1.5px solid var(--dg-color-border)",
   borderRadius: "8px",
   fontSize: "var(--dg-fs-body)",
+  fontWeight: "var(--dg-type-control-weight)",
   background: "var(--dg-color-bg)",
   color: "var(--dg-color-text-primary)",
   outline: "none",
@@ -166,7 +167,7 @@ export default function RequestDemoPage() {
             maxWidth: "480px",
             width: "100%",
             textAlign: "center",
-            boxShadow: "0 4px 24px rgba(15,23,42,0.08)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
           }}
         >
           <CheckCircle2
@@ -206,7 +207,7 @@ export default function RequestDemoPage() {
               gap: "8px",
               padding: "13px 32px",
               background: "var(--dg-color-brand)",
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               border: "none",
               borderRadius: "999px",
               fontSize: "var(--dg-fs-body)",
@@ -227,7 +228,7 @@ export default function RequestDemoPage() {
             padding: "40px 36px",
             maxWidth: "540px",
             width: "100%",
-            boxShadow: "0 4px 24px rgba(15,23,42,0.08)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
           }}
         >
           {/* Header */}
@@ -287,7 +288,7 @@ export default function RequestDemoPage() {
               {/* Contact Name */}
               <div>
                 <label style={labelStyle}>
-                  Contact Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                  Contact name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -337,7 +338,7 @@ export default function RequestDemoPage() {
               {/* Organization Name */}
               <div>
                 <label style={labelStyle}>
-                  Organization Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                  Organization name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -354,7 +355,7 @@ export default function RequestDemoPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
                   <label style={labelStyle}>
-                    Employee Count <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                    Employee count <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <CustomSelect
                     value={orgSize || ""}
@@ -367,7 +368,7 @@ export default function RequestDemoPage() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Industry / Facility Type</label>
+                  <label style={labelStyle}>Industry / facility type</label>
                   <input
                     type="text"
                     value={industry}
@@ -425,14 +426,18 @@ export default function RequestDemoPage() {
           gap: "4px",
           alignItems: "center",
           fontSize: "var(--dg-fs-label)",
-          color: "var(--dg-color-text-faint)",
+          color: "var(--dg-color-text-label)",
         }}
       >
         <Link
           href="/privacy"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "var(--dg-color-text-faint)", textDecoration: "none" }}
+          style={{
+            color: "var(--dg-color-text-label)",
+            textDecoration: "none",
+            fontWeight: "var(--dg-type-control-weight)",
+          }}
         >
           Privacy Policy
         </Link>
@@ -441,7 +446,11 @@ export default function RequestDemoPage() {
           href="/terms"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "var(--dg-color-text-faint)", textDecoration: "none" }}
+          style={{
+            color: "var(--dg-color-text-label)",
+            textDecoration: "none",
+            fontWeight: "var(--dg-type-control-weight)",
+          }}
         >
           Terms of Service
         </Link>
@@ -450,13 +459,14 @@ export default function RequestDemoPage() {
           type="button"
           onClick={openConsentPreferences}
           style={{
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-label)",
             textDecoration: "none",
             background: "none",
             border: "none",
             padding: 0,
             cursor: "pointer",
             font: "inherit",
+            fontWeight: "var(--dg-type-control-weight)",
           }}
         >
           Cookie preferences

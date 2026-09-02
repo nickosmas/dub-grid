@@ -122,6 +122,11 @@ function renderPanel(
     onSaveWithReinvite: (updated: Employee, oldInvitation: Invitation) => void | Promise<void>;
     orgId: string;
     onEmailConflictChange: (hasConflict: boolean) => void;
+    onSaveBlockedChange: (isBlocked: boolean) => void;
+    employee: Employee;
+    roles: NamedItem[];
+    certifications: NamedItem[];
+    persistent: boolean;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
@@ -129,17 +134,19 @@ function renderPanel(
 
   render(
     <EditEmployeePanel
-      employee={employee}
+      employee={overrides.employee ?? employee}
       orgId={overrides.orgId}
       focusAreas={focusAreas}
-      certifications={[...DESIGNATIONS]}
-      roles={[...ROLES]}
+      certifications={overrides.certifications ?? [...DESIGNATIONS]}
+      roles={overrides.roles ?? [...ROLES]}
       isManagementUser={overrides.isManagementUser}
       onSave={onSave}
       onCancel={onCancel}
       pendingInvitation={overrides.pendingInvitation}
       onSaveWithReinvite={overrides.onSaveWithReinvite}
       onEmailConflictChange={overrides.onEmailConflictChange}
+      onSaveBlockedChange={overrides.onSaveBlockedChange}
+      persistent={overrides.persistent}
     />,
   );
 
@@ -172,6 +179,51 @@ describe("EditEmployeePanel", () => {
       const emailInput = screen.getByDisplayValue("alice@example.com");
       expect(emailInput).toBeInTheDocument();
     });
+
+    it("hides incompatible roles but keeps a selected legacy role removable", () => {
+      renderPanel({
+        employee: { ...employee, certificationId: null, roleIds: [1] },
+        certifications: [
+          {
+            id: 5,
+            orgId: "org-1",
+            name: "Registered Nurse",
+            abbr: "RN",
+            sortOrder: 0,
+          },
+        ],
+        roles: [
+          {
+            id: 1,
+            orgId: "org-1",
+            name: "Legacy Lead",
+            abbr: "LL",
+            sortOrder: 0,
+            requiredCertificationIds: [5],
+          },
+          {
+            id: 2,
+            orgId: "org-1",
+            name: "Clinical Lead",
+            abbr: "CL",
+            sortOrder: 1,
+            requiredCertificationIds: [5],
+          },
+          {
+            id: 3,
+            orgId: "org-1",
+            name: "Coordinator",
+            abbr: "CO",
+            sortOrder: 2,
+            requiredCertificationIds: [],
+          },
+        ],
+      });
+
+      expect(screen.getByRole("button", { name: "Legacy Lead" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Coordinator" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Clinical Lead" })).not.toBeInTheDocument();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -181,6 +233,15 @@ describe("EditEmployeePanel", () => {
     it("Save button is disabled when form is unmodified", () => {
       renderPanel();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("hides pristine Close in persistent mode and shows Discard after an edit", async () => {
+      const user = userEvent.setup();
+      renderPanel({ persistent: true });
+
+      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+      await user.type(screen.getByDisplayValue("Alice"), "a");
+      expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
     });
 
     it("Save becomes enabled after changing the first name field", async () => {
@@ -243,6 +304,21 @@ describe("EditEmployeePanel", () => {
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("reports blocking validation to a host when required focus areas are cleared", async () => {
+      const user = userEvent.setup();
+      const onSaveBlockedChange = vi.fn();
+      renderPanel({ onSaveBlockedChange });
+
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(false);
+
+      await user.click(screen.getByRole("button", { name: "North" }));
+      expect(screen.getByText("At least one focus areas is required")).toBeVisible();
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(true);
+
+      await user.click(screen.getByRole("button", { name: "North" }));
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(false);
     });
   });
 

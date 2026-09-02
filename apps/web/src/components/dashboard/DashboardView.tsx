@@ -3,10 +3,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import dynamic from "next/dynamic";
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
-import { queryKeys } from "@/lib/query-keys";
 
 import type { Permissions, WebPermissions } from "@/hooks";
 import type {
@@ -22,7 +20,6 @@ import type {
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
-  Invitation,
   ShiftRequest,
 } from "@/types";
 import {
@@ -31,7 +28,6 @@ import {
   fetchPublishedDateRanges,
   fetchShiftRequests,
 } from "@/features/schedule/client";
-import { fetchOrganizationInvitations } from "@/features/organization/client";
 import {
   buildPublishedDateSet,
   filterPublishedDates,
@@ -54,7 +50,7 @@ import {
   buildActivityFeed,
   computeCoverageTrendData,
 } from "@/lib/dashboard-stats";
-import { getScheduleStartForSpan } from "@/lib/schedule-view";
+import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
 import { formatDateKey } from "@/lib/utils";
 
 export type ViewMode = "day" | "week" | "2weeks";
@@ -68,6 +64,7 @@ import DashboardGreeting from "./DashboardGreeting";
 import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
+import { useDashboardInvitations } from "./useDashboardInvitations";
 const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), {
   ssr: false,
 });
@@ -263,6 +260,10 @@ export default function DashboardView({
   const [periodStart, setPeriodStart] = useState<Date>(() =>
     getScheduleStartForSpan({ date: new Date(), span: 1, payPeriodStartDate: null }),
   );
+  useEffect(() => {
+    if (effectiveViewMode !== "2weeks") return;
+    setPeriodStart((current) => realignTwoWeekScheduleStart(current, 2, payPeriodStartDate));
+  }, [effectiveViewMode, payPeriodStartDate]);
   const currentTime = useMinuteNow();
   // Day-granular "today" key: changes only at midnight, so it can drive the
   // fetch window / hero look-ahead without re-running every minute.
@@ -292,6 +293,14 @@ export default function DashboardView({
   const periodDates = useMemo(
     () => getDatesInRange(periodStart, periodDays),
     [periodStart, periodDays],
+  );
+  const myScheduleStart = useMemo(
+    () => (effectiveViewMode === "day" ? alignPeriodStart(periodStart, "week") : periodStart),
+    [alignPeriodStart, effectiveViewMode, periodStart],
+  );
+  const myScheduleEnd = useMemo(
+    () => addDays(myScheduleStart, effectiveViewMode === "2weeks" ? 13 : 6),
+    [effectiveViewMode, myScheduleStart],
   );
   const prevPeriodStart = useMemo(
     () => addDays(periodStart, -periodDays),
@@ -340,11 +349,7 @@ export default function DashboardView({
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
 
-  const invitationsQuery = useQuery<Invitation[]>({
-    queryKey: queryKeys.org.invitations(orgId),
-    queryFn: () => fetchOrganizationInvitations(orgId),
-  });
-  const invitations = invitationsQuery.data ?? [];
+  const invitations = useDashboardInvitations(orgId, !isUserDashboardMode);
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -353,7 +358,6 @@ export default function DashboardView({
 
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShiftsLoading(true);
 
     // Fetch the date range needed: previous period start → current period end.
@@ -362,11 +366,16 @@ export default function DashboardView({
     // next upcoming shift even when it falls outside the period being browsed.
     const today = new Date(`${todayKey}T00:00:00`);
     const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const earliestDashboardDate =
+      myScheduleStart < prevPeriodStart ? myScheduleStart : prevPeriodStart;
+    const latestDashboardDate = myScheduleEnd > periodEnd ? myScheduleEnd : periodEnd;
     const fetchStart = formatDateKey(
-      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
+      isUserDashboardMode && today < earliestDashboardDate ? today : earliestDashboardDate,
     );
     const fetchEnd = formatDateKey(
-      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
+      isUserDashboardMode && lookaheadEnd > latestDashboardDate
+        ? lookaheadEnd
+        : latestDashboardDate,
     );
     Promise.all([
       fetchShifts(
@@ -421,6 +430,8 @@ export default function DashboardView({
     periodEndKey,
     periodStartKey,
     prevPeriodStart,
+    myScheduleEnd,
+    myScheduleStart,
   ]);
 
   // Shift requests
@@ -998,7 +1009,7 @@ export default function DashboardView({
     // page so the logo stays put across routes (see globals.css).
     paddingLeft: "var(--dg-page-gutter)",
     paddingRight: "var(--dg-page-gutter)",
-    maxWidth: isUserDashboardMode ? 1560 : 1300,
+    maxWidth: 1560,
     margin: "0 auto",
     width: "100%" as const,
     boxSizing: "border-box" as const,

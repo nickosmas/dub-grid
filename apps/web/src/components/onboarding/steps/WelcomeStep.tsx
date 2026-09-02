@@ -117,7 +117,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
       <h1
         style={{
           fontSize: 28,
-          fontWeight: 800,
+          fontWeight: "var(--dg-type-page-title-weight)",
           color: "var(--dg-color-text-primary)",
           margin: "0 0 12px",
           letterSpacing: "-0.03em",

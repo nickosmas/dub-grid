@@ -42,6 +42,7 @@ interface StaffFilterPopoverProps {
   unlinkedCount: number;
   onClearAll: () => void;
   hasActiveFilters: boolean;
+  showAdministrativeFilters?: boolean;
 }
 
 export function StaffFilterPopover({
@@ -77,6 +78,7 @@ export function StaffFilterPopover({
   unlinkedCount,
   onClearAll,
   hasActiveFilters,
+  showAdministrativeFilters = true,
 }: StaffFilterPopoverProps) {
   return (
     <FilterPanelShell
@@ -87,28 +89,30 @@ export function StaffFilterPopover({
       onClearAll={onClearAll}
       onClose={onClose}
     >
-      <FilterSection title="Employment">
-        <FilterChip
-          active={filterEmploymentType === "all"}
-          onClick={() => onFilterEmploymentTypeChange("all")}
-        >
-          All
-        </FilterChip>
-        <FilterChip
-          active={filterEmploymentType === "full_time"}
-          onClick={() => onFilterEmploymentTypeChange("full_time")}
-        >
-          Full-time
-        </FilterChip>
-        <FilterChip
-          active={filterEmploymentType === "part_time"}
-          onClick={() => onFilterEmploymentTypeChange("part_time")}
-        >
-          Part-time
-        </FilterChip>
-      </FilterSection>
+      {showAdministrativeFilters && (
+        <FilterSection title="Employment">
+          <FilterChip
+            active={filterEmploymentType === "all"}
+            onClick={() => onFilterEmploymentTypeChange("all")}
+          >
+            All
+          </FilterChip>
+          <FilterChip
+            active={filterEmploymentType === "full_time"}
+            onClick={() => onFilterEmploymentTypeChange("full_time")}
+          >
+            Full-time
+          </FilterChip>
+          <FilterChip
+            active={filterEmploymentType === "part_time"}
+            onClick={() => onFilterEmploymentTypeChange("part_time")}
+          >
+            Part-time
+          </FilterChip>
+        </FilterSection>
+      )}
 
-      {departments.length > 0 && (
+      {showAdministrativeFilters && departments.length > 0 && (
         <FilterSection title={departmentLabel}>
           <FilterChip
             active={filterDepartment === null}
@@ -132,7 +136,7 @@ export function StaffFilterPopover({
               onChange={(event) => onFilterDepartmentAdminOnlyChange(event.target.checked)}
               className="h-3.5 w-3.5 accent-[var(--dg-color-brand)]"
             />
-            <span className="text-xs font-medium text-[var(--dg-color-text-secondary)]">
+            <span className="text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-primary)]">
               Department admins only
             </span>
           </label>
@@ -212,70 +216,74 @@ export function StaffFilterPopover({
         )}
       </FilterSection>
 
-      <FilterSection title="Account">
-        <FilterChip
-          active={filterAccountLink === "all"}
-          onClick={() => onFilterAccountLinkChange("all")}
-        >
-          All
-        </FilterChip>
-        <FilterChip
-          active={filterAccountLink === "linked"}
-          onClick={() => onFilterAccountLinkChange("linked")}
-        >
-          Linked account
-        </FilterChip>
-        <FilterChip
-          active={filterAccountLink === "unlinked"}
-          onClick={() => onFilterAccountLinkChange("unlinked")}
-        >
-          Unlinked account{unlinkedCount > 0 ? ` (${unlinkedCount})` : ""}
-        </FilterChip>
-      </FilterSection>
-
-      <FilterSection title="Contact">
-        <FilterGroup label="Email">
+      {showAdministrativeFilters && (
+        <FilterSection title="Account">
           <FilterChip
-            active={filterEmailPresence === "all"}
-            onClick={() => onFilterEmailPresenceChange("all")}
+            active={filterAccountLink === "all"}
+            onClick={() => onFilterAccountLinkChange("all")}
           >
             All
           </FilterChip>
           <FilterChip
-            active={filterEmailPresence === "present"}
-            onClick={() => onFilterEmailPresenceChange("present")}
+            active={filterAccountLink === "linked"}
+            onClick={() => onFilterAccountLinkChange("linked")}
           >
-            Has email
+            Linked account
           </FilterChip>
           <FilterChip
-            active={filterEmailPresence === "missing"}
-            onClick={() => onFilterEmailPresenceChange("missing")}
+            active={filterAccountLink === "unlinked"}
+            onClick={() => onFilterAccountLinkChange("unlinked")}
           >
-            Missing email
+            Unlinked account{unlinkedCount > 0 ? ` (${unlinkedCount})` : ""}
           </FilterChip>
-        </FilterGroup>
+        </FilterSection>
+      )}
 
-        <FilterGroup label="Phone">
-          <FilterChip
-            active={filterPhonePresence === "all"}
-            onClick={() => onFilterPhonePresenceChange("all")}
-          >
-            All
-          </FilterChip>
-          <FilterChip
-            active={filterPhonePresence === "present"}
-            onClick={() => onFilterPhonePresenceChange("present")}
-          >
-            Has phone
-          </FilterChip>
-          <FilterChip
-            active={filterPhonePresence === "missing"}
-            onClick={() => onFilterPhonePresenceChange("missing")}
-          >
-            Missing phone
-          </FilterChip>
-        </FilterGroup>
-      </FilterSection>
+      {showAdministrativeFilters && (
+        <FilterSection title="Contact">
+          <FilterGroup label="Email">
+            <FilterChip
+              active={filterEmailPresence === "all"}
+              onClick={() => onFilterEmailPresenceChange("all")}
+            >
+              All
+            </FilterChip>
+            <FilterChip
+              active={filterEmailPresence === "present"}
+              onClick={() => onFilterEmailPresenceChange("present")}
+            >
+              Has email
+            </FilterChip>
+            <FilterChip
+              active={filterEmailPresence === "missing"}
+              onClick={() => onFilterEmailPresenceChange("missing")}
+            >
+              Missing email
+            </FilterChip>
+          </FilterGroup>
+
+          <FilterGroup label="Phone">
+            <FilterChip
+              active={filterPhonePresence === "all"}
+              onClick={() => onFilterPhonePresenceChange("all")}
+            >
+              All
+            </FilterChip>
+            <FilterChip
+              active={filterPhonePresence === "present"}
+              onClick={() => onFilterPhonePresenceChange("present")}
+            >
+              Has phone
+            </FilterChip>
+            <FilterChip
+              active={filterPhonePresence === "missing"}
+              onClick={() => onFilterPhonePresenceChange("missing")}
+            >
+              Missing phone
+            </FilterChip>
+          </FilterGroup>
+        </FilterSection>
+      )}
     </FilterPanelShell>
   );
 }

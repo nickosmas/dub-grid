@@ -95,7 +95,7 @@ export function StaffDetailPanel({
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [open, setOpen] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [hasEmailConflict, setHasEmailConflict] = useState(false);
+  const [isEditorSaveBlocked, setIsEditorSaveBlocked] = useState(false);
   const onCloseRef = useLatestRef(onClose);
   const pendingInvitation = canManageEmployees
     ? pendingInviteByEmployeeId.get(employee.id)
@@ -111,6 +111,7 @@ export function StaffDetailPanel({
     canManageManagementAccess && onManageManagementAccess && employee.status !== "removed",
   );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
+  const showEmploymentStatusActions = canManageEmployees && !isSelf;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
   // Only staff managers can open the full /people/[id] page (mirrors the
   // table's name-link gate); the self link just goes to /profile.
@@ -150,7 +151,7 @@ export function StaffDetailPanel({
 
   useEffect(() => {
     setHasUnsavedChanges(false);
-    setHasEmailConflict(false);
+    setIsEditorSaveBlocked(false);
     setOpen(true);
   }, [employee.id]);
 
@@ -207,7 +208,7 @@ export function StaffDetailPanel({
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-body)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `2px solid ${avatarTone.borderColor}`,
@@ -308,7 +309,7 @@ export function StaffDetailPanel({
           </div>
         </div>
 
-        {/* Editable body — nothing commits until the shared footer's Save is pressed. */}
+        {/* Editable body - nothing commits until the owning editor saves. */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
           <InlineEditEmployee
             employee={employee}
@@ -327,86 +328,82 @@ export function StaffDetailPanel({
             onSave={onSave}
             onCancel={handleRequestClose}
             onDirtyChange={setHasUnsavedChanges}
-            onEmailConflictChange={setHasEmailConflict}
+            onSaveBlockedChange={setIsEditorSaveBlocked}
             pendingInvitation={pendingInvitation}
             onSaveWithReinvite={onSaveWithReinvite}
           />
-          {showAccountAccessActions && (
+          {(showAccountAccessActions || showEmploymentStatusActions) && (
             <div
               style={{
-                padding: "0 24px 24px",
+                padding: "16px 24px 20px",
+                borderTop: "1px solid var(--dg-color-border-light)",
                 display: "flex",
                 flexDirection: "column",
-                gap: 10,
+                gap: 12,
               }}
             >
-              {pendingInvitation && onRevoke ? (
-                <PendingInvitationBanner
-                  pendingInvitation={pendingInvitation}
-                  onReinvite={handleReinvite}
-                  onRevoke={onRevoke}
-                  isInSandbox={isInSandbox}
-                />
-              ) : (
-                showInviteActions &&
-                onInvite && (
-                  <Button
-                    onClick={() => onInvite(employee)}
-                    disabled={isInSandbox}
-                    className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-                    title={
-                      isInSandbox
-                        ? "Sending invitations isn't available in sandbox mode."
-                        : undefined
-                    }
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+              {showAccountAccessActions && (
+                <>
+                  {pendingInvitation && onRevoke ? (
+                    <PendingInvitationBanner
+                      pendingInvitation={pendingInvitation}
+                      onReinvite={handleReinvite}
+                      onRevoke={onRevoke}
+                      isInSandbox={isInSandbox}
+                    />
+                  ) : (
+                    showInviteActions &&
+                    onInvite && (
+                      <Button
+                        onClick={() => onInvite(employee)}
+                        disabled={isInSandbox}
+                        className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+                        title={
+                          isInSandbox
+                            ? "Sending invitations isn't available in sandbox mode."
+                            : undefined
+                        }
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                          <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        Send Invitation
+                      </Button>
+                    )
+                  )}
+                  {showManagementAccessAction && onManageManagementAccess && (
+                    <Button
+                      onClick={() => onManageManagementAccess(employee)}
+                      className="dg-btn dg-btn-secondary dg-btn-sm self-start"
                     >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    Send Invitation
-                  </Button>
-                )
+                      {hasManagementAccess || hasPendingManagementInvite
+                        ? "Edit Management Access"
+                        : "Add to Management"}
+                    </Button>
+                  )}
+                </>
               )}
-              {showManagementAccessAction && onManageManagementAccess && (
-                <Button
-                  onClick={() => onManageManagementAccess(employee)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-                >
-                  {hasManagementAccess || hasPendingManagementInvite
-                    ? "Edit Management Access"
-                    : "Add to Management"}
-                </Button>
+              {showEmploymentStatusActions && (
+                <EmployeeStatusActions
+                  employee={employee}
+                  canEdit={canManageEmployees}
+                  isSelf={false}
+                  onDeactivate={onDeactivate}
+                  onActivate={onActivate}
+                  onRemove={onRemove}
+                  variant="panel"
+                />
               )}
-            </div>
-          )}
-          {canManageEmployees && !isSelf && (
-            <div
-              style={{
-                padding: "0 24px 24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <EmployeeStatusActions
-                employee={employee}
-                canEdit={canManageEmployees}
-                isSelf={false}
-                onDeactivate={onDeactivate}
-                onActivate={onActivate}
-                onRemove={onRemove}
-                variant="panel"
-              />
             </div>
           )}
         </div>
@@ -430,7 +427,7 @@ export function StaffDetailPanel({
               canEditEmployee ? (
                 <Button
                   onClick={handleFooterSave}
-                  disabled={!hasUnsavedChanges || hasEmailConflict}
+                  disabled={!hasUnsavedChanges || isEditorSaveBlocked}
                   className="dg-btn dg-btn-primary"
                 >
                   {EDITOR_ACTION_LABELS.save}

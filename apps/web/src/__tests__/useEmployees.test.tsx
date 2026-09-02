@@ -16,6 +16,12 @@ const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 
 vi.mock("@/features/employees/client", () => {
+  class MockEmployeeProfileConflictError extends Error {
+    constructor(public readonly latestEmployee: unknown) {
+      super("Employee details changed elsewhere.");
+      this.name = "EmployeeProfileConflictError";
+    }
+  }
   class MockEmployeeStatusConflictError extends Error {
     constructor(public readonly latestEmployee: unknown) {
       super("Employee status changed elsewhere.");
@@ -25,6 +31,7 @@ vi.mock("@/features/employees/client", () => {
   return {
     activateEmployee: (...args: unknown[]) => mockActivateEmployee(...args),
     deactivateEmployee: (...args: unknown[]) => mockDeactivateEmployee(...args),
+    EmployeeProfileConflictError: MockEmployeeProfileConflictError,
     EmployeeStatusConflictError: MockEmployeeStatusConflictError,
     fetchEmployees: (...args: unknown[]) => mockFetchEmployees(...args),
     insertEmployee: vi.fn(),
@@ -90,7 +97,10 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchEmployees.mockResolvedValue([EMPLOYEE]);
-    mockUpdateEmployee.mockResolvedValue(undefined);
+    mockUpdateEmployee.mockImplementation(async (employee) => ({
+      ...employee,
+      version: employee.version + 1,
+    }));
     mockCreateOrganizationInvitation.mockResolvedValue({
       invitationId: "inv-2",
       token: "fresh-token",

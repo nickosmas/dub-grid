@@ -8,7 +8,7 @@ import {
   rowToShiftRequest,
 } from "@/lib/db/mappers";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
-import type { MobilePublishedScheduleRow } from "@dubgrid/data-access";
+import type { MobilePublishedScheduleRow, MobileShiftRequestQueryRow } from "@dubgrid/data-access";
 import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
@@ -26,6 +26,7 @@ import {
   fetchMobilePendingInvitationRows,
   fetchMobilePublishHistoryRows,
   fetchMobileRoleRows as fetchMobileRoleRowsData,
+  fetchMobileShiftRequestHistoryRows as fetchMobileShiftRequestHistoryRowsData,
   fetchMobileShiftRequestRows as fetchMobileShiftRequestRowsData,
   fetchMobileUnreadNotificationCount as fetchMobileUnreadNotificationCountData,
   fetchProfileNameRowsByIds as fetchProfileNameRowsByIdsData,
@@ -66,6 +67,7 @@ import type {
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
+  MobileBootstrapRole,
   MobileOpenShift,
   MobilePerson,
   MobileScheduleEntry,
@@ -345,12 +347,13 @@ export async function fetchMobileFocusAreas(
 export async function fetchMobileRoles(
   serviceClient: SupabaseClient,
   orgId: string,
-): Promise<MobileNamedItem[]> {
+): Promise<MobileBootstrapRole[]> {
   const rows = await fetchMobileRoleRowsData(serviceClient, orgId);
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     abbr: row.abbr,
+    requiredCertificationIds: row.required_certification_ids ?? [],
   }));
 }
 
@@ -1458,23 +1461,15 @@ export async function fetchMobileCoverageSummary(
   };
 }
 
-export async function fetchMobileShiftRequests(
-  serviceClient: SupabaseClient,
+function mapMobileShiftRequestRows(
+  rows: MobileShiftRequestQueryRow[],
   input: {
-    orgId: string;
-    employeeId?: string;
-    includeOpenPickupRequests?: boolean;
-    startDate?: string;
-    endDate?: string;
+    assignmentDetailsByPair: Map<string, MobileAssignmentDetails>;
+    focusAreaNameMap: Map<number, string>;
+    jobNameMap: Map<number, string>;
   },
-): Promise<MobileShiftRequest[]> {
-  const [assignmentDetailsByPair, focusAreaNameMap, jobNameMap] = await Promise.all([
-    fetchAssignmentDetailsMap(serviceClient, input.orgId),
-    fetchFocusAreaNameMap(serviceClient, input.orgId),
-    fetchJobNameMap(serviceClient, input.orgId),
-  ]);
-  const rows = await fetchMobileShiftRequestRowsData(serviceClient, input);
-
+): MobileShiftRequest[] {
+  const { assignmentDetailsByPair, focusAreaNameMap, jobNameMap } = input;
   return rows.map((row) => {
     const requester = Array.isArray(row.requester) ? (row.requester[0] ?? null) : row.requester;
     const target = Array.isArray(row.target) ? (row.target[0] ?? null) : row.target;
@@ -1599,6 +1594,49 @@ export async function fetchMobileShiftRequests(
           : null,
     };
   });
+}
+
+async function loadMobileShiftRequestMappingContext(serviceClient: SupabaseClient, orgId: string) {
+  const [assignmentDetailsByPair, focusAreaNameMap, jobNameMap] = await Promise.all([
+    fetchAssignmentDetailsMap(serviceClient, orgId),
+    fetchFocusAreaNameMap(serviceClient, orgId),
+    fetchJobNameMap(serviceClient, orgId),
+  ]);
+
+  return { assignmentDetailsByPair, focusAreaNameMap, jobNameMap };
+}
+
+export async function fetchMobileShiftRequests(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId?: string;
+    includeOpenPickupRequests?: boolean;
+    startDate?: string;
+    endDate?: string;
+  },
+): Promise<MobileShiftRequest[]> {
+  const [mappingContext, rows] = await Promise.all([
+    loadMobileShiftRequestMappingContext(serviceClient, input.orgId),
+    fetchMobileShiftRequestRowsData(serviceClient, input),
+  ]);
+
+  return mapMobileShiftRequestRows(rows, mappingContext);
+}
+
+export async function fetchMobileShiftRequestHistory(
+  serviceClient: SupabaseClient,
+  input: Parameters<typeof fetchMobileShiftRequestHistoryRowsData>[1],
+) {
+  const [mappingContext, page] = await Promise.all([
+    loadMobileShiftRequestMappingContext(serviceClient, input.orgId),
+    fetchMobileShiftRequestHistoryRowsData(serviceClient, input),
+  ]);
+
+  return {
+    requests: mapMobileShiftRequestRows(page.rows, mappingContext),
+    nextCursor: page.nextCursor,
+  };
 }
 
 export async function fetchMobilePeople(

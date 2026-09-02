@@ -15,7 +15,6 @@ import {
   updateAppOnlyUser,
 } from "@/features/organization/client";
 import { useIsInSandbox } from "@/hooks/useIsInSandbox";
-import { checkEmployeeEmailConflict, updateEmployeeIdentity } from "@/features/employees/client";
 
 vi.mock("@/hooks/useIsInSandbox", () => ({
   useIsInSandbox: vi.fn(() => false),
@@ -50,23 +49,6 @@ vi.mock("@/features/organization/client", () => ({
   },
 }));
 
-vi.mock("@/features/employees/client", () => {
-  class MockEmployeeContactConflictError extends Error {
-    constructor(
-      message: string,
-      public readonly field: "email" | "phone",
-    ) {
-      super(message);
-      this.name = "EmployeeContactConflictError";
-    }
-  }
-  return {
-    updateEmployeeIdentity: vi.fn(),
-    checkEmployeeEmailConflict: vi.fn(),
-    EmployeeContactConflictError: MockEmployeeContactConflictError,
-  };
-});
-
 vi.mock("@/features/permissions/client", () => ({
   usePermissions: () => ({
     isSuperAdmin: true,
@@ -89,8 +71,6 @@ const resendOrganizationInvitationGuardedMock = vi.mocked(resendOrganizationInvi
 const revokeOrganizationInvitationGuardedMock = vi.mocked(revokeOrganizationInvitationGuarded);
 const updateOrganizationMembershipGuardedMock = vi.mocked(updateOrganizationMembershipGuarded);
 const useIsInSandboxMock = vi.mocked(useIsInSandbox);
-const updateEmployeeIdentityMock = vi.mocked(updateEmployeeIdentity);
-const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
 
 const employee: Employee = {
   id: "emp-1",
@@ -209,10 +189,6 @@ describe("EmployeeManagementAccessEditor", () => {
   beforeEach(() => {
     useIsInSandboxMock.mockReturnValue(false);
     fetchOrganizationUsersMock.mockResolvedValue([]);
-    checkEmployeeEmailConflictMock.mockResolvedValue({
-      conflict: false,
-      conflictingEmployeeId: null,
-    });
     updateAppOnlyUserMock.mockResolvedValue(undefined);
     updateOrganizationMembershipGuardedMock.mockResolvedValue(makeOrganizationUser());
     createOrganizationInvitationMock.mockResolvedValue({
@@ -240,10 +216,6 @@ describe("EmployeeManagementAccessEditor", () => {
         updatedAt: "2026-01-02T00:00:00.000Z",
       }),
     );
-    updateEmployeeIdentityMock.mockResolvedValue({
-      success: true,
-      employee: { ...employee, email: "new.hire@example.com" },
-    });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -366,13 +338,12 @@ describe("EmployeeManagementAccessEditor", () => {
         departmentIds: [11],
       });
       expect(resendOrganizationInvitationGuardedMock).not.toHaveBeenCalled();
-      expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledWith(null);
       expect(onClose).toHaveBeenCalledOnce();
     });
   });
 
-  it("locks the login email while a pending invitation exists, instead of allowing a silent resend", async () => {
+  it("uses Profile details as the only email-entry point for a pending invitation", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onCompleted = vi.fn();
@@ -399,11 +370,8 @@ describe("EmployeeManagementAccessEditor", () => {
       await screen.findByRole("region", { name: /edit management access/i }),
     ).toBeInTheDocument();
 
-    const emailInput = screen.getByRole("textbox");
-    expect(emailInput).toBeDisabled();
-    expect(
-      screen.getByText(/an invitation is already pending at this address/i),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resend Invitation" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Operations" }));
@@ -424,7 +392,6 @@ describe("EmployeeManagementAccessEditor", () => {
         departmentIds: [10, 11],
       });
       expect(resendOrganizationInvitationGuardedMock).not.toHaveBeenCalled();
-      expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
       expect(onCompleted).toHaveBeenCalledWith(null);
       expect(onClose).toHaveBeenCalledOnce();
     });
@@ -494,7 +461,40 @@ describe("EmployeeManagementAccessEditor", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("warns upfront that saving will email an invitation when adding a person with no linked account", async () => {
+  it("does not flash missing-email guidance while linked account data is loading", async () => {
+    let resolveUsers: (users: OrganizationUser[]) => void = () => undefined;
+    fetchOrganizationUsersMock.mockImplementationOnce(
+      () =>
+        new Promise<OrganizationUser[]>((resolve) => {
+          resolveUsers = resolve;
+        }),
+    );
+
+    render(
+      <EmployeeManagementAccessEditor
+        employee={{ ...employee, email: "", userId: "user-1" }}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+    expect(screen.queryByText(/add an email address in profile details/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveUsers([makeOrganizationUser()]);
+    });
+
+    expect(await screen.findByRole("button", { name: "Save Access" })).toBeInTheDocument();
+    expect(screen.queryByText(/add an email address in profile details/i)).not.toBeInTheDocument();
+  });
+
+  it("requires an email in Profile details before inviting an unlinked person", async () => {
     const user = userEvent.setup();
 
     render(
@@ -512,19 +512,14 @@ describe("EmployeeManagementAccessEditor", () => {
       expect(fetchOrganizationUsersMock).toHaveBeenCalled();
     });
 
-    expect(
-      screen.queryByText(/saving emails an invitation link to this address/i),
-    ).not.toBeInTheDocument();
-
-    await user.type(screen.getByRole("textbox"), "new.hire@example.com");
-
-    expect(
-      screen.getByText(/saving emails an invitation link to this address/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send Invitation" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(await screen.findByText(/add an email address in profile details/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Leadership" }));
+    expect(screen.getByRole("button", { name: "Send Invitation" })).toBeDisabled();
+    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
 
-  it("locks the login email to the existing contact email when inviting someone who already has one on file", async () => {
+  it("uses the Profile details email when inviting someone", async () => {
     const onCompleted = vi.fn();
     const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
 
@@ -544,10 +539,8 @@ describe("EmployeeManagementAccessEditor", () => {
       expect(fetchOrganizationUsersMock).toHaveBeenCalled();
     });
 
-    const emailInput = screen.getByRole("textbox");
-    expect(emailInput).toHaveValue(employee.email);
-    expect(emailInput).toBeDisabled();
-    expect(screen.getByText(/this is their contact email from staff details/i)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Leadership" }));
     await act(async () => {
@@ -581,113 +574,17 @@ describe("EmployeeManagementAccessEditor", () => {
 
     await screen.findByRole("region", { name: /edit management access/i });
 
-    expect(
-      screen.getByText(/an invitation is already pending at this address/i),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Invitation" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resend Invitation" })).not.toBeInTheDocument();
   });
 
-  it("backfills a blank employee email before sending a first invitation", async () => {
+  it("uses the outlined secondary treatment for both Close and Discard", async () => {
     const user = userEvent.setup();
-    const onCompleted = vi.fn();
-    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
 
     render(
       <EmployeeManagementAccessEditor
-        ref={editorRef}
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        managementDepartments={managementDepartments}
-        onClose={vi.fn()}
-        onCompleted={onCompleted}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
-    });
-
-    await user.type(screen.getByRole("textbox"), "new.hire@example.com");
-    await user.click(screen.getByRole("button", { name: "Leadership" }));
-    await act(async () => {
-      await editorRef.current?.save();
-    });
-
-    await waitFor(() => {
-      expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
-        expect.objectContaining({ employeeId: "emp-1", email: "new.hire@example.com" }),
-      );
-      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "new.hire@example.com" }),
-      );
-      expect(onCompleted).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "new.hire@example.com" }),
-      );
-    });
-
-    // Order matters: the employee record must be backfilled before the
-    // invitation is created, not after.
-    expect(updateEmployeeIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(
-      createOrganizationInvitationMock.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("backfills a blank employee email after revoking a pending invitation", async () => {
-    const user = userEvent.setup();
-    const onCompleted = vi.fn();
-    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
-
-    render(
-      <EmployeeManagementAccessEditor
-        ref={editorRef}
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        managementDepartments={managementDepartments}
-        directoryPerson={makeDirectoryPerson({
-          managementDepartmentIds: [10],
-          invitationStatus: "pending",
-        })}
-        pendingInvitation={makePendingInvitation()}
-        onClose={vi.fn()}
-        onCompleted={onCompleted}
-      />,
-    );
-
-    await screen.findByRole("region", { name: /edit management access/i });
-
-    await user.click(screen.getByRole("button", { name: /remove from management/i }));
-    await act(async () => {
-      await editorRef.current?.save();
-    });
-
-    await waitFor(() => {
-      expect(revokeOrganizationInvitationGuardedMock).toHaveBeenCalled();
-      expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
-        expect.objectContaining({ employeeId: "emp-1", email: "alice@example.com" }),
-      );
-      expect(onCompleted).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "new.hire@example.com" }),
-      );
-    });
-
-    // Order matters: revoke first, so the email-change trigger has no live
-    // invitation left to auto-revoke.
-    expect(revokeOrganizationInvitationGuardedMock.mock.invocationCallOrder[0]).toBeLessThan(
-      updateEmployeeIdentityMock.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("does not backfill the employee email while a pending invitation is meant to stay alive", async () => {
-    const user = userEvent.setup();
-    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
-
-    render(
-      <EmployeeManagementAccessEditor
-        ref={editorRef}
-        employee={{ ...employee, email: "" }}
+        employee={employee}
         orgId="org-1"
         orgName="Test Org"
         managementDepartments={managementDepartments}
@@ -701,84 +598,15 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    await screen.findByRole("region", { name: /edit management access/i });
+    const closeButton = await screen.findByRole("button", { name: "Close" });
+    expect(closeButton).toHaveClass("dg-btn-secondary");
+    expect(closeButton).not.toHaveClass("dg-btn-ghost");
 
-    // Departments-only change — the invitation must survive this save, so
-    // backfilling employees.email here would self-revoke it via the DB
-    // trigger. Regression guard for that landmine.
     await user.click(screen.getByRole("button", { name: "Operations" }));
-    await act(async () => {
-      await editorRef.current?.save();
-    });
 
-    await waitFor(() => {
-      expect(updateOrganizationInvitationGuardedMock).toHaveBeenCalled();
-    });
-    expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
-  });
-
-  it("swallows a backfill failure without blocking the invite or its success toast", async () => {
-    const user = userEvent.setup();
-    const onCompleted = vi.fn();
-    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
-    updateEmployeeIdentityMock.mockRejectedValue(new Error("stale version"));
-
-    render(
-      <EmployeeManagementAccessEditor
-        ref={editorRef}
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        managementDepartments={managementDepartments}
-        onClose={vi.fn()}
-        onCompleted={onCompleted}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
-    });
-
-    await user.type(screen.getByRole("textbox"), "new.hire@example.com");
-    await user.click(screen.getByRole("button", { name: "Leadership" }));
-    await act(async () => {
-      await editorRef.current?.save();
-    });
-
-    await waitFor(() => {
-      expect(createOrganizationInvitationMock).toHaveBeenCalled();
-      expect(onCompleted).toHaveBeenCalledWith(null);
-    });
-  });
-
-  it("flags an email already used by another employee in realtime and blocks saving", async () => {
-    const user = userEvent.setup();
-    checkEmployeeEmailConflictMock.mockResolvedValue({
-      conflict: true,
-      conflictingEmployeeId: "other-emp",
-    });
-
-    render(
-      <EmployeeManagementAccessEditor
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        managementDepartments={managementDepartments}
-        onClose={vi.fn()}
-        onCompleted={vi.fn()}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
-    });
-
-    await user.type(screen.getByRole("textbox"), "taken@example.com");
-    await user.click(screen.getByRole("button", { name: "Leadership" }));
-
-    await screen.findByText(/already used by another person on your team/i);
-    expect(screen.getByRole("button", { name: "Send Invitation" })).toBeDisabled();
-    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
+    const discardButton = screen.getByRole("button", { name: "Discard" });
+    expect(discardButton).toHaveClass("dg-btn-secondary");
+    expect(discardButton).not.toHaveClass("dg-btn-ghost");
   });
 
   it("keeps edits in place and discards them from the editor", async () => {

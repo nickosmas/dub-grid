@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/Button";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -364,7 +365,7 @@ export default function NotificationBell({
               height: 16,
               borderRadius: "50%",
               background: "var(--dg-color-danger)",
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               fontSize: unreadCountFontSize,
               fontWeight: 700,
               display: "flex",
@@ -440,7 +441,15 @@ export default function NotificationBell({
           </div>
 
           {/* List */}
-          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             {loading ? (
               <div
                 style={{
@@ -599,6 +608,7 @@ export default function NotificationBell({
               View all alerts
             </Link>
           )}
+          <ScrollOverflowCue />
         </div>
       )}
       {confirmingMarkAllRead && (

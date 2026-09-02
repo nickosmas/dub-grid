@@ -84,6 +84,7 @@ export function Screen({
   scrollEventThrottle,
   adjustsForKeyboard = true,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
+  scrollEnabled = true,
 }: PropsWithChildren<{
   // No `title`/`subtitle` here on purpose. A page's title is the native header's
   // (`createTopLevelStackOptions` / `createDetailStackOptions` on its route), or
@@ -107,11 +108,26 @@ export function Screen({
    */
   adjustsForKeyboard?: boolean;
   bottomPaddingMode?: ScreenBottomPaddingMode;
+  /**
+   * Set false for content that is never taller than the screen and must
+   * never scroll — a full-page error or empty state. Swaps the `ScrollView`
+   * for a plain `flex: 1` `View`, so a `fillScreen` `StatusBanner` or
+   * `EmptyStateCard` inside it can center with a bare `flex: 1,
+   * justifyContent: "center"` and land exactly right, no viewport-height
+   * measuring required. `stickyHeader` still renders (in normal flow, not
+   * floating) so a screen that shows one above its data — a calendar strip,
+   * a search bar — keeps it above the error/empty state too. `onRefresh`,
+   * `onScroll`, and `scrollViewRef` do nothing in this mode — pull-to-refresh
+   * needs a real scroll gesture to hang off of, and a page that never
+   * scrolls has no scroll position to track or restore.
+   */
+  scrollEnabled?: boolean;
 }>) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
+  const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
   const internalScrollViewRef = useRef<ScrollView>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was
@@ -185,9 +201,8 @@ export function Screen({
       automaticallyAdjustKeyboardInsets={adjustsForKeyboard}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
-        flexGrow: 1,
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
-        paddingBottom: getScreenBottomPadding(bottomPaddingMode, insets.bottom),
+        paddingBottom: resolvedBottomPadding,
       }}
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
@@ -231,6 +246,38 @@ export function Screen({
       {overlay}
     </View>
   );
+
+  if (!scrollEnabled) {
+    return (
+      <View style={styles.root}>
+        {stickyHeader ? (
+          // Nothing scrolls under it here, so it needs none of the floating
+          // shell's `position: absolute` and scroll-under chrome — just the
+          // same fill, padding and hairline, in normal flow above the content.
+          <View
+            style={[
+              styles.stickyHeaderShell,
+              styles.nonScrollStickyHeaderShell,
+              stickyHeaderShellStyle,
+              { paddingTop: resolvedStickyHeaderTopPadding },
+            ]}
+          >
+            {stickyHeader}
+          </View>
+        ) : null}
+        <View
+          style={[
+            styles.content,
+            styles.contentDefault,
+            styles.nonScrollContent,
+            { paddingBottom: resolvedBottomPadding },
+          ]}
+        >
+          {children}
+        </View>
+      </View>
+    );
+  }
 
   if (shouldExposeNativeScrollRoot) {
     return scrollView;
@@ -319,7 +366,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.background,
     },
     content: {
-      flexGrow: 1,
       paddingHorizontal: getScreenGutter(),
       gap: mobileSpacing.sectionGap,
     },
@@ -328,6 +374,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     contentWithStickyHeader: {
       paddingTop: mobileSpacing.sectionGap,
+    },
+    nonScrollContent: {
+      flex: 1,
     },
     stickyHeaderShell: {
       position: "absolute",
@@ -358,6 +407,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // sibling than the scroll view, so it loses ties too, and has to clear
       // both outright.
       elevation: 4,
+    },
+    nonScrollStickyHeaderShell: {
+      // Overrides `stickyHeaderShell`'s absolute positioning: nothing scrolls
+      // under it in this mode, so it sits in normal flow instead of floating.
+      position: "relative",
     },
     overlayLayer: {
       ...StyleSheet.absoluteFillObject,

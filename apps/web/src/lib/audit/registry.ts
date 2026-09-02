@@ -572,6 +572,17 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     details: (d) => changeRows(d),
   },
+  "invitation.access_replaced": {
+    category: "invitations",
+    severity: "update",
+    headline: (d, ctx) => {
+      const target = d.text("email") ?? ctx.targetEmail ?? ctx.targetLabel;
+      return target
+        ? `Changed invitation access for ${target} and sent a replacement`
+        : "Changed invitation access and sent a replacement";
+    },
+    details: (d) => changeRows(d),
+  },
   "invitation.accepted": {
     category: "invitations",
     severity: "create",

@@ -120,9 +120,8 @@ type GridmasterView =
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 
 const SIDEBAR_MENU_BTN_CLASS =
-  "h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150";
-const SIDEBAR_GROUP_LABEL_CLASS =
-  "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0";
+  "h-9 text-[var(--dg-type-navigation-color)] data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-type-attention-primary-color)] transition-all ease-in-out duration-150";
+const SIDEBAR_GROUP_LABEL_CLASS = "px-3 pb-0";
 
 // ── Organization search combobox (header) ────────────────────────────────────
 
@@ -216,11 +215,11 @@ function OrgSearchCombobox({
           <div
             style={{
               padding: "8px 14px",
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-subtle)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
+              fontSize: "var(--dg-type-field-title-size)",
+              fontWeight: "var(--dg-type-field-title-weight)",
+              color: "var(--dg-type-field-title-color)",
+              textTransform: "none",
+              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
@@ -989,16 +988,12 @@ export default function GridmasterPortal() {
                             onClick={item.onClick}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
-                            <span
-                              className={
-                                view === item.key
-                                  ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                  : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                              }
-                            >
+                            <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                               <item.Icon />
                             </span>
-                            <span className="font-semibold">{item.label}</span>
+                            <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                              {item.label}
+                            </span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
@@ -1026,16 +1021,12 @@ export default function GridmasterPortal() {
                             onClick={item.onClick}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
-                            <span
-                              className={
-                                view === item.key
-                                  ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                  : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
-                              }
-                            >
+                            <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                               <item.Icon />
                             </span>
-                            <span className="font-semibold">{item.label}</span>
+                            <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+                              {item.label}
+                            </span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
@@ -1218,7 +1209,7 @@ function GridmasterSidebarCollapseButton() {
     <SidebarMenuButton
       onClick={toggleSidebar}
       tooltip={open ? "Collapse Menu (b)" : "Expand Menu (b)"}
-      className="h-9 text-[var(--dg-color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
+      className="h-9 text-[var(--dg-type-navigation-color)] transition-all ease-in-out duration-150"
     >
       <span className="flex shrink-0 items-center justify-center">
         <svg
@@ -1239,7 +1230,9 @@ function GridmasterSidebarCollapseButton() {
           <polyline points="6 17 11 12 6 7" />
         </svg>
       </span>
-      <span className="font-semibold">Collapse Menu</span>
+      <span className="text-[length:var(--dg-type-navigation-size)] tracking-normal">
+        Collapse Menu
+      </span>
     </SidebarMenuButton>
   );
 }

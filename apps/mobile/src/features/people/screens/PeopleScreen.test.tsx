@@ -461,6 +461,81 @@ describe("PeopleScreen", () => {
     expect(screen.getAllByText("Clinical Leadership").length).toBeGreaterThan(1);
   });
 
+  it("asks before replacing a management-only pending invitation's access", () => {
+    const mutateCalls: ReturnType<typeof vi.fn>[] = [];
+    useMutation.mockImplementation(() => {
+      const mutate = vi.fn();
+      mutateCalls.push(mutate);
+      return { error: null, isPending: false, mutate, mutateAsync: vi.fn() };
+    });
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [],
+        departments: [{ id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" }],
+        user: { id: "user-1" },
+        permissions: {
+          canManageEmployees: true,
+          canManageManagementAccess: true,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [],
+        managementUsers: [
+          {
+            id: "inv:9",
+            source: "pending_invite",
+            userId: null,
+            employeeId: null,
+            employeeStatus: null,
+            firstName: "Jo",
+            lastName: "Park",
+            email: "jo@dubgrid.com",
+            phone: "",
+            orgRole: "admin",
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            updatedAt: "2026-04-28T00:00:00.000Z",
+            invitationId: "9",
+            invitationExpiresAt: "2099-05-01T00:00:00.000Z",
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Done"));
+    fireEvent.click(screen.getByText("Jo Park"));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+    fireEvent.click(screen.getByText("Super Admin"));
+    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+    expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+    expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
+    expect(mutateCalls.flatMap((mutate) => mutate.mock.calls)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke and resend" }));
+    expect(
+      mutateCalls.flatMap((mutate) => mutate.mock.calls).map(([payload]) => payload),
+    ).toContainEqual({
+      orgRole: "super_admin",
+      managementDepartmentIds: [10],
+    });
+  });
+
   it("navigates to the add-person screen for admins who can manage employees", () => {
     useQuery.mockReturnValue({
       data: { people: [] },
@@ -671,6 +746,96 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText(/Inactive/)).not.toBeInTheDocument();
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
+  });
+
+  it("excludes self and hides employment details and administrative filters for regular users", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [],
+        roles: [{ id: 9, name: "Charge Nurse", abbr: "CN" }],
+        user: { id: "user-self" },
+        linkedEmployee: { id: "emp-self" },
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-self", firstName: "Current", userId: "user-self" }),
+          buildPerson({ id: "emp-2", firstName: "Mina", focusAreaIds: [2], roleIds: [9] }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.queryByText("Current Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.queryByText("FT")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
+    expect(screen.queryByText("App access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status")).not.toBeInTheDocument();
+    expect(screen.getByText("Focus area")).toBeInTheDocument();
+    expect(screen.getByText("Role")).toBeInTheDocument();
+    expect(screen.getByText("Sort by")).toBeInTheDocument();
+  });
+
+  it("matches regular-user search against qualifications but not hidden contact fields", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [{ id: 7, name: "Registered Nurse", abbr: "RN" }],
+        roles: [{ id: 9, name: "Charge Nurse", abbr: "CN" }],
+        permissions: { canManageEmployees: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({
+            id: "emp-2",
+            email: "private@dubgrid.com",
+            focusAreaIds: [2],
+            certificationId: 7,
+            roleIds: [9],
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.change(screen.getByLabelText("Search people"), {
+      target: { value: "private@dubgrid.com" },
+    });
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search people"), {
+      target: { value: "Charge Nurse" },
+    });
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
   });
 
   it("shows management users to regular users without opening their profile", () => {

@@ -36,6 +36,12 @@ const BASE_ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
   { value: "admin", label: "Admin" },
 ];
 
+const ROLE_LABELS: Record<ManagementAccessRole, string> = {
+  user: "User",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
 function sameIds(left: number[], right: number[]): boolean {
   if (left.length !== right.length) return false;
   const sortedLeft = [...left].sort((a, b) => a - b);
@@ -74,8 +80,8 @@ export function ManagementAccessSheet({
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
-  onSubmit: (draft: ManagementAccessDraft) => void;
-  onRemove: () => void;
+  onSubmit: (draft: ManagementAccessDraft) => Promise<unknown>;
+  onRemove: () => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -85,6 +91,9 @@ export function ManagementAccessSheet({
   const [draft, setDraft] = useState<ManagementAccessDraft>(baseline);
   const [wasVisible, setWasVisible] = useState(visible);
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
+  const [pendingAccessChange, setPendingAccessChange] = useState<ManagementAccessDraft | null>(
+    null,
+  );
 
   // Reseed on open rather than on every `person` identity change: a background
   // refetch hands down a new object, and keying off that would wipe whatever
@@ -126,6 +135,14 @@ export function ManagementAccessSheet({
         ? current.managementDepartmentIds.filter((id) => id !== departmentId)
         : [...current.managementDepartmentIds, departmentId],
     }));
+  }
+
+  function submitDraft() {
+    if (person.pendingInvitation && draft.orgRole !== baseline.orgRole) {
+      setPendingAccessChange(draft);
+      return;
+    }
+    return onSubmit(draft);
   }
 
   // Every way out funnels through here, so an edit in progress asks before it
@@ -209,7 +226,7 @@ export function ManagementAccessSheet({
             disabled={!canSubmit}
             label="Save Access"
             loading={isPending}
-            onPress={() => onSubmit(draft)}
+            onPress={submitDraft}
             tone="primary"
           />
           {isEditing ? (
@@ -227,6 +244,21 @@ export function ManagementAccessSheet({
       <ConfirmationModal {...guard.confirmationProps} />
 
       <ConfirmationModal
+        body={`Change access from ${ROLE_LABELS[baseline.orgRole]} to ${ROLE_LABELS[pendingAccessChange?.orgRole ?? baseline.orgRole]}? The current invitation will be revoked and a replacement will be sent to ${person.pendingInvitation?.email ?? person.email}.`}
+        confirmLabel="Revoke and resend"
+        confirmTone="danger"
+        loading={isPending}
+        onCancel={() => setPendingAccessChange(null)}
+        onConfirm={() => {
+          const next = pendingAccessChange;
+          setPendingAccessChange(null);
+          return next ? onSubmit(next) : undefined;
+        }}
+        title="Replace invitation access?"
+        visible={pendingAccessChange !== null}
+      />
+
+      <ConfirmationModal
         body="They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
         confirmLabel="Remove Access"
         confirmTone="danger"
@@ -234,7 +266,7 @@ export function ManagementAccessSheet({
         onCancel={() => setShowRemoveConfirmation(false)}
         onConfirm={() => {
           setShowRemoveConfirmation(false);
-          onRemove();
+          return onRemove();
         }}
         title="Remove management access?"
         visible={showRemoveConfirmation}

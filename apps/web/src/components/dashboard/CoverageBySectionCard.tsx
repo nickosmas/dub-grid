@@ -71,7 +71,13 @@ export default function CoverageBySectionCard({
             <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
             <div className="dg-card-subtitle">{subtitle}</div>
             {publishSummary && (
-              <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-type-metadata-size)",
+                  color: "var(--dg-color-text-subtle)",
+                  marginTop: 2,
+                }}
+              >
                 {publishSummary}
               </div>
             )}
@@ -122,7 +128,13 @@ export default function CoverageBySectionCard({
           <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
           <div className="dg-card-subtitle">{subtitle}</div>
           {publishSummary && (
-            <div style={{ fontSize: 11, color: "var(--dg-color-text-subtle)", marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-type-metadata-size)",
+                color: "var(--dg-color-text-subtle)",
+                marginTop: 2,
+              }}
+            >
               {publishSummary}
             </div>
           )}
@@ -165,7 +177,12 @@ export default function CoverageBySectionCard({
                     {sec.focusAreaName}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--dg-color-text-subtle)" }}>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-type-metadata-size)",
+                        color: "var(--dg-color-text-subtle)",
+                      }}
+                    >
                       {sec.filledTotal} / {sec.requiredTotal} filled
                     </span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: PCT_COLORS[pctColor] }}>
@@ -200,13 +217,9 @@ export default function CoverageBySectionCard({
         {sections.length > 0 && sections[0].daily.length > 0 && (
           <div style={{ marginTop: 20 }}>
             <div
+              className="dg-type-content-group-heading"
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "var(--dg-color-text-subtle)",
                 marginBottom: 10,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
               }}
             >
               Day-by-day staffing
@@ -225,7 +238,7 @@ export default function CoverageBySectionCard({
                 <div
                   key={d.dateKey}
                   style={{
-                    fontSize: 10,
+                    fontSize: "var(--dg-type-metadata-size)",
                     color: "var(--dg-color-text-subtle)",
                     textAlign: "center",
                     fontWeight: 500,
@@ -241,7 +254,7 @@ export default function CoverageBySectionCard({
                 <React.Fragment key={sec.focusAreaId}>
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: "var(--dg-type-metadata-size)",
                       color: "var(--dg-color-text-subtle)",
                       textAlign: "right",
                       paddingRight: 8,
@@ -272,7 +285,7 @@ export default function CoverageBySectionCard({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 10,
+                          fontSize: "var(--dg-type-badge-size)",
                           fontWeight: 600,
                           background: colors.bg,
                           color: colors.text,

@@ -54,9 +54,11 @@ Already shipped (see build-plan.md for the checked list):
 - Gridmaster portal: impersonation, audit logs, platform administration
 - Billing: Stripe subscriptions, 14-day free trial (trial clock starts on
   first Super Admin login, not signup)
-- Mobile app (Expo) parity for schedule, people, requests, alerts,
-  dashboard - by design, some surfaces (reports, billing, Gridmaster
-  portal, the permissions editor, org settings) are web-only, not gaps
+- Mobile app (Expo) release catch-up: enforce role-certification eligibility
+  before selection and make the admin/super-admin dashboard canonical in data
+  and decision support. Schedule editing and publishing remain intentionally
+  web-only, as do reports, billing, Gridmaster portal, the permissions editor,
+  and organization settings.
 - Invite-only registration and onboarding (accounts are created
   pre-confirmed via the invitation API, never a public self-serve signup)
 - Auth: password reset (mobile uses an in-app OTP flow via an ephemeral
@@ -66,9 +68,8 @@ Already shipped (see build-plan.md for the checked list):
 - Test sandbox: cookie-based cloned org for safe QA without touching real
   tenant data
 
-> TODO (confirm): roadmap beyond the current in-progress fix wasn't
-> specified during adoption. See build-plan.md's single placeholder item -
-> replace it with the real next features when ready.
+The next roadmap work is the mobile release catch-up in `build-plan.md` item 17. It is deliberately split into role eligibility, the shared dashboard model,
+and native dashboard presentation so each can be reviewed independently.
 
 ## 4. Data - What are we storing?
 

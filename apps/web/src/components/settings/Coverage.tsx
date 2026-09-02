@@ -117,11 +117,11 @@ function CoveragePreview({ draft }: { draft: CoverageDraft }) {
     lineHeight: 1,
   };
   const labelStyle: React.CSSProperties = {
-    color: "var(--dg-color-text-muted)",
-    fontSize: "var(--dg-fs-caption)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    fontWeight: 600,
+    color: "var(--dg-type-field-title-color)",
+    fontSize: "var(--dg-type-field-title-size)",
+    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+    lineHeight: "var(--dg-type-field-title-line-height)",
+    fontWeight: "var(--dg-type-field-title-weight)",
   };
   const emptyStyle: React.CSSProperties = {
     color: "var(--dg-color-text-faint)",
@@ -399,7 +399,7 @@ function CoverageOptionRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-primary)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -463,11 +463,11 @@ function CoverageOptionRow({
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <label
                 style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+                  fontSize: "var(--dg-type-field-title-size)",
+                  fontWeight: "var(--dg-type-field-title-weight)",
+                  color: "var(--dg-type-field-title-color)",
+                  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                  lineHeight: "var(--dg-type-field-title-line-height)",
                 }}
               >
                 Minimum Staff
@@ -510,11 +510,11 @@ function CoverageOptionRow({
                 >
                   <span
                     style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 700,
-                      color: "var(--dg-color-text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
+                      fontSize: "var(--dg-type-field-title-size)",
+                      fontWeight: "var(--dg-type-field-title-weight)",
+                      color: "var(--dg-type-field-title-color)",
+                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                      lineHeight: "var(--dg-type-field-title-line-height)",
                     }}
                   >
                     {day}
@@ -688,17 +688,7 @@ function FocusAreaCoverageCard({
                     borderBottom: "1px solid var(--dg-color-border-light)",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 700,
-                      color: "var(--dg-color-text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    {section.title}
-                  </div>
+                  <div className="dg-type-content-group-heading">{section.title}</div>
                 </div>
                 <div style={{ padding: "0 12px" }}>
                   {section.options.map((option, optionIndex) => (

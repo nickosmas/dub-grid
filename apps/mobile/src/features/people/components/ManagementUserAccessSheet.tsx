@@ -30,6 +30,12 @@ const BASE_ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
   { value: "admin", label: "Admin" },
 ];
 
+const ROLE_LABELS: Record<ManagementAccessRole, string> = {
+  user: "User",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
 function sameIds(left: number[], right: number[]): boolean {
   if (left.length !== right.length) return false;
   const sortedLeft = [...left].sort((a, b) => a - b);
@@ -56,7 +62,7 @@ export function ManagementUserAccessSheet({
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
-  onSubmit: (draft: Draft) => void;
+  onSubmit: (draft: Draft) => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -71,6 +77,7 @@ export function ManagementUserAccessSheet({
   const [baseline, setBaseline] = useState<Draft>(seed);
   const [draft, setDraft] = useState<Draft>(baseline);
   const [wasVisible, setWasVisible] = useState(visible);
+  const [pendingAccessChange, setPendingAccessChange] = useState<Draft | null>(null);
 
   // Reseeded on open, not on every roster refetch, so a background refresh
   // can't overwrite what the user is part-way through choosing.
@@ -109,6 +116,14 @@ export function ManagementUserAccessSheet({
     onDiscard: () => setDraft(baseline),
     onClose: onDismiss,
   });
+
+  function submitDraft() {
+    if (managementUser.source === "pending_invite" && draft.orgRole !== baseline.orgRole) {
+      setPendingAccessChange(draft);
+      return;
+    }
+    return onSubmit(draft);
+  }
 
   return (
     <>
@@ -176,7 +191,7 @@ export function ManagementUserAccessSheet({
             disabled={!canSubmit}
             label="Save Access"
             loading={isPending}
-            onPress={() => onSubmit(draft)}
+            onPress={submitDraft}
             tone="primary"
           />
           <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
@@ -184,6 +199,20 @@ export function ManagementUserAccessSheet({
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />
+      <ConfirmationModal
+        body={`Change access from ${ROLE_LABELS[baseline.orgRole]} to ${ROLE_LABELS[pendingAccessChange?.orgRole ?? baseline.orgRole]}? The current invitation will be revoked and a replacement will be sent to ${managementUser.email}.`}
+        confirmLabel="Revoke and resend"
+        confirmTone="danger"
+        loading={isPending}
+        onCancel={() => setPendingAccessChange(null)}
+        onConfirm={() => {
+          const next = pendingAccessChange;
+          setPendingAccessChange(null);
+          return next ? onSubmit(next) : undefined;
+        }}
+        title="Replace invitation access?"
+        visible={pendingAccessChange !== null}
+      />
     </>
   );
 }

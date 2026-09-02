@@ -171,7 +171,7 @@ export default function OrganizationLabels({
           style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
         >
           <div>
-            <label style={labelStyle}>FOCUS AREAS LABEL</label>
+            <label style={labelStyle}>Focus areas label</label>
             <input
               value={form.focusAreaLabel}
               onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
@@ -206,7 +206,7 @@ export default function OrganizationLabels({
             </p>
           </div>
           <div>
-            <label style={labelStyle}>CERTIFICATIONS LABEL</label>
+            <label style={labelStyle}>Certifications label</label>
             <input
               value={form.certificationLabel}
               onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
@@ -243,7 +243,7 @@ export default function OrganizationLabels({
             </p>
           </div>
           <div>
-            <label style={labelStyle}>ROLES LABEL</label>
+            <label style={labelStyle}>Roles label</label>
             <input
               value={form.roleLabel}
               onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}

@@ -102,12 +102,6 @@ export async function fetchUserSessionsForUser(
   }));
 }
 
-type UserSessionPlatformGroup = "web" | "mobile";
-
-function toPlatformGroup(platform: UserSessionPlatform | null): UserSessionPlatformGroup {
-  return platform === "web" ? "web" : "mobile";
-}
-
 export interface UserSessionOverview {
   active: UserSessionRecord[];
   stale: UserSessionRecord[];
@@ -115,44 +109,28 @@ export interface UserSessionOverview {
 
 const STALE_SESSIONS_LIMIT = 5;
 
-/**
- * Self-service session list: the active session per platform (web/mobile -
- * only the single most recent one per platform counts, so two browser tabs
- * both pinged in the last few minutes don't each show as "active"), plus
- * the 5 most recently used sessions that have since gone quiet.
- */
+interface FetchUserSessionOverviewOptions {
+  now?: Date;
+  currentSupabaseSessionId?: string | null;
+}
+
 export async function fetchUserSessionOverviewForUser(
   userId: string,
-  now: Date = new Date(),
+  options: FetchUserSessionOverviewOptions = {},
 ): Promise<UserSessionOverview> {
+  const now = options.now ?? new Date();
   const cutoffMs = now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS;
-  // Sort explicitly rather than trust the caller's ordering, since every
-  // grouping decision below (most-recent-per-platform, most-recent-overall)
-  // depends on it.
   const sessions = (await fetchUserSessionsForUser(userId)).sort(
     (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
   );
 
-  const byGroup = new Map<UserSessionPlatformGroup, UserSessionRecord[]>();
-  for (const session of sessions) {
-    const group = toPlatformGroup(session.platform);
-    const list = byGroup.get(group) ?? [];
-    list.push(session);
-    byGroup.set(group, list);
-  }
-
-  const active: UserSessionRecord[] = [];
-  const activeIds = new Set<string>();
-  for (const group of byGroup.values()) {
-    const mostRecent = group[0];
-    if (mostRecent && new Date(mostRecent.lastActiveAt).getTime() >= cutoffMs) {
-      active.push(mostRecent);
-      activeIds.add(mostRecent.id);
-    }
-  }
-  active.sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
-
-  // 5 most recently used sessions among whatever wasn't picked as active.
+  const active = sessions.filter(
+    (session) =>
+      (options.currentSupabaseSessionId != null &&
+        session.supabaseSessionId === options.currentSupabaseSessionId) ||
+      new Date(session.lastActiveAt).getTime() >= cutoffMs,
+  );
+  const activeIds = new Set(active.map((session) => session.id));
   const stale = sessions.filter((s) => !activeIds.has(s.id)).slice(0, STALE_SESSIONS_LIMIT);
 
   return { active, stale };

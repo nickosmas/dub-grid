@@ -52,7 +52,7 @@ export default function SetupPendingScreen() {
         <h1
           style={{
             fontSize: 24,
-            fontWeight: 800,
+            fontWeight: "var(--dg-type-page-title-weight)",
             color: "var(--dg-color-text-primary)",
             margin: "0 0 12px",
             letterSpacing: "-0.02em",

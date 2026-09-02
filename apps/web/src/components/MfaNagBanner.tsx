@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePermissions } from "@/hooks";
 import { Button } from "@/components/Button";
 
-const BANNER_HEIGHT = 36;
 const DISMISS_KEY = "dg_mfa_nag_dismissed";
 
 export default function MfaNagBanner() {
@@ -27,20 +26,15 @@ export default function MfaNagBanner() {
 
   return (
     <div
+      role="status"
+      className="flex min-h-9 flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-center leading-5"
       style={{
-        height: BANNER_HEIGHT,
         background:
           "linear-gradient(135deg, var(--dg-color-warning), var(--dg-color-warning-dark))",
         color: "var(--dg-color-text-inverse)",
-        padding: "0 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
         fontSize: "var(--dg-fs-label, 13px)",
         fontWeight: 600,
         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-        textAlign: "center",
       }}
     >
       <svg

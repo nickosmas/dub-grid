@@ -19,7 +19,7 @@ const shellStyle = {
 };
 
 const titleStyle = {
-  fontSize: "var(--dg-fs-page-title)",
+  fontSize: "var(--dg-type-page-title-size)",
   fontWeight: 700,
   color: "var(--dg-color-text-primary)",
   margin: 0,

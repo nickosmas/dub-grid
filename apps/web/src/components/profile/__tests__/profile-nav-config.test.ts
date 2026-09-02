@@ -9,17 +9,15 @@ import {
 } from "@/components/profile/profile-nav-config";
 
 describe("profile nav config", () => {
-  it("always renders the Account group with Profile/Security/Alerts/Appearance", () => {
+  it("renders one flat primary group with account items", () => {
     for (const isOnSchedule of [true, false]) {
       const groups = buildProfileNavGroups({ isOnSchedule });
-      const account = groups.find((g) => g.id === "account");
-      expect(account?.label).toBe("Account");
-      expect(account?.items.map((i) => i.id)).toEqual([
-        "profile",
-        "security",
-        "notifications",
-        "appearance",
-      ]);
+      const primary = groups.find((group) => group.id === "primary");
+      expect(primary?.items.map((item) => item.id)).toEqual(
+        isOnSchedule
+          ? ["profile", "security", "notifications", "appearance", "overview"]
+          : ["profile", "security", "notifications", "appearance"],
+      );
     }
   });
 
@@ -40,16 +38,17 @@ describe("profile nav config", () => {
     }
   });
 
-  it("hides the My work group for users who are not on the schedule (management-only or non-employees)", () => {
+  it("does not add Overview for management-only or non-employee users", () => {
     const groups = buildProfileNavGroups({ isOnSchedule: false });
-    expect(groups.map((g) => g.id)).toEqual(["account", "legal"]);
+    expect(groups.map((group) => group.id)).toEqual(["primary", "legal"]);
+    expect(groups[0]?.items.map((item) => item.id)).not.toContain("overview");
   });
 
-  it("renders the My work group with Overview and Schedule for on-schedule employees", () => {
+  it("adds Overview without a separate Schedule destination for on-schedule employees", () => {
     const groups = buildProfileNavGroups({ isOnSchedule: true });
-    const work = groups.find((g) => g.id === "work");
-    expect(work?.label).toBe("My work");
-    expect(work?.items.map((i) => i.id)).toEqual(["overview", "schedule"]);
+    const primary = groups.find((group) => group.id === "primary");
+    expect(primary?.items.map((item) => item.id)).toContain("overview");
+    expect(primary?.items.map((item) => item.id)).not.toContain("schedule");
   });
 
   it("defaults to Profile so anyone landing on /profile sees their account first", () => {
@@ -65,5 +64,6 @@ describe("profile nav config", () => {
     expect(resolveProfileSection("org-general")).toBeNull();
     expect(resolveProfileSection("settings")).toBeNull();
     expect(resolveProfileSection("privacy")).toBeNull();
+    expect(resolveProfileSection("schedule")).toBe("overview");
   });
 });

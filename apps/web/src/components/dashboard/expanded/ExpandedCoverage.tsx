@@ -70,7 +70,7 @@ export default function ExpandedCoverage({
                   borderRadius: "var(--dg-radius-sm)",
                   background: "var(--dg-color-bg)",
                   border: "1px dashed var(--dg-color-border)",
-                  fontSize: 11,
+                  fontSize: "var(--dg-type-metadata-size)",
                   color: "var(--dg-color-text-subtle)",
                 }}
               >
@@ -245,7 +245,7 @@ export default function ExpandedCoverage({
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    fontSize: 11,
+                                    fontSize: "var(--dg-type-badge-size)",
                                     fontWeight: 600,
                                     background: colors.bg,
                                     color: colors.text,
@@ -285,7 +285,7 @@ const summaryBadgeStyle = {
 };
 
 const heatmapLabelStyle = {
-  fontSize: 11,
+  fontSize: "var(--dg-type-metadata-size)",
   fontWeight: 600 as const,
   color: "var(--dg-color-text-subtle)",
   marginBottom: 10,
@@ -294,7 +294,7 @@ const heatmapLabelStyle = {
 };
 
 const heatmapHeaderStyle = {
-  fontSize: 10,
+  fontSize: "var(--dg-type-metadata-size)",
   color: "var(--dg-color-text-subtle)",
   textAlign: "center" as const,
   fontWeight: 500,
@@ -302,7 +302,7 @@ const heatmapHeaderStyle = {
 };
 
 const heatmapRowLabelStyle = {
-  fontSize: 11,
+  fontSize: "var(--dg-type-metadata-size)",
   color: "var(--dg-color-text-subtle)",
   textAlign: "right" as const,
   paddingRight: 8,

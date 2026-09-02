@@ -1089,11 +1089,16 @@ export default function ShiftDetailScreen() {
     setSelectedTargetShift(null);
   }
 
+  const isFillScreenState =
+    contentState.kind === "error" ||
+    (contentState.kind !== "loading" && (!employeeId || !shiftDate || !shiftEntry));
+
   return (
     <Screen
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

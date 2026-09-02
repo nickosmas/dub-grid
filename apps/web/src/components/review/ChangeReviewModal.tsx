@@ -88,11 +88,11 @@ export default function ChangeReviewModal({
             >
               <div
                 style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+                  fontSize: "var(--dg-type-field-title-size)",
+                  fontWeight: "var(--dg-type-field-title-weight)",
+                  color: "var(--dg-type-field-title-color)",
+                  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                  lineHeight: "var(--dg-type-field-title-line-height)",
                 }}
               >
                 {change.label}
@@ -100,8 +100,9 @@ export default function ChangeReviewModal({
               <div>
                 <div
                   style={{
-                    fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-text-faint)",
+                    fontSize: "var(--dg-type-field-title-size)",
+                    fontWeight: "var(--dg-type-field-title-weight)",
+                    color: "var(--dg-type-field-title-color)",
                     marginBottom: 4,
                   }}
                 >
@@ -121,8 +122,9 @@ export default function ChangeReviewModal({
               <div>
                 <div
                   style={{
-                    fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-text-faint)",
+                    fontSize: "var(--dg-type-field-title-size)",
+                    fontWeight: "var(--dg-type-field-title-weight)",
+                    color: "var(--dg-type-field-title-color)",
                     marginBottom: 4,
                   }}
                 >

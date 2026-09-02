@@ -124,7 +124,7 @@ export default function ImpersonationHistory() {
       <h2
         style={{
           margin: "0 0 4px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}
@@ -189,15 +189,15 @@ export default function ImpersonationHistory() {
                   <thead>
                     <tr>
                       <th style={thStyle}>Status</th>
-                      <th style={thStyle}>Target User</th>
+                      <th style={thStyle}>Target user</th>
                       <th style={thStyle}>Organization</th>
                       <th style={thStyle}>Gridmaster</th>
                       <th style={thStyle}>Justification</th>
                       <th style={thStyle}>Started</th>
                       <th style={thStyle}>Ended</th>
                       <th style={thStyle}>Duration</th>
-                      <th style={thStyle}>End Reason</th>
-                      <th style={thStyle}>IP Address</th>
+                      <th style={thStyle}>End reason</th>
+                      <th style={thStyle}>IP address</th>
                     </tr>
                   </thead>
                   <tbody>

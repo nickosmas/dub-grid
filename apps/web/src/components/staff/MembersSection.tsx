@@ -6,11 +6,12 @@ import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronDown, Import as ImportIcon, Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
   fetchOrganizationInvitations,
+  replaceOrganizationInvitationAccessGuarded,
   resendInvitation,
   revokeInvitation,
   updateAppOnlyUser,
@@ -37,8 +38,9 @@ import type {
   Invitation,
   NamedItem,
   OrganizationRole,
+  OrganizationUser,
 } from "@/types";
-import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import Modal from "@/components/Modal";
@@ -80,6 +82,8 @@ import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import ScrollableTabs from "@/components/ScrollableTabs";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -124,9 +128,9 @@ export interface MembersSectionProps {
 }
 
 export function MembersSection({
-  employees,
-  inactiveEmployees,
-  removedEmployees,
+  employees: suppliedEmployees,
+  inactiveEmployees: suppliedInactiveEmployees,
+  removedEmployees: suppliedRemovedEmployees,
   focusAreas,
   certifications,
   roles,
@@ -152,13 +156,40 @@ export function MembersSection({
   managementDepartmentLabel = "Management Departments",
 }: MembersSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const isTablet = useMediaQuery(TABLET);
   const featureFlags = useClientFeatureFlags();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const currentUserId = currentUser?.id ?? null;
+  const regularUserMode = !canManageEmployees;
+  const employees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedEmployees,
+    [currentUserId, regularUserMode, suppliedEmployees],
+  );
+  const inactiveEmployees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedInactiveEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedInactiveEmployees,
+    [currentUserId, regularUserMode, suppliedInactiveEmployees],
+  );
+  const removedEmployees = useMemo(
+    () =>
+      regularUserMode
+        ? suppliedRemovedEmployees.filter(
+            (employee) => !isCurrentUsersEmployee(employee.userId, currentUserId),
+          )
+        : suppliedRemovedEmployees,
+    [currentUserId, regularUserMode, suppliedRemovedEmployees],
+  );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
   // Broader, view-only gate: lets a non-admin management-only user see the
@@ -175,6 +206,9 @@ export function MembersSection({
     inactiveEmployees,
     removedEmployees,
     focusAreas,
+    certifications,
+    roles,
+    regularUserMode,
   });
   const {
     activeTab,
@@ -488,6 +522,7 @@ export function MembersSection({
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
   const [, setRevokingId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<{
     action: BulkStaffAction;
@@ -498,12 +533,13 @@ export function MembersSection({
   const [exportConfirm, setExportConfirm] = useState(false);
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || regularUserMode) return;
     let cancelled = false;
 
     fetchOrganizationInvitations(orgId)
       .then((invites) => {
         if (cancelled) return;
+        loadedInvitationsForOrgIdRef.current = orgId;
         setPendingInvitations(
           invites.filter(
             (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
@@ -511,13 +547,19 @@ export function MembersSection({
         );
       })
       .catch((err) => {
+        if (cancelled) return;
         Sentry.captureException(err);
+        loadedInvitationsForOrgIdRef.current = orgId;
+        setPendingInvitations([]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [orgId]);
+  }, [orgId, regularUserMode]);
+
+  const invitationStateReady =
+    regularUserMode || !orgId || loadedInvitationsForOrgIdRef.current === orgId;
 
   // Re-derive against "now" on a slow tick so invitations that cross their
   // 72h expiry while the page is open stop rendering as "Pending". Without
@@ -531,14 +573,14 @@ export function MembersSection({
 
   const pendingInviteByEmployeeId = useMemo(() => {
     const map = new Map<string, Invitation>();
-    for (const inv of pendingInvitations) {
+    for (const inv of regularUserMode ? [] : pendingInvitations) {
       if (new Date(inv.expiresAt).getTime() <= nowMs) continue;
       if (inv.employeeId) {
         map.set(inv.employeeId, inv);
       }
     }
     return map;
-  }, [pendingInvitations, nowMs]);
+  }, [pendingInvitations, nowMs, regularUserMode]);
 
   const {
     directory,
@@ -566,9 +608,33 @@ export function MembersSection({
     }
     return map;
   }, [directory]);
+  const replacePendingInvitationRole = (
+    pendingInvitation: Invitation | null | undefined,
+  ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
+    if (!canManageManagementAccess || !orgId || !pendingInvitation?.updatedAt) return undefined;
+    const expectedUpdatedAt = pendingInvitation.updatedAt;
+    return async (newRole) => {
+      const replacement = await replaceOrganizationInvitationAccessGuarded({
+        orgId,
+        invitationId: pendingInvitation.id,
+        expectedUpdatedAt,
+        roleToAssign: newRole,
+      });
+      setPendingInvitations((current) => [
+        replacement.invitation,
+        ...current.filter((invitation) => invitation.id !== pendingInvitation.id),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.org.invitations(orgId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
+      ]);
+    };
+  };
+
   // Returns an inline role-change handler when the viewer may manage access and
-  // the person has an editable login; otherwise undefined (read-only cell).
+  // the person has an editable login or pending invitation.
   const roleChangeHandlerFor = (
+    employeeId: string,
     userId: string | null | undefined,
     membershipUpdatedAt: string | null | undefined,
   ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
@@ -577,12 +643,15 @@ export function MembersSection({
     if (
       !canManageManagementAccess ||
       !orgId ||
-      !userId ||
-      !membershipUpdatedAt ||
-      isSelfAction(currentUserId, userId)
+      (userId ? isSelfAction(currentUserId, userId) : false)
     ) {
       return undefined;
     }
+    const pendingInvitation = pendingInviteByEmployeeId.get(employeeId);
+    if (!userId) {
+      return replacePendingInvitationRole(pendingInvitation);
+    }
+    if (!membershipUpdatedAt) return undefined;
     const oid = orgId;
     const uid = userId;
     const expectedUpdatedAt = membershipUpdatedAt;
@@ -608,6 +677,22 @@ export function MembersSection({
   const [showManagement, setShowManagement] = useState(false);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
   const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
+  const [managementAccessDirty, setManagementAccessDirty] = useState(false);
+  const closeManagementAccessPopup = useCallback(() => {
+    setManagementAccessDirty(false);
+    setManagementAccessEmployee(null);
+  }, []);
+  const openManagementAccessPopup = useCallback((employee: Employee) => {
+    setManagementAccessDirty(false);
+    setManagementAccessEmployee(employee);
+  }, []);
+  const {
+    requestClose: requestManagementAccessClose,
+    unsavedChangesDialog: managementAccessUnsavedChangesDialog,
+  } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: managementAccessDirty,
+    onDiscard: closeManagementAccessPopup,
+  });
   const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(
     null,
   );
@@ -763,7 +848,7 @@ export function MembersSection({
   }
 
   function refreshInvitations() {
-    if (!orgId) return;
+    if (!orgId || regularUserMode) return;
 
     fetchOrganizationInvitations(orgId)
       .then((invites) => {
@@ -888,6 +973,27 @@ export function MembersSection({
     [orgId, queryClient],
   );
 
+  const syncMembershipInCaches = useCallback(
+    (membership: OrganizationUser) => {
+      if (!orgId) return;
+      queryClient.setQueryData(
+        queryKeys.org.directory(orgId),
+        (current: DirectoryPerson[] | undefined) =>
+          current?.map((person) =>
+            person.userId === membership.id
+              ? {
+                  ...person,
+                  orgRole: membership.orgRole,
+                  adminPermissions: membership.adminPermissions,
+                  membershipUpdatedAt: membership.updatedAt,
+                }
+              : person,
+          ),
+      );
+    },
+    [orgId, queryClient],
+  );
+
   const syncExistingEmployeeInCaches = useCallback(
     (updatedEmployee?: Employee | null) => {
       if (!orgId || !updatedEmployee) return;
@@ -946,7 +1052,7 @@ export function MembersSection({
       <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
         <div className="space-y-8">
           <div>
-            <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+            <h1 className="text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
               Directory
             </h1>
             <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
@@ -979,6 +1085,7 @@ export function MembersSection({
             onScheduleCount={employees.length}
             fullTimeCount={employmentSummary.fullTime}
             partTimeCount={employmentSummary.partTime}
+            showEmploymentCounts={!regularUserMode}
           />
 
           {!showManagement && (
@@ -994,8 +1101,33 @@ export function MembersSection({
             />
           )}
 
-          <div className="flex items-center gap-3 overflow-x-auto overflow-y-visible py-1">
-            <div className="flex min-w-0 items-center gap-2">
+          <div
+            data-testid="people-toolbar"
+            className="dg-toolbar-type"
+            style={
+              isMobile
+                ? { display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }
+                : {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    rowGap: 8,
+                    flexWrap: "wrap",
+                    paddingBottom: 4,
+                  }
+            }
+          >
+            <div
+              data-testid="people-toolbar-controls"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                minWidth: 0,
+                maxWidth: "100%",
+                ...(isMobile ? { width: "100%", flexWrap: "wrap" } : {}),
+              }}
+            >
               {canSeeManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
@@ -1017,12 +1149,22 @@ export function MembersSection({
                     }
                   }}
                   style={{ minWidth: 180 }}
-                  fontSize={13}
+                  fontSize="var(--dg-fs-navigation-item)"
+                  fontWeight="var(--dg-type-control-weight)"
+                  activeFontWeight="var(--dg-type-control-weight)"
+                  letterSpacing="normal"
                 />
               )}
 
               {!showManagement && (
-                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                <ScrollableTabs
+                  className="dg-span-tabs dg-span-tabs--light"
+                  style={{
+                    flex: isMobile ? "1 1 180px" : "0 1 auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                  }}
+                >
                   {tabs.map((tab, index) => {
                     const active = activeTab === tab.key;
                     const prevActive = index > 0 && activeTab === tabs[index - 1].key;
@@ -1077,11 +1219,18 @@ export function MembersSection({
                       </span>
                     );
                   })}
-                </div>
+                </ScrollableTabs>
               )}
 
               {showManagement && departmentItems.length > 0 && (
-                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                <ScrollableTabs
+                  className="dg-span-tabs dg-span-tabs--light"
+                  style={{
+                    flex: isMobile ? "1 1 180px" : "0 1 auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                  }}
+                >
                   <Button
                     onClick={() => setDeptFilterId(null)}
                     className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
@@ -1161,12 +1310,15 @@ export function MembersSection({
                         </span>
                       );
                     })}
-                </div>
+                </ScrollableTabs>
               )}
 
               <Button
                 ref={filterBtnRef}
                 onClick={() => setFilterOpen((current) => !current)}
+                aria-label="Filter"
+                aria-expanded={filterOpen}
+                aria-haspopup="dialog"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 style={{ position: "relative" }}
               >
@@ -1193,6 +1345,7 @@ export function MembersSection({
                     setPage(1);
                   }}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
+                  aria-label="Reorder"
                   disabled={!hasReorderableStaffRows}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -1207,7 +1360,15 @@ export function MembersSection({
                 </Button>
               )}
 
-              <div className="relative" style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}>
+              <div
+                data-testid="people-search"
+                className="relative"
+                style={{
+                  minWidth: 0,
+                  flex: isMobile ? "1 1 160px" : "1 1 300px",
+                  maxWidth: isMobile ? undefined : 380,
+                }}
+              >
                 <svg
                   width="14"
                   height="14"
@@ -1227,12 +1388,15 @@ export function MembersSection({
                   className="dg-input w-full"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by name, email, or phone..."
+                  placeholder={
+                    regularUserMode
+                      ? "Search by name or qualification..."
+                      : "Search by name, email, or phone..."
+                  }
                   style={{
                     height: 32,
                     paddingLeft: 32,
                     paddingRight: searchQuery ? 30 : 12,
-                    fontSize: 13,
                   }}
                 />
                 {searchQuery && (
@@ -1251,7 +1415,16 @@ export function MembersSection({
               </div>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div
+              style={{
+                marginLeft: isMobile ? 0 : "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: isMobile ? "flex-end" : undefined,
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
               {!showManagement && canManageEmployees && orgId && !isMobile && (
                 <MaybeHint
                   content={
@@ -1299,7 +1472,8 @@ export function MembersSection({
                     aria-haspopup="menu"
                     className="dg-btn dg-btn-primary dg-btn-sm"
                   >
-                    + Add
+                    <Plus size={14} />
+                    Add
                     <ChevronDown size={14} />
                   </Button>
                   {addMenuOpen && (
@@ -1343,7 +1517,8 @@ export function MembersSection({
 
               {canAddScheduled && !canAddManagement && (
                 <Button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
-                  + Add
+                  <Plus size={14} />
+                  Add
                 </Button>
               )}
 
@@ -1352,7 +1527,8 @@ export function MembersSection({
                   onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  + Add
+                  <Plus size={14} />
+                  Add
                 </Button>
               )}
             </div>
@@ -1452,6 +1628,7 @@ export function MembersSection({
               onFilterPhonePresenceChange={setFilterPhonePresence}
               onClearAll={clearFilters}
               hasActiveFilters={hasActiveFilters}
+              showAdministrativeFilters={!regularUserMode}
             />
           )}
 
@@ -1478,10 +1655,10 @@ export function MembersSection({
                 <div
                   data-tour="staff-table"
                   data-testid="staff-table"
-                  className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
+                  className="overflow-x-auto rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
                 >
                   {isReordering ? (
-                    <div className="dg-staff-directory-table dg-staff-directory-table--without-status">
+                    <div className="dg-staff-directory-table dg-staff-directory-table--without-status min-w-[1280px]">
                       <div className="dg-staff-directory-header bg-[var(--dg-color-bg)]">
                         <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex select-none items-center gap-1">
@@ -1499,18 +1676,14 @@ export function MembersSection({
                           </span>
                         </div>
                         <div className="dg-staff-directory-head-cell flex">Employment</div>
-                        <div className="dg-staff-directory-head-cell hidden md:flex">
-                          {focusAreaLabel}
-                        </div>
-                        <div className="dg-staff-directory-head-cell hidden md:flex">
+                        <div className="dg-staff-directory-head-cell flex">{focusAreaLabel}</div>
+                        <div className="dg-staff-directory-head-cell flex">
                           {certificationLabel}
                         </div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Roles</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Account</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Access</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">
-                          Date Joined
-                        </div>
+                        <div className="dg-staff-directory-head-cell flex">Roles</div>
+                        <div className="dg-staff-directory-head-cell flex">Account</div>
+                        <div className="dg-staff-directory-head-cell flex">Access</div>
+                        <div className="dg-staff-directory-head-cell flex">Date Joined</div>
                         <div className="dg-staff-directory-head-cell flex" />
                       </div>
                       <div className="dg-staff-directory-body">
@@ -1539,7 +1712,12 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
+                              orgRole={
+                                orgRoleByEmployeeId.get(employee.id) ??
+                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
+                                null
+                              }
+                              invitationStateReady={invitationStateReady}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={() => undefined}
@@ -1555,11 +1733,15 @@ export function MembersSection({
                       </div>
                     </div>
                   ) : (
-                    <Table>
+                    <Table
+                      className={canViewEmployeeDetails ? "min-w-[1280px]" : "min-w-[720px]"}
+                      showScrollCues
+                      scrollLabel="People roster"
+                    >
                       <TableHeader>
                         <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                            <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
                               <div className="flex items-center gap-1.5">
                                 {canManageEmployees && (
                                   <input
@@ -1589,7 +1771,7 @@ export function MembersSection({
                             </TableHead>
                           )}
                           <TableHead
-                            className="cursor-pointer select-none border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]"
+                            className="cursor-pointer select-none border-r border-[var(--dg-color-border-light)]"
                             onClick={() => handleSort("name")}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -1598,38 +1780,36 @@ export function MembersSection({
                             </span>
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="w-[110px] border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                            <TableHead className="w-[110px] border-r border-[var(--dg-color-border-light)]">
                               Employment
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && activeTab === "all" && (
-                            <TableHead className="w-[110px] border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:border-r">
+                            <TableHead className="w-[110px] border-[var(--dg-color-border-light)] md:border-r">
                               Status
                             </TableHead>
                           )}
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell md:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             {focusAreaLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] md:table-cell lg:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             {certificationLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             Roles
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="border-r border-[var(--dg-color-border-light)]">
                               Account
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell lg:border-r">
+                            <TableHead className="border-r border-[var(--dg-color-border-light)]">
                               Access
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)] lg:table-cell">
-                              Date Joined
-                            </TableHead>
+                            <TableHead className="w-[140px]">Date joined</TableHead>
                           )}
                           <TableHead className="w-[40px] pr-6" />
                         </UITableRow>
@@ -1656,11 +1836,17 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
+                              orgRole={
+                                orgRoleByEmployeeId.get(employee.id) ??
+                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
+                                null
+                              }
                               onRoleChange={roleChangeHandlerFor(
+                                employee.id,
                                 directoryByEmployeeId.get(employee.id)?.userId,
                                 directoryByEmployeeId.get(employee.id)?.membershipUpdatedAt,
                               )}
+                              invitationStateReady={invitationStateReady}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>
@@ -1695,31 +1881,23 @@ export function MembersSection({
           {canSeeManagementUsers &&
             showManagement &&
             (filteredDeptUsers.length > 0 ? (
-              <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]">
-                <Table>
+              <div className="overflow-x-auto rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]">
+                <Table className="min-w-[900px]" showScrollCues scrollLabel="People roster">
                   <TableHeader>
                     <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
-                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
                         ID
                       </TableHead>
-                      <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Name
                       </TableHead>
-                      {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
-                          {managementDepartmentLabel}
-                        </TableHead>
-                      )}
-                      {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
-                          Role
-                        </TableHead>
-                      )}
-                      {!isMobile && !isTablet && (
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--dg-color-text-subtle)]">
-                          Status
-                        </TableHead>
-                      )}
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
+                        {managementDepartmentLabel}
+                      </TableHead>
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
+                        Role
+                      </TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-[40px] pr-6" />
                     </UITableRow>
                   </TableHeader>
@@ -1807,7 +1985,7 @@ export function MembersSection({
                           <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--dg-type-badge-size)] font-semibold"
                                 style={{
                                   background: isPending
                                     ? "var(--dg-color-surface)"
@@ -1851,7 +2029,7 @@ export function MembersSection({
                                     </span>
                                   )}
                                   {isYou && (
-                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--dg-color-control-active-bg)] text-[var(--dg-color-control-active-text)] shrink-0">
+                                    <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                                       You
                                     </span>
                                   )}
@@ -1864,7 +2042,7 @@ export function MembersSection({
                                       has an employees row post-Flow-B. */}
                                   {person.focusAreaIds.length > 0 && (
                                     <span
-                                      className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                      className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
                                       style={{
                                         background: "var(--dg-color-today-bg)",
                                         color: "var(--dg-color-today-text)",
@@ -1881,39 +2059,44 @@ export function MembersSection({
                             </div>
                           </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
-                              <span className="text-[13px] text-[var(--dg-color-text-muted)]">
-                                {personDepts.length > 0
-                                  ? personDepts.map((department) => department.name).join(", ")
-                                  : "\u2014"}
-                              </span>
-                            </TableCell>
-                          )}
+                          <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
+                            <span className="text-[13px] text-[var(--dg-color-text-muted)]">
+                              {personDepts.length > 0
+                                ? personDepts.map((department) => department.name).join(", ")
+                                : "\u2014"}
+                            </span>
+                          </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
-                              <InlineRoleSelect
-                                orgRole={person.orgRole}
-                                onChange={roleChangeHandlerFor(
-                                  person.userId,
-                                  person.membershipUpdatedAt,
-                                )}
-                                isSelf={isSelfAction(currentUserId, person.userId)}
-                              />
-                            </TableCell>
-                          )}
+                          <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
+                            <InlineRoleSelect
+                              orgRole={person.orgRole}
+                              onChange={
+                                person.userId
+                                  ? roleChangeHandlerFor(
+                                      person.employeeId ?? "",
+                                      person.userId,
+                                      person.membershipUpdatedAt,
+                                    )
+                                  : replacePendingInvitationRole(
+                                      pendingInvitations.find(
+                                        (invitation) =>
+                                          invitation.id === person.personId.replace("inv:", ""),
+                                      ),
+                                    )
+                              }
+                              isSelf={isSelfAction(currentUserId, person.userId)}
+                              pendingInvitationEmail={person.userId ? undefined : person.email}
+                            />
+                          </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="py-4">
-                              <span
-                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                style={statusColors}
-                              >
-                                {statusLabel}
-                              </span>
-                            </TableCell>
-                          )}
+                          <TableCell className="py-4">
+                            <span
+                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
+                              style={statusColors}
+                            >
+                              {statusLabel}
+                            </span>
+                          </TableCell>
 
                           <TableCell className="w-[40px] py-4 pr-6 text-right">
                             <div
@@ -2082,63 +2265,81 @@ export function MembersSection({
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={selectedEmployeeHasPendingManagementInvite}
           onManageManagementAccess={
-            canManageManagementAccess
-              ? (employee) => setManagementAccessEmployee(employee)
-              : undefined
+            canManageManagementAccess ? openManagementAccessPopup : undefined
           }
           onRevoke={handleRevokeInvitation}
         />
       )}
 
-      {managementAccessEmployee && orgId && (
-        <Modal title="Management Access" onClose={() => setManagementAccessEmployee(null)}>
-          <div className="mt-4 flex flex-col gap-6">
+      {managementAccessEmployee && selectedEmployee && orgId && (
+        <Modal
+          title={
+            selectedEmployeeDirectoryPerson?.isManagementUser ||
+            selectedEmployeeHasPendingManagementInvite
+              ? "Edit management access"
+              : "Add to management"
+          }
+          onClose={closeManagementAccessPopup}
+          onRequestClose={requestManagementAccessClose}
+          style={{ maxWidth: 560, width: "100%" }}
+        >
+          <div className="flex flex-col gap-6">
             {selectedEmployeeDirectoryPerson?.orgRole ? (
               <MemberAccessControls
                 orgRole={selectedEmployeeDirectoryPerson.orgRole}
                 adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
                 isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
+                pendingInvitationEmail={
+                  pendingInviteByEmployeeId.get(managementAccessEmployee.id)?.email
+                }
                 onRoleChange={
-                  canManageManagementAccess &&
-                  selectedEmployeeDirectoryPerson.userId &&
-                  selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                    ? async (newRole) => {
-                        const person = selectedEmployeeDirectoryPerson;
-                        if (!orgId || !person.userId || !person.membershipUpdatedAt) return;
-                        await updateOrganizationMembershipGuarded({
-                          orgId,
-                          userId: person.userId,
-                          expectedUpdatedAt: person.membershipUpdatedAt,
-                          orgRole: newRole,
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.directory(orgId),
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.users(orgId),
-                        });
-                      }
-                    : undefined
+                  !canManageManagementAccess
+                    ? undefined
+                    : selectedEmployeeDirectoryPerson.userId &&
+                        selectedEmployeeDirectoryPerson.membershipUpdatedAt
+                      ? async (newRole) => {
+                          const person = selectedEmployeeDirectoryPerson;
+                          if (!person.userId || !person.membershipUpdatedAt) return;
+                          const membership = await updateOrganizationMembershipGuarded({
+                            orgId,
+                            userId: person.userId,
+                            expectedUpdatedAt: person.membershipUpdatedAt,
+                            orgRole: newRole,
+                          });
+                          syncMembershipInCaches(membership);
+                          await Promise.all([
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.org.directory(orgId),
+                            }),
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.org.users(orgId),
+                            }),
+                          ]);
+                        }
+                      : roleChangeHandlerFor(managementAccessEmployee.id, null, null)
                 }
                 onPermissionsChange={
                   canManageManagementAccess &&
                   selectedEmployeeDirectoryPerson.userId &&
                   selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                    ? async (perms) => {
+                    ? async (permissions) => {
                         const person = selectedEmployeeDirectoryPerson;
-                        if (!orgId || !person.userId || !person.membershipUpdatedAt) return;
-                        await updateOrganizationMembershipGuarded({
+                        if (!person.userId || !person.membershipUpdatedAt) return;
+                        const membership = await updateOrganizationMembershipGuarded({
                           orgId,
                           userId: person.userId,
                           expectedUpdatedAt: person.membershipUpdatedAt,
-                          adminPermissions: perms,
+                          adminPermissions: permissions,
                         });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.directory(orgId),
-                        });
-                        await queryClient.invalidateQueries({
-                          queryKey: queryKeys.org.users(orgId),
-                        });
+                        syncMembershipInCaches(membership);
+                        await Promise.all([
+                          queryClient.invalidateQueries({
+                            queryKey: queryKeys.org.directory(orgId),
+                          }),
+                          queryClient.invalidateQueries({
+                            queryKey: queryKeys.org.users(orgId),
+                          }),
+                        ]);
                       }
                     : undefined
                 }
@@ -2151,20 +2352,28 @@ export function MembersSection({
               managementDepartments={managementDepts}
               directoryPerson={selectedEmployeeDirectoryPerson}
               pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
-              onClose={() => setManagementAccessEmployee(null)}
+              onDirtyChange={setManagementAccessDirty}
+              onClose={closeManagementAccessPopup}
               onCompleted={async (updatedEmployee) => {
                 syncExistingEmployeeInCaches(updatedEmployee);
                 await refreshInvitations();
                 await Promise.all([
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  }),
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  }),
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.employees.all(orgId),
+                  }),
                 ]);
               }}
             />
           </div>
         </Modal>
       )}
+      {managementAccessUnsavedChangesDialog}
 
       {selectedPerson && canSeeManagementUsers && (
         <ManagementStaffPanel
@@ -2176,25 +2385,33 @@ export function MembersSection({
           canManageManagementAccess={canManageManagementAccess}
           isSelf={isSelfAction(currentUserId, selectedPerson.userId)}
           onRoleChange={
-            canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt
-              ? async (newRole) => {
-                  const userId = selectedPerson.userId;
-                  const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
-                  if (!orgId || !userId || !expectedUpdatedAt) return;
-                  await updateOrganizationMembershipGuarded({
-                    orgId,
-                    userId,
-                    expectedUpdatedAt,
-                    orgRole: newRole,
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.directory(orgId),
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.users(orgId),
-                  });
-                }
-              : undefined
+            !canManageManagementAccess
+              ? undefined
+              : selectedPerson.userId && selectedPerson.membershipUpdatedAt
+                ? async (newRole) => {
+                    const userId = selectedPerson.userId;
+                    const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
+                    if (!orgId || !userId || !expectedUpdatedAt) return;
+                    await updateOrganizationMembershipGuarded({
+                      orgId,
+                      userId,
+                      expectedUpdatedAt,
+                      orgRole: newRole,
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: queryKeys.org.directory(orgId),
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: queryKeys.org.users(orgId),
+                    });
+                  }
+                : selectedPerson.employeeId
+                  ? roleChangeHandlerFor(selectedPerson.employeeId, null, null)
+                  : replacePendingInvitationRole(
+                      pendingInvitations.find(
+                        (item) => item.id === selectedPerson.personId.replace("inv:", ""),
+                      ),
+                    )
           }
           onPermissionsChange={
             canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt

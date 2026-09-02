@@ -141,7 +141,7 @@ describe("settings help cleanup", () => {
       />,
     );
 
-    const fullNameHeader = screen.getByText("Full Name").closest("div");
+    const fullNameHeader = screen.getByText("Full name").closest("div");
     const abbreviationHeader = screen.getByText("Abbreviation").closest("div");
     const scheduleEligibilityHeader = screen
       .getByText("Only schedule-eligible roles can limit jobs.")

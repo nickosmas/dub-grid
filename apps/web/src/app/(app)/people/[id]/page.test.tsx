@@ -6,13 +6,10 @@ const mockReplace = vi.fn();
 const mockUseAuth = vi.fn();
 const mockUsePermissions = vi.fn();
 const mockFetchEmployeeByUserId = vi.fn();
+const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-    push: vi.fn(),
-    back: vi.fn(),
-  }),
+  useRouter: () => mockRouter,
   notFound: vi.fn(),
 }));
 
@@ -67,5 +64,31 @@ describe("PersonDetailRouteContent", () => {
 
     expect(await screen.findByTestId("staff-detail-page")).toHaveTextContent("emp-2");
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("does not refetch or hide detail when auth refreshes the same user identity", async () => {
+    mockFetchEmployeeByUserId.mockResolvedValue({ id: "emp-self" });
+    const { rerender } = render(<PersonDetailRouteContent employeeId="emp-2" />);
+
+    expect(await screen.findByTestId("staff-detail-page")).toHaveTextContent("emp-2");
+    expect(mockFetchEmployeeByUserId).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({ user: { id: "user-1" }, isLoading: false });
+    rerender(<PersonDetailRouteContent employeeId="emp-2" />);
+
+    expect(screen.getByTestId("staff-detail-page")).toHaveTextContent("emp-2");
+    expect(mockFetchEmployeeByUserId).toHaveBeenCalledTimes(1);
+  });
+
+  it("rechecks detail when the signed-in user identity changes", async () => {
+    mockFetchEmployeeByUserId.mockResolvedValue({ id: "emp-self" });
+    const { rerender } = render(<PersonDetailRouteContent employeeId="emp-2" />);
+    await screen.findByTestId("staff-detail-page");
+
+    mockUseAuth.mockReturnValue({ user: { id: "user-2" }, isLoading: false });
+    rerender(<PersonDetailRouteContent employeeId="emp-2" />);
+
+    await waitFor(() => expect(mockFetchEmployeeByUserId).toHaveBeenCalledTimes(2));
+    expect(mockFetchEmployeeByUserId).toHaveBeenLastCalledWith("user-2", "org-1");
   });
 });

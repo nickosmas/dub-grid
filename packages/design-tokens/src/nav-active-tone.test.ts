@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lightColorTokens, darkColorTokens } from "./index";
+import { lightColorTokens, darkColorTokens, lightShadcnTokens } from "./index";
 
 /**
  * `navActiveBg` is the active-item highlight for the navbar tabs and the app
@@ -65,5 +65,22 @@ describe("navActiveBg stays consistent with the rest of the palette", () => {
     expect(relativeLuminance(darkColorTokens.navActiveBg)).toBeGreaterThan(
       relativeLuminance(darkColorTokens.surface),
     );
+  });
+});
+
+describe("light shadcn neutrals use the web surface ramp", () => {
+  it("does not reintroduce translucent or near-white component fills", () => {
+    expect(lightShadcnTokens).toMatchObject({
+      background: "#FCFCFC",
+      card: "#FFFFFF",
+      popover: "#FFFFFF",
+      secondary: "#EEEEEE",
+      muted: "#EEEEEE",
+      accent: "#EEEEEE",
+      border: "#E5E5E5",
+      input: "#E5E5E5",
+      sidebar: "#FFFFFF",
+      sidebarAccent: "#E5E5E5",
+    });
   });
 });

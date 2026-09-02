@@ -101,7 +101,7 @@ export default async function GoodbyePage({
             margin: "0 0 16px",
             textAlign: "center",
             fontSize: "clamp(2rem, 4vw, 2.75rem)",
-            fontWeight: 800,
+            fontWeight: "var(--dg-type-page-title-weight)",
             letterSpacing: "-0.03em",
             color: "var(--dg-color-text-primary)",
             lineHeight: 1.15,

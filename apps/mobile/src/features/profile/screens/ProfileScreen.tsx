@@ -294,7 +294,7 @@ export default function ProfileScreen() {
     }
   }
 
-  function confirmProfileAction() {
+  function confirmProfileAction(): Promise<void> | undefined {
     const action = pendingConfirmation;
     setPendingConfirmation(null);
     if (!action) return;
@@ -304,11 +304,10 @@ export default function ProfileScreen() {
       // refreshSession() cascade (new accessToken → query refetches → realtime
       // channel rebuild) must not land while a sheet is still mounted over it.
       setIsSwitchModalVisible(false);
-      void handleSwitchOrganization(action.membership);
-      return;
+      return handleSwitchOrganization(action.membership);
     }
 
-    void handleLogout();
+    return handleLogout();
   }
 
   const isSwitchConfirmation = pendingConfirmation?.kind === "switch-org";
@@ -333,12 +332,17 @@ export default function ProfileScreen() {
     setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
   }
 
+  const isFillScreenState =
+    contentState.kind === "error" ||
+    (contentState.kind !== "loading" && (contentState.kind === "empty" || !profile));
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
       onScroll={handleProfileScroll}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
       scrollEventThrottle={16}
       // Passed only while a switch is in flight: `renderOverlay` costs the
       // screen its native scroll root, which is what drives the iOS large
@@ -448,7 +452,11 @@ export default function ProfileScreen() {
                 ? (cancelChangeRequestMutation.variables?.id ?? null)
                 : null
             }
-            onCancel={(request) => cancelChangeRequestMutation.mutate(request)}
+            onCancel={(request) =>
+              new Promise<void>((resolve) => {
+                cancelChangeRequestMutation.mutate(request, { onSettled: () => resolve() });
+              })
+            }
           />
 
           {/* Where you are, and nothing more: the staff status and focus areas

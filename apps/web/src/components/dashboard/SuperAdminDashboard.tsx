@@ -21,11 +21,13 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     focusAreas,
     currentEmpId,
     currentPeriodShifts,
+    allShifts,
     assignmentById,
     absenceTypeById,
     jobs,
     shiftCategories,
     periodDates,
+    viewMode,
     periodLabel,
     overtimeThreshold,
     isMobile,
@@ -42,11 +44,14 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
       <MyScheduleRow
         currentEmpId={currentEmpId}
         currentPeriodShifts={currentPeriodShifts}
+        allShifts={allShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
         periodDates={periodDates}
+        viewMode={viewMode}
+        isMobile={isMobile}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}
       />

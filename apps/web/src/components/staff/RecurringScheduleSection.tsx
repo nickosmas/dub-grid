@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
@@ -134,6 +135,7 @@ function ShiftCellPopover({
           borderRadius: "var(--dg-radius-lg)",
           boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           width: isMobileView ? "calc(100vw - 16px)" : "max-content",
@@ -160,20 +162,10 @@ function ShiftCellPopover({
               borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Select Shift
-            </span>
+            <span className="dg-type-component-heading">Select Shift</span>
             <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px" }}>
             <ShiftPicker
               assignments={assignments}
               shiftCategories={shiftCategories}
@@ -242,6 +234,7 @@ function ShiftCellPopover({
             )}
           </div>
         </div>
+        <ScrollOverflowCue />
       </PopoverContent>
     </Popover>
   );
@@ -438,7 +431,7 @@ function RecurringShiftPill({
             isNameMode
               ? {
                   fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   lineHeight: 1.2,
                   textAlign: "center" as const,
                   maxWidth: "100%",
@@ -450,7 +443,7 @@ function RecurringShiftPill({
                 }
               : {
                   fontSize: "var(--dg-fs-title)",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   lineHeight: 1.2,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -989,7 +982,7 @@ export function RecurringScheduleSection({
         <h1
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-page-title)",
+            fontSize: "var(--dg-type-page-title-size)",
             fontWeight: 700,
             color: "var(--dg-color-text-primary)",
           }}
@@ -1142,11 +1135,11 @@ export function RecurringScheduleSection({
             <div
               style={{
                 padding: "10px 12px",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-subtle)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
+                fontSize: "var(--dg-type-table-heading-size)",
+                fontWeight: "var(--dg-type-table-heading-weight)",
+                color: "var(--dg-type-table-heading-color)",
+                textTransform: "none",
+                letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
                 position: isMobile ? undefined : "sticky",
                 left: isMobile ? undefined : 0,
                 zIndex: isMobile ? undefined : 4,
@@ -1162,11 +1155,11 @@ export function RecurringScheduleSection({
                 key={day}
                 style={{
                   padding: "10px 4px",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-subtle)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+                  fontSize: "var(--dg-type-table-heading-size)",
+                  fontWeight: "var(--dg-type-table-heading-weight)",
+                  color: "var(--dg-type-table-heading-color)",
+                  textTransform: "none",
+                  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
                   textAlign: "center",
                 }}
               >

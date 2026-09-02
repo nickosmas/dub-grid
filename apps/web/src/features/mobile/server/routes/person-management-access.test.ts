@@ -6,6 +6,8 @@ const fetchMobileDepartmentRows = vi.fn();
 const createMobileEmployeeInvitationRow = vi.fn();
 const refreshMobileEmployeeInvitationRow = vi.fn();
 const revokeMobileEmployeeInvitationRow = vi.fn();
+const replaceMobilePendingInvitationAccessRow = vi.fn();
+const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
 const updateMobileInvitationAssignmentsRow = vi.fn();
 const updateMobileMembershipAccessRow = vi.fn();
 const insertMobileAuditLogEntry = vi.fn();
@@ -22,7 +24,9 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
+  replaceMobilePendingInvitationAccessRow,
   revokeMobileEmployeeInvitationRow,
+  rollbackMobilePendingInvitationAccessReplacement,
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
 }));
@@ -113,6 +117,7 @@ describe("mobile person management-access route", () => {
       updated_at: null,
     });
     revokeMobileEmployeeInvitationRow.mockResolvedValue(null);
+    rollbackMobilePendingInvitationAccessReplacement.mockResolvedValue(true);
     loadMobilePersonWithAccess.mockResolvedValue({
       person: makePerson(),
       userId: null,
@@ -286,9 +291,7 @@ describe("mobile person management-access route", () => {
     );
   });
 
-  // The pre-existing row wasn't this request's to destroy: revoking it would
-  // take away access that has nothing to do with the failed email.
-  it("leaves a pre-existing invitation alone when the resend email fails", async () => {
+  it("replaces a pre-existing invitation when its access level changes", async () => {
     loadMobilePersonWithAccess.mockResolvedValue({
       person: makePerson({
         pendingInvitation: {
@@ -304,19 +307,66 @@ describe("mobile person management-access route", () => {
       pendingInvitation: {
         id: INVITATION_ID,
         email: "mina@example.com",
+        role_to_assign: "user",
         dept_admin_ids: [],
         updated_at: "2026-05-01T00:00:00Z",
       },
     });
-    updateMobileInvitationAssignmentsRow.mockResolvedValue({
-      id: INVITATION_ID,
-      updated_at: "2026-05-01T00:00:01Z",
+    replaceMobilePendingInvitationAccessRow.mockResolvedValue({
+      previousInvitationId: INVITATION_ID,
+      invitation: {
+        id: "99999999-9999-4999-8999-999999999999",
+        token: "replacement-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
     });
-    refreshMobileEmployeeInvitationRow.mockResolvedValue({
-      id: INVITATION_ID,
-      token: "fresh-token",
-      email: "mina@example.com",
-      updated_at: "2026-05-01T00:00:02Z",
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "admin",
+        managementDepartmentIds: [9],
+        expectedInvitationUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        invitationId: INVITATION_ID,
+        roleToAssign: "admin",
+      }),
+    );
+    expect(updateMobileInvitationAssignmentsRow).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ token: "replacement-token" }),
+    );
+  });
+
+  it("restores the old invitation when a replacement email fails", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson(),
+      userId: null,
+      membership: null,
+      pendingInvitation: {
+        id: INVITATION_ID,
+        email: "mina@example.com",
+        role_to_assign: "user",
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+    });
+    replaceMobilePendingInvitationAccessRow.mockResolvedValue({
+      previousInvitationId: INVITATION_ID,
+      invitation: {
+        id: "99999999-9999-4999-8999-999999999999",
+        token: "replacement-token",
+        email: "mina@example.com",
+        updated_at: "2026-05-01T00:00:02Z",
+      },
     });
     sendInvitationEmail.mockRejectedValue(new Error("resend down"));
 
@@ -331,7 +381,54 @@ describe("mobile person management-access route", () => {
     );
 
     expect(response.status).toBe(502);
+    expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
+      {},
+      {
+        orgId: "44444444-4444-4444-8444-444444444444",
+        previousInvitationId: INVITATION_ID,
+        replacementInvitationId: "99999999-9999-4999-8999-999999999999",
+      },
+    );
     expect(revokeMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+  });
+
+  it("resends the same invitation for department-only changes", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson(),
+      userId: null,
+      membership: null,
+      pendingInvitation: {
+        id: INVITATION_ID,
+        email: "mina@example.com",
+        role_to_assign: "user",
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+    });
+    updateMobileInvitationAssignmentsRow.mockResolvedValue({
+      id: INVITATION_ID,
+      updated_at: "2026-05-01T00:00:01Z",
+    });
+    refreshMobileEmployeeInvitationRow.mockResolvedValue({
+      id: INVITATION_ID,
+      token: "fresh-token",
+      email: "mina@example.com",
+      updated_at: "2026-05-01T00:00:02Z",
+    });
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "user",
+        managementDepartmentIds: [9],
+        expectedInvitationUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateMobileInvitationAssignmentsRow).toHaveBeenCalled();
+    expect(replaceMobilePendingInvitationAccessRow).not.toHaveBeenCalled();
   });
 
   it("clears the management departments on DELETE without touching the staff profile", async () => {

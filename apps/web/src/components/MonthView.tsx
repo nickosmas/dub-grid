@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import {
@@ -126,6 +127,7 @@ function DayPopover({
           borderRadius: "var(--dg-radius-lg)",
           boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           width: 300,
@@ -155,7 +157,7 @@ function DayPopover({
         </div>
 
         {/* Employee breakdown */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 14px" }}>
           {focusAreaSections.length === 0 ? (
             <div
               style={{
@@ -262,6 +264,7 @@ function DayPopover({
             </div>
           )}
         </div>
+        <ScrollOverflowCue />
       </PopoverContent>
     </Popover>
   );

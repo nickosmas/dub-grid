@@ -174,6 +174,23 @@ describe("AddPersonScreen", () => {
     });
   });
 
+  it("submits one create when Add person is pressed twice in the same tick", async () => {
+    createMobilePerson.mockResolvedValue({
+      success: true,
+      person: { id: "emp-1" },
+    });
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    const submit = screen.getByRole("button", { name: "Add person" });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(createMobilePerson).toHaveBeenCalledTimes(1));
+  });
+
   it("sends an invitation when an email is provided", async () => {
     createMobilePerson.mockResolvedValue({
       success: true,

@@ -77,6 +77,7 @@ beforeAll(async () => {
 
 const profileData = {
   user: {
+    id: "user-1",
     firstName: "Mina",
     lastName: "Diaz",
     email: "mina@dubgrid.com",
@@ -180,16 +181,37 @@ describe("ProfileWorkScreen", () => {
     updateProfileAccount.mockResolvedValue({ success: true });
   });
 
-  it("hides the edit panel by default and shows account + staff details", () => {
+  it("opens directly in the persistent account and staff editor", () => {
     render(<ProfileWorkScreen />);
 
     expect(screen.getByText("Account")).toBeInTheDocument();
     expect(screen.getByText("Staff profile")).toBeInTheDocument();
     expect(screen.getByText("Employment")).toBeInTheDocument();
     expect(screen.getAllByText("Supervisor").length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "RN" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "RN" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Contact notes")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
+  it("preserves a dirty draft when the same profile refetches in the background", async () => {
+    const view = render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
+
+    useQuery.mockReturnValue({
+      data: {
+        ...profileData,
+        user: { ...profileData.user, firstName: "Server" },
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    view.rerender(<ProfileWorkScreen />);
+
+    await waitFor(() => expect(screen.getByLabelText("First name")).toHaveValue("Draft"));
   });
 
   // The staff profile a manager opens names both, and reading your own record
@@ -218,16 +240,13 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
   });
 
-  it("disables Save changes and Discard until a field changes, then saves", async () => {
+  it("keeps Save disabled and hides Discard until a field changes, then saves", async () => {
     render(<ProfileWorkScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Discard" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
@@ -253,10 +272,36 @@ describe("ProfileWorkScreen", () => {
     });
   });
 
-  it("goes back without asking while there is nothing to lose", () => {
+  it("hides an incompatible new role while keeping the selected role removable", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        permissions: { canManageEmployees: true },
+        focusAreas: profileData.focusAreas,
+        departments: [],
+        certifications: [{ id: 5, name: "Registered Nurse", abbr: "RN" }],
+        currentOrg: { useCompactRoleCertificationLabels: true },
+        roles: [
+          { id: 3, name: "Supervisor", abbr: "SUP", requiredCertificationIds: [5] },
+          { id: 4, name: "Clinical Lead", abbr: "CL", requiredCertificationIds: [5] },
+        ],
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
     render(<ProfileWorkScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const selectedRole = screen.getByRole("button", { name: "SUP" });
+    expect(selectedRole).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: "CL" })).not.toBeInTheDocument();
+
+    fireEvent.click(selectedRole);
+    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+  });
+
+  it("goes back without asking while there is nothing to lose", () => {
+    render(<ProfileWorkScreen />);
 
     // Open but untouched. On iOS the whole screen is a back-swipe target, so a
     // guard that fired here would interrupt an ordinary swipe back.
@@ -268,8 +313,6 @@ describe("ProfileWorkScreen", () => {
 
   it("asks before a back press throws away an edit, and leaves once discarded", () => {
     render(<ProfileWorkScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
     act(() => {
@@ -288,8 +331,6 @@ describe("ProfileWorkScreen", () => {
 
   it("keeps the edit when the back press is called off", () => {
     render(<ProfileWorkScreen />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
     act(() => {

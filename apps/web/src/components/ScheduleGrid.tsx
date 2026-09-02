@@ -1086,7 +1086,7 @@ const SectionBlock = memo(function SectionBlock({
       <div
         style={{
           fontSize: "var(--dg-fs-section-title)",
-          fontWeight: 800,
+          fontWeight: 600,
           color: "var(--dg-color-text-primary)",
           marginBottom: 10,
           padding: "2px 0",
@@ -1357,7 +1357,7 @@ const SectionBlock = memo(function SectionBlock({
                       height: 18,
                       borderRadius: 9,
                       background: "var(--dg-color-warning)",
-                      color: "#fff",
+                      color: "var(--dg-color-text-inverse)",
                       fontSize: "var(--dg-fs-badge)",
                       fontWeight: 700,
                       display: "inline-flex",
@@ -1471,7 +1471,7 @@ const SectionBlock = memo(function SectionBlock({
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
-                                    fontWeight: 800,
+                                    fontWeight: 600,
                                     lineHeight: 1.1,
                                   }}
                                 >
@@ -1501,8 +1501,8 @@ const SectionBlock = memo(function SectionBlock({
                                   borderRadius: "50%",
                                   background: scPill?.text ?? "var(--dg-color-warning)",
                                   color: scPill?.color ?? "var(--dg-color-text-inverse)",
-                                  fontSize: 10,
-                                  fontWeight: 700,
+                                  fontSize: "var(--dg-type-badge-size)",
+                                  fontWeight: 600,
                                   display: "inline-flex",
                                   alignItems: "center",
                                   justifyContent: "center",
@@ -2387,7 +2387,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   display: "flex",
                                                   alignItems: "center",
                                                   fontSize: "var(--dg-fs-footnote)",
-                                                  fontWeight: 800,
+                                                  fontWeight: 600,
                                                   lineHeight: 1,
                                                   background: singleCrossFocusPalette.background,
                                                   color: singleCrossFocusPalette.color,
@@ -2436,7 +2436,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   isNameMode
                                                     ? {
                                                         fontSize: "var(--dg-fs-caption)",
-                                                        fontWeight: 800,
+                                                        fontWeight: 600,
                                                         lineHeight: singleIsThreeRow ? 1.15 : 1.2,
                                                         textAlign: "center" as const,
                                                         maxWidth: "100%",
@@ -2452,7 +2452,7 @@ const SectionBlock = memo(function SectionBlock({
                                                       }
                                                     : {
                                                         fontSize: "var(--dg-fs-title)",
-                                                        fontWeight: 800,
+                                                        fontWeight: 600,
                                                         lineHeight: 1.2,
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
@@ -2840,7 +2840,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     fontSize: isNameMode
                                                       ? "var(--dg-fs-micro)"
                                                       : "var(--dg-fs-caption)",
-                                                    fontWeight: 800,
+                                                    fontWeight: 600,
                                                     position: "relative",
                                                     cursor: "pointer",
                                                     textDecoration:
@@ -2879,7 +2879,7 @@ const SectionBlock = memo(function SectionBlock({
                                                         display: "flex",
                                                         alignItems: "center",
                                                         fontSize: "var(--dg-fs-micro)",
-                                                        fontWeight: 800,
+                                                        fontWeight: 600,
                                                         lineHeight: 1,
                                                         background:
                                                           multiCrossFocusPalette.background,
@@ -3222,7 +3222,7 @@ const SectionBlock = memo(function SectionBlock({
                                           display: "flex",
                                           alignItems: "center",
                                           fontSize: "var(--dg-fs-footnote)",
-                                          fontWeight: 800,
+                                          fontWeight: 600,
                                           lineHeight: 1,
                                           background: deletedCrossFocusPalette.background,
                                           color: deletedCrossFocusPalette.color,
@@ -3243,7 +3243,7 @@ const SectionBlock = memo(function SectionBlock({
                                     <span
                                       style={{
                                         fontSize: "var(--dg-fs-title)",
-                                        fontWeight: 800,
+                                        fontWeight: 600,
                                         lineHeight: 1,
                                       }}
                                     >
@@ -3360,8 +3360,8 @@ const SectionBlock = memo(function SectionBlock({
                                     borderRadius: "50%",
                                     background: "var(--dg-color-brand)",
                                     color: "var(--dg-color-text-inverse)",
-                                    fontSize: 9,
-                                    fontWeight: 700,
+                                    fontSize: "var(--dg-type-badge-size)",
+                                    fontWeight: 600,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -3387,7 +3387,7 @@ const SectionBlock = memo(function SectionBlock({
                                     position: "absolute",
                                     bottom: 1,
                                     right: 2,
-                                    fontSize: 10,
+                                    fontSize: "var(--dg-type-badge-size)",
                                     lineHeight: 1,
                                     color: "var(--dg-color-text-muted)",
                                     zIndex: 2,
@@ -4153,7 +4153,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
               borderRadius: 8,
               padding: "6px 16px",
               fontSize: "var(--dg-fs-title)",
-              fontWeight: 800,
+              fontWeight: 600,
               boxShadow: "var(--shadow-drag)",
               cursor: "grabbing",
               whiteSpace: "nowrap",

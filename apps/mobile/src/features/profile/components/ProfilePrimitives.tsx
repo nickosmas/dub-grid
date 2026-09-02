@@ -414,7 +414,13 @@ export function ProfileChoiceGroup<TId extends string | number>({
   onToggle,
 }: {
   label: string;
-  items: Array<{ id: TId; name: string; abbr?: string | null }>;
+  items: Array<{
+    id: TId;
+    name: string;
+    abbr?: string | null;
+    disabled?: boolean;
+    disabledReason?: string;
+  }>;
   selectedIds: TId[];
   error?: string | null;
   onToggle: (id: TId) => void;
@@ -428,6 +434,10 @@ export function ProfileChoiceGroup<TId extends string | number>({
       <View style={styles.chipRow}>
         {items.map((item) => (
           <Chip
+            accessibilityLabel={
+              item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
+            }
+            disabled={item.disabled}
             key={item.id}
             label={item.name}
             onPress={() => onToggle(item.id)}

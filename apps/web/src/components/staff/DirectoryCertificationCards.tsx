@@ -30,9 +30,7 @@ function CountTile({
       }
     >
       <CardContent>
-        <p className="text-[11px] font-semibold uppercase tracking-wide truncate text-[var(--dg-color-text-subtle)]">
-          {label}
-        </p>
+        <p className="dg-type-field-title truncate">{label}</p>
         <p className="text-2xl font-bold tracking-tight mt-0.5 tabular-nums">{count}</p>
       </CardContent>
     </Card>

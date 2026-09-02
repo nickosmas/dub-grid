@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -267,13 +267,6 @@ export default function SettingsPage({
       ? requestedSection
       : defaultSection;
   const maxWidth = getMaxWidth(activeSection);
-  const [isRolesEditing, setIsRolesEditing] = useState(false);
-
-  useEffect(() => {
-    setIsRolesEditing(false);
-  }, [activeSection]);
-
-  const shellMaxWidth = activeSection === "staff-roles" && !isRolesEditing ? 1120 : maxWidth;
 
   // Permission notice for view-only users.
   const banner =
@@ -317,7 +310,7 @@ export default function SettingsPage({
       footerGroupIds={FOOTER_GROUP_IDS}
       defaultSection={defaultSection}
       activeSection={activeSection}
-      maxWidth={shellMaxWidth}
+      maxWidth={maxWidth}
       banner={banner}
     >
       {/* ── General group ─────────────────────────────────────── */}
@@ -422,7 +415,7 @@ export default function SettingsPage({
         <StringListSettings
           label={certificationLabel}
           sectionTitle={certificationLabel}
-          maxWidth={shellMaxWidth}
+          maxWidth={maxWidth}
           items={certifications}
           placeholder="e.g. Registered Nurse"
           hideAbbr
@@ -451,7 +444,7 @@ export default function SettingsPage({
         <StringListSettings
           label={roleLabel}
           sectionTitle={roleLabel}
-          maxWidth={shellMaxWidth}
+          maxWidth={maxWidth}
           items={orgRoles}
           placeholder="e.g. Charge Nurse"
           hideAbbr
@@ -476,7 +469,6 @@ export default function SettingsPage({
           scheduleEligibilityHelpText="Only schedule-eligible roles can limit jobs."
           certifications={certifications}
           showRequiredCertifications
-          onEditingChange={setIsRolesEditing}
           onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
         />
       )}

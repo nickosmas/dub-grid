@@ -6,13 +6,13 @@ import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
+import { validatePhone, validateRequired } from "@/components/FormField";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import { updateEmployee } from "@/features/employees/client";
+import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 /** Only the read-only prefill fields this modal actually needs — satisfied by
@@ -63,7 +63,6 @@ export function AddManagementUserToScheduleModal({
 }: AddManagementUserToScheduleModalProps) {
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);
-  const [email, setEmail] = useState(person.email);
   const [phone, setPhone] = useState(person.phone);
   const [certificationId, setCertificationId] = useState<number | null>(person.certificationId);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>(person.focusAreaIds);
@@ -76,7 +75,6 @@ export function AddManagementUserToScheduleModal({
       JSON.stringify({
         firstName: person.firstName,
         lastName: person.lastName,
-        email: person.email,
         phone: person.phone,
         certificationId: person.certificationId,
         focusAreaIds: [...person.focusAreaIds].sort((left, right) => left - right),
@@ -89,7 +87,6 @@ export function AddManagementUserToScheduleModal({
     JSON.stringify({
       firstName,
       lastName,
-      email,
       phone,
       certificationId,
       focusAreaIds: [...focusAreaIds].sort((left, right) => left - right),
@@ -110,24 +107,19 @@ export function AddManagementUserToScheduleModal({
     () => ({
       firstName: touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName: touched.lastName ? validateRequired(lastName, "Last name") : null,
-      // Email is optional — admin can schedule someone before onboarding
-      // (no email yet) and fill it in later when inviting. Validate only
-      // when a value is present.
-      email: touched.email && email.trim() ? validateEmail(email) : null,
       phone: touched.phone ? validatePhone(phone) : null,
       focusAreaIds:
         touched.focusAreaIds && focusAreaIds.length === 0
           ? `At least one ${focusAreaLabel.toLowerCase()} is required`
           : null,
     }),
-    [email, firstName, focusAreaIds, focusAreaLabel, lastName, touched],
+    [firstName, focusAreaIds, focusAreaLabel, lastName, phone, touched],
   );
 
   const canSubmit =
     !!person.userId &&
     !validateRequired(firstName, "First name") &&
     !validateRequired(lastName, "Last name") &&
-    (!email.trim() || !validateEmail(email)) &&
     !validatePhone(phone) &&
     focusAreaIds.length > 0 &&
     !saving;
@@ -154,7 +146,6 @@ export function AddManagementUserToScheduleModal({
       setTouched({
         firstName: true,
         lastName: true,
-        email: true,
         phone: true,
         focusAreaIds: true,
       });
@@ -170,18 +161,22 @@ export function AddManagementUserToScheduleModal({
         ...employee,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
         phone: normalizeOptionalUsPhone(phone),
         certificationId,
         focusAreaIds,
         roleIds,
         contactNotes: contactNotes.trim(),
       };
-      await updateEmployee(updated, orgId, employee.version);
+      const savedEmployee = await updateEmployee(updated, orgId, employee.version);
       toast.success("Added to the schedule");
-      onAdded(updated);
+      onAdded(savedEmployee);
       onClose();
     } catch (err) {
+      if (err instanceof EmployeeProfileConflictError) {
+        onAdded(err.latestEmployee);
+        toast.error("Staff details changed elsewhere. Review the latest values and try again.");
+        return;
+      }
       toast.error(
         formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."),
       );
@@ -245,24 +240,7 @@ export function AddManagementUserToScheduleModal({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={fieldLabelStyle}>
-                Email{" "}
-                <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
-                  (optional)
-                </span>
-              </label>
-              <input
-                className="dg-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={() => markTouched("email")}
-                style={fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined}
-              />
-              {fieldErrors.email && <FieldError message={fieldErrors.email} />}
-            </div>
+          <div>
             <div>
               <label style={fieldLabelStyle}>Phone</label>
               <input
@@ -294,9 +272,6 @@ export function AddManagementUserToScheduleModal({
                     selected={active}
                     onClick={() => toggleFocusArea(focusArea.id)}
                     padding="5px 12px"
-                    unselectedBackground="var(--dg-color-bg-secondary)"
-                    unselectedBorderColor="transparent"
-                    unselectedTextColor="var(--dg-color-text-faint)"
                   >
                     {focusArea.name}
                   </SelectableTag>
@@ -332,9 +307,6 @@ export function AddManagementUserToScheduleModal({
                   selected={roleIds.includes(role.id)}
                   onClick={() => toggleRole(role.id)}
                   padding="5px 12px"
-                  unselectedBackground="var(--dg-color-bg-secondary)"
-                  unselectedBorderColor="transparent"
-                  unselectedTextColor="var(--dg-color-text-faint)"
                 >
                   {role.name}
                 </SelectableTag>
@@ -392,8 +364,10 @@ function FieldError({ message }: { message: string }) {
 
 const fieldLabelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: "var(--dg-fs-label)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-secondary)",
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   marginBottom: 6,
 };

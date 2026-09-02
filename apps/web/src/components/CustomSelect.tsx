@@ -20,8 +20,14 @@ interface CustomSelectProps<T extends string | number> {
   height?: React.CSSProperties["height"];
   /** Extra style on the trigger button */
   style?: React.CSSProperties;
-  /** Font size override (default 13) */
+  /** Font size override (default productive control size) */
   fontSize?: number | string;
+  /** Font weight override (default productive control weight) */
+  fontWeight?: React.CSSProperties["fontWeight"];
+  /** Selected-option font weight override (default productive control weight) */
+  activeFontWeight?: React.CSSProperties["fontWeight"];
+  /** Letter spacing override */
+  letterSpacing?: React.CSSProperties["letterSpacing"];
 }
 
 export default function CustomSelect<T extends string | number>({
@@ -34,7 +40,10 @@ export default function CustomSelect<T extends string | number>({
   placeholder,
   height,
   style,
-  fontSize = 13,
+  fontSize = "var(--dg-type-control-size)",
+  fontWeight = 500,
+  activeFontWeight = 500,
+  letterSpacing,
 }: CustomSelectProps<T>) {
   const [open, setOpenRaw] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -99,8 +108,9 @@ export default function CustomSelect<T extends string | number>({
           borderRadius: "var(--dg-btn-radius)",
           padding: "0 10px 0 12px",
           fontSize,
-          fontWeight: 500,
-          color: disabled ? "var(--dg-color-text-subtle)" : "var(--dg-color-text-secondary)",
+          fontWeight,
+          letterSpacing,
+          color: disabled ? "var(--dg-color-text-subtle)" : "var(--dg-type-control-color)",
           cursor: disabled ? "not-allowed" : "pointer",
           fontFamily: "inherit",
           whiteSpace: "nowrap",
@@ -206,7 +216,9 @@ export default function CustomSelect<T extends string | number>({
                 }}
                 onMouseEnter={() => setFocusedIndex(idx)}
                 style={{
-                  fontWeight: isActive ? 700 : undefined,
+                  fontSize,
+                  fontWeight: isActive ? activeFontWeight : fontWeight,
+                  letterSpacing,
                   color: isActive ? "var(--dg-color-text-primary)" : undefined,
                   background: isFocused
                     ? "var(--dg-color-bg-secondary)"

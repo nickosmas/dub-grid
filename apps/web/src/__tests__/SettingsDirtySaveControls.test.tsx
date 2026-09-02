@@ -242,9 +242,9 @@ describe("settings dirty save controls", () => {
       screen.queryByText("Scheduled only. Does not rename management departments."),
     ).not.toBeInTheDocument();
     // The other three labels remain customizable.
-    expect(screen.getByText("FOCUS AREAS LABEL")).toBeInTheDocument();
-    expect(screen.getByText("CERTIFICATIONS LABEL")).toBeInTheDocument();
-    expect(screen.getByText("ROLES LABEL")).toBeInTheDocument();
+    expect(screen.getByText("Focus areas label")).toBeInTheDocument();
+    expect(screen.getByText("Certifications label")).toBeInTheDocument();
+    expect(screen.getByText("Roles label")).toBeInTheDocument();
   });
 
   it("display mode uses Cancel while the mode selection is dirty", async () => {
@@ -341,6 +341,33 @@ describe("settings dirty save controls", () => {
     expect(saveButton).toBeEnabled();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
+  });
+
+  it("gives schedule rules distinct titles, descriptions, and divided rows", () => {
+    const { container } = render(
+      <ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />,
+    );
+
+    const title = screen.getByText("Enforce shift conflict prevention");
+    const description = screen.getByText("When enabled, overlapping shifts cannot be saved.");
+    const rows = container.querySelectorAll("[data-schedule-rule-row]");
+
+    expect(title).toHaveStyle({
+      color: "var(--dg-color-text-primary)",
+      fontSize: "var(--dg-fs-body-sm)",
+      fontWeight: "600",
+    });
+    expect(description).toHaveStyle({
+      color: "var(--dg-color-text-muted)",
+      fontSize: "var(--dg-type-field-title-size)",
+      fontWeight: "400",
+    });
+    expect(rows).toHaveLength(5);
+    for (const row of Array.from(rows).slice(1)) {
+      expect(row.getAttribute("style")).toContain(
+        "border-top: 1px solid var(--dg-color-border-light)",
+      );
+    }
   });
 
   it("schedule rules save a biweekly pay-period anchor date", async () => {
@@ -2543,8 +2570,8 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByLabelText(/override time/i));
 
-    expect(screen.getByText("START")).toBeInTheDocument();
-    expect(screen.getByText("END")).toBeInTheDocument();
+    expect(screen.getByText("Start")).toBeInTheDocument();
+    expect(screen.getByText("End")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 

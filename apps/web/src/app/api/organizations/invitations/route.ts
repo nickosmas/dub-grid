@@ -5,7 +5,7 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { z } from "zod";
-import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { apiLimiter, checkRateLimit, emailTargetLimiter, hashEmail } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
@@ -20,6 +20,10 @@ import type { Invitation } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import {
+  getInvitationEmailConfig,
+  sendInvitationEmail,
+} from "@/features/mobile/server/invitation-email";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +54,16 @@ const resendSchema = z.object({
   invitationId: z.string().uuid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
+
+const replaceAccessSchema = z.object({
+  action: z.literal("replace_access"),
+  orgId: z.string().uuid(),
+  invitationId: z.string().uuid(),
+  expectedUpdatedAt: z.string().datetime({ offset: true }),
+  roleToAssign: invitationRoleSchema,
+});
+
+const postSchema = z.discriminatedUnion("action", [resendSchema, replaceAccessSchema]);
 
 const getSchema = z.object({
   orgId: z.string().uuid(),
@@ -100,6 +114,28 @@ async function fetchInvitation(orgId: string, invitationId: string): Promise<Inv
   return data ? rowToInvitation(data as DbInvitation) : null;
 }
 
+async function fetchInvitationWithToken(
+  orgId: string,
+  invitationId: string,
+): Promise<{ invitation: Invitation; token: string } | null> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select(
+      "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+    )
+    .eq("org_id", orgId)
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as DbInvitation;
+  if (!row.token) throw new Error("Invitation token is missing");
+  return { invitation: rowToInvitation(row), token: row.token };
+}
+
 /**
  * `one_pending_invite_per_email` is a partial unique index on
  * invitations(org_id, email) WHERE accepted_at IS NULL AND revoked_at IS
@@ -142,6 +178,7 @@ async function writeAuditEntry(input: {
   action: string;
   changes: ReturnType<typeof buildInvitationChanges>;
   req: NextRequest;
+  relatedInvitationId?: string;
 }) {
   const serviceClient = getServiceClient();
   const { error } = await serviceClient.from("audit_log").insert({
@@ -159,6 +196,7 @@ async function writeAuditEntry(input: {
         from: change.previousValue,
         to: change.nextValue,
       })),
+      ...(input.relatedInvitationId ? { replacementInvitationId: input.relatedInvitationId } : {}),
     },
     ip_address: getRequestIp(input.req),
     user_agent: input.req.headers.get("user-agent"),
@@ -170,6 +208,38 @@ async function writeAuditEntry(input: {
       "Invitation audit log write failed",
     );
   }
+}
+
+async function checkInvitationEmailLimit(email: string) {
+  return checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
+}
+
+async function sendPendingInvitationEmail(input: {
+  orgId: string;
+  token: string;
+  email: string;
+  inviterName: string | null;
+}) {
+  const config = getInvitationEmailConfig();
+  if (!config) {
+    throw new Error("Email service not configured");
+  }
+
+  const serviceClient = getServiceClient();
+  const { data: organization, error } = await serviceClient
+    .from("organizations")
+    .select("name")
+    .eq("id", input.orgId)
+    .maybeSingle();
+  if (error) throw error;
+
+  await sendInvitationEmail({
+    config,
+    token: input.token,
+    email: input.email,
+    orgName: (organization?.name as string | null) || "your organization",
+    inviterName: input.inviterName,
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -495,7 +565,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
-  const parsed = resendSchema.safeParse(body);
+  const parsed = postSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
@@ -506,19 +576,183 @@ export async function POST(req: NextRequest) {
     const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
-    const currentInvitation = await fetchInvitation(orgId, invitationId);
-    if (!currentInvitation) {
+    const currentSnapshot = await fetchInvitationWithToken(orgId, invitationId);
+    if (!currentSnapshot) {
       return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     }
+    const { invitation: currentInvitation, token: previousToken } = currentSnapshot;
 
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
     }
 
+    const serviceClient = getServiceClient();
+
+    const targetLimit = await checkInvitationEmailLimit(currentInvitation.email);
+    if (targetLimit.misconfigured) {
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+    }
+    if (targetLimit.limited) {
+      const retryAfter = targetLimit.reset
+        ? Math.ceil((targetLimit.reset - Date.now()) / 1000)
+        : 60;
+      return NextResponse.json(
+        {
+          error:
+            "We've sent several invites to that address already. Wait a few minutes and try again.",
+        },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
+      );
+    }
+
+    if (parsed.data.action === "replace_access") {
+      if (
+        currentInvitation.revokedAt ||
+        currentInvitation.acceptedAt ||
+        new Date(currentInvitation.expiresAt).getTime() < Date.now()
+      ) {
+        return NextResponse.json(
+          { error: "This invitation is no longer pending. Refresh and try again." },
+          { status: 409 },
+        );
+      }
+
+      if (currentInvitation.roleToAssign === parsed.data.roleToAssign) {
+        return NextResponse.json({ success: true, invitation: currentInvitation });
+      }
+
+      const { data: replacementData, error: replacementError } = await serviceClient.rpc(
+        "replace_pending_invitation_access",
+        {
+          p_org_id: orgId,
+          p_invitation_id: invitationId,
+          p_expected_updated_at: expectedUpdatedAt,
+          p_role: parsed.data.roleToAssign,
+          p_invited_by: user.id,
+        },
+      );
+      if (replacementError) {
+        const message = String(replacementError.message ?? "").toLowerCase();
+        if (message.includes("changed elsewhere")) {
+          const latestInvitation = await fetchInvitation(orgId, invitationId);
+          if (latestInvitation) return buildConflictResponse(latestInvitation);
+        }
+        if (message.includes("no longer pending")) {
+          return NextResponse.json(
+            { error: "This invitation is no longer pending. Refresh and try again." },
+            { status: 409 },
+          );
+        }
+        if (message.includes("not found")) {
+          return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+        }
+        throw replacementError;
+      }
+
+      const replacement = replacementData as {
+        previous_invitation_id?: string;
+        invitation_id?: string;
+        token?: string;
+        expires_at?: string;
+      } | null;
+      if (
+        !replacement?.previous_invitation_id ||
+        !replacement.invitation_id ||
+        !replacement.token ||
+        !replacement.expires_at
+      ) {
+        throw new Error("Invitation replacement did not return complete data.");
+      }
+
+      const replacementInvitation = await fetchInvitation(orgId, replacement.invitation_id);
+      if (!replacementInvitation) {
+        throw new Error("Replacement invitation could not be loaded.");
+      }
+
+      try {
+        await sendPendingInvitationEmail({
+          orgId,
+          token: replacement.token,
+          email: replacementInvitation.email,
+          inviterName: user.email ?? null,
+        });
+      } catch (emailError) {
+        const { data: rolledBack, error: rollbackError } = await serviceClient.rpc(
+          "rollback_pending_invitation_access_replacement",
+          {
+            p_org_id: orgId,
+            p_previous_invitation_id: replacement.previous_invitation_id,
+            p_replacement_invitation_id: replacement.invitation_id,
+          },
+        );
+        if (rollbackError || rolledBack !== true) {
+          logger.error(
+            {
+              error: rollbackError,
+              orgId,
+              invitationId,
+              replacementInvitationId: replacement.invitation_id,
+            },
+            "Failed to roll back invitation access replacement after email failure",
+          );
+        }
+        Sentry.captureException(emailError, {
+          extra: { context: "invitation-access-replacement-email", orgId, invitationId },
+        });
+        return NextResponse.json(
+          {
+            error:
+              emailError instanceof Error && emailError.message === "Email service not configured"
+                ? "Email service not configured"
+                : "We couldn't send the replacement invitation. The original invitation is still active.",
+          },
+          {
+            status:
+              emailError instanceof Error && emailError.message === "Email service not configured"
+                ? 503
+                : 502,
+          },
+        );
+      }
+
+      await writeAuditEntry({
+        orgId,
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        resourceId: invitationId,
+        action: "invitation.access_replaced",
+        changes: buildInvitationChanges(currentInvitation, {
+          roleToAssign: parsed.data.roleToAssign,
+        }),
+        relatedInvitationId: replacement.invitation_id,
+        req,
+      });
+
+      void dispatchNotificationEvent(user.id, {
+        action: "invitation_revoked",
+        orgId,
+        invitationId,
+        inviteeEmail: currentInvitation.email,
+      });
+      void dispatchNotificationEvent(user.id, {
+        action: "invitation_created",
+        orgId,
+        invitationId: replacement.invitation_id,
+        inviteeEmail: replacementInvitation.email,
+      });
+
+      return NextResponse.json({
+        success: true,
+        previousInvitationId: replacement.previous_invitation_id,
+        invitation: replacementInvitation,
+        token: replacement.token,
+        expiresAt: replacement.expires_at,
+      });
+    }
+
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const serviceClient = getServiceClient();
     const { data: updatedInvitation, error } = await serviceClient
       .from("invitations")
       .update({
@@ -544,6 +778,53 @@ export async function POST(req: NextRequest) {
     }
 
     const latestInvitation = rowToInvitation(updatedInvitation as DbInvitation);
+
+    try {
+      await sendPendingInvitationEmail({
+        orgId,
+        token,
+        email: latestInvitation.email,
+        inviterName: user.email ?? null,
+      });
+    } catch (emailError) {
+      const { data: restoredInvitation, error: rollbackError } = await serviceClient
+        .from("invitations")
+        .update({
+          token: previousToken,
+          expires_at: currentInvitation.expiresAt,
+          revoked_at: currentInvitation.revokedAt,
+        })
+        .eq("org_id", orgId)
+        .eq("id", invitationId)
+        .eq("updated_at", latestInvitation.updatedAt)
+        .eq("token", token)
+        .is("accepted_at", null)
+        .select("id")
+        .maybeSingle();
+      if (rollbackError || !restoredInvitation) {
+        logger.error(
+          { error: rollbackError, orgId, invitationId },
+          "Failed to restore invitation after resend email failure",
+        );
+      }
+      Sentry.captureException(emailError, {
+        extra: { context: "invitation-resend-email", orgId, invitationId },
+      });
+      return NextResponse.json(
+        {
+          error:
+            emailError instanceof Error && emailError.message === "Email service not configured"
+              ? "Email service not configured"
+              : "We couldn't send that invitation email. Try again.",
+        },
+        {
+          status:
+            emailError instanceof Error && emailError.message === "Email service not configured"
+              ? 503
+              : 502,
+        },
+      );
+    }
 
     await writeAuditEntry({
       orgId,

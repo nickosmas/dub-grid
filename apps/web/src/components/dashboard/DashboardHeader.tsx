@@ -67,8 +67,6 @@ function ViewTrendsLink({ onClick }: { onClick: () => void }) {
       style={{
         height: "var(--dg-toolbar-h)",
         padding: "0 10px",
-        fontSize: "var(--dg-fs-caption)",
-        fontWeight: 600,
         borderRadius: "var(--dg-btn-radius)",
         display: "flex",
         alignItems: "center",
@@ -119,6 +117,7 @@ export default function DashboardHeader({
   if (isMobile) {
     return (
       <div
+        className="dg-toolbar-type"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -127,7 +126,14 @@ export default function DashboardHeader({
         }}
       >
         {/* Row 1: Period navigation */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "var(--dg-toolbar-h) minmax(0, 1fr) var(--dg-toolbar-h)",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
           <Hint content={hint("Go to previous period")} side="bottom">
             <Button
               onClick={onPrev}
@@ -158,12 +164,13 @@ export default function DashboardHeader({
               </svg>
             </Button>
           </Hint>
-          <div style={{ flex: 1, textAlign: "center", userSelect: "none" }}>
+          <div style={{ minWidth: 0, textAlign: "center", userSelect: "none" }}>
             <span
               style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                fontWeight: 600,
+                display: "block",
                 color: "var(--dg-color-text-secondary)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
             >
@@ -200,27 +207,13 @@ export default function DashboardHeader({
               </svg>
             </Button>
           </Hint>
-          <Button
-            onClick={onToday}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              height: "var(--dg-toolbar-h)",
-              padding: "0 14px",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              borderRadius: "var(--dg-btn-radius)",
-              flexShrink: 0,
-            }}
-          >
-            {todayLabel}
-          </Button>
         </div>
 
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            flexWrap: "wrap",
             gap: 8,
           }}
         >
@@ -229,11 +222,29 @@ export default function DashboardHeader({
               modes={viewModeOptions}
               viewMode={viewMode}
               onViewModeChange={onViewModeChange}
-              style={{ alignSelf: "flex-start" }}
+              style={{
+                alignSelf: "flex-start",
+                maxWidth: "100%",
+                minWidth: 0,
+                overflowX: "auto",
+                overflowY: "hidden",
+              }}
             />
           ) : (
             <div />
           )}
+          <Button
+            onClick={onToday}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              height: "var(--dg-toolbar-h)",
+              padding: "0 14px",
+              borderRadius: "var(--dg-btn-radius)",
+              flexShrink: 0,
+            }}
+          >
+            {todayLabel}
+          </Button>
           {onViewTrends ? <ViewTrendsLink onClick={onViewTrends} /> : null}
         </div>
       </div>
@@ -243,6 +254,7 @@ export default function DashboardHeader({
   /* ── Desktop / Tablet ───────────────────────────────────── */
   return (
     <div
+      className="dg-toolbar-type"
       style={{
         display: "flex",
         alignItems: "center",
@@ -297,8 +309,6 @@ export default function DashboardHeader({
           >
             <span
               style={{
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
                 color: "var(--dg-color-text-secondary)",
                 whiteSpace: "nowrap",
               }}
@@ -345,8 +355,6 @@ export default function DashboardHeader({
           style={{
             height: "var(--dg-toolbar-h)",
             padding: "0 14px",
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
             borderRadius: "var(--dg-btn-radius)",
           }}
         >

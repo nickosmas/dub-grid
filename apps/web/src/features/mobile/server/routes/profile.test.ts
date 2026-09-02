@@ -460,6 +460,7 @@ describe("mobile profile preference and session routes", () => {
     expect(getPayload.stale[0].isCurrent).toBe(false);
     expect(fetchUserSessionOverviewForUser).toHaveBeenCalledWith(
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      { currentSupabaseSessionId: "77777777-7777-4777-8777-777777777777" },
     );
     expect(deleteResponse.status).toBe(200);
     expect(revokeUserSessionForUser).toHaveBeenCalledWith(

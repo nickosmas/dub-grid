@@ -251,7 +251,7 @@ export default function GridmasterAccountsView({
       <h2
         style={{
           margin: "0 0 16px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}
@@ -341,8 +341,8 @@ export default function GridmasterAccountsView({
                 <tr>
                   <th style={thStyle}>Email</th>
                   <th style={thStyle}>Role</th>
-                  <th style={thStyle}>Last Login</th>
-                  <th style={thStyle}>Date Joined</th>
+                  <th style={thStyle}>Last login</th>
+                  <th style={thStyle}>Date joined</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
               </thead>

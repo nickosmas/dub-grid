@@ -116,7 +116,7 @@ describe("NavigationGuardProvider", () => {
     renderGuarded({ dirty: true, onDiscard });
 
     await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
-    await userEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
 
     expect(onDiscard).toHaveBeenCalledTimes(1);
     // Replayed through the anchor itself, so a <Link replace> stays a replace.
@@ -309,7 +309,7 @@ describe("NavigationGuardProvider", () => {
       </NavigationGuardProvider>,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
 
     // Reconstructed rather than replayed — the one path where a <Link replace>
     // would degrade to a push, which is why it is the fallback and not the rule.

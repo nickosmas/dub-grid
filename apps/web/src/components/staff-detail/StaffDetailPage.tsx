@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +8,6 @@ import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
-import Modal from "@/components/Modal";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
@@ -32,13 +30,16 @@ import {
   removeEmployee,
   EmployeeAccessDeniedError,
   EmployeeContactConflictError,
+  EmployeeProfileConflictError,
   EmployeeStatusConflictError,
-  OptimisticLockError,
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
-import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
-import { formatDateKey } from "@/lib/utils";
+import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
+import {
+  getProfileOverviewCurrentWeekDateKeys,
+  getProfileOverviewDateRange,
+} from "@/features/account/shared/profile-schedule";
 import type {
   AdminPermissions,
   DirectoryPerson,
@@ -49,15 +50,11 @@ import type {
   OrganizationRole,
   OrganizationUser,
   AuditLogEntry,
-  ShiftRequest,
 } from "@/types";
-import {
-  fetchRecurringShifts,
-  fetchScheduleActorNames,
-  fetchShiftRequests,
-} from "@/features/schedule/client";
+import { fetchRecurringShifts } from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
+  replaceOrganizationInvitationAccessGuarded,
   revokeInvitation,
   updateOrganizationMembershipGuarded,
 } from "@/features/organization/client";
@@ -66,21 +63,16 @@ import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { EmployeeStatusActions } from "./EmployeeStatusActions";
 import { OverviewTab } from "./tabs/OverviewTab";
-import { ScheduleTab } from "./tabs/ScheduleTab";
 import { ActivityTab } from "./tabs/ActivityTab";
+import { RecurringScheduleCard } from "./RecurringScheduleCard";
 import { SettingsShell, type ShellNavGroup } from "@/components/settings/SettingsShell";
-import {
-  ActivityIcon,
-  DashboardIcon,
-  ProfileIcon,
-  ScheduleIcon,
-} from "@/components/icons/NavIcons";
+import { ActivityIcon, DashboardIcon, ProfileIcon } from "@/components/icons/NavIcons";
 
 interface StaffDetailPageProps {
   employeeId: string;
 }
 
-type StaffProfileSection = "profile" | "overview" | "schedule" | "activity";
+type StaffProfileSection = "profile" | "overview" | "activity";
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
@@ -91,13 +83,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     org,
     focusAreas,
     assignments: assignments,
-    absenceTypes,
     shiftCategories,
     certifications,
     orgRoles,
     departments,
     assignmentLabelMap,
-    assignmentNameMap,
     absenceTypeMap,
     loading: orgLoading,
   } = useOrganizationData();
@@ -105,14 +95,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
-  const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
+  const [isEditingManagementAccess, setIsEditingManagementAccess] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
 
   const orgId = perms.orgId ?? org?.id ?? null;
+  const overviewRange = useMemo(
+    () => getProfileOverviewDateRange(new Date(), org?.timezone),
+    [org?.timezone],
+  );
   const { directory } = useDirectory(orgId);
   const queryClient = useQueryClient();
 
@@ -124,9 +117,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       ? [...queryKeys.org.invitations(orgId), employeeId]
       : ["org", "anon", "invitations", employeeId],
     queryFn: () => fetchEmployeeInvitations(orgId!, employeeId),
-    enabled: !!orgId,
+    enabled: Boolean(orgId) && !perms.isLoading && perms.canViewEmployeeDetails,
   });
-  const invitations = invitationsQuery.data ?? [];
+  const invitations = perms.canViewEmployeeDetails ? (invitationsQuery.data ?? []) : [];
   const pendingInvite = useMemo(() => {
     return (
       invitations.find(
@@ -168,18 +161,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return map;
   }, [shiftCategories]);
 
-  const focusAreaById = useMemo(() => {
-    const map = new Map<number, (typeof focusAreas)[number]>();
-    for (const fa of focusAreas) map.set(fa.id, fa);
-    return map;
-  }, [focusAreas]);
-
-  const absenceTypeById = useMemo(() => {
-    const map = new Map<number, (typeof absenceTypes)[number]>();
-    for (const at of absenceTypes) map.set(at.id, at);
-    return map;
-  }, [absenceTypes]);
-
   // Fetch employee data once we have orgId
   useEffect(() => {
     if (perms.isLoading || !perms.canViewEmployeeDetails) return;
@@ -201,18 +182,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setEmployee(emp);
 
         // Fetch the rest in parallel
-        const [empShifts, recShifts, empRequests] = await Promise.all([
-          fetchEmployeeShifts(employeeId, orgId, assignmentLabelMap, absenceTypeMap),
+        const [empShifts, recShifts] = await Promise.all([
+          fetchEmployeeShifts(
+            employeeId,
+            orgId,
+            assignmentLabelMap,
+            absenceTypeMap,
+            overviewRange.startDate,
+            overviewRange.endDate,
+          ),
           perms.canViewRecurringShifts
             ? fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap)
             : Promise.resolve([]),
-          fetchShiftRequests(orgId, assignmentLabelMap, { empId: employeeId }),
         ]);
 
         if (cancelled) return;
         setShifts(empShifts);
         setRecurringShifts(recShifts);
-        setShiftRequests(empRequests);
       } catch (err: unknown) {
         if (!cancelled) {
           if (err instanceof EmployeeAccessDeniedError) {
@@ -243,10 +229,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     perms.isGridmaster,
     perms.isLoading,
     router,
+    overviewRange.endDate,
+    overviewRange.startDate,
   ]);
 
   useEffect(() => {
-    setShowManagementAccessModal(false);
+    setIsEditingManagementAccess(false);
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
   }, [employeeId]);
@@ -315,8 +303,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           : null;
       setEmployee(updatedEmployee);
       try {
-        await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-        syncEmployeeCaches(updatedEmployee);
+        const savedEmployee = await updateEmployee(
+          updatedEmployee,
+          orgId,
+          previousEmployee.version,
+        );
+        setEmployee(savedEmployee);
+        syncEmployeeCaches(savedEmployee);
         toast.success(
           revokedInvitationEmail
             ? `Employee saved. Their pending invitation to ${revokedInvitationEmail} was revoked.`
@@ -327,14 +320,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           void refreshInvitations();
         }
       } catch (err) {
-        if (err instanceof OptimisticLockError) {
-          const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
-          if (latestEmployee) {
-            setEmployee(latestEmployee);
-            syncEmployeeCaches(latestEmployee);
-          } else {
-            setEmployee(previousEmployee);
-          }
+        if (err instanceof EmployeeProfileConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
           );
@@ -362,18 +350,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       const previousEmployee = employee;
       setEmployee(updatedEmployee);
 
+      let savedEmployee: Employee;
       try {
-        await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-        syncEmployeeCaches(updatedEmployee);
+        savedEmployee = await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+        setEmployee(savedEmployee);
+        syncEmployeeCaches(savedEmployee);
       } catch (err) {
-        if (err instanceof OptimisticLockError) {
-          const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
-          if (latestEmployee) {
-            setEmployee(latestEmployee);
-            syncEmployeeCaches(latestEmployee);
-          } else {
-            setEmployee(previousEmployee);
-          }
+        if (err instanceof EmployeeProfileConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
           toast.error(
             "Employee details changed elsewhere. Review the latest values and try again.",
           );
@@ -393,13 +378,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       // is correctly saved either way.
       try {
         const created = await createOrganizationInvitation({
-          email: updatedEmployee.email,
+          email: savedEmployee.email,
           role: oldInvitation.roleToAssign,
           orgId,
-          employeeId: updatedEmployee.id,
-          firstName: updatedEmployee.firstName,
-          lastName: updatedEmployee.lastName,
-          phone: updatedEmployee.phone || undefined,
+          employeeId: savedEmployee.id,
+          firstName: savedEmployee.firstName,
+          lastName: savedEmployee.lastName,
+          phone: savedEmployee.phone || undefined,
           departmentIds: oldInvitation.departmentIds,
           deptAdminIds: oldInvitation.deptAdminIds,
         });
@@ -409,7 +394,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             token: created.token,
-            email: updatedEmployee.email,
+            email: savedEmployee.email,
             orgName: org?.name || "your organization",
           }),
         });
@@ -424,7 +409,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           throw new Error(`Employee saved, but ${detail}`);
         }
 
-        toast.success(`Employee saved. A new invitation was sent to ${updatedEmployee.email}.`);
+        toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
         toast.error(
           formatClientErrorMessage(
@@ -548,50 +533,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
-    const weekStart = getWeekStart(new Date());
-    const weekDateKeys = getWeekDates(weekStart).map(formatDateKey);
     return computeEmployeeWeeklyHours(
       employee.id,
-      weekDateKeys,
+      getProfileOverviewCurrentWeekDateKeys(overviewRange),
       shifts,
       assignmentById,
       40,
       categoryById,
     );
-  }, [assignmentById, categoryById, employee, shifts]);
-
-  // Batch-fetch profile names for shift audit display (who created/edited each shift)
-  const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
-  useEffect(() => {
-    const ids = new Set<string>();
-    for (const entry of Object.values(shifts)) {
-      if (entry.createdBy) ids.add(entry.createdBy);
-      if (entry.updatedBy) ids.add(entry.updatedBy);
-    }
-    if (ids.size === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!orgId) return;
-        const { names } = await fetchScheduleActorNames({
-          ids: Array.from(ids),
-          orgId,
-        });
-        if (cancelled) return;
-        const map = new Map<string, string>();
-        for (const [id, name] of Object.entries(names)) {
-          if (name) map.set(id, name);
-        }
-        setAuditNames(map);
-      } catch {
-        // Non-critical — audit names are informational
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, shifts]);
+  }, [assignmentById, categoryById, employee, overviewRange, shifts]);
 
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
   const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
@@ -599,22 +549,19 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => directory.find((person) => person.employeeId === employee?.id) ?? null,
     [directory, employee?.id],
   );
-  // Management-only people have an `employees` row but no focus areas — they
-  // have no schedule of their own, so hide the Schedule tab (see ProfilePage's
-  // identical isOnSchedule check).
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const profileSection = searchParams.get("section");
   const activeSection: StaffProfileSection =
-    profileSection === "overview" ||
-    profileSection === "activity" ||
-    (profileSection === "schedule" && isOnSchedule)
-      ? profileSection
-      : "profile";
+    profileSection === "activity"
+      ? "activity"
+      : profileSection === "overview" || (profileSection === "schedule" && isOnSchedule)
+        ? "overview"
+        : "profile";
   const profileNavGroups = useMemo<ShellNavGroup<StaffProfileSection>[]>(
     () => [
       {
-        id: "account",
-        label: "Account",
+        id: "primary",
+        label: "Profile",
         items: [
           {
             id: "profile",
@@ -622,28 +569,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             Icon: ProfileIcon,
             description: "Account and work details for this staff member.",
           },
-        ],
-      },
-      {
-        id: "work",
-        label: "My work",
-        items: [
           {
             id: "overview",
             label: "Overview",
             Icon: DashboardIcon,
-            description: "Current work details, assignments, and weekly hours.",
+            description: "Current work details, assignments, weekly hours, and recurring schedule.",
           },
-          ...(isOnSchedule
-            ? [
-                {
-                  id: "schedule" as const,
-                  label: "Schedule",
-                  Icon: ScheduleIcon,
-                  description: "Upcoming shifts, recurring schedule, and requests.",
-                },
-              ]
-            : []),
         ],
       },
       {
@@ -659,7 +590,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         ],
       },
     ],
-    [isOnSchedule],
+    [],
   );
   const hasPendingManagementInvite =
     !!directoryPerson &&
@@ -704,7 +635,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const handleRoleChange = useCallback(
     async (role: OrganizationRole) => {
-      if (!orgId || !directoryPerson?.userId || !directoryPerson.membershipUpdatedAt) return;
+      if (!orgId || !directoryPerson) return;
+      if (!directoryPerson.userId) {
+        if (!pendingInvite?.updatedAt) return;
+        await replaceOrganizationInvitationAccessGuarded({
+          orgId,
+          invitationId: pendingInvite.id,
+          expectedUpdatedAt: pendingInvite.updatedAt,
+          roleToAssign: role,
+        });
+        await refreshInvitations();
+        refreshDirectory();
+        return;
+      }
+      if (!directoryPerson.membershipUpdatedAt) return;
       const updatedMembership = await updateOrganizationMembershipGuarded({
         orgId,
         userId: directoryPerson.userId,
@@ -717,7 +661,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
       ]);
     },
-    [directoryPerson, orgId, queryClient, syncDirectoryMembership],
+    [
+      directoryPerson,
+      orgId,
+      pendingInvite,
+      queryClient,
+      refreshDirectory,
+      refreshInvitations,
+      syncDirectoryMembership,
+    ],
   );
 
   const isLoading = loading || orgLoading || perms.isLoading;
@@ -753,15 +705,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           defaultSection="profile"
           activeSection={activeSection}
           footerGroupIds={["history"]}
-          banner={
-            <Link
-              href="/people"
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-color-text-muted)] transition-colors hover:text-[var(--dg-color-text-primary)]"
-            >
-              <ChevronLeft className="size-4" strokeWidth={2.5} />
-              People
-            </Link>
-          }
+          hideContentGroupLabels
+          leadingNavigation={{ href: "/people", label: "Back to People", Icon: ChevronLeft }}
         >
           {activeSection === "profile" && (
             <div className="space-y-6">
@@ -801,6 +746,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       certificationLabel={org?.certificationLabel}
                       roleLabel={org?.roleLabel}
                       isManagementUser={directoryPerson?.isManagementUser}
+                      persistent
                       onSave={handleSaveEmployee}
                       onCancel={() => {}}
                       pendingInvitation={pendingInvite ?? undefined}
@@ -846,7 +792,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               </section>
 
               {canManageManagementAccess &&
-                (directoryPerson?.isManagementUser || hasPendingManagementInvite) && (
+                orgId &&
+                (directoryPerson?.isManagementUser ||
+                  hasPendingManagementInvite ||
+                  isEditingManagementAccess) && (
                   <section>
                     <div className="dg-card">
                       <div className="dg-card-header">
@@ -856,40 +805,84 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             Organization role and management department assignment.
                           </div>
                         </div>
-                        {employee.status !== "removed" ? (
+                        {!isEditingManagementAccess && employee.status !== "removed" ? (
                           <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() => setShowManagementAccessModal(true)}
+                            onClick={() => setIsEditingManagementAccess(true)}
                           >
                             Edit access
                           </Button>
                         ) : null}
                       </div>
-                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                        <ProfileField
-                          label="Role"
-                          value={
-                            directoryPerson?.orgRole
-                              ? formatOrganizationRole(directoryPerson.orgRole)
-                              : "No app access"
-                          }
-                        />
-                        <ProfileField
-                          label="Management departments"
-                          value={
-                            directoryPerson?.managementDepartmentIds.length
-                              ? directoryPerson.managementDepartmentIds
-                                  .map(
-                                    (id) =>
-                                      departments.find((department) => department.id === id)?.name,
-                                  )
-                                  .filter(Boolean)
-                                  .join(", ")
-                              : "—"
-                          }
-                        />
-                      </div>
+                      {isEditingManagementAccess ? (
+                        <div className="dg-card-body flex flex-col gap-6">
+                          {directoryPerson?.orgRole ? (
+                            <MemberAccessControls
+                              orgRole={directoryPerson.orgRole}
+                              adminPermissions={directoryPerson.adminPermissions}
+                              onRoleChange={handleRoleChange}
+                              onPermissionsChange={
+                                directoryPerson.userId ? handlePermissionsChange : undefined
+                              }
+                              isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                              pendingInvitationEmail={pendingInvite?.email}
+                            />
+                          ) : null}
+                          <EmployeeManagementAccessEditor
+                            employee={employee}
+                            orgId={orgId}
+                            orgName={org.name || "your organization"}
+                            managementDepartments={(departments ?? []).filter(
+                              (department) => department.type === "management",
+                            )}
+                            directoryPerson={directoryPerson}
+                            pendingInvitation={pendingInvite ?? undefined}
+                            onClose={() => setIsEditingManagementAccess(false)}
+                            onCompleted={async (updatedEmployee) => {
+                              if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
+                              await refreshInvitations();
+                              await Promise.all([
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.org.directory(orgId),
+                                }),
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.org.users(orgId),
+                                }),
+                                queryClient.invalidateQueries({
+                                  queryKey: queryKeys.employees.all(orgId),
+                                }),
+                              ]);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="dg-card-body grid gap-4 sm:grid-cols-2">
+                          <ProfileField
+                            label="Role"
+                            value={
+                              directoryPerson?.orgRole
+                                ? formatOrganizationRole(directoryPerson.orgRole)
+                                : "No app access"
+                            }
+                          />
+                          <ProfileField
+                            label="Management departments"
+                            value={
+                              directoryPerson?.managementDepartmentIds.length
+                                ? directoryPerson.managementDepartmentIds
+                                    .map(
+                                      (id) =>
+                                        departments.find((department) => department.id === id)
+                                          ?.name,
+                                    )
+                                    .filter(Boolean)
+                                    .join(", ")
+                                : "—"
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   </section>
                 )}
@@ -918,7 +911,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <Button
                       type="button"
                       className="dg-btn dg-btn-secondary"
-                      onClick={() => setShowManagementAccessModal(true)}
+                      onClick={() => setIsEditingManagementAccess(true)}
                     >
                       Add to management
                     </Button>
@@ -962,22 +955,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   orgRoles={orgRoles}
                   pendingInvite={pendingInvite}
                   thisWeekHours={thisWeekHours}
-                />
-              ) : null}
-              {activeSection === "schedule" && isOnSchedule ? (
-                <ScheduleTab
-                  employee={employee}
-                  shifts={shifts}
-                  assignmentById={assignmentById}
-                  assignmentNameMap={assignmentNameMap}
-                  focusAreas={focusAreas}
-                  categoryById={categoryById}
-                  focusAreaById={focusAreaById}
-                  absenceTypeById={absenceTypeById}
-                  auditNames={auditNames}
-                  shiftRequests={shiftRequests}
-                  recurringShifts={recurringShifts}
-                  canViewRecurringShifts={perms.canViewRecurringShifts}
+                  timeZone={org?.timezone}
+                  scheduleOverview={
+                    perms.canViewRecurringShifts ? (
+                      <RecurringScheduleCard recurringShifts={recurringShifts} />
+                    ) : undefined
+                  }
                 />
               ) : null}
               {activeSection === "activity" ? (
@@ -1028,42 +1011,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           }}
         />
       )}
-
-      {showManagementAccessModal && employee && orgId && org && (
-        <Modal title="Management Access" onClose={() => setShowManagementAccessModal(false)}>
-          <div className="mt-4 flex flex-col gap-6">
-            {directoryPerson?.orgRole ? (
-              <MemberAccessControls
-                orgRole={directoryPerson.orgRole}
-                adminPermissions={directoryPerson.adminPermissions}
-                onRoleChange={handleRoleChange}
-                onPermissionsChange={handlePermissionsChange}
-                isSelf={isSelfAction(currentUser?.id, employee.userId)}
-              />
-            ) : null}
-            <EmployeeManagementAccessEditor
-              employee={employee}
-              orgId={orgId}
-              orgName={org.name || "your organization"}
-              managementDepartments={(departments ?? []).filter(
-                (department) => department.type === "management",
-              )}
-              directoryPerson={directoryPerson}
-              pendingInvitation={pendingInvite ?? undefined}
-              onClose={() => setShowManagementAccessModal(false)}
-              onCompleted={async (updatedEmployee) => {
-                syncEmployeeCaches(updatedEmployee);
-                await refreshInvitations();
-                await Promise.all([
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
-                  queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
-                ]);
-              }}
-            />
-          </div>
-        </Modal>
-      )}
     </>
   );
 }
@@ -1071,9 +1018,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title">{label}</div>
       <div className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--dg-color-text-primary)]">
         {value}
       </div>

@@ -36,8 +36,11 @@ export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const overview = await fetchUserSessionOverviewForUser(auth.user.id);
   const currentSupabaseSessionId = auth.claims.session_id;
+  const overview = await fetchUserSessionOverviewForUser(auth.user.id, {
+    currentSupabaseSessionId:
+      typeof currentSupabaseSessionId === "string" ? currentSupabaseSessionId : null,
+  });
 
   return NextResponse.json(
     mobileProfileSessionsResponseSchema.parse({

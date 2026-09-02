@@ -66,7 +66,7 @@ export function StaffDetailHeader({ employee, actions }: StaffDetailHeaderProps)
                 </span>
               </div>
 
-              <h1 className="mt-3 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+              <h1 className="mt-3 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                 {displayName}
               </h1>
             </div>
@@ -89,9 +89,7 @@ export function StaffDetailHeader({ employee, actions }: StaffDetailHeaderProps)
 function BioField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] px-3 py-2.5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--dg-color-text-subtle)]">
-        {label}
-      </div>
+      <div className="dg-type-field-title">{label}</div>
       <div className="mt-1 truncate text-[13px] font-medium text-[var(--dg-color-text-primary)]">
         {value}
       </div>

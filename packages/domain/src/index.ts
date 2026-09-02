@@ -1,5 +1,6 @@
 export * from "./account-status";
 export * from "./billing";
+export * from "./credential-requirements";
 export * from "./employment-status";
 export * from "./notification-metadata";
 export * from "./org-roles";

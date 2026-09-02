@@ -2,6 +2,7 @@ import type {
   MobileNotification,
   MobileNotificationPriority,
   MobileNotificationsCursor,
+  MobileShiftRequestHistoryCursor,
   ScheduleCellState,
 } from "@dubgrid/contracts";
 import type { AdminPermissions, PlatformRole } from "@dubgrid/domain";
@@ -39,9 +40,17 @@ const INVITATION_COLS =
   "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 
 const POSTGREST_UNSAFE = /[(),."\\]/;
+const ISO_TIMESTAMP_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function assertSafeFilterValue(value: string, label: string): void {
   if (POSTGREST_UNSAFE.test(value)) {
+    throw new Error(`Unsafe PostgREST filter value for ${label}`);
+  }
+}
+
+function assertSafeTimestampFilterValue(value: string, label: string): void {
+  if (!ISO_TIMESTAMP_WITH_OFFSET.test(value)) {
     throw new Error(`Unsafe PostgREST filter value for ${label}`);
   }
 }
@@ -74,6 +83,10 @@ export interface MobileAbsenceTypeRow extends Pick<
 export interface MobileFocusAreaRow extends Pick<DbFocusArea, "id" | "name" | "department_id"> {}
 
 export interface MobileNamedItemRow extends Pick<DbNamedItem, "id" | "name" | "abbr"> {}
+
+export interface MobileRoleRow extends MobileNamedItemRow {
+  required_certification_ids: number[] | null;
+}
 
 export interface MobileDepartmentRow extends Pick<DbDepartment, "id" | "name" | "abbr" | "type"> {}
 
@@ -739,17 +752,17 @@ export async function fetchMobileFocusAreaRows(
 export async function fetchMobileRoleRows(
   serviceClient: SupabaseClient,
   orgId: string,
-): Promise<MobileNamedItemRow[]> {
+): Promise<MobileRoleRow[]> {
   const { data, error } = await serviceClient
     .from("organization_roles")
-    .select("id, name, abbr")
+    .select("id, name, abbr, required_certification_ids")
     .eq("org_id", orgId)
     .is("archived_at", null)
     .order("sort_order");
 
   if (error) throw error;
 
-  return (data ?? []) as MobileNamedItemRow[];
+  return (data ?? []) as MobileRoleRow[];
 }
 
 export async function fetchMobileCertificationRows(
@@ -1048,6 +1061,72 @@ export async function fetchMobileShiftRequestRows(
   return (data ?? []) as MobileShiftRequestQueryRow[];
 }
 
+const MOBILE_SHIFT_REQUEST_HISTORY_STATUSES = [
+  "approved",
+  "rejected",
+  "cancelled",
+  "expired",
+] as const;
+
+export async function fetchMobileShiftRequestHistoryRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId?: string;
+    limit: number;
+    cursor?: MobileShiftRequestHistoryCursor | null;
+  },
+): Promise<{
+  rows: MobileShiftRequestQueryRow[];
+  nextCursor: MobileShiftRequestHistoryCursor | null;
+}> {
+  const limit = Math.max(1, Math.min(input.limit, 100));
+  let query = serviceClient
+    .from("shift_requests")
+    .select(
+      `*,
+       requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
+       target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
+    )
+    .eq("org_id", input.orgId)
+    .in("status", [...MOBILE_SHIFT_REQUEST_HISTORY_STATUSES])
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit + 1);
+
+  if (input.employeeId) {
+    assertSafeFilterValue(input.employeeId, "employeeId");
+    query = query.or(
+      `requester_emp_id.eq.${input.employeeId},target_emp_id.eq.${input.employeeId}`,
+    );
+  }
+
+  if (input.cursor) {
+    assertSafeTimestampFilterValue(input.cursor.createdAt, "cursor.createdAt");
+    assertSafeFilterValue(input.cursor.id, "cursor.id");
+    query = query.or(
+      `created_at.lt.${input.cursor.createdAt},and(created_at.eq.${input.cursor.createdAt},id.lt.${input.cursor.id})`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const fetchedRows = (data ?? []) as MobileShiftRequestQueryRow[];
+  const rows = fetchedRows.slice(0, limit);
+  const last = fetchedRows.length > limit ? rows.at(-1) : null;
+
+  return {
+    rows,
+    nextCursor: last
+      ? {
+          createdAt: last.created_at,
+          id: last.id,
+        }
+      : null,
+  };
+}
+
 const MOBILE_PEOPLE_PAGE_SIZE = 500;
 
 export async function fetchMobilePeopleRows(
@@ -1300,6 +1379,74 @@ export async function createMobileEmployeeInvitationRow(
   if (error) throw error;
 
   return data as MobileInvitationRow;
+}
+
+export async function replaceMobilePendingInvitationAccessRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string | null;
+    roleToAssign: "user" | "admin" | "super_admin";
+    invitedBy: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+): Promise<{
+  previousInvitationId: string;
+  invitation: MobileInvitationRow;
+}> {
+  const { data, error } = await serviceClient.rpc("replace_pending_invitation_access", {
+    p_org_id: input.orgId,
+    p_invitation_id: input.invitationId,
+    p_expected_updated_at: input.expectedUpdatedAt,
+    p_role: input.roleToAssign,
+    p_invited_by: input.invitedBy,
+    p_department_ids: input.departmentIds ?? null,
+    p_dept_admin_ids: input.deptAdminIds ?? null,
+  });
+  if (error) throw error;
+
+  const result = data as {
+    previous_invitation_id?: string;
+    invitation_id?: string;
+  } | null;
+  if (!result?.previous_invitation_id || !result.invitation_id) {
+    throw new Error("Invitation replacement did not return an invitation.");
+  }
+
+  const { data: invitation, error: invitationError } = await serviceClient
+    .from("invitations")
+    .select(INVITATION_COLS)
+    .eq("org_id", input.orgId)
+    .eq("id", result.invitation_id)
+    .single();
+  if (invitationError) throw invitationError;
+
+  return {
+    previousInvitationId: result.previous_invitation_id,
+    invitation: invitation as MobileInvitationRow,
+  };
+}
+
+export async function rollbackMobilePendingInvitationAccessReplacement(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    previousInvitationId: string;
+    replacementInvitationId: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await serviceClient.rpc(
+    "rollback_pending_invitation_access_replacement",
+    {
+      p_org_id: input.orgId,
+      p_previous_invitation_id: input.previousInvitationId,
+      p_replacement_invitation_id: input.replacementInvitationId,
+    },
+  );
+  if (error) throw error;
+  return data === true;
 }
 
 /**

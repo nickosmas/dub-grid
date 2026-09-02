@@ -372,9 +372,7 @@ function ModuleRow({
       {/* Toggles */}
       <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--dg-color-border-light)]">
         <div className="flex flex-col items-center justify-center gap-1.5">
-          <span className="md:hidden text-[11px] font-medium text-[var(--dg-color-text-subtle)] uppercase">
-            View
-          </span>
+          <span className="dg-type-table-heading md:hidden">View</span>
           {hasView ? (
             <ToggleSwitch
               on={viewOn}
@@ -386,9 +384,7 @@ function ModuleRow({
           )}
         </div>
         <div className="flex flex-col items-center justify-center gap-1.5">
-          <span className="md:hidden text-[11px] font-medium text-[var(--dg-color-text-subtle)] uppercase">
-            Edit
-          </span>
+          <span className="dg-type-table-heading md:hidden">Edit</span>
           {hasEdit ? (
             <ToggleSwitch on={editOn} disabled={editDisabled} onChange={onToggleEdit} />
           ) : (
@@ -571,8 +567,8 @@ export default function PermissionsEditor({
           {/* ── Scrollable content ──────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Column headers — desktop only */}
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 border-b border-[var(--dg-color-border-light)] text-[11px] font-semibold text-[var(--dg-color-text-subtle)] uppercase tracking-wider">
-              <div className="col-span-8">Module & Access Level</div>
+            <div className="dg-type-table-heading hidden grid-cols-12 gap-4 border-b border-[var(--dg-color-border-light)] px-6 py-3 md:grid">
+              <div className="col-span-8">Module & access level</div>
               <div className="col-span-2 text-center">View</div>
               <div className="col-span-2 text-center">Edit</div>
             </div>
@@ -581,9 +577,7 @@ export default function PermissionsEditor({
               <div key={group.category} className="pb-1">
                 {/* Category header */}
                 <div className="px-6 py-3 bg-[var(--dg-color-bg)]">
-                  <h3 className="text-[13px] font-semibold text-[var(--dg-color-text-secondary)] uppercase tracking-wider">
-                    {group.label}
-                  </h3>
+                  <h3 className="dg-type-content-group-heading">{group.label}</h3>
                 </div>
 
                 {/* Module rows */}

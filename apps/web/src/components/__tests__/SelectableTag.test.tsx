@@ -35,6 +35,7 @@ describe("SelectableTag", () => {
       color: "var(--dg-color-text-secondary)",
       borderRadius: "999px",
     });
+    expect(button.style.border).toBe("1.5px solid var(--dg-color-border)");
 
     await user.click(button);
     expect(handleClick).toHaveBeenCalledOnce();

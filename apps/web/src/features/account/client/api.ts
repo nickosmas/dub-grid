@@ -2,9 +2,17 @@
 
 import type { Employee } from "@dubgrid/domain";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import type { RecurringShift, ShiftMap, ShiftRequest } from "@/types";
+import type { RecurringShift, ShiftMap } from "@/types";
 import type { NotificationPreferenceMap } from "@/features/account/shared/preferences";
 import type { Permissions } from "@/features/permissions/shared";
+import type {
+  CalendarSubscriptionIssued,
+  CalendarSubscriptionStatus,
+} from "@/features/account/shared/calendar-subscription";
+import {
+  EmployeeContactConflictError,
+  EmployeeProfileConflictError,
+} from "@/features/employees/client";
 
 export interface TermsAcceptanceStatus {
   acceptedCurrentTerms: boolean;
@@ -25,8 +33,6 @@ export interface AccountSelfProfileData {
   managementDepartmentIds: number[];
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
-  shiftRequests: ShiftRequest[];
-  auditNames: Array<[string, string]>;
 }
 
 export interface AccountSessionRecord {
@@ -176,6 +182,28 @@ export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfP
   return requestJson<AccountSelfProfileData>(`/api/account/self${suffix ? `?${suffix}` : ""}`);
 }
 
+export function fetchCalendarSubscriptionStatus(): Promise<CalendarSubscriptionStatus> {
+  return requestJson<CalendarSubscriptionStatus>("/api/account/calendar-subscription");
+}
+
+export function createCalendarSubscription(): Promise<CalendarSubscriptionIssued> {
+  return requestJson<CalendarSubscriptionIssued>("/api/account/calendar-subscription", {
+    method: "POST",
+  });
+}
+
+export function rotateCalendarSubscription(): Promise<CalendarSubscriptionIssued> {
+  return requestJson<CalendarSubscriptionIssued>("/api/account/calendar-subscription", {
+    method: "PUT",
+  });
+}
+
+export function revokeCalendarSubscription(): Promise<CalendarSubscriptionStatus> {
+  return requestJson<CalendarSubscriptionStatus>("/api/account/calendar-subscription", {
+    method: "DELETE",
+  });
+}
+
 export function updateSelfProfileDetails(input: {
   firstName: string | null;
   lastName: string | null;
@@ -196,10 +224,40 @@ export function updateSelfProfilePhone(input: {
   phone: string;
   expectedVersion?: number;
 }): Promise<{ employee: Employee }> {
-  return requestJson("/api/account/profile/phone", {
+  return fetch("/api/account/profile/phone", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then(async (response) => {
+    const body = (await response.json().catch(() => null)) as {
+      code?: string;
+      employee?: Employee;
+      error?: string;
+      field?: "email" | "phone";
+      message?: string;
+    } | null;
+    if (response.status === 409 && body?.code === "EMPLOYEE_CONFLICT" && body.employee) {
+      throw new EmployeeProfileConflictError(body.employee);
+    }
+    if (
+      response.status === 409 &&
+      body?.code === "EMPLOYEE_CONTACT_CONFLICT" &&
+      (body.field === "email" || body.field === "phone")
+    ) {
+      throw new EmployeeContactConflictError(
+        body.message ?? body.error ?? "Contact details are already in use.",
+        body.field,
+      );
+    }
+    if (!response.ok) {
+      throw new Error(
+        formatClientErrorMessage(body?.error, "We couldn't update phone. Try again."),
+      );
+    }
+    if (!body?.employee) {
+      throw new Error("The server saved the phone but did not return the updated staff profile.");
+    }
+    return { employee: body.employee };
   });
 }
 

@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import StringListSettings from "@/components/settings/StringListSettings";
+import StringListSettings, {
+  getTwoRowRequirementFit,
+} from "@/components/settings/StringListSettings";
 import type { Department, NamedItem } from "@/types";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -34,6 +36,22 @@ const lpn = (): NamedItem => ({
   name: "LPN",
   abbr: "LPN",
   sortOrder: 1,
+});
+
+const cna = (): NamedItem => ({
+  id: 3,
+  orgId: "org-1",
+  name: "CNA",
+  abbr: "CNA",
+  sortOrder: 2,
+});
+
+const md = (): NamedItem => ({
+  id: 4,
+  orgId: "org-1",
+  name: "MD",
+  abbr: "MD",
+  sortOrder: 3,
 });
 
 /** Three departments by default, so a multi-selection stays a genuine subset. */
@@ -94,6 +112,23 @@ describe("StringListSettings — department assignment", () => {
     expect(pressed("Nursing")).toBe("false");
   });
 
+  it("uses the shared rounded selectable-pill treatment for departments", () => {
+    renderCertifications([rn([NURSING.id])]);
+
+    const selected = screen.getByRole("button", { name: "Nursing" });
+    const unselected = screen.getByRole("button", { name: "Emergency" });
+    expect(selected).toHaveStyle({
+      background: "var(--dg-color-brand)",
+      color: "var(--dg-color-text-inverse)",
+      borderRadius: "999px",
+    });
+    expect(unselected).toHaveStyle({
+      background: "var(--dg-color-surface)",
+      color: "var(--dg-color-text-secondary)",
+      borderRadius: "999px",
+    });
+  });
+
   it("deselects a department when toggled off", async () => {
     const user = userEvent.setup();
     const onSave = renderCertifications([rn([NURSING.id, EMERGENCY.id])]);
@@ -122,34 +157,34 @@ describe("StringListSettings — department assignment", () => {
     expect(pressed("Org-wide")).toBe("true");
   });
 
-  // Selecting every department says the same thing as org-wide, and org-wide
-  // also covers departments added later, which is what "all of them" means.
-  it("collapses to org-wide once every department is selected", async () => {
+  it("preserves all current departments as distinct from org-wide", async () => {
     const user = userEvent.setup();
     const onSave = renderCertifications([rn([NURSING.id, EMERGENCY.id])]);
 
     await click(user, "Outpatient");
 
-    expect(pressed("Org-wide")).toBe("true");
-    expect(pressed("Nursing")).toBe("false");
+    expect(pressed("Org-wide")).toBe("false");
+    expect(pressed("Nursing")).toBe("true");
+    expect(pressed("Emergency")).toBe("true");
+    expect(pressed("Outpatient")).toBe("true");
 
     await click(user, /^save$/i);
-    expect(savedItem(onSave)).toMatchObject({ departmentIds: [] });
+    expect(savedItem(onSave)).toMatchObject({
+      departmentIds: [NURSING.id, EMERGENCY.id, OUTPATIENT.id],
+    });
   });
 
-  it("collapses in a two-department org as soon as both are selected", async () => {
+  it("preserves all current departments in a two-department organization", async () => {
     const user = userEvent.setup();
     const onSave = renderCertifications([rn([NURSING.id])], [NURSING, EMERGENCY]);
 
     await click(user, "Emergency");
     await click(user, /^save$/i);
 
-    expect(savedItem(onSave)).toMatchObject({ departmentIds: [] });
+    expect(savedItem(onSave)).toMatchObject({ departmentIds: [NURSING.id, EMERGENCY.id] });
   });
 
-  // With one department, "all" and "that one" are the same set, so collapsing
-  // would leave the picker unable to express any scoping at all.
-  it("does not collapse when the org has a single department", async () => {
+  it("preserves the only current department as an explicit scope", async () => {
     const user = userEvent.setup();
     const onSave = renderCertifications([rn([])], [NURSING]);
 
@@ -159,16 +194,16 @@ describe("StringListSettings — department assignment", () => {
     expect(savedItem(onSave)).toMatchObject({ departmentIds: [NURSING.id] });
   });
 
-  // Rows saved before the rule existed shouldn't keep a second spelling of
-  // org-wide, so the collapse also runs on save, not only on toggle.
-  it("normalizes an all-departments row on save even when untouched", async () => {
+  it("does not convert a saved all-current-departments scope to org-wide", async () => {
     const user = userEvent.setup();
     const onSave = renderCertifications([rn([NURSING.id, EMERGENCY.id, OUTPATIENT.id])]);
 
     await user.type(screen.getByPlaceholderText("Full name"), "x");
     await click(user, /^save$/i);
 
-    expect(savedItem(onSave)).toMatchObject({ departmentIds: [] });
+    expect(savedItem(onSave)).toMatchObject({
+      departmentIds: [NURSING.id, EMERGENCY.id, OUTPATIENT.id],
+    });
   });
 
   it("moves a row with its keyboard reorder control", async () => {
@@ -222,5 +257,234 @@ describe("StringListSettings — name-first compact labels", () => {
     await click(user, /^save$/i);
 
     expect(savedItem(onSave)).toMatchObject({ name: "Charge Nurse", abbr: "CN" });
+  });
+});
+
+describe("StringListSettings — role certification requirements", () => {
+  it("fills the available two rows before introducing overflow", () => {
+    expect(
+      getTwoRowRequirementFit({
+        containerWidth: 400,
+        pillWidths: [240, 40, 150],
+        overflowWidths: new Map([
+          [1, 60],
+          [2, 60],
+        ]),
+      }),
+    ).toBe(3);
+
+    expect(
+      getTwoRowRequirementFit({
+        containerWidth: 240,
+        pillWidths: [190, 160, 100],
+        overflowWidths: new Map([
+          [1, 60],
+          [2, 60],
+        ]),
+      }),
+    ).toBe(2);
+  });
+
+  it("uses rounded selectable tags and preserves all certifications as certified-only", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Charge nurse",
+            abbr: "CN",
+            sortOrder: 0,
+            requiredCertificationIds: [rn().id],
+          },
+        ]}
+        onSave={onSave}
+        placeholder="Role"
+        certifications={[rn(), lpn()]}
+        showRequiredCertifications
+        initialEditing
+      />,
+    );
+
+    const anyone = screen.getByRole("button", { name: "Anyone" });
+    const selectedCertification = screen.getByRole("button", { name: "RN" });
+    const unselectedCertification = screen.getByRole("button", { name: "LPN" });
+
+    expect(anyone).toHaveStyle({
+      background: "var(--dg-color-surface)",
+      color: "var(--dg-color-text-secondary)",
+      borderRadius: "999px",
+    });
+    expect(selectedCertification).toHaveStyle({
+      background: "var(--dg-color-brand)",
+      color: "var(--dg-color-text-inverse)",
+      borderRadius: "999px",
+    });
+    expect(unselectedCertification.style.border).toBe("1.5px solid var(--dg-color-border)");
+
+    await user.click(unselectedCertification);
+    expect(anyone).toHaveAttribute("aria-pressed", "false");
+    expect(selectedCertification).toHaveAttribute("aria-pressed", "true");
+    expect(unselectedCertification).toHaveAttribute("aria-pressed", "true");
+    await click(user, /^save$/i);
+
+    expect(savedItem(onSave)).toMatchObject({ requiredCertificationIds: [rn().id, lpn().id] });
+  });
+
+  it("uses compact two-row category pills with a tooltip-backed overflow in view mode", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Charge nurse",
+            abbr: "CN",
+            sortOrder: 0,
+            isScheduleRole: true,
+            departmentIds: [NURSING.id],
+            requiredCertificationIds: [rn().id, lpn().id, cna().id],
+          },
+        ]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        hideAbbr
+        departments={[NURSING, EMERGENCY]}
+        showScheduleRoleToggle
+        certifications={[rn(), lpn(), cna(), md()]}
+        showRequiredCertifications
+      />,
+    );
+
+    const visiblePills = container.querySelectorAll(
+      '.dg-role-requirement-view-pill[data-status-pill-variant="category"]',
+    );
+    expect(visiblePills).toHaveLength(2);
+    expect(visiblePills[0]).toHaveTextContent("RN");
+    expect(visiblePills[1]).toHaveTextContent("LPN");
+
+    const overflow = screen.getByRole("button", { name: "1 more requirements: CNA" });
+    expect(overflow).toHaveTextContent("+1 more");
+    await user.hover(overflow);
+    expect(
+      await screen.findByText("CNA", { selector: '[data-slot="tooltip-content"]' }),
+    ).toBeVisible();
+
+    const row = container.querySelector<HTMLElement>(".dg-settings-reorder-item");
+    expect(row).not.toBeNull();
+    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 1.25fr)");
+    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 1fr)");
+    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 0.75fr)");
+    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 2fr)");
+    expect(row!.style.minWidth).toBe("");
+    expect(row!.parentElement?.style.overflowX).toBe("");
+  });
+
+  it("uses the same compact category-pill treatment for role names in view mode", () => {
+    const { container } = render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Director of Christian Science Nursing",
+            abbr: "Director",
+            sortOrder: 0,
+            isScheduleRole: true,
+          },
+        ]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        hideAbbr
+        showScheduleRoleToggle
+      />,
+    );
+
+    const roleName = container.querySelector<HTMLElement>(
+      '.dg-role-name-view-pill[data-status-pill-variant="category"]',
+    );
+    expect(roleName).toHaveTextContent("Director of Christian Science Nursing");
+    expect(roleName).toHaveClass("max-w-full", "whitespace-normal");
+  });
+
+  it("keeps long visible requirements complete rather than truncating them", () => {
+    const longRequirement = {
+      ...rn(),
+      name: "Journal Listed Christian Science Nurse",
+    };
+    const { container } = render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Charge nurse",
+            abbr: "CN",
+            sortOrder: 0,
+            requiredCertificationIds: [longRequirement.id, lpn().id, cna().id],
+          },
+        ]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        hideAbbr
+        certifications={[longRequirement, lpn(), cna(), md()]}
+        showRequiredCertifications
+      />,
+    );
+
+    const visiblePills = container.querySelectorAll(
+      '.dg-role-requirement-view-pill[data-status-pill-variant="category"]',
+    );
+    expect(visiblePills).toHaveLength(2);
+    expect(visiblePills[0]).toHaveTextContent("Journal Listed Christian Science Nurse");
+    expect(visiblePills[0]?.querySelector(".dg-role-requirement-pill-label")).toHaveTextContent(
+      "Journal Listed Christian Science Nurse",
+    );
+    expect(screen.getByRole("button", { name: "1 more requirements: CNA" })).toHaveTextContent(
+      "+1 more",
+    );
+  });
+
+  it("shows schedule eligibility as Yes or No in view mode", () => {
+    render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Schedule role",
+            abbr: "SR",
+            sortOrder: 0,
+            isScheduleRole: true,
+          },
+          {
+            id: 11,
+            orgId: "org-1",
+            name: "Display role",
+            abbr: "DR",
+            sortOrder: 1,
+            isScheduleRole: false,
+          },
+        ]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        hideAbbr
+        showScheduleRoleToggle
+      />,
+    );
+
+    expect(screen.getByText("Yes", { exact: true })).toBeVisible();
+    expect(screen.getByText("No", { exact: true })).toBeVisible();
+    expect(screen.queryByText("Schedule eligible", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Cosmetic only", { exact: true })).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ManagementStaffPanel } from "@/components/staff/ManagementStaffPanel";
@@ -194,7 +194,11 @@ describe("ManagementStaffPanel", () => {
     expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: /discard changes/i }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: /unsaved changes/i })).getByRole("button", {
+        name: /^discard$/i,
+      }),
+    );
 
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledOnce();

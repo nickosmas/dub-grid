@@ -223,7 +223,7 @@ function AcceptInviteContent() {
           <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
         ) : (
           <>
-            <h1 className="dg-auth-heading dg-auth-page-heading">Accept Invitation</h1>
+            <h1 className="dg-auth-heading dg-auth-page-heading">Accept invitation</h1>
             <p className="dg-auth-description">
               {existingAccount ? (
                 orgName ? (
@@ -300,7 +300,7 @@ function AcceptInviteContent() {
               {!existingAccount && (
                 <div>
                   <label htmlFor="invite-confirm-password" className="dg-auth-field-label">
-                    Confirm Password
+                    Confirm password
                   </label>
                   <PasswordInput
                     id="invite-confirm-password"

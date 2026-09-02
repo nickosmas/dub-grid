@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash b25ebfe885ef7b956598dc2523ef1f83cfa13c63de1ae3f428d3759aed70c3f0 -->
+<!-- blueprint:source-hash 84b3f3453d6e27fa734f02f853f1fb341799bc6d50a303146bd744844b8e7baa -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -63,7 +63,14 @@ roadmap slot (see Open questions).
 15. **Print / export** - PDF, CSV, and .ics output.
 16. **Test sandbox** - cookie-based cloned org for safe QA against
     non-production data.
-17. **TODO** - next roadmap feature not yet named (see Open questions).
+17. **Mobile release catch-up** - close release-delta gaps while preserving
+    deliberate web-only authoring and organization-settings boundaries.
+    - **17a. Mobile role certification eligibility** - expose role credential
+      requirements and prevent incompatible new mobile selections before save.
+    - **17b. Canonical mobile dashboard model** - share dashboard calculations
+      and deliver canonical dashboard data through the authenticated mobile API.
+    - **17c. Canonical mobile dashboard experience** - show those facts in
+      native, read-only dashboard cards and detail screens.
 
 ## Data model
 
@@ -200,7 +207,5 @@ Main route groups (web, App Router):
 
 ## Open questions
 
-- Item 17's real next feature(s) were not specified during `/adopt` and
-  need to be named before `/feature 17` can spec anything.
 - Exact per-seat billing price points / tier breaks are unconfirmed.
 - Deployment env vars, health check path, and domain notes are unconfirmed.

@@ -7,6 +7,7 @@ import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
@@ -265,8 +266,8 @@ export default function ShiftRequestBoard({
             {isCalloff && (
               <span
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
+                  fontSize: "var(--dg-type-badge-size)",
+                  fontWeight: 500,
                   padding: "2px 7px",
                   borderRadius: 6,
                   background: "var(--dg-color-danger-bg, #FEF2F2)",
@@ -766,6 +767,7 @@ export default function ShiftRequestBoard({
         <div
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: "auto",
             padding: isMobile ? "16px" : "20px 24px",
           }}
@@ -800,6 +802,7 @@ export default function ShiftRequestBoard({
             </div>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
     </>
   );

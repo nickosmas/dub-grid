@@ -98,6 +98,27 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  it("adds both cursor fields when loading another request-history page", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ requests: [], nextCursor: null }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { getShiftRequestHistory } = await import("./api");
+
+    await getShiftRequestHistory("token-123", {
+      limit: 25,
+      cursorCreatedAt: "2026-04-01T10:00:00.000Z",
+      cursorId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://app.dubgrid.com/api/mobile/v1/shift-requests/history?limit=25&cursorCreatedAt=2026-04-01T10%3A00%3A00.000Z&cursorId=00000000-0000-4000-8000-000000000001",
+      expect.any(Object),
+    );
+  });
+
   it("adds swap option query params when requesting mobile swap targets", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

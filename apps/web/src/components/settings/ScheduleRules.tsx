@@ -13,6 +13,28 @@ import { Switch } from "@/components/ui/switch";
 import { SectionCard } from "./shared";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
+const ruleTitleStyle: React.CSSProperties = {
+  fontSize: "var(--dg-fs-body-sm)",
+  fontWeight: 600,
+  color: "var(--dg-color-text-primary)",
+};
+
+const ruleDescriptionStyle: React.CSSProperties = {
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: 400,
+  color: "var(--dg-color-text-muted)",
+  lineHeight: 1.5,
+  marginTop: 3,
+};
+
+const ruleRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  padding: "18px 0",
+  borderTop: "1px solid var(--dg-color-border-light)",
+};
+
 export default function ScheduleRules({
   organization,
   onOrganizationSave,
@@ -137,32 +159,23 @@ export default function ScheduleRules({
 
   return (
     <SectionCard>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
         <div
+          data-schedule-rule-row
           style={{
+            ...ruleRowStyle,
+            flexDirection: "row",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 16,
+            paddingTop: 0,
+            borderTop: "none",
           }}
         >
           <div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
-              Enforce shift conflict prevention
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
+            <div style={ruleTitleStyle}>Enforce shift conflict prevention</div>
+            <div style={ruleDescriptionStyle}>
               When enabled, overlapping shifts cannot be saved.
             </div>
           </div>
@@ -175,25 +188,12 @@ export default function ScheduleRules({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div data-schedule-rule-row style={ruleRowStyle}>
           <div>
-            <label
-              htmlFor="pay-period-start-date"
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
+            <label htmlFor="pay-period-start-date" style={ruleTitleStyle}>
               Biweekly pay period start date
             </label>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
+            <div style={ruleDescriptionStyle}>
               Set one anchor date and DubGrid will align every 2-week schedule view to that
               repeating pay period. Leave blank to keep 2-week views aligned to calendar weeks.
             </div>
@@ -209,25 +209,12 @@ export default function ScheduleRules({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div data-schedule-rule-row style={ruleRowStyle}>
           <div>
-            <label
-              htmlFor="mentored-coverage-credit"
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
+            <label htmlFor="mentored-coverage-credit" style={ruleTitleStyle}>
               Mentored coverage credit
             </label>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
+            <div style={ruleDescriptionStyle}>
               Controls how mentored assignments count toward coverage requirements.
             </div>
           </div>
@@ -244,25 +231,12 @@ export default function ScheduleRules({
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div data-schedule-rule-row style={ruleRowStyle}>
           <div>
-            <label
-              htmlFor="open-shift-coverage-visibility"
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
+            <label htmlFor="open-shift-coverage-visibility" style={ruleTitleStyle}>
               Show coverage shortages to staff
             </label>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
+            <div style={ruleDescriptionStyle}>
               Open shifts created when a published schedule is short of its coverage requirements.
               Schedulers always see these. Always shows them to staff regardless of their own
               schedule; hidden keeps staff from seeing them even when short-staffed.
@@ -277,25 +251,12 @@ export default function ScheduleRules({
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div data-schedule-rule-row style={ruleRowStyle}>
           <div>
-            <label
-              htmlFor="open-shift-calloff-visibility"
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
+            <label htmlFor="open-shift-calloff-visibility" style={ruleTitleStyle}>
               Show call-off vacancies to staff
             </label>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
+            <div style={ruleDescriptionStyle}>
               Open shifts left behind when someone calls off and their shift is offered up for
               pickup. Always shows them to staff regardless of their own schedule; hidden keeps the
               vacancy off the staff view.
@@ -310,7 +271,7 @@ export default function ScheduleRules({
           />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 2 }}>
           <Button
             onClick={() => setConfirmOpen(true)}
             disabled={!isModified || saving}

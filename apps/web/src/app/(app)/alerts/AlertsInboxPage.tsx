@@ -507,8 +507,8 @@ export function InboxView() {
           <h1
             style={{
               margin: 0,
-              fontSize: "var(--dg-fs-page-title)",
-              fontWeight: 800,
+              fontSize: "var(--dg-type-page-title-size)",
+              fontWeight: 700,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -536,7 +536,7 @@ export function InboxView() {
         </Button>
       </header>
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+      <div className="dg-alerts-layout">
         <FilterSidebar filters={filters} facets={facets} onChange={setFilters} />
 
         <main style={{ flex: 1, minWidth: 0 }}>
@@ -727,17 +727,7 @@ function NotificationDetailModal({ notification, onClose }: NotificationDetailMo
               background: "var(--dg-color-bg-secondary)",
             }}
           >
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: 0.4,
-              }}
-            >
-              Details
-            </span>
+            <span className="dg-type-content-group-heading">Details</span>
             {entries.map((entry) => (
               <div
                 key={entry.label}
@@ -801,19 +791,7 @@ function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
   const totalArchived = facets?.totalArchived ?? 0;
 
   return (
-    <aside
-      style={{
-        width: 200,
-        flexShrink: 0,
-        position: "sticky",
-        // Park below the sticky app header instead of scrolling under it,
-        // which would hide the top status links.
-        top: "calc(var(--dg-app-shell-header-height) + 16px)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-      }}
-    >
+    <aside className="dg-alerts-sidebar">
       <FilterChip
         active={!filters.includeArchived}
         onClick={() => setSection(false)}
@@ -1042,6 +1020,7 @@ function Toolbar({
 
   return (
     <div
+      className="dg-toolbar-type"
       style={{
         display: "flex",
         alignItems: "center",
@@ -1058,7 +1037,6 @@ function Toolbar({
           gap: 8,
           padding: "0 6px",
           color: "var(--dg-color-text-muted)",
-          fontSize: "var(--dg-fs-label)",
           cursor: hasNotifications ? "pointer" : "default",
         }}
       >
@@ -1115,6 +1093,10 @@ function Toolbar({
         options={categoryOptions}
         onChange={onCategoryChange}
         style={{ minWidth: 160 }}
+        fontSize="var(--dg-fs-navigation-item)"
+        fontWeight="var(--dg-type-control-weight)"
+        activeFontWeight="var(--dg-type-control-weight)"
+        letterSpacing="normal"
       />
 
       <CustomSelect
@@ -1123,6 +1105,10 @@ function Toolbar({
         options={priorityOptions}
         onChange={onPriorityChange}
         style={{ minWidth: 140 }}
+        fontSize="var(--dg-fs-navigation-item)"
+        fontWeight="var(--dg-type-control-weight)"
+        activeFontWeight="var(--dg-type-control-weight)"
+        letterSpacing="normal"
       />
 
       <Button

@@ -170,14 +170,12 @@ function CalendarField({
       >
         <span className="min-w-0">
           {showSelectionLabel && (
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--dg-color-text-subtle)]">
-              {selectionLabel}
-            </span>
+            <span className="dg-type-field-title block">{selectionLabel}</span>
           )}
           <span
             className={cn(
               "block truncate font-medium",
-              compact ? "text-[12px]" : "text-[13px]",
+              "text-[length:var(--dg-type-control-size)]",
               value ? "text-[var(--dg-color-text-secondary)]" : "text-[var(--dg-color-text-faint)]",
             )}
           >
@@ -185,7 +183,7 @@ function CalendarField({
           </span>
         </span>
         <span className="flex items-center gap-2 text-[var(--dg-color-text-secondary)]">
-          <span className="text-[11px] font-medium text-[var(--dg-color-text-faint)]">
+          <span className="text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-primary)]">
             {expanded ? "Close" : "Edit"}
           </span>
           <ChevronDown
@@ -235,7 +233,9 @@ function CalendarField({
                 key={weekday}
                 className={cn(
                   "flex items-center justify-center font-medium text-[var(--dg-color-text-subtle)]",
-                  compact ? "h-6 text-[10px]" : "h-7 text-[10px]",
+                  compact
+                    ? "h-6 text-[length:var(--dg-type-badge-size)]"
+                    : "h-7 text-[length:var(--dg-type-badge-size)]",
                 )}
               >
                 {weekday}
@@ -262,7 +262,9 @@ function CalendarField({
                   tabIndex={expanded ? 0 : -1}
                   className={cn(
                     "relative flex items-center justify-center rounded-lg transition-colors",
-                    compact ? "h-7 text-[11px]" : "h-8 text-[12px]",
+                    compact
+                      ? "h-7 text-[length:var(--dg-type-badge-size)]"
+                      : "h-8 text-[length:var(--dg-type-badge-size)]",
                     isSelected
                       ? "bg-[var(--dg-color-brand)] font-semibold text-[var(--dg-color-text-inverse)]"
                       : isDisabled
@@ -510,7 +512,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             <span
               style={{
                 fontSize: "var(--dg-fs-label)",
-                fontWeight: 800,
+                fontWeight: 600,
               }}
             >
               {previewDisplayParts.primaryLabel}
@@ -788,12 +790,11 @@ const badgeRowStyle: React.CSSProperties = {
 };
 
 const badgeLabelStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-body)",
-  fontWeight: 700,
-  color: "var(--dg-color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  lineHeight: 1.1,
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
 };
 
 const sectionFieldsetStyle: React.CSSProperties = {
@@ -825,12 +826,11 @@ const endOptionsStyle: React.CSSProperties = {
 };
 
 const sectionLabelStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-footnote)",
-  fontWeight: 700,
-  color: "var(--dg-color-text-subtle)",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  lineHeight: 1.1,
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
   margin: 0,
 };
 

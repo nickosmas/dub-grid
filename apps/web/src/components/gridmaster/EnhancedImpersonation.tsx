@@ -203,7 +203,7 @@ export default function EnhancedImpersonation({
       <h2
         style={{
           margin: "0 0 4px",
-          fontSize: "var(--dg-fs-page-title)",
+          fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
         }}

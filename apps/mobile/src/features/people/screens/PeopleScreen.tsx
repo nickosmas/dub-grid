@@ -77,6 +77,7 @@ type ManagementSortMode = "alphabetical" | "access";
 type StaffFilters = {
   focusAreaId: number | "all";
   certificationId: number | "all";
+  roleId: number | "all";
   employmentType: "all" | MobilePerson["employmentType"];
   appAccess: "all" | PersonAppAccess;
   status: StatusFilter;
@@ -93,6 +94,7 @@ type ManagementFilters = {
 const STAFF_FILTER_DEFAULTS: StaffFilters = {
   focusAreaId: "all",
   certificationId: "all",
+  roleId: "all",
   employmentType: "all",
   appAccess: "all",
   status: "active",
@@ -181,6 +183,7 @@ export default function PeopleScreen() {
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  const regularUserMode = !canManageEmployees;
   const canManageManagementAccess = Boolean(
     bootstrapQuery.data?.permissions.canManageManagementAccess,
   );
@@ -268,14 +271,17 @@ export default function PeopleScreen() {
     setManagementFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function confirmProfileRequestAction() {
+  function confirmProfileRequestAction(): Promise<void> | undefined {
     if (!profileRequestConfirmation) return;
 
-    resolveRequestMutation.mutate({
+    const input = {
       requestId: profileRequestConfirmation.request.id,
       action: profileRequestConfirmation.action,
-    });
+    };
     setProfileRequestConfirmation(null);
+    return new Promise<void>((resolve) => {
+      resolveRequestMutation.mutate(input, { onSettled: () => resolve() });
+    });
   }
 
   const focusAreaMap = useMemo(
@@ -285,10 +291,31 @@ export default function PeopleScreen() {
       ),
     [bootstrapQuery.data?.focusAreas],
   );
+  const certificationSearchTextById = useMemo(
+    () =>
+      new Map(
+        (bootstrapQuery.data?.certifications ?? []).map((certification) => [
+          certification.id,
+          `${certification.name} ${certification.abbr}`.toLowerCase(),
+        ]),
+      ),
+    [bootstrapQuery.data?.certifications],
+  );
+  const roleSearchTextById = useMemo(
+    () =>
+      new Map(
+        (bootstrapQuery.data?.roles ?? []).map((role) => [
+          role.id,
+          `${role.name} ${role.abbr}`.toLowerCase(),
+        ]),
+      ),
+    [bootstrapQuery.data?.roles],
+  );
   const people = peopleQuery.data?.people ?? [];
   const profileRequests = profileRequestsQuery.data?.requests ?? [];
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
+  const roles = bootstrapQuery.data?.roles ?? [];
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(
@@ -304,21 +331,42 @@ export default function PeopleScreen() {
     (canManageManagementAccess || canManageEmployees) && managementDepartments.length > 0;
   const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
   const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
+  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
+  const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+  const visiblePeople = useMemo(
+    () =>
+      people.filter((person) => {
+        if (!canManageEmployees && person.status !== "active") return false;
+        if (!regularUserMode) return true;
+        return !(
+          (currentEmployeeId !== null && person.id === currentEmployeeId) ||
+          (currentUserId !== null && person.userId === currentUserId)
+        );
+      }),
+    [canManageEmployees, currentEmployeeId, currentUserId, people, regularUserMode],
+  );
   const filteredPeople = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
 
-    return people
+    return visiblePeople
       .filter((person) => {
-        if (!canManageEmployees && person.status !== "active") {
-          return false;
-        }
-
         const fullName = getFullName(person).toLowerCase();
-        const matchesSearch =
-          !normalizedSearch ||
-          fullName.includes(normalizedSearch) ||
-          person.email.toLowerCase().includes(normalizedSearch) ||
-          person.phone.toLowerCase().includes(normalizedSearch);
+        const visibleDirectoryText = [
+          fullName,
+          ...person.focusAreaIds.map((id) => focusAreaMap.get(id) ?? ""),
+          person.certificationId == null
+            ? ""
+            : (certificationSearchTextById.get(person.certificationId) ?? ""),
+          ...person.roleIds.map((id) => roleSearchTextById.get(id) ?? ""),
+        ]
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = regularUserMode
+          ? !normalizedSearch || visibleDirectoryText.includes(normalizedSearch)
+          : !normalizedSearch ||
+            fullName.includes(normalizedSearch) ||
+            person.email.toLowerCase().includes(normalizedSearch) ||
+            person.phone.toLowerCase().includes(normalizedSearch);
 
         const matchesStatus = !canManageEmployees
           ? true
@@ -334,8 +382,10 @@ export default function PeopleScreen() {
           staffFilters.certificationId === "all"
             ? true
             : person.certificationId === staffFilters.certificationId;
+        const matchesRole =
+          staffFilters.roleId === "all" ? true : person.roleIds.includes(staffFilters.roleId);
         const matchesEmploymentType =
-          staffFilters.employmentType === "all"
+          regularUserMode || staffFilters.employmentType === "all"
             ? true
             : person.employmentType === staffFilters.employmentType;
         // App access is an admin-only column on the row, and an admin-only
@@ -350,6 +400,7 @@ export default function PeopleScreen() {
           matchesStatus &&
           matchesFocus &&
           matchesCertification &&
+          matchesRole &&
           matchesEmploymentType &&
           matchesAppAccess
         );
@@ -366,11 +417,16 @@ export default function PeopleScreen() {
 
         return getFullName(left).localeCompare(getFullName(right));
       });
-  }, [canManageEmployees, people, searchValue, staffFilters]);
-  const visiblePeople = useMemo(
-    () => (canManageEmployees ? people : people.filter((person) => person.status === "active")),
-    [canManageEmployees, people],
-  );
+  }, [
+    canManageEmployees,
+    certificationSearchTextById,
+    focusAreaMap,
+    regularUserMode,
+    roleSearchTextById,
+    searchValue,
+    staffFilters,
+    visiblePeople,
+  ]);
   const activeCount = visiblePeople.filter((person) => person.status === "active").length;
   const inactiveCount = visiblePeople.length - activeCount;
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
@@ -414,9 +470,14 @@ export default function PeopleScreen() {
   // reports a count against a list those filters aren't touching.
   const activeFilterCount = isManagementTab
     ? countActiveFilters(managementFilters, MANAGEMENT_FILTER_DEFAULTS)
-    : countActiveFilters(staffFilters, STAFF_FILTER_DEFAULTS);
-  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
-  const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+    : regularUserMode
+      ? [
+          staffFilters.focusAreaId !== "all",
+          staffFilters.certificationId !== "all",
+          staffFilters.roleId !== "all",
+          staffFilters.sort !== STAFF_FILTER_DEFAULTS.sort,
+        ].filter(Boolean).length
+      : countActiveFilters(staffFilters, STAFF_FILTER_DEFAULTS);
   const contentState = useMobileContentState({
     // Bootstrap is in both halves. `canManageEmployees` decides which people
     // are visible at all, so clearing the skeleton on the people query alone
@@ -442,6 +503,16 @@ export default function PeopleScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={
+        contentState.kind === "loading" ||
+        !(isManagementTab
+          ? contentState.kind === "error" ||
+            managementUsers.length === 0 ||
+            filteredManagementUsers.length === 0
+          : contentState.kind === "error" ||
+            visiblePeople.length === 0 ||
+            filteredPeople.length === 0)
+      }
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
@@ -571,23 +642,43 @@ export default function PeopleScreen() {
               </SelectionSection>
             ) : null}
 
-            <SelectionSection label="Employment type">
-              <SelectionRow
-                label="All employment types"
-                onPress={() => setStaffFilter("employmentType", "all")}
-                selected={staffFilters.employmentType === "all"}
-              />
-              <SelectionRow
-                label="Full-time"
-                onPress={() => setStaffFilter("employmentType", "full_time")}
-                selected={staffFilters.employmentType === "full_time"}
-              />
-              <SelectionRow
-                label="Part-time"
-                onPress={() => setStaffFilter("employmentType", "part_time")}
-                selected={staffFilters.employmentType === "part_time"}
-              />
-            </SelectionSection>
+            {regularUserMode && roles.length > 0 ? (
+              <SelectionSection label="Role">
+                <SelectionRow
+                  label="All roles"
+                  onPress={() => setStaffFilter("roleId", "all")}
+                  selected={staffFilters.roleId === "all"}
+                />
+                {roles.map((role) => (
+                  <SelectionRow
+                    key={role.id}
+                    label={useCompactRoleCertificationLabels ? role.abbr || role.name : role.name}
+                    onPress={() => setStaffFilter("roleId", role.id)}
+                    selected={staffFilters.roleId === role.id}
+                  />
+                ))}
+              </SelectionSection>
+            ) : null}
+
+            {canManageEmployees ? (
+              <SelectionSection label="Employment type">
+                <SelectionRow
+                  label="All employment types"
+                  onPress={() => setStaffFilter("employmentType", "all")}
+                  selected={staffFilters.employmentType === "all"}
+                />
+                <SelectionRow
+                  label="Full-time"
+                  onPress={() => setStaffFilter("employmentType", "full_time")}
+                  selected={staffFilters.employmentType === "full_time"}
+                />
+                <SelectionRow
+                  label="Part-time"
+                  onPress={() => setStaffFilter("employmentType", "part_time")}
+                  selected={staffFilters.employmentType === "part_time"}
+                />
+              </SelectionSection>
+            ) : null}
 
             {canManageEmployees ? (
               <SelectionSection label="App access">
@@ -831,7 +922,11 @@ export default function PeopleScreen() {
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
-          body="Try a different name, email, phone, focus area, or certification."
+          body={
+            regularUserMode
+              ? "Try a different name, focus area, certification, or role."
+              : "Try a different name, email, phone, focus area, certification, or role."
+          }
           iconName="search-outline"
           title="No matches"
         />
@@ -847,7 +942,9 @@ export default function PeopleScreen() {
               const subtitle =
                 focusAreasForPerson.length > 0
                   ? focusAreasForPerson.join(", ")
-                  : person.email || person.phone || "No contact on file";
+                  : canManageEmployees
+                    ? person.email || person.phone || "No contact on file"
+                    : "No focus area";
               const accessHint = person.pendingInvitation
                 ? "Invitation pending"
                 : person.userId
@@ -868,7 +965,7 @@ export default function PeopleScreen() {
                   <PersonRow
                     accessHint={canManageEmployees ? accessHint : null}
                     id={person.id}
-                    employmentType={person.employmentType}
+                    employmentType={canManageEmployees ? person.employmentType : null}
                     isLast={index === filteredPeople.length - 1}
                     name={getFullName(person)}
                     navigable={navigable}
@@ -903,7 +1000,11 @@ export default function PeopleScreen() {
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowInviteManagementUser(false)}
-        onSubmit={(body) => inviteManagementUserMutation.mutate(body)}
+        onSubmit={(body) =>
+          new Promise<void>((resolve) => {
+            inviteManagementUserMutation.mutate(body, { onSettled: () => resolve() });
+          })
+        }
         visible={showInviteManagementUser}
       />
       <ConfirmationModal

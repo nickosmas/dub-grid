@@ -7,11 +7,7 @@ import {
   checkUserExistsByEmail,
   createOrganizationInvitation,
 } from "@/features/organization/client";
-import {
-  checkEmployeeEmailConflict,
-  checkEmployeePhoneConflict,
-  updateEmployeeIdentity,
-} from "@/features/employees/client";
+import { checkEmployeePhoneConflict } from "@/features/employees/client";
 import { useIsInSandbox } from "@/hooks/useIsInSandbox";
 
 vi.mock("@/hooks/useIsInSandbox", () => ({
@@ -29,23 +25,9 @@ vi.mock("@/features/organization/client", () => ({
   }),
 }));
 
-vi.mock("@/features/employees/client", () => {
-  class MockEmployeeContactConflictError extends Error {
-    constructor(
-      message: string,
-      public readonly field: "email" | "phone",
-    ) {
-      super(message);
-      this.name = "EmployeeContactConflictError";
-    }
-  }
-  return {
-    updateEmployeeIdentity: vi.fn(),
-    checkEmployeeEmailConflict: vi.fn(),
-    checkEmployeePhoneConflict: vi.fn(),
-    EmployeeContactConflictError: MockEmployeeContactConflictError,
-  };
-});
+vi.mock("@/features/employees/client", () => ({
+  checkEmployeePhoneConflict: vi.fn(),
+}));
 
 vi.mock("@/features/permissions/client", () => ({
   usePermissions: () => ({
@@ -63,8 +45,6 @@ vi.mock("sonner", () => ({
 
 const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
 const checkUserExistsByEmailMock = vi.mocked(checkUserExistsByEmail);
-const updateEmployeeIdentityMock = vi.mocked(updateEmployeeIdentity);
-const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
 const checkEmployeePhoneConflictMock = vi.mocked(checkEmployeePhoneConflict);
 const useIsInSandboxMock = vi.mocked(useIsInSandbox);
 
@@ -118,10 +98,6 @@ describe("InviteEmployeeModal", () => {
       token: "invite-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
-    checkEmployeeEmailConflictMock.mockResolvedValue({
-      conflict: false,
-      conflictingEmployeeId: null,
-    });
     checkEmployeePhoneConflictMock.mockResolvedValue({
       conflict: false,
       conflictingEmployeeId: null,
@@ -142,6 +118,22 @@ describe("InviteEmployeeModal", () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("uses the outlined secondary treatment for Close", () => {
+    render(
+      <InviteEmployeeModal
+        employee={null}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    const closeButton = screen.getByRole("button", { name: "Close" });
+    expect(closeButton.className).toContain("dg-btn-secondary");
+    expect(closeButton.className).not.toContain("dg-btn-ghost");
   });
 
   it("requires both names for management invites before enabling send", async () => {
@@ -324,7 +316,7 @@ describe("InviteEmployeeModal", () => {
     expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
   });
 
-  it("seeds the email field from a pending invitation when the employee has none on file", async () => {
+  it("does not use a pending invitation as a second email-entry source", async () => {
     render(
       <InviteEmployeeModal
         employee={{ ...employee, email: "" }}
@@ -348,49 +340,28 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    expect(await screen.findByDisplayValue("already.invited@example.com")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("employee@example.com")).not.toBeInTheDocument();
+    expect(screen.getByText(/add an email address in profile details/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
   });
 
-  it("backfills a blank employee email before creating the invitation", async () => {
-    const user = userEvent.setup();
-    const onInvited = vi.fn();
-    updateEmployeeIdentityMock.mockResolvedValue({
-      success: true,
-      employee: { ...employee, email: "new.hire@example.com" },
-    });
-
+  it("requires Profile details to supply an employee invitation email", () => {
     render(
       <InviteEmployeeModal
         employee={{ ...employee, email: "" }}
         orgId="org-1"
         orgName="Test Org"
         onClose={vi.fn()}
-        onInvited={onInvited}
+        onInvited={vi.fn()}
       />,
     );
 
-    await user.type(screen.getByPlaceholderText("employee@example.com"), "new.hire@example.com");
-    await user.click(await screen.findByRole("button", { name: /send invitation/i }));
-
-    await waitFor(() => {
-      expect(updateEmployeeIdentityMock).toHaveBeenCalledWith(
-        expect.objectContaining({ employeeId: "emp-1", email: "new.hire@example.com" }),
-      );
-      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "new.hire@example.com" }),
-      );
-      expect(onInvited).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "new.hire@example.com" }),
-      );
-    });
-    expect(updateEmployeeIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(
-      createOrganizationInvitationMock.mock.invocationCallOrder[0],
-    );
+    expect(screen.queryByPlaceholderText("employee@example.com")).not.toBeInTheDocument();
+    expect(screen.getByText(/add an email address in profile details/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
   });
 
-  it("does not backfill when the employee already has a contact email", async () => {
-    const user = userEvent.setup();
-
+  it("shows the Profile details target without rendering a duplicate employee email field", () => {
     render(
       <InviteEmployeeModal
         employee={employee}
@@ -401,34 +372,12 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: /send invitation/i }));
-
-    await waitFor(() => {
-      expect(createOrganizationInvitationMock).toHaveBeenCalled();
-    });
-    expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
-  });
-
-  it("locks the email field to the existing contact email and hides the duplicate-account lookup UI", async () => {
-    render(
-      <InviteEmployeeModal
-        employee={employee}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
-    );
-
-    const emailInput = await screen.findByPlaceholderText("employee@example.com");
-    expect(emailInput).toHaveValue(employee.email);
-    expect(emailInput).toBeDisabled();
-    expect(screen.getByText(/this is their contact email from staff details/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("employee@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
     expect(checkUserExistsByEmailMock).not.toHaveBeenCalled();
-    expect(checkEmployeeEmailConflictMock).not.toHaveBeenCalled();
   });
 
-  it("does not backfill for a management-only invite (no employee record yet)", async () => {
+  it("keeps email entry in the management-only profile-creation flow", async () => {
     const user = userEvent.setup();
 
     render(
@@ -449,31 +398,6 @@ describe("InviteEmployeeModal", () => {
     await waitFor(() => {
       expect(createOrganizationInvitationMock).toHaveBeenCalled();
     });
-    expect(updateEmployeeIdentityMock).not.toHaveBeenCalled();
-  });
-
-  it("flags an email already used by another employee in realtime and blocks sending", async () => {
-    const user = userEvent.setup();
-    checkEmployeeEmailConflictMock.mockResolvedValue({
-      conflict: true,
-      conflictingEmployeeId: "other-emp",
-    });
-
-    render(
-      <InviteEmployeeModal
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        onClose={vi.fn()}
-        onInvited={vi.fn()}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText("employee@example.com"), "taken@example.com");
-
-    await screen.findByText(/already used by another person on your team/i);
-    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
-    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
 
   it("flags a phone number already used by another employee in realtime for management invites", async () => {
