@@ -23,6 +23,7 @@ interface ErrorBody {
   invitation?: Invitation;
   token?: string;
   expiresAt?: string;
+  previousInvitationId?: string;
 }
 
 export class OrganizationAccessConflictError extends Error {
@@ -379,6 +380,37 @@ export async function resendOrganizationInvitationGuarded(input: {
     invitation: body.invitation,
     token: body.token,
     expiresAt: body.expiresAt,
+  };
+}
+
+export async function replaceOrganizationInvitationAccessGuarded(input: {
+  orgId: string;
+  invitationId: string;
+  expectedUpdatedAt: string;
+  roleToAssign: OrganizationRole;
+}): Promise<{
+  previousInvitationId: string;
+  invitation: Invitation;
+}> {
+  const response = await fetch(resolveClientUrl("/api/organizations/invitations"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, action: "replace_access" }),
+  });
+
+  const body = await parseBody(response);
+
+  if (response.status === 409 && body?.invitation) {
+    throw new InvitationAccessConflictError(body.invitation);
+  }
+
+  if (!response.ok || !body?.invitation || !body.previousInvitationId) {
+    throw new Error(getErrorMessage(body, "We couldn't replace that invitation. Try again."));
+  }
+
+  return {
+    previousInvitationId: body.previousInvitationId,
+    invitation: body.invitation,
   };
 }
 

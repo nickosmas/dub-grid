@@ -349,11 +349,15 @@ export default function ProfileWorkScreen() {
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
 
+  const isFillScreenState =
+    contentState.kind === "error" || (contentState.kind !== "loading" && !profile);
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

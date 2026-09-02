@@ -803,7 +803,7 @@ export default function OrganizationSetupWizard({
               height="28"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#fff"
+              stroke="var(--dg-color-text-inverse)"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"

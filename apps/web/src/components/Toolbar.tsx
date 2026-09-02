@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
+import { Switch } from "@/components/ui/switch";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -101,37 +102,6 @@ function ClearSearchButton({ onClick }: { onClick: () => void }) {
         style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
       />
     </Hint>
-  );
-}
-
-/* ── Toggle Switch ── */
-function ToggleSwitch({ on }: { on: boolean }) {
-  return (
-    <div
-      style={{
-        width: 32,
-        height: 18,
-        borderRadius: 9,
-        background: on ? "var(--dg-color-success)" : "var(--dg-color-border)",
-        position: "relative",
-        transition: "background 150ms ease",
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: "50%",
-          background: "var(--dg-color-surface)",
-          position: "absolute",
-          top: 2,
-          left: on ? 16 : 2,
-          transition: "left 150ms ease",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-        }}
-      />
-    </div>
   );
 }
 
@@ -303,7 +273,7 @@ function ToolsMenu({
                 <circle cx="12" cy="7" r="4" />
               </svg>
               <span style={{ flex: 1 }}>Authors</span>
-              <ToggleSwitch on={!!showAudit} />
+              <Switch checked={!!showAudit} presentationOnly />
             </MenuItem>
           </Hint>
         )}
@@ -657,8 +627,8 @@ export default function Toolbar({
             options={spanOptions}
             onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
             fontSize="var(--dg-fs-navigation-item)"
-            fontWeight={400}
-            activeFontWeight={400}
+            fontWeight="var(--dg-type-control-weight)"
+            activeFontWeight="var(--dg-type-control-weight)"
             letterSpacing="normal"
             style={{ minWidth: 0, flex: "1 1 110px" }}
           />
@@ -801,9 +771,17 @@ export default function Toolbar({
       }}
     >
       {/* ── NAV ZONE: Time navigation + span (stays as one unit) ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          minWidth: 0,
+          maxWidth: "100%",
+        }}
+      >
         {/* Chevrons + date label */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
             <Button
               onClick={onPrev}
@@ -838,7 +816,11 @@ export default function Toolbar({
             style={{
               color: "var(--dg-color-text-secondary)",
               whiteSpace: "nowrap",
-              minWidth: 120,
+              minWidth: 0,
+              width: 120,
+              flex: "1 1 120px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
               textAlign: "center",
               userSelect: "none",
             }}
@@ -896,8 +878,8 @@ export default function Toolbar({
           options={spanOptions}
           onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
           fontSize="var(--dg-fs-navigation-item)"
-          fontWeight={400}
-          activeFontWeight={400}
+          fontWeight="var(--dg-type-control-weight)"
+          activeFontWeight="var(--dg-type-control-weight)"
           letterSpacing="normal"
         />
       </div>
@@ -909,12 +891,17 @@ export default function Toolbar({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            ...(isTablet ? { order: 3, flexBasis: "100%" } : {}),
+            minWidth: 0,
+            maxWidth: "100%",
+            ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%", flexWrap: "wrap" } : {}),
           }}
         >
           {/* Focus area filter */}
           {focusAreaOptions.length > 1 && (
-            <div data-tour="schedule-focus-filter" style={{ flex: 1, minWidth: 0 }}>
+            <div
+              data-tour="schedule-focus-filter"
+              style={{ flex: isTablet ? "1 1 240px" : 1, minWidth: 0 }}
+            >
               <ScrollableTabs
                 className="dg-span-tabs dg-span-tabs--light"
                 style={{ flex: 1, minWidth: 0 }}
@@ -953,7 +940,13 @@ export default function Toolbar({
           <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
 
           {/* Staff search */}
-          <div style={{ position: "relative" }}>
+          <div
+            style={{
+              position: "relative",
+              minWidth: 0,
+              flex: isTablet ? "1 1 160px" : undefined,
+            }}
+          >
             <svg
               width="13"
               height="13"
@@ -983,7 +976,7 @@ export default function Toolbar({
               className="dg-input"
               style={{
                 paddingLeft: 30,
-                width: isTablet ? 180 : 160,
+                width: isTablet ? "100%" : 160,
                 borderRadius: "var(--dg-btn-radius)",
               }}
             />

@@ -42,3 +42,18 @@ shared scroll architecture and needs its own spec, not a cleanup pass.
 **Why it matters:** The screen correctly fetches cursor-paginated pages, but flattens every loaded page and maps all alert cards inside the shared Screen ScrollView. Each "Load more" permanently increases mounted views, animations, layout work, and memory, so long alert histories lose the performance benefit pagination should provide.
 **Suggested fix:** Move the feed to FlatList or another virtualized list, place search/filter controls in its header, preserve pull-to-refresh and empty/error states, and avoid index-staggered entrance animations for recycled rows.
 **Resolution:**
+
+### F-42 [P2] open - MembersSection tests finish with unwrapped responsive updates
+
+**File:** apps/web/src/**tests**/MembersSection.test.tsx:659-779; apps/web/src/hooks/useMediaQuery.ts:18-32
+**Found:** 2026-09-02 by /audit (scope: current; lens: tests)
+**Why it matters:** Eight MembersSection cases report React `act(...)` warnings
+after render because the real `useMediaQuery` effect updates component state
+outside the test interaction boundary. The assertions currently pass, but work
+can continue after an assertion or test teardown, making this area noisy and
+capable of hiding timing-dependent regressions.
+**Suggested fix:** Mock `useMediaQuery` to a deterministic viewport value in the
+MembersSection test harness, or await the initial responsive update inside an
+`act`-aware helper before asserting. Keep separate targeted coverage for actual
+media-query transitions.
+**Resolution:**

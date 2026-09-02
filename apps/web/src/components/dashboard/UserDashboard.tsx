@@ -1530,7 +1530,7 @@ function MeHeroCard({
         background: isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT,
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-md)",
-        color: "#fff",
+        color: "var(--dg-color-text-inverse)",
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
@@ -1587,7 +1587,7 @@ function MeHeroCard({
           >
             <h2
               style={{
-                color: "#fff",
+                color: "var(--dg-color-text-inverse)",
                 fontSize: isCompact ? "1.55rem" : "1.9rem",
                 fontWeight: 600,
                 letterSpacing: 0,
@@ -1629,7 +1629,7 @@ function MeHeroCard({
           </span>
           <span
             style={{
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               fontSize: 24,
               fontWeight: 600,
               lineHeight: 1,
@@ -1693,7 +1693,7 @@ function MeHeroCard({
           >
             <div
               style={{
-                background: "#fff",
+                background: "var(--dg-color-text-inverse)",
                 borderRadius: 999,
                 height: "100%",
                 width: `${Math.round(timing.progress * 100)}%`,
@@ -1775,7 +1775,7 @@ function HeroInfoRow({ icon, text }: { icon: ReactNode; text: string }) {
       <span
         style={{
           fontSize: 15,
-          fontWeight: 650,
+          fontWeight: 600,
           minWidth: 0,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -1809,7 +1809,7 @@ function HeroPillRow({
       {showTypeLabel ? (
         <div
           style={{
-            color: inverse ? "#fff" : "var(--dg-color-text-primary)",
+            color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-primary)",
             fontSize: inverse ? 20 : 15,
             fontWeight: 600,
             lineHeight: 1.1,
@@ -1869,7 +1869,7 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
         background: inverse ? "rgba(255,255,255,0.16)" : "var(--dg-color-bg-secondary)",
         border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--dg-color-border)",
         borderRadius: 7,
-        color: inverse ? "#fff" : "var(--dg-color-text-secondary)",
+        color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-secondary)",
         display: "inline-flex",
         fontSize: 12,
         fontWeight: 600,
@@ -1898,7 +1898,7 @@ function SplitShiftBadge({ inverse = false, label }: { inverse?: boolean; label:
           ? "1px solid rgba(255,255,255,0.28)"
           : "1px solid var(--dg-color-brand-border)",
         borderRadius: 999,
-        color: inverse ? "#fff" : "var(--dg-color-brand)",
+        color: inverse ? "var(--dg-color-text-inverse)" : "var(--dg-color-brand)",
         display: "inline-flex",
         flexShrink: 0,
         fontSize: 13,
@@ -1960,7 +1960,7 @@ function HeroSplitShiftSegment({
         >
           <span
             style={{
-              color: "#fff",
+              color: "var(--dg-color-text-inverse)",
               fontSize: 20,
               fontWeight: 600,
               lineHeight: 1.15,
@@ -1978,7 +1978,7 @@ function HeroSplitShiftSegment({
             {timeRange ? (
               <span
                 style={{
-                  color: "#fff",
+                  color: "var(--dg-color-text-inverse)",
                   fontSize: 16,
                   fontWeight: 700,
                   textAlign: "right",
@@ -2790,7 +2790,7 @@ function WeekShiftRow({
                 display: "flex",
                 flexShrink: 0,
                 fontSize: 12,
-                fontWeight: 650,
+                fontWeight: 600,
                 gap: 5,
               }}
             >

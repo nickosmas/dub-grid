@@ -327,7 +327,7 @@ export default function AddEmployeeModal({
                         onClick={() => removeRow(row._id)}
                         disabled={rows.length === 1}
                         aria-label={`Remove staff member row ${idx + 1}`}
-                        className={`flex items-center justify-center rounded-lg text-[var(--dg-color-text-faint)] transition-colors duration-120 ${
+                        className={`flex items-center justify-center rounded-lg text-[var(--dg-color-text-primary)] transition-colors duration-120 ${
                           rows.length === 1
                             ? "opacity-30 cursor-default"
                             : "hover:bg-[var(--dg-color-bg-secondary)] hover:text-[var(--dg-color-text-primary)] cursor-pointer"
@@ -365,7 +365,7 @@ export default function AddEmployeeModal({
                     >
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={fieldLabelStyle}>
-                          First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                          First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                         </label>
                         <input
                           ref={idx === rows.length - 1 ? newRowFirstNameRef : undefined}
@@ -396,7 +396,7 @@ export default function AddEmployeeModal({
 
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={fieldLabelStyle}>
-                          Last Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                          Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                         </label>
                         <input
                           className="dg-input"
@@ -527,9 +527,6 @@ export default function AddEmployeeModal({
                               onClick={() => toggleFocusArea(row._id, focusArea.id)}
                               padding="4px 12px"
                               fontSize="var(--dg-fs-caption)"
-                              unselectedBackground="var(--dg-color-bg-secondary)"
-                              unselectedBorderColor="transparent"
-                              unselectedTextColor="var(--dg-color-text-faint)"
                               style={{ whiteSpace: "nowrap" }}
                             >
                               {focusArea.name}

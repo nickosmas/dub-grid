@@ -34,6 +34,7 @@ import {
   selectVisibleCoverageGaps,
 } from "./_lib/open-shifts";
 import { Hint } from "@/components/ui/hint";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
 import { X } from "lucide-react";
 
@@ -5574,7 +5575,6 @@ function SchedulerContent() {
                   style={{
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--dg-color-danger-text)",
-                    opacity: 0.82,
                     marginLeft: 4,
                   }}
                 >
@@ -5659,7 +5659,7 @@ function SchedulerContent() {
                     style={{ background: "var(--dg-color-info-text)" }}
                   />
                   <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
-                  <span style={{ opacity: 0.85 }}>
+                  <span>
                     {(() => {
                       const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
                       const unit =
@@ -5684,7 +5684,7 @@ function SchedulerContent() {
                           className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
                           {outOfWindowDraftGroupRanges[index]}{" "}
-                          <span style={{ opacity: 0.7, marginLeft: 4 }}>({group.count})</span>
+                          <span style={{ marginLeft: 4 }}>({group.count})</span>
                         </Button>
                       </Hint>
                     ))}
@@ -5749,7 +5749,7 @@ function SchedulerContent() {
                       style={{ background: "var(--dg-color-info-text)" }}
                     />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
-                    <span style={{ opacity: 0.85 }}>
+                    <span>
                       {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
                     </span>
                     <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
@@ -5781,9 +5781,7 @@ function SchedulerContent() {
                               className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
                               {`${formatDate(startDate)}–${formatDate(endDate)}`}{" "}
-                              <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                                ({group.changeCount})
-                              </span>
+                              <span style={{ marginLeft: 4 }}>({group.changeCount})</span>
                             </Button>
                           </Hint>
                         );
@@ -5840,7 +5838,7 @@ function SchedulerContent() {
                         actually contains appear at all. */}
                     <ChangeCountChips counts={publishChangeCounts} />
                     {inWindowPublishHistory.length > 1 && (
-                      <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                      <span style={{ marginLeft: 4 }}>
                         across {inWindowPublishHistory.length} publishes
                       </span>
                     )}
@@ -5866,7 +5864,6 @@ function SchedulerContent() {
                           <span
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
-                              opacity: 0.6,
                               fontStyle: "italic",
                             }}
                           >
@@ -6943,6 +6940,7 @@ function SchedulerContent() {
               progress={activeOperation.progress}
             />
           )}
+          <ScrollOverflowCue documentViewport />
         </>
       )}
     </div>

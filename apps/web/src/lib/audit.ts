@@ -44,6 +44,7 @@ export type AuditAction =
   // Invitations
   | "invitation.sent"
   | "invitation.accepted"
+  | "invitation.access_replaced"
   | "invitation.revoked"
   | "invitation.resent"
   // Config items

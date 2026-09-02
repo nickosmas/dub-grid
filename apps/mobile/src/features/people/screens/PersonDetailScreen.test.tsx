@@ -1120,6 +1120,35 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("asks before replacing a pending invitation's access level", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: {
+          orgRole: null,
+          managementDepartmentIds: [9],
+          pendingInvitation: {
+            id: "invite-1",
+            email: "mina@dubgrid.com",
+            expiresAt: "2099-05-01T00:00:00.000Z",
+            updatedAt: "2026-04-28T00:00:00.000Z",
+            roleToAssign: "user",
+          },
+        },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      fireEvent.click(screen.getByText("Admin"));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+      expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+      expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
+      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+
+      confirmDialog("Revoke and resend");
+      expect(allMutatePayloads(mutationCalls)).toContainEqual({
+        draft: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+    });
+
     // Save used to be live the moment the sheet opened, so the everyday
     // "opened it to check, closed it again" ended in a no-op write.
     it("holds Save until something actually changes", () => {

@@ -5,6 +5,7 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import { Button } from "@/components/Button";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -191,7 +192,14 @@ export default function CoveragePanel({
         )}
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: isMobile ? "16px" : "20px 24px",
+          }}
+        >
           {isUnpublished ? (
             <EmptyState
               size="compact"
@@ -349,6 +357,7 @@ export default function CoveragePanel({
             </>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
     </>
   );

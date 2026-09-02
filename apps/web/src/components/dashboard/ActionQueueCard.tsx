@@ -288,7 +288,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                   padding: "3px 8px",
                   borderRadius: 5,
                   background: "var(--dg-color-success)",
-                  color: "#fff",
+                  color: "var(--dg-color-text-inverse)",
                   border: "none",
                   cursor: isRunning ? "not-allowed" : "pointer",
                 }}
@@ -355,13 +355,9 @@ function GroupedItems({ items }: { items: ActionItem[] }) {
         <div key={group.type}>
           {/* Section header */}
           <div
+            className="dg-type-content-group-heading"
             style={{
               padding: "8px 18px 4px",
-              fontSize: "var(--dg-type-field-title-size)",
-              fontWeight: "var(--dg-type-field-title-weight)",
-              color: "var(--dg-type-field-title-color)",
-              textTransform: "none",
-              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               borderTop: gi > 0 ? "1px solid var(--dg-color-border-light)" : "none",
             }}
           >

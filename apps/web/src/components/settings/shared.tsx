@@ -26,10 +26,10 @@ export const inputStyle: React.CSSProperties = {
   borderStyle: "solid",
   borderColor: "var(--dg-color-border)",
   borderRadius: "var(--dg-btn-radius)",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: "var(--dg-type-control-size)",
+  fontWeight: "var(--dg-type-control-weight)",
   fontFamily: "inherit",
-  color: "var(--dg-color-text-secondary)",
+  color: "var(--dg-color-text-primary)",
   background: "var(--dg-color-surface)",
   outline: "none",
 };

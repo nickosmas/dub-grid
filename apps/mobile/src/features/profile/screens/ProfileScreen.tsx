@@ -332,12 +332,17 @@ export default function ProfileScreen() {
     setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
   }
 
+  const isFillScreenState =
+    contentState.kind === "error" ||
+    (contentState.kind !== "loading" && (contentState.kind === "empty" || !profile));
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
       onScroll={handleProfileScroll}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
       scrollEventThrottle={16}
       // Passed only while a switch is in flight: `renderOverlay` costs the
       // screen its native scroll root, which is what drives the iOS large

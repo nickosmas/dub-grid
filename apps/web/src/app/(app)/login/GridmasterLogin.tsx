@@ -148,10 +148,10 @@ export default function GridmasterLogin() {
         <Card>
           <a href={landingUrl} className="dg-auth-logo-block">
             <DubGridLogo size={52} />
-            <span className="dg-auth-portal-label">Gridmaster Portal</span>
+            <span className="dg-auth-portal-label">Gridmaster portal</span>
           </a>
 
-          <h1 className="dg-auth-heading">Platform Admin Sign In</h1>
+          <h1 className="dg-auth-heading">Platform admin sign in</h1>
 
           <EmailPasswordForm
             email={email}
@@ -170,10 +170,10 @@ export default function GridmasterLogin() {
               href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
               className="dg-auth-link"
             >
-              Back to Standard Login
+              Back to standard login
             </a>
             <a href={landingUrl} className="dg-auth-link">
-              Back to Home
+              Back to home
             </a>
           </div>
         </Card>

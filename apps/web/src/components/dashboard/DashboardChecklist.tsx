@@ -118,7 +118,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
                 justifyContent: "center",
                 background: step.done ? "var(--dg-color-success)" : "transparent",
                 border: step.done ? "none" : "2px solid var(--dg-color-border)",
-                color: "#fff",
+                color: "var(--dg-color-text-inverse)",
                 fontSize: 12,
                 fontWeight: 700,
                 flexShrink: 0,

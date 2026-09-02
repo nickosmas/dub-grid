@@ -427,7 +427,6 @@ export default function Header({ orgName }: HeaderProps) {
                   style={{
                     color: "var(--dg-color-border)",
                     fontSize: "var(--dg-fs-body)",
-                    fontWeight: 300,
                     userSelect: "none",
                     flexShrink: 0,
                   }}
@@ -535,7 +534,6 @@ export default function Header({ orgName }: HeaderProps) {
                 style={{
                   color: "var(--dg-color-border)",
                   fontSize: "var(--dg-fs-title)",
-                  fontWeight: 300,
                   userSelect: "none",
                 }}
               >

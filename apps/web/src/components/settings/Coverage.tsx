@@ -399,7 +399,7 @@ function CoverageOptionRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-primary)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -688,17 +688,7 @@ function FocusAreaCoverageCard({
                     borderBottom: "1px solid var(--dg-color-border-light)",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "var(--dg-type-field-title-size)",
-                      fontWeight: "var(--dg-type-field-title-weight)",
-                      color: "var(--dg-type-field-title-color)",
-                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                      lineHeight: "var(--dg-type-field-title-line-height)",
-                    }}
-                  >
-                    {section.title}
-                  </div>
+                  <div className="dg-type-content-group-heading">{section.title}</div>
                 </div>
                 <div style={{ padding: "0 12px" }}>
                   {section.options.map((option, optionIndex) => (

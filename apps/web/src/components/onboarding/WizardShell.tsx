@@ -79,7 +79,7 @@ export default function WizardShell({
               border: "none",
               fontSize: 13,
               fontWeight: 500,
-              color: "var(--dg-color-text-faint)",
+              color: "var(--dg-color-text-label)",
               cursor: skipLoading ? "not-allowed" : "pointer",
               textDecoration: "underline",
               textUnderlineOffset: 3,

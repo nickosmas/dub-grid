@@ -1357,7 +1357,7 @@ const SectionBlock = memo(function SectionBlock({
                       height: 18,
                       borderRadius: 9,
                       background: "var(--dg-color-warning)",
-                      color: "#fff",
+                      color: "var(--dg-color-text-inverse)",
                       fontSize: "var(--dg-fs-badge)",
                       fontWeight: 700,
                       display: "inline-flex",

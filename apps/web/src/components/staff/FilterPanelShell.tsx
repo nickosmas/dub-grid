@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/Button";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
 /**
@@ -45,9 +46,9 @@ export function FilterPanelShell({
           type="button"
           onClick={onClearAll}
           disabled={!hasActiveFilters}
-          className={`text-xs font-semibold transition-colors ${
+          className={`text-[length:var(--dg-type-control-size)] font-medium transition-colors ${
             hasActiveFilters
-              ? "text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-primary)]"
+              ? "text-[var(--dg-color-text-primary)] hover:text-[var(--dg-color-text-secondary)]"
               : "cursor-not-allowed text-[var(--dg-color-text-faint)]"
           }`}
         >
@@ -56,7 +57,7 @@ export function FilterPanelShell({
         <Button
           type="button"
           onClick={onClose}
-          className="rounded-[var(--dg-radius-sm)] bg-[var(--dg-color-brand)] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          className="rounded-[var(--dg-radius-sm)] bg-[var(--dg-color-brand)] px-3 py-1.5 text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-inverse)] transition-opacity hover:opacity-90"
         >
           Done
         </Button>
@@ -105,9 +106,10 @@ export function FilterPanelShell({
           className="isolate z-50"
         >
           <PopoverPrimitive.Popup
-            className={`flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] shadow-[var(--shadow-menu)] outline-hidden ${widthClassName}`}
+            className={`relative flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] shadow-[var(--shadow-menu)] outline-hidden ${widthClassName}`}
           >
             {content}
+            <ScrollOverflowCue />
           </PopoverPrimitive.Popup>
         </PopoverPrimitive.Positioner>
       </PopoverPrimitive.Portal>
@@ -118,7 +120,7 @@ export function FilterPanelShell({
 export function FilterSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-[var(--dg-color-border-light)] py-4 first:pt-1 last:border-b-0">
-      <div className="dg-type-field-title mb-2">{title}</div>
+      <div className="dg-type-content-group-heading mb-2">{title}</div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </section>
   );

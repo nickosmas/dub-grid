@@ -503,6 +503,16 @@ export default function PeopleScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={
+        contentState.kind === "loading" ||
+        !(isManagementTab
+          ? contentState.kind === "error" ||
+            managementUsers.length === 0 ||
+            filteredManagementUsers.length === 0
+          : contentState.kind === "error" ||
+            visiblePeople.length === 0 ||
+            filteredPeople.length === 0)
+      }
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}

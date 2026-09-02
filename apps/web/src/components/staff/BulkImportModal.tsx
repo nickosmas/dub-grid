@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucid
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -958,6 +959,7 @@ export function BulkImportModal({
             </Button>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
       {unsavedChangesDialog}
     </div>,

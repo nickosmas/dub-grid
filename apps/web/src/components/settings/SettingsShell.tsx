@@ -294,7 +294,7 @@ export function SettingsShell<TId extends string = string>({
             <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>
               <Link
                 href={leadingNavigation.href}
-                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dg-type-attention-secondary-color)] transition-colors hover:text-[var(--dg-type-attention-primary-color)]"
+                className="inline-flex items-center gap-1.5 text-[length:var(--dg-type-navigation-size)] font-medium text-[var(--dg-type-navigation-color)] transition-colors hover:text-[var(--dg-color-text-secondary)]"
               >
                 <leadingNavigation.Icon />
                 {leadingNavigation.label}

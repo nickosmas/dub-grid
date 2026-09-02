@@ -8,6 +8,7 @@ import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsVi
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
@@ -256,7 +257,7 @@ function SessionDetailPanel({
           </div>
           <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
         </div>
-        <div style={{ padding: "8px 20px 24px", overflowY: "auto" }}>
+        <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
           <DetailRow label="User name" value={session.userName ?? "—"} />
           <DetailRow label="User email" value={session.userEmail ?? "Unknown email"} />
@@ -277,6 +278,7 @@ function SessionDetailPanel({
           <DetailRow label="Last active" value={formatDateTime(session.lastActiveAt)} />
           <DetailRow label="Created" value={formatDateTime(session.createdAt)} />
         </div>
+        <ScrollOverflowCue />
       </div>
     </>
   );

@@ -804,12 +804,28 @@ export default function RequestsScreen() {
     visibleTabs,
   ]);
   const activeTab = selectedTab ?? defaultTab;
+  // Mirrors the `fillScreen` branches below: loading and error/global-empty
+  // win outright, then each tab owns whether its own list is empty.
+  const isFillScreenState =
+    contentState.kind !== "loading" &&
+    (contentState.kind === "error" ||
+      (activeTab === "history"
+        ? historyContentState.kind !== "ready"
+        : contentState.kind === "empty" ||
+          (activeTab === "available"
+            ? availableOpenShiftFeed.totalCount === 0
+            : activeTab === "all"
+              ? allRequests.length === 0
+              : activeTab === "mine"
+                ? myRequests.length === 0
+                : approvalRequests.length === 0)));
 
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      scrollEnabled={!isFillScreenState}
     >
       {/* Active request counts wait for their shared data. History resolves
           independently so a slow archive cannot hide active request actions. */}

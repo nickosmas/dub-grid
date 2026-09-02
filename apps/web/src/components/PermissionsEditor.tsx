@@ -577,7 +577,7 @@ export default function PermissionsEditor({
               <div key={group.category} className="pb-1">
                 {/* Category header */}
                 <div className="px-6 py-3 bg-[var(--dg-color-bg)]">
-                  <h3 className="dg-type-field-title">{group.label}</h3>
+                  <h3 className="dg-type-content-group-heading">{group.label}</h3>
                 </div>
 
                 {/* Module rows */}

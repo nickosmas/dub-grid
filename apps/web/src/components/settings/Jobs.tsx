@@ -53,6 +53,7 @@ import {
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
 import {
+  DEFAULT_SCHEDULED_JOB_STYLE,
   DEFAULT_SHIFT_JOB_SYSTEM_KEY,
   isDefaultShiftSystemJob,
   isProtectedSystemJob,
@@ -88,8 +89,8 @@ type JobFormState = {
   defaultDurationMinutes: number | null;
 };
 
-const DEFAULT_JOB_PRESET_COLOR = "#E2E8F0";
-const DEFAULT_JOB_PRESET_TEXT = "#1E293B";
+const DEFAULT_JOB_PRESET_COLOR = DEFAULT_SCHEDULED_JOB_STYLE.color;
+const DEFAULT_JOB_PRESET_TEXT = DEFAULT_SCHEDULED_JOB_STYLE.text;
 const EMPTY_SCHEDULED_JOB_STYLE = {
   color: "",
   border: "",
@@ -419,17 +420,7 @@ function SectionBlock({
 
   const header = (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-      <div
-        style={{
-          fontSize: "var(--dg-type-field-title-size)",
-          fontWeight: "var(--dg-type-field-title-weight)",
-          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-          lineHeight: "var(--dg-type-field-title-line-height)",
-          color: "var(--dg-type-field-title-color)",
-        }}
-      >
-        {title}
-      </div>
+      <div className="dg-type-content-group-heading">{title}</div>
       {description ? (
         <div
           style={{
@@ -483,7 +474,7 @@ function SectionBlock({
           <span
             aria-hidden="true"
             style={{
-              color: "var(--dg-color-text-faint)",
+              color: "var(--dg-color-text-primary)",
               transform: open ? "rotate(180deg)" : "none",
               transition: "transform 150ms ease",
             }}
@@ -1390,7 +1381,7 @@ function JobRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-primary)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}

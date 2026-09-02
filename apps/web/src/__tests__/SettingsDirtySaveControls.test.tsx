@@ -343,6 +343,33 @@ describe("settings dirty save controls", () => {
     expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
   });
 
+  it("gives schedule rules distinct titles, descriptions, and divided rows", () => {
+    const { container } = render(
+      <ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />,
+    );
+
+    const title = screen.getByText("Enforce shift conflict prevention");
+    const description = screen.getByText("When enabled, overlapping shifts cannot be saved.");
+    const rows = container.querySelectorAll("[data-schedule-rule-row]");
+
+    expect(title).toHaveStyle({
+      color: "var(--dg-color-text-primary)",
+      fontSize: "var(--dg-fs-body-sm)",
+      fontWeight: "600",
+    });
+    expect(description).toHaveStyle({
+      color: "var(--dg-color-text-muted)",
+      fontSize: "var(--dg-type-field-title-size)",
+      fontWeight: "400",
+    });
+    expect(rows).toHaveLength(5);
+    for (const row of Array.from(rows).slice(1)) {
+      expect(row.getAttribute("style")).toContain(
+        "border-top: 1px solid var(--dg-color-border-light)",
+      );
+    }
+  });
+
   it("schedule rules save a biweekly pay-period anchor date", async () => {
     const user = userEvent.setup();
     const onOrganizationSave = vi.fn();

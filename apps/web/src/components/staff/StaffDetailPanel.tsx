@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
@@ -57,7 +57,6 @@ interface StaffDetailPanelProps {
   hasManagementAccess?: boolean;
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
-  managementAccessEditor?: (onDirtyChange: (hasUnsavedChanges: boolean) => void) => ReactNode;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
 }
 
@@ -85,7 +84,6 @@ export function StaffDetailPanel({
   hasManagementAccess,
   hasPendingManagementInvite,
   onManageManagementAccess,
-  managementAccessEditor,
   onRevoke,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
@@ -97,8 +95,7 @@ export function StaffDetailPanel({
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [open, setOpen] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const isEditingManagementAccess = Boolean(managementAccessEditor);
-  const [hasEmailConflict, setHasEmailConflict] = useState(false);
+  const [isEditorSaveBlocked, setIsEditorSaveBlocked] = useState(false);
   const onCloseRef = useLatestRef(onClose);
   const pendingInvitation = canManageEmployees
     ? pendingInviteByEmployeeId.get(employee.id)
@@ -114,6 +111,7 @@ export function StaffDetailPanel({
     canManageManagementAccess && onManageManagementAccess && employee.status !== "removed",
   );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
+  const showEmploymentStatusActions = canManageEmployees && !isSelf;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
   // Only staff managers can open the full /people/[id] page (mirrors the
   // table's name-link gate); the self link just goes to /profile.
@@ -153,13 +151,9 @@ export function StaffDetailPanel({
 
   useEffect(() => {
     setHasUnsavedChanges(false);
-    setHasEmailConflict(false);
+    setIsEditorSaveBlocked(false);
     setOpen(true);
   }, [employee.id]);
-
-  useEffect(() => {
-    setHasUnsavedChanges(false);
-  }, [isEditingManagementAccess]);
 
   const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
 
@@ -317,40 +311,39 @@ export function StaffDetailPanel({
 
         {/* Editable body - nothing commits until the owning editor saves. */}
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-          {managementAccessEditor ? (
-            <div style={{ padding: 24 }}>{managementAccessEditor(setHasUnsavedChanges)}</div>
-          ) : (
-            <>
-              <InlineEditEmployee
-                employee={employee}
-                orgId={orgId}
-                focusAreas={focusAreas}
-                certifications={certifications}
-                roles={roles}
-                roleLabel={roleLabel}
-                focusAreaLabel={focusAreaLabel}
-                certificationLabel={certificationLabel}
-                departments={departments}
-                departmentLabel={departmentLabel}
-                isManagementUser={hasManagementAccess}
-                ref={editorRef}
-                hideActions
-                onSave={onSave}
-                onCancel={handleRequestClose}
-                onDirtyChange={setHasUnsavedChanges}
-                onEmailConflictChange={setHasEmailConflict}
-                pendingInvitation={pendingInvitation}
-                onSaveWithReinvite={onSaveWithReinvite}
-              />
+          <InlineEditEmployee
+            employee={employee}
+            orgId={orgId}
+            focusAreas={focusAreas}
+            certifications={certifications}
+            roles={roles}
+            roleLabel={roleLabel}
+            focusAreaLabel={focusAreaLabel}
+            certificationLabel={certificationLabel}
+            departments={departments}
+            departmentLabel={departmentLabel}
+            isManagementUser={hasManagementAccess}
+            ref={editorRef}
+            hideActions
+            onSave={onSave}
+            onCancel={handleRequestClose}
+            onDirtyChange={setHasUnsavedChanges}
+            onSaveBlockedChange={setIsEditorSaveBlocked}
+            pendingInvitation={pendingInvitation}
+            onSaveWithReinvite={onSaveWithReinvite}
+          />
+          {(showAccountAccessActions || showEmploymentStatusActions) && (
+            <div
+              style={{
+                padding: "16px 24px 20px",
+                borderTop: "1px solid var(--dg-color-border-light)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
               {showAccountAccessActions && (
-                <div
-                  style={{
-                    padding: "0 24px 24px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                  }}
-                >
+                <>
                   {pendingInvitation && onRevoke ? (
                     <PendingInvitationBanner
                       pendingInvitation={pendingInvitation}
@@ -398,62 +391,51 @@ export function StaffDetailPanel({
                         : "Add to Management"}
                     </Button>
                   )}
-                </div>
+                </>
               )}
-              {canManageEmployees && !isSelf && (
-                <div
-                  style={{
-                    padding: "0 24px 24px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                  }}
-                >
-                  <EmployeeStatusActions
-                    employee={employee}
-                    canEdit={canManageEmployees}
-                    isSelf={false}
-                    onDeactivate={onDeactivate}
-                    onActivate={onActivate}
-                    onRemove={onRemove}
-                    variant="panel"
-                  />
-                </div>
+              {showEmploymentStatusActions && (
+                <EmployeeStatusActions
+                  employee={employee}
+                  canEdit={canManageEmployees}
+                  isSelf={false}
+                  onDeactivate={onDeactivate}
+                  onActivate={onActivate}
+                  onRemove={onRemove}
+                  variant="panel"
+                />
               )}
-            </>
+            </div>
           )}
         </div>
 
-        {!managementAccessEditor && (
-          <div
-            style={{
-              flexShrink: 0,
-              padding: "16px 24px",
-              borderTop: "1px solid var(--dg-color-border-light)",
-            }}
-          >
-            <EditorActionRow
-              secondaryAction={
-                <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
-                  {canEditEmployee
-                    ? getEditorDismissLabel({ hasUnsavedChanges })
-                    : EDITOR_ACTION_LABELS.close}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "16px 24px",
+            borderTop: "1px solid var(--dg-color-border-light)",
+          }}
+        >
+          <EditorActionRow
+            secondaryAction={
+              <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
+                {canEditEmployee
+                  ? getEditorDismissLabel({ hasUnsavedChanges })
+                  : EDITOR_ACTION_LABELS.close}
+              </Button>
+            }
+            primaryAction={
+              canEditEmployee ? (
+                <Button
+                  onClick={handleFooterSave}
+                  disabled={!hasUnsavedChanges || isEditorSaveBlocked}
+                  className="dg-btn dg-btn-primary"
+                >
+                  {EDITOR_ACTION_LABELS.save}
                 </Button>
-              }
-              primaryAction={
-                canEditEmployee ? (
-                  <Button
-                    onClick={handleFooterSave}
-                    disabled={!hasUnsavedChanges || hasEmailConflict}
-                    className="dg-btn dg-btn-primary"
-                  >
-                    {EDITOR_ACTION_LABELS.save}
-                  </Button>
-                ) : undefined
-              }
-            />
-          </div>
-        )}
+              ) : undefined
+            }
+          />
+        </div>
       </SheetContent>
       {unsavedChangesDialog}
     </Sheet>

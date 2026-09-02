@@ -148,15 +148,12 @@ describe("AddManagementUserToScheduleModal", () => {
 
     const firstNameInput = screen.getByDisplayValue("Jordan");
     const lastNameInput = screen.getByDisplayValue("Lee");
-    const emailInput = screen.getByDisplayValue("jordan@example.com");
     const phoneInput = screen.getByDisplayValue("(415) 425-3334");
 
     await user.clear(firstNameInput);
     await user.type(firstNameInput, "  Jordyn  ");
     await user.clear(lastNameInput);
     await user.type(lastNameInput, "  Lane  ");
-    await user.clear(emailInput);
-    await user.type(emailInput, "  jordyn@example.com  ");
     await user.clear(phoneInput);
     await user.type(phoneInput, "415-555-0199");
 
@@ -181,7 +178,7 @@ describe("AddManagementUserToScheduleModal", () => {
           userId: "user-1",
           firstName: "Jordyn",
           lastName: "Lane",
-          email: "jordyn@example.com",
+          email: "jordan@example.com",
           phone: "(415) 555-0199",
           certificationId: null,
           focusAreaIds: [1],
@@ -196,6 +193,24 @@ describe("AddManagementUserToScheduleModal", () => {
       );
       expect(onClose).toHaveBeenCalledOnce();
     });
+  });
+
+  it("keeps email editing in Profile details", () => {
+    render(
+      <AddManagementUserToScheduleModal
+        orgId="org-1"
+        person={makePerson()}
+        employee={makeEmployee()}
+        focusAreas={focusAreas}
+        certifications={certifications}
+        roles={roles}
+        onClose={vi.fn()}
+        onAdded={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByDisplayValue("jordan@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
   });
 
   it("blocks the patch when the phone number is invalid", async () => {

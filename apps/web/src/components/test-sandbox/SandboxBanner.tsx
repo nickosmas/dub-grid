@@ -114,7 +114,7 @@ export default function SandboxBanner() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {error ? <span style={{ fontWeight: 500, opacity: 0.85 }}>{error}</span> : null}
+        {error ? <span style={{ fontWeight: 500 }}>{error}</span> : null}
         <Button
           type="button"
           onClick={handleReset}

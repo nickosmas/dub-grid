@@ -41,6 +41,7 @@ export function MemberAccessControls({
   onPermissionsChange,
   labelStyle,
   isSelf = false,
+  pendingInvitationEmail,
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
@@ -48,6 +49,7 @@ export function MemberAccessControls({
   onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
   labelStyle?: CSSProperties;
   isSelf?: boolean;
+  pendingInvitationEmail?: string;
 }) {
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
@@ -100,9 +102,13 @@ export function MemberAccessControls({
           </div>
           {pendingRole && (
             <ConfirmDialog
-              title="Change role"
-              message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
-              confirmLabel="Change role"
+              title={pendingInvitationEmail ? "Replace invitation access?" : "Change role"}
+              message={
+                pendingInvitationEmail
+                  ? `Change access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}? The current invitation will be revoked and a replacement will be sent to ${pendingInvitationEmail}.`
+                  : `Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`
+              }
+              confirmLabel={pendingInvitationEmail ? "Revoke and resend" : "Change role"}
               variant="warning"
               onCancel={() => setPendingRole(null)}
               // Awaited rather than fired into a `void` IIFE: the dialog stays
@@ -114,7 +120,11 @@ export function MemberAccessControls({
                 setChangingRole(true);
                 try {
                   await onRoleChange(next);
-                  toast.success(`Role updated to ${ROLE_LABELS[next] ?? next}.`);
+                  toast.success(
+                    pendingInvitationEmail
+                      ? `Invitation replaced with ${ROLE_LABELS[next] ?? next} access.`
+                      : `Role updated to ${ROLE_LABELS[next] ?? next}.`,
+                  );
                   setPendingRole(null);
                 } catch (error) {
                   toast.error(

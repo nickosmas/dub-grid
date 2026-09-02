@@ -154,9 +154,9 @@ function BillingMetric({
         <div
           style={{
             minWidth: 0,
-            fontSize: "11px",
-            color: "var(--dg-color-text-muted)",
-            fontWeight: 700,
+            fontSize: "var(--dg-type-metadata-size)",
+            color: "var(--dg-type-metadata-color)",
+            fontWeight: 500,
           }}
         >
           {label}
@@ -327,17 +327,7 @@ function BillingOperationDetailsDialog({
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div
-            style={{
-              color: "var(--dg-type-field-title-color)",
-              fontSize: "var(--dg-type-field-title-size)",
-              fontWeight: "var(--dg-type-field-title-weight)",
-              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-              lineHeight: "var(--dg-type-field-title-line-height)",
-            }}
-          >
-            Event details
-          </div>
+          <div className="dg-type-content-group-heading">Event details</div>
           {details.length > 0 ? (
             <DetailRows rows={details.map((item) => [item.label, item.value])} />
           ) : (
@@ -390,7 +380,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
         style={{
           color: "var(--dg-color-text-primary)",
           fontSize: "var(--dg-fs-label)",
-          fontWeight: 650,
+          fontWeight: 600,
           margin: 0,
           overflowWrap: "anywhere",
         }}

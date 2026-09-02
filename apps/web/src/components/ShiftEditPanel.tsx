@@ -36,6 +36,7 @@ import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
@@ -1025,11 +1026,11 @@ export default function ShiftEditPanel({
 
   const sectionLabel: React.CSSProperties = {
     marginBottom: 8,
-    fontSize: "var(--dg-type-field-title-size)",
-    fontWeight: "var(--dg-type-field-title-weight)",
-    color: "var(--dg-type-field-title-color)",
-    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-    lineHeight: "var(--dg-type-field-title-line-height)",
+    fontSize: "var(--dg-type-content-group-heading-size)",
+    fontWeight: "var(--dg-type-content-group-heading-weight)",
+    color: "var(--dg-type-content-group-heading-color)",
+    letterSpacing: "var(--dg-type-content-group-heading-letter-spacing)",
+    lineHeight: "var(--dg-type-content-group-heading-line-height)",
   };
 
   const hasSwapTimeConflict = useCallback(
@@ -2353,7 +2354,7 @@ export default function ShiftEditPanel({
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       marginTop: 4,
-                      color: "var(--dg-color-text-faint)",
+                      color: "var(--dg-color-text-label)",
                     }}
                   >
                     Try another day.
@@ -3340,6 +3341,7 @@ export default function ShiftEditPanel({
               </Button>
             </div>
           </div>
+          <ScrollOverflowCue />
         </div>
         {renderPendingRequestConfirmation()}
       </>
@@ -3442,7 +3444,14 @@ export default function ShiftEditPanel({
         </div>
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: isMobile ? "16px" : "20px 24px",
+          }}
+        >
           {showStandaloneRequestFlow ? (
             renderRequestControls({ standalone: true })
           ) : showRepeatForm && onRepeatConfirm && empId ? (
@@ -4092,6 +4101,7 @@ export default function ShiftEditPanel({
             </div>
           </div>
         )}
+        <ScrollOverflowCue />
       </div>
 
       {renderPendingRequestConfirmation()}

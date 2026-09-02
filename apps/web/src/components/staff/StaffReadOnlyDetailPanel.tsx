@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { Employee, FocusArea, NamedItem } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getAvatarTone, borderColorFromText } from "@dubgrid/design-tokens";
 
@@ -194,7 +195,10 @@ export function StaffReadOnlyDetailPanel({
         </div>
 
         {/* Body */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 24px 32px" }}>
+        <div
+          ref={scrollRef}
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px 32px" }}
+        >
           {/* Quick action */}
           {employee.email && (
             <a
@@ -319,6 +323,7 @@ export function StaffReadOnlyDetailPanel({
             </div>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
     </>,
     document.body,
@@ -329,13 +334,9 @@ function ReadOnlySection({ title, children }: { title: string; children: ReactNo
   return (
     <section style={{ marginBottom: 22 }}>
       <h3
+        className="dg-type-content-group-heading"
         style={{
           margin: "0 0 10px 2px",
-          fontSize: "var(--dg-type-field-title-size)",
-          fontWeight: "var(--dg-type-field-title-weight)",
-          color: "var(--dg-type-field-title-color)",
-          letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-          lineHeight: "var(--dg-type-field-title-line-height)",
         }}
       >
         {title}

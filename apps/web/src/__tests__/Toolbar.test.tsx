@@ -107,6 +107,23 @@ describe("Toolbar — Sort menu", () => {
 });
 
 describe("Toolbar — Tools dropdown", () => {
+  it("uses the shared switch visual for Authors without nesting another control", async () => {
+    const user = userEvent.setup();
+    const onAuditToggle = vi.fn();
+    render(<Toolbar {...defaultProps} showAudit onAuditToggle={onAuditToggle} />);
+
+    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    const authorsItem = screen.getByRole("menuitem", { name: /Authors/i });
+    const switchVisual = authorsItem.querySelector('[data-slot="switch"]');
+
+    expect(switchVisual).toHaveAttribute("aria-hidden", "true");
+    expect(switchVisual).toHaveStyle({ background: "var(--dg-color-brand)" });
+    expect(authorsItem.querySelector('[role="switch"]')).not.toBeInTheDocument();
+
+    await user.click(authorsItem);
+    expect(onAuditToggle).toHaveBeenCalledOnce();
+  });
+
   it("renders Print inside Tools dropdown", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);

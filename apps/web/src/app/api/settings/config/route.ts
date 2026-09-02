@@ -72,6 +72,7 @@ import {
 } from "@/lib/job-placement";
 import { CacheKey, cacheDel } from "@/lib/cache";
 import {
+  DEFAULT_SCHEDULED_JOB_STYLE,
   DEFAULT_SHIFT_JOB_SYSTEM_KEY,
   isDefaultShiftSystemJob,
   isRegularStaffSystemJob,
@@ -706,9 +707,9 @@ async function ensureDefaultShiftJobForOrg(orgId: string): Promise<void> {
     applicable_shift_ids: [],
     eligible_role_ids: [],
     required_certification_ids: [],
-    color: "#E2E8F0",
-    border_color: "transparent",
-    text_color: "#1E293B",
+    color: DEFAULT_SCHEDULED_JOB_STYLE.color,
+    border_color: DEFAULT_SCHEDULED_JOB_STYLE.border,
+    text_color: DEFAULT_SCHEDULED_JOB_STYLE.text,
     default_start_time: null,
     default_end_time: null,
     default_duration_hours: null,
@@ -2184,9 +2185,9 @@ export async function POST(req: NextRequest) {
               text_color: validatedJob.job.text,
             }
           : {
-              color: "#E2E8F0",
-              border_color: "transparent",
-              text_color: "#1E293B",
+              color: DEFAULT_SCHEDULED_JOB_STYLE.color,
+              border_color: DEFAULT_SCHEDULED_JOB_STYLE.border,
+              text_color: DEFAULT_SCHEDULED_JOB_STYLE.text,
             };
 
         const row = {

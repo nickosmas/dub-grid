@@ -17,7 +17,7 @@ const buttonVariants = cva(
         outline:
           "border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] text-[var(--dg-type-control-color)] hover:bg-[var(--dg-color-bg-secondary)] aria-expanded:bg-[var(--dg-color-bg-secondary)]",
         secondary:
-          "border-[var(--dg-color-border)] bg-transparent text-[var(--dg-type-control-color)] hover:bg-[var(--dg-color-bg-secondary)] aria-expanded:bg-[var(--dg-color-bg-secondary)]",
+          "border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-surface)] text-[var(--dg-type-control-color)] hover:border-[var(--dg-color-border-strong)] hover:bg-[var(--dg-color-surface-hover)] active:bg-[var(--dg-color-control-active-border)] aria-expanded:bg-[var(--dg-color-surface-hover)]",
         ghost:
           "text-[var(--dg-type-control-color)] hover:bg-[var(--dg-color-border-light)] aria-expanded:bg-[var(--dg-color-border-light)]",
         destructive:

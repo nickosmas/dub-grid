@@ -20,13 +20,7 @@ import {
   checkUserExistsByEmail,
   type UserExistsByEmailResult,
 } from "@/features/organization/client";
-import {
-  checkEmployeeEmailConflict,
-  checkEmployeePhoneConflict,
-  EmployeeContactConflictError,
-  type EmployeeEmailConflictResult,
-  updateEmployeeIdentity,
-} from "@/features/employees/client";
+import { checkEmployeePhoneConflict } from "@/features/employees/client";
 import { useIsInSandbox } from "@/hooks";
 import { usePermissions } from "@/features/permissions/client";
 
@@ -49,11 +43,8 @@ interface InviteEmployeeModalProps {
   onInvited: (updatedEmployee?: Employee | null) => void | Promise<void>;
   /** Available departments (for management staff mode). Accepts NamedItem[] or Department[]. */
   departments?: (NamedItem | Department)[];
-  /** When reopening this modal for someone with an already-live invitation
-   *  (e.g. after a revoke-then-reinvite step), seeds the email field from the
-   *  invitation's target address rather than the employee's (often blank)
-   *  contact email — otherwise a differently-typed address here can orphan
-   *  the original invite under a second, invisible pending row. */
+  /** Retained for callers that reopen the modal from a pending-invitation
+   *  banner. The target address still comes only from Profile details. */
   pendingInvitation?: Invitation;
 }
 
@@ -64,7 +55,6 @@ export default function InviteEmployeeModal({
   onClose,
   onInvited,
   departments = [],
-  pendingInvitation,
 }: InviteEmployeeModalProps) {
   const isManagementInvite = !employee;
   const isInSandbox = useIsInSandbox();
@@ -73,7 +63,7 @@ export default function InviteEmployeeModal({
     () => (isSuperAdmin || isGridmaster ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS),
     [isSuperAdmin, isGridmaster],
   );
-  const [email, setEmail] = useState(employee?.email || pendingInvitation?.email || "");
+  const [email, setEmail] = useState(employee?.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -85,9 +75,6 @@ export default function InviteEmployeeModal({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [emailLookup, setEmailLookup] = useState<UserExistsByEmailResult | null>(null);
   const [emailLookupLoading, setEmailLookupLoading] = useState(false);
-  const [employeeEmailConflict, setEmployeeEmailConflict] = useState(false);
-  const [employeeEmailConflictReason, setEmployeeEmailConflictReason] =
-    useState<EmployeeEmailConflictResult["reason"]>(undefined);
   const [employeePhoneConflict, setEmployeePhoneConflict] = useState(false);
 
   // Management departments only (filtered from all departments — only Department has .type)
@@ -99,14 +86,14 @@ export default function InviteEmployeeModal({
   const initialDraftSnapshot = useMemo(
     () =>
       JSON.stringify({
-        email: employee?.email || pendingInvitation?.email || "",
+        email: employee?.email || "",
         firstName: "",
         lastName: "",
         phone: "",
         departmentIds: [] as number[],
         role: "user",
       }),
-    [employee?.email, pendingInvitation?.email],
+    [employee?.email],
   );
   const hasUnsavedChanges =
     JSON.stringify({
@@ -126,17 +113,10 @@ export default function InviteEmployeeModal({
       onClose();
     }
   }, [onClose, requestClose, sending]);
-  const trimmedEmail = email.trim();
+  const trimmedEmail = (isManagementInvite ? email : employee?.email || "").trim();
   const requiredEmailError = trimmedEmail
     ? validateEmail(trimmedEmail)
     : "Email address is required";
-
-  // employees.email is the single source of truth for an employee-linked
-  // invite's target address once it's set — the field here is only ever
-  // freely editable when there's no contact email on file yet (a brand-new
-  // hire) or for a pure management-only invite (no employee record at all).
-  // Change it in Staff details instead, which backfills employees.email.
-  const emailReadOnly = !!employee?.email;
 
   // Pre-flight: when the email is a valid format, check whether it already
   // maps to a DubGrid user (any org). Debounced to avoid spamming the
@@ -148,7 +128,7 @@ export default function InviteEmployeeModal({
   //     existing user's profile name after they accept.
   //   - !exists → no banner; standard new-user invitation.
   useEffect(() => {
-    if (emailReadOnly || requiredEmailError) {
+    if (!isManagementInvite || requiredEmailError) {
       setEmailLookup(null);
       setEmailLookupLoading(false);
       return;
@@ -173,41 +153,7 @@ export default function InviteEmployeeModal({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [emailReadOnly, trimmedEmail, requiredEmailError, orgId]);
-
-  // Only meaningful when this invite would backfill employees.email on
-  // submit (see maybeBackfillEmployeeEmail below) — a blank roster contact
-  // email about to be set from this field. Flags a collision with a
-  // DIFFERENT active employee's contact email before Send is even pressed,
-  // instead of only surfacing it via a swallowed backfill failure.
-  useEffect(() => {
-    if (!employee || emailReadOnly || requiredEmailError) {
-      setEmployeeEmailConflict(false);
-      setEmployeeEmailConflictReason(undefined);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      checkEmployeeEmailConflict(trimmedEmail, orgId, employee.id, employee.userId)
-        .then((result) => {
-          if (!cancelled) {
-            setEmployeeEmailConflict(result.conflict);
-            setEmployeeEmailConflictReason(result.reason);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            console.error("checkEmployeeEmailConflict failed", err);
-            setEmployeeEmailConflict(false);
-            setEmployeeEmailConflictReason(undefined);
-          }
-        });
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [employee, emailReadOnly, requiredEmailError, trimmedEmail, orgId]);
+  }, [isManagementInvite, trimmedEmail, requiredEmailError, orgId]);
 
   // Management-only invites create a brand-new employees row on accept
   // (accept_invitation() in 002_functions_triggers.sql), so a phone number
@@ -242,7 +188,6 @@ export default function InviteEmployeeModal({
     !isInSandbox &&
     !requiredEmailError &&
     !emailLookup?.existsInThisOrg &&
-    !employeeEmailConflict &&
     !employeePhoneConflict &&
     (!isManagementInvite || (!!firstName.trim() && !!lastName.trim())) &&
     (!isManagementInvite || managementDepts.length === 0 || departmentIds.length > 0) &&
@@ -260,7 +205,7 @@ export default function InviteEmployeeModal({
         isManagementInvite && touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName:
         isManagementInvite && touched.lastName ? validateRequired(lastName, "Last name") : null,
-      email: touched.email ? requiredEmailError : null,
+      email: isManagementInvite && touched.email ? requiredEmailError : null,
       phone: isManagementInvite && touched.phone ? validatePhone(phone) : null,
       departmentIds:
         isManagementInvite &&
@@ -282,45 +227,11 @@ export default function InviteEmployeeModal({
     ],
   );
 
-  // Only meaningful for an employee-linked invite whose roster contact email
-  // is currently blank — never overwrites an existing, possibly deliberately
-  // distinct, contact email. Safe to run before creating the invitation:
-  // no live invitation row exists yet for the DB trigger to react to.
-  async function maybeBackfillEmployeeEmail(): Promise<Employee | null> {
-    if (!employee || employee.email || !trimmedEmail || requiredEmailError) return null;
-    try {
-      const { employee: updated } = await updateEmployeeIdentity({
-        employeeId: employee.id,
-        orgId,
-        userId: employee.userId,
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        phone: employee.phone || "",
-        email: trimmedEmail,
-        expectedVersion: employee.version,
-      });
-      return updated;
-    } catch (err) {
-      // Non-blocking — the invite action itself already succeeded, so a
-      // failed backfill must never throw out of this helper. A stale
-      // version conflict just means someone else edited this employee
-      // moments ago; stay silent. But an actionable contact conflict (this
-      // email already belongs to someone else) is worth surfacing, since
-      // it's exactly why the employee's email field stayed blank.
-      if (err instanceof EmployeeContactConflictError) {
-        toast.error(
-          "That email is already used by another person, so it wasn't saved to this employee's profile.",
-        );
-      }
-      return null;
-    }
-  }
-
   async function handleSend() {
     if (!canSend) {
       setTouched((prev) => ({
         ...prev,
-        email: true,
+        ...(isManagementInvite ? { email: true } : {}),
         ...(isManagementInvite ? { firstName: true, lastName: true, departmentIds: true } : {}),
         ...(isManagementInvite ? { phone: true } : {}),
       }));
@@ -330,7 +241,6 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const backfilledEmployee = await maybeBackfillEmployeeEmail();
       const { token } = await createOrganizationInvitation({
         email: trimmedEmail,
         role,
@@ -371,7 +281,7 @@ export default function InviteEmployeeModal({
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
       setSent(true);
-      await onInvited(backfilledEmployee);
+      await onInvited(null);
       onClose();
     } catch (err) {
       const message =
@@ -486,64 +396,34 @@ export default function InviteEmployeeModal({
             </div>
           )}
 
-          {/* Email */}
-          <div>
-            <label style={labelStyle}>Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => markTouched("email")}
-              placeholder="employee@example.com"
-              disabled={emailReadOnly}
-              style={
-                fieldErrors.email
-                  ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
-                  : inputStyle
-              }
-            />
-            {emailReadOnly && (
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--dg-color-text-muted)",
-                }}
-              >
-                This is their contact email from Staff details. Change it there to update their
-                invite address.
-              </div>
-            )}
-            {!emailReadOnly && fieldErrors.email && (
-              <div
-                style={{
-                  color: "var(--dg-color-danger)",
-                  fontSize: "var(--dg-fs-footnote)",
-                  marginTop: 4,
-                }}
-                role="alert"
-              >
-                {fieldErrors.email}
-              </div>
-            )}
-            {!emailReadOnly && !fieldErrors.email && employeeEmailConflict && (
-              <div
-                style={{
-                  color: "var(--dg-color-danger)",
-                  fontSize: "var(--dg-fs-footnote)",
-                  marginTop: 4,
-                }}
-                role="alert"
-              >
-                {employeeEmailConflictReason === "gridmaster"
-                  ? "That email address is reserved."
-                  : "That email is already used by another person on your team."}
-              </div>
-            )}
-            {!emailReadOnly &&
-              !fieldErrors.email &&
-              !emailLookupLoading &&
-              emailLookup?.existsInThisOrg && (
+          {isManagementInvite ? (
+            <div>
+              <label style={labelStyle}>Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => markTouched("email")}
+                placeholder="employee@example.com"
+                style={
+                  fieldErrors.email
+                    ? { ...inputStyle, borderColor: "var(--dg-color-danger)" }
+                    : inputStyle
+                }
+              />
+              {fieldErrors.email && (
+                <div
+                  style={{
+                    color: "var(--dg-color-danger)",
+                    fontSize: "var(--dg-fs-footnote)",
+                    marginTop: 4,
+                  }}
+                  role="alert"
+                >
+                  {fieldErrors.email}
+                </div>
+              )}
+              {!fieldErrors.email && !emailLookupLoading && emailLookup?.existsInThisOrg && (
                 <div
                   role="alert"
                   style={{
@@ -560,34 +440,44 @@ export default function InviteEmployeeModal({
                   again.
                 </div>
               )}
-            {!fieldErrors.email &&
-              !emailLookupLoading &&
-              emailLookup?.exists &&
-              !emailLookup.existsInThisOrg && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    padding: "8px 12px",
-                    borderRadius: 6,
-                    background: "var(--dg-color-info-bg)",
-                    color: "var(--dg-color-info-text)",
-                    fontSize: "var(--dg-fs-footnote)",
-                  }}
-                >
-                  <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a DubGrid
-                  account. They&apos;ll join your organization when they accept the invite
-                  {emailLookup.displayName ? (
-                    <>
-                      {" "}
-                      — your roster will show their name as{" "}
-                      <strong>{emailLookup.displayName}</strong>.
-                    </>
-                  ) : (
-                    <>.</>
-                  )}
-                </div>
-              )}
-          </div>
+              {!fieldErrors.email &&
+                !emailLookupLoading &&
+                emailLookup?.exists &&
+                !emailLookup.existsInThisOrg && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      background: "var(--dg-color-info-bg)",
+                      color: "var(--dg-color-info-text)",
+                      fontSize: "var(--dg-fs-footnote)",
+                    }}
+                  >
+                    <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a DubGrid
+                    account. They&apos;ll join your organization when they accept the invite
+                    {emailLookup.displayName ? (
+                      <>
+                        {", and your roster will show their name as "}
+                        <strong>{emailLookup.displayName}</strong>.
+                      </>
+                    ) : (
+                      <>.</>
+                    )}
+                  </div>
+                )}
+            </div>
+          ) : !trimmedEmail ? (
+            <div
+              role="alert"
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--dg-color-danger)",
+              }}
+            >
+              Add an email address in Profile details before sending an invitation.
+            </div>
+          ) : null}
 
           {/* Phone (management staff mode, optional) */}
           {isManagementInvite && (
@@ -662,9 +552,6 @@ export default function InviteEmployeeModal({
                       markTouched("departmentIds");
                     }}
                     padding="5px 12px"
-                    unselectedBackground="var(--dg-color-bg-secondary)"
-                    unselectedBorderColor="transparent"
-                    unselectedTextColor="var(--dg-color-text-faint)"
                   >
                     {department.name}
                   </SelectableTag>
@@ -705,7 +592,7 @@ export default function InviteEmployeeModal({
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <Button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
             </Button>
             <Button
@@ -779,8 +666,8 @@ const inputStyle: React.CSSProperties = {
   borderColor: "var(--dg-color-border, #C8D6EC)",
   borderRadius: "var(--dg-btn-radius)",
   fontSize: "var(--dg-fs-body-sm)",
-  color: "var(--dg-color-text-primary, #0F1724)",
-  background: "var(--dg-color-bg, #fff)",
+  color: "var(--dg-color-text-primary)",
+  background: "var(--dg-color-bg)",
   outline: "none",
   boxSizing: "border-box",
 };

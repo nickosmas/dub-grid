@@ -133,7 +133,7 @@ export function ProfilePanel({
   const [saving, setSaving] = useState(false);
   const [requestedEmail, setRequestedEmail] = useState<string | null>(null);
   const [workHasChanges, setWorkHasChanges] = useState(false);
-  const [workEmailConflict, setWorkEmailConflict] = useState(false);
+  const [workSaveBlocked, setWorkSaveBlocked] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
   const workEditorRef = useRef<EditEmployeePanelHandle>(null);
   const seededIdentityRef = useRef<string | null>(null);
@@ -171,7 +171,7 @@ export function ProfilePanel({
   const hasPhoneChanges = normalizedPhone !== savedPhone;
   const hasAnyChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges || workHasChanges;
   const hasInvalidDraft = Boolean(
-    firstNameError || lastNameError || emailError || phoneError || workEmailConflict,
+    firstNameError || lastNameError || emailError || phoneError || workSaveBlocked,
   );
 
   useEffect(() => {
@@ -642,7 +642,7 @@ export function ProfilePanel({
               hideActions
               persistent
               onDirtyChange={setWorkHasChanges}
-              onEmailConflictChange={setWorkEmailConflict}
+              onSaveBlockedChange={setWorkSaveBlocked}
               onSave={async (updatedEmployee) => {
                 await saveWorkDetails(updatedEmployee);
               }}

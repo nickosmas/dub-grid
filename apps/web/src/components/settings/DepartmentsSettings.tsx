@@ -227,7 +227,11 @@ function FocusAreaRows({
                   flex: 1,
                 }}
               >
-                {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
+                {fa.name || (
+                  <span style={{ fontStyle: "italic", color: "var(--dg-color-text-faint)" }}>
+                    Unnamed
+                  </span>
+                )}
               </span>
             )}
             {isEditing && (

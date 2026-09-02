@@ -57,7 +57,11 @@ import {
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
 import { normalizePresetBg } from "@/lib/colors";
-import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
+import {
+  DEFAULT_SCHEDULED_JOB_STYLE,
+  isDefaultShiftSystemJob,
+  isRegularStaffSystemJob,
+} from "@/lib/system-jobs";
 
 // ── Dependency Checks ────────────────────────────────────────────────────────
 // Before archiving any config item, check if it's referenced elsewhere.
@@ -69,9 +73,9 @@ export interface DependencyInfo {
 }
 
 const SCHEDULED_JOB_STORAGE_STYLE = {
-  color: "#E2E8F0",
-  borderColor: "transparent",
-  textColor: "#1E293B",
+  color: DEFAULT_SCHEDULED_JOB_STYLE.color,
+  borderColor: DEFAULT_SCHEDULED_JOB_STYLE.border,
+  textColor: DEFAULT_SCHEDULED_JOB_STYLE.text,
 } as const;
 
 type ScheduleCellDependencyRow = Pick<DbScheduleCell, "id"> & {

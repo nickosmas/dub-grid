@@ -9,6 +9,7 @@ import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
 export function ScheduleLoadingScreen() {
   return (
     <div
+      data-schedule-loading
       style={{
         position: "fixed",
         inset: 0,

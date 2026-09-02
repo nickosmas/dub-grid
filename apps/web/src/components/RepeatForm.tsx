@@ -175,7 +175,7 @@ function CalendarField({
           <span
             className={cn(
               "block truncate font-medium",
-              compact ? "text-[12px]" : "text-[13px]",
+              "text-[length:var(--dg-type-control-size)]",
               value ? "text-[var(--dg-color-text-secondary)]" : "text-[var(--dg-color-text-faint)]",
             )}
           >
@@ -183,7 +183,7 @@ function CalendarField({
           </span>
         </span>
         <span className="flex items-center gap-2 text-[var(--dg-color-text-secondary)]">
-          <span className="text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-faint)]">
+          <span className="text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-primary)]">
             {expanded ? "Close" : "Edit"}
           </span>
           <ChevronDown

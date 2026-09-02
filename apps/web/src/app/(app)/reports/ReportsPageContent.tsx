@@ -1327,7 +1327,7 @@ const calendarPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
+  boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   padding: 12,
   width: 292,
 };
@@ -1473,7 +1473,7 @@ const targetDropdownPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
+  boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   maxHeight: "min(420px, calc(100vh - 80px))",
   overflowY: "auto",
   padding: 12,

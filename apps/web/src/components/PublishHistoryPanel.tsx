@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
@@ -597,7 +598,14 @@ export default function PublishHistoryPanel({
         <ProgressBar loading={loading} />
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: isMobile ? "16px" : "20px 24px",
+          }}
+        >
           {loading && entries.length === 0 && (
             <div
               aria-hidden
@@ -750,6 +758,7 @@ export default function PublishHistoryPanel({
             </div>
           )}
         </div>
+        <ScrollOverflowCue />
       </div>
     </>
   );

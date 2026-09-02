@@ -32,8 +32,9 @@ const tableCell = {
 
 const tableHeader = {
   ...tableCell,
-  fontWeight: 600,
-  color: "var(--dg-color-text-primary)",
+  fontSize: "var(--dg-fs-label)",
+  fontWeight: "var(--dg-type-table-heading-weight)",
+  color: "var(--dg-color-text-label)",
   background: "var(--dg-color-surface-hover)",
 } as const;
 

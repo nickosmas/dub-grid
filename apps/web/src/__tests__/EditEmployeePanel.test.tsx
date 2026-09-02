@@ -122,6 +122,7 @@ function renderPanel(
     onSaveWithReinvite: (updated: Employee, oldInvitation: Invitation) => void | Promise<void>;
     orgId: string;
     onEmailConflictChange: (hasConflict: boolean) => void;
+    onSaveBlockedChange: (isBlocked: boolean) => void;
     employee: Employee;
     roles: NamedItem[];
     certifications: NamedItem[];
@@ -144,6 +145,7 @@ function renderPanel(
       pendingInvitation={overrides.pendingInvitation}
       onSaveWithReinvite={overrides.onSaveWithReinvite}
       onEmailConflictChange={overrides.onEmailConflictChange}
+      onSaveBlockedChange={overrides.onSaveBlockedChange}
       persistent={overrides.persistent}
     />,
   );
@@ -302,6 +304,21 @@ describe("EditEmployeePanel", () => {
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("reports blocking validation to a host when required focus areas are cleared", async () => {
+      const user = userEvent.setup();
+      const onSaveBlockedChange = vi.fn();
+      renderPanel({ onSaveBlockedChange });
+
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(false);
+
+      await user.click(screen.getByRole("button", { name: "North" }));
+      expect(screen.getByText("At least one focus areas is required")).toBeVisible();
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(true);
+
+      await user.click(screen.getByRole("button", { name: "North" }));
+      expect(onSaveBlockedChange).toHaveBeenLastCalledWith(false);
     });
   });
 

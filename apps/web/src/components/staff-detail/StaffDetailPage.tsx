@@ -54,6 +54,7 @@ import type {
 import { fetchRecurringShifts } from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
+  replaceOrganizationInvitationAccessGuarded,
   revokeInvitation,
   updateOrganizationMembershipGuarded,
 } from "@/features/organization/client";
@@ -634,7 +635,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const handleRoleChange = useCallback(
     async (role: OrganizationRole) => {
-      if (!orgId || !directoryPerson?.userId || !directoryPerson.membershipUpdatedAt) return;
+      if (!orgId || !directoryPerson) return;
+      if (!directoryPerson.userId) {
+        if (!pendingInvite?.updatedAt) return;
+        await replaceOrganizationInvitationAccessGuarded({
+          orgId,
+          invitationId: pendingInvite.id,
+          expectedUpdatedAt: pendingInvite.updatedAt,
+          roleToAssign: role,
+        });
+        await refreshInvitations();
+        refreshDirectory();
+        return;
+      }
+      if (!directoryPerson.membershipUpdatedAt) return;
       const updatedMembership = await updateOrganizationMembershipGuarded({
         orgId,
         userId: directoryPerson.userId,
@@ -647,7 +661,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
       ]);
     },
-    [directoryPerson, orgId, queryClient, syncDirectoryMembership],
+    [
+      directoryPerson,
+      orgId,
+      pendingInvite,
+      queryClient,
+      refreshDirectory,
+      refreshInvitations,
+      syncDirectoryMembership,
+    ],
   );
 
   const isLoading = loading || orgLoading || perms.isLoading;
@@ -800,8 +822,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               orgRole={directoryPerson.orgRole}
                               adminPermissions={directoryPerson.adminPermissions}
                               onRoleChange={handleRoleChange}
-                              onPermissionsChange={handlePermissionsChange}
+                              onPermissionsChange={
+                                directoryPerson.userId ? handlePermissionsChange : undefined
+                              }
                               isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                              pendingInvitationEmail={pendingInvite?.email}
                             />
                           ) : null}
                           <EmployeeManagementAccessEditor

@@ -1381,6 +1381,74 @@ export async function createMobileEmployeeInvitationRow(
   return data as MobileInvitationRow;
 }
 
+export async function replaceMobilePendingInvitationAccessRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string | null;
+    roleToAssign: "user" | "admin" | "super_admin";
+    invitedBy: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
+): Promise<{
+  previousInvitationId: string;
+  invitation: MobileInvitationRow;
+}> {
+  const { data, error } = await serviceClient.rpc("replace_pending_invitation_access", {
+    p_org_id: input.orgId,
+    p_invitation_id: input.invitationId,
+    p_expected_updated_at: input.expectedUpdatedAt,
+    p_role: input.roleToAssign,
+    p_invited_by: input.invitedBy,
+    p_department_ids: input.departmentIds ?? null,
+    p_dept_admin_ids: input.deptAdminIds ?? null,
+  });
+  if (error) throw error;
+
+  const result = data as {
+    previous_invitation_id?: string;
+    invitation_id?: string;
+  } | null;
+  if (!result?.previous_invitation_id || !result.invitation_id) {
+    throw new Error("Invitation replacement did not return an invitation.");
+  }
+
+  const { data: invitation, error: invitationError } = await serviceClient
+    .from("invitations")
+    .select(INVITATION_COLS)
+    .eq("org_id", input.orgId)
+    .eq("id", result.invitation_id)
+    .single();
+  if (invitationError) throw invitationError;
+
+  return {
+    previousInvitationId: result.previous_invitation_id,
+    invitation: invitation as MobileInvitationRow,
+  };
+}
+
+export async function rollbackMobilePendingInvitationAccessReplacement(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    previousInvitationId: string;
+    replacementInvitationId: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await serviceClient.rpc(
+    "rollback_pending_invitation_access_replacement",
+    {
+      p_org_id: input.orgId,
+      p_previous_invitation_id: input.previousInvitationId,
+      p_replacement_invitation_id: input.replacementInvitationId,
+    },
+  );
+  if (error) throw error;
+  return data === true;
+}
+
 /**
  * Re-point a pending invitation at a different role or set of management
  * departments. Guarded on `expectedUpdatedAt` like every other invitation write

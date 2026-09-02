@@ -229,7 +229,7 @@ export default function OpenShiftsCard({
                           padding: "3px 8px",
                           borderRadius: 5,
                           background: "var(--dg-color-brand)",
-                          color: "#fff",
+                          color: "var(--dg-color-text-inverse)",
                           border: "none",
                           cursor: "pointer",
                           whiteSpace: "nowrap",

@@ -136,7 +136,7 @@ export function StaffFilterPopover({
               onChange={(event) => onFilterDepartmentAdminOnlyChange(event.target.checked)}
               className="h-3.5 w-3.5 accent-[var(--dg-color-brand)]"
             />
-            <span className="text-xs font-medium text-[var(--dg-color-text-secondary)]">
+            <span className="text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-primary)]">
               Department admins only
             </span>
           </label>

@@ -7,13 +7,13 @@ import Modal from "@/components/Modal";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
   ACTIVITY_CATEGORIES,
   matchesCategory,
   describeAction,
   getActionSeverity,
-  severityColor,
   formatRelativeTime,
   formatDetails,
   groupByDate,
@@ -29,6 +29,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { formatDateTime } from "@/lib/audit/details";
 
 const PAGE_SIZE = 50;
+
+const ACTION_TONES = {
+  create: "success",
+  delete: "danger",
+  warning: "warning",
+  update: "neutral",
+} satisfies Record<ReturnType<typeof getActionSeverity>, StatusPillTone>;
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -133,7 +140,7 @@ function Toolbar({
             border: "1px solid var(--dg-color-border)",
             background: "var(--dg-color-surface)",
             fontSize: "var(--dg-fs-navigation-item)",
-            fontWeight: 400,
+            fontWeight: "var(--dg-type-control-weight)",
             letterSpacing: "normal",
             color: "var(--dg-color-text-primary)",
             outline: "none",
@@ -154,8 +161,8 @@ function Toolbar({
         onChange={onCategoryChange}
         style={{ minWidth: isMobile ? undefined : 160 }}
         fontSize="var(--dg-fs-navigation-item)"
-        fontWeight={400}
-        activeFontWeight={400}
+        fontWeight="var(--dg-type-control-weight)"
+        activeFontWeight="var(--dg-type-control-weight)"
         letterSpacing="normal"
       />
     </div>
@@ -185,23 +192,10 @@ function DateGroupRow({ label, colSpan }: { label: string; colSpan: number }) {
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const colors = severityColor(getActionSeverity(action));
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: 4,
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 600,
-        background: colors.bg,
-        border: `1px solid ${colors.border}`,
-        color: colors.fg,
-        whiteSpace: "nowrap",
-      }}
-    >
+    <StatusPill tone={ACTION_TONES[getActionSeverity(action)]} variant="category">
       {getAuditCategoryLabel(action)}
-    </span>
+    </StatusPill>
   );
 }
 
@@ -256,7 +250,7 @@ function DetailsCell({
   );
 }
 
-function ActivityDetailsDialog({
+export function ActivityDetailsDialog({
   entry,
   onClose,
 }: {
@@ -271,23 +265,11 @@ function ActivityDetailsDialog({
   const timestamp = new Date(entry.createdAt);
 
   return (
-    <Modal
-      title="Activity details"
-      onClose={onClose}
-      style={{ maxWidth: 600, width: "min(600px, calc(100vw - 32px))" }}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <Modal title="Activity details" onClose={onClose} className="dg-activity-details-modal">
+      <div className="dg-activity-details">
+        <div className="dg-activity-details-summary">
           <ActionBadge action={entry.action} />
-          <div
-            style={{
-              color: "var(--dg-color-text-primary)",
-              fontSize: "var(--dg-fs-card-title)",
-              fontWeight: 600,
-            }}
-          >
-            {describeAction(entry)}
-          </div>
+          <div className="dg-activity-details-headline">{describeAction(entry)}</div>
         </div>
         <DetailRows
           rows={[
@@ -297,78 +279,67 @@ function ActivityDetailsDialog({
                 ? entry.createdAt
                 : timestamp.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
             ],
-            ["Performed by", actorSecondary ? `${actor} (${actorSecondary})` : actor],
-            ["Target changed", targetSecondary ? `${target} (${targetSecondary})` : target],
+            [
+              "Performed by",
+              <ActivityDetailIdentity key="actor" primary={actor} secondary={actorSecondary} />,
+            ],
+            [
+              "Target changed",
+              <ActivityDetailIdentity key="target" primary={target} secondary={targetSecondary} />,
+            ],
             ["Item type", getResourceTypeLabel(entry.resourceType)],
             ["Activity type", getAuditCategoryLabel(entry.action)],
           ]}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div
-            style={{
-              color: "var(--dg-type-field-title-color)",
-              fontSize: "var(--dg-type-field-title-size)",
-              fontWeight: "var(--dg-type-field-title-weight)",
-              letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-              lineHeight: "var(--dg-type-field-title-line-height)",
-            }}
-          >
+        <section className="dg-activity-details-changes" aria-labelledby="activity-changes-title">
+          <div id="activity-changes-title" className="dg-type-content-group-heading">
             What changed
           </div>
           {details.length > 0 ? (
-            <DetailRows rows={details.map((detail) => [detail.label, detail.value])} />
+            <DetailRows
+              rows={details.map((detail): [string, React.ReactNode] => [
+                detail.label,
+                detail.value,
+              ])}
+            />
           ) : (
-            <div
-              style={{
-                color: "var(--dg-color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-              }}
-            >
-              No additional details were recorded.
-            </div>
+            <div className="dg-activity-details-empty">No additional details were recorded.</div>
           )}
-        </div>
+        </section>
       </div>
     </Modal>
   );
 }
 
-function DetailRows({ rows }: { rows: Array<[string, string]> }) {
+function DetailRows({ rows }: { rows: Array<[string, React.ReactNode]> }) {
   return (
-    <dl
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(104px, max-content) minmax(0, 1fr)",
-        gap: "8px 14px",
-        margin: 0,
-      }}
-    >
-      {rows.map(([label, value]) => (
-        <React.Fragment key={`${label}:${value}`}>
-          <dt
-            style={{
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-            }}
-          >
-            {label}
-          </dt>
-          <dd
-            style={{
-              color: "var(--dg-color-text-primary)",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 650,
-              margin: 0,
-              overflowWrap: "anywhere",
-            }}
-          >
-            {value}
-          </dd>
-        </React.Fragment>
+    <dl className="dg-activity-details-list">
+      {rows.map(([label, value], index) => (
+        <div className="dg-activity-details-row" key={`${label}:${index}`}>
+          <dt className="dg-activity-details-label">{label}</dt>
+          <dd className="dg-activity-details-value">{value}</dd>
+        </div>
       ))}
     </dl>
+  );
+}
+
+function ActivityDetailIdentity({
+  primary,
+  secondary,
+}: {
+  primary: string;
+  secondary?: string | null;
+}) {
+  const showSecondary = secondary && secondary !== primary;
+
+  return (
+    <span className="dg-activity-details-identity">
+      <span className="dg-activity-details-identity-primary">{primary}</span>
+      {showSecondary ? (
+        <span className="dg-activity-details-identity-secondary">{secondary}</span>
+      ) : null}
+    </span>
   );
 }
 

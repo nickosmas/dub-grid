@@ -2,9 +2,12 @@ import { type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type StatusPillTone = "success" | "warning" | "danger" | "info" | "neutral";
+export type StatusPillVariant = "status" | "category";
 
 interface StatusPillProps {
   tone?: StatusPillTone;
+  variant?: StatusPillVariant;
+  bordered?: boolean;
   dot?: boolean;
   children: ReactNode;
   title?: string;
@@ -40,28 +43,42 @@ const TONE_VARS: Record<StatusPillTone, { bg: string; text: string; border: stri
   },
 };
 
+const CATEGORY_NEUTRAL_VARS = {
+  bg: "var(--dg-color-surface)",
+  text: "var(--dg-color-text-label)",
+  border: "var(--dg-color-border)",
+};
+
 export function StatusPill({
   tone = "neutral",
+  variant = "status",
+  bordered = true,
   dot,
   children,
   title,
   className,
   "aria-label": ariaLabel,
 }: StatusPillProps) {
-  const vars = TONE_VARS[tone];
-  const showDot = dot ?? tone !== "neutral";
+  const vars =
+    variant === "category" && tone === "neutral" ? CATEGORY_NEUTRAL_VARS : TONE_VARS[tone];
+  const showDot = dot ?? (variant === "status" && tone !== "neutral");
   const style: CSSProperties = {
-    background: vars.bg,
+    background:
+      variant === "category" ? `color-mix(in srgb, ${vars.bg} 96%, ${vars.text})` : vars.bg,
     color: vars.text,
-    border: `1px solid ${vars.border}`,
+    ...(bordered ? { border: `1px solid ${vars.border}` } : {}),
   };
 
   return (
     <span
       aria-label={ariaLabel}
+      data-status-pill-variant={variant}
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium tracking-normal whitespace-nowrap",
+        "inline-flex items-center gap-1.5 px-2 py-0.5 tracking-normal whitespace-nowrap",
+        variant === "category"
+          ? "rounded-[4px] text-[length:var(--dg-fs-footnote)] font-semibold"
+          : "rounded-md text-[length:var(--dg-type-badge-size)] font-medium",
         className,
       )}
       style={style}

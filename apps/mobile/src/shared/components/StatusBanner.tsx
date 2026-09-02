@@ -133,12 +133,12 @@ function CenteredStatus({
 }) {
   const mobileColors = useMobileColors();
   const centeredStyles = useMemo(() => createCenteredStyles(mobileColors), [mobileColors]);
-  // `Screen`'s scroll content stretches to fill the viewport when it's
-  // shorter than the screen (see its `flexGrow: 1`), so this only has to
-  // claim that space and center within it — no window-height guesswork.
+  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
+  // reliably fills the non-scrolling container's remaining space and centers
+  // within it, with none of the viewport-height guessing a ScrollView forces.
   const fillStyle = fillScreen
     ? {
-        flexGrow: 1,
+        flex: 1,
         justifyContent: "center" as const,
       }
     : null;

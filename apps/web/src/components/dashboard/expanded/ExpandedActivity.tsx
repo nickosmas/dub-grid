@@ -139,7 +139,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                   border: "1px solid",
                   borderColor: active ? "var(--dg-color-brand)" : "var(--dg-color-border)",
                   background: active ? "var(--dg-color-brand)" : "transparent",
-                  color: active ? "#fff" : "var(--dg-color-text-secondary)",
+                  color: active ? "var(--dg-color-text-inverse)" : "var(--dg-color-text-secondary)",
                   cursor: "pointer",
                   transition: "all 0.15s",
                 }}

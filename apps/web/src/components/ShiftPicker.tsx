@@ -321,7 +321,7 @@ export default function ShiftPicker({
               justifyContent: "center",
             }}
           >
-            <Check size={10} color="#fff" strokeWidth={3.5} />
+            <Check size={10} color="var(--dg-color-text-inverse)" strokeWidth={3.5} />
           </div>
         )}
 
@@ -578,7 +578,7 @@ export default function ShiftPicker({
                           justifyContent: "center",
                         }}
                       >
-                        <Check size={10} color="#fff" strokeWidth={3.5} />
+                        <Check size={10} color="var(--dg-color-text-inverse)" strokeWidth={3.5} />
                       </div>
                     )}
                     <MaybeHint content={at.name || at.label} side="left">

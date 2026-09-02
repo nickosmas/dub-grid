@@ -17,6 +17,7 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
@@ -455,6 +456,7 @@ export function ManagementStaffPanel({
       onPermissionsChange={onPermissionsChange}
       labelStyle={labelStyle}
       isSelf={isSelf}
+      pendingInvitationEmail={isPending ? effectiveEmail : undefined}
     />
   );
 
@@ -623,6 +625,7 @@ export function ManagementStaffPanel({
         <div
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: "auto",
             padding: "16px 20px",
             display: "flex",
@@ -787,9 +790,6 @@ export function ManagementStaffPanel({
                         selected={deptIds.includes(department.id)}
                         onClick={() => toggleDepartment(department.id)}
                         padding="5px 12px"
-                        unselectedBackground="var(--dg-color-bg-secondary)"
-                        unselectedBorderColor="transparent"
-                        unselectedTextColor="var(--dg-color-text-faint)"
                       >
                         {department.name}
                       </SelectableTag>
@@ -848,16 +848,7 @@ export function ManagementStaffPanel({
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {/* Contact section */}
               <div>
-                <div
-                  style={{
-                    fontSize: "var(--dg-type-field-title-size)",
-                    fontWeight: "var(--dg-type-field-title-weight)",
-                    color: "var(--dg-type-field-title-color)",
-                    letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                    lineHeight: "var(--dg-type-field-title-line-height)",
-                    marginBottom: 8,
-                  }}
-                >
+                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
                   Contact
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -885,7 +876,7 @@ export function ManagementStaffPanel({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       style={{
-                        color: "var(--dg-color-text-faint)",
+                        color: "var(--dg-color-text-secondary)",
                         flexShrink: 0,
                       }}
                     >
@@ -919,7 +910,7 @@ export function ManagementStaffPanel({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         style={{
-                          color: "var(--dg-color-text-faint)",
+                          color: "var(--dg-color-text-secondary)",
                           flexShrink: 0,
                         }}
                       >
@@ -936,16 +927,7 @@ export function ManagementStaffPanel({
                 personDepts.length > 0 ||
                 (showLastActive && !isPending && person.lastSignInAt !== null)) && (
                 <div>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-type-field-title-size)",
-                      fontWeight: "var(--dg-type-field-title-weight)",
-                      color: "var(--dg-type-field-title-color)",
-                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                      lineHeight: "var(--dg-type-field-title-line-height)",
-                      marginBottom: 10,
-                    }}
-                  >
+                  <div className="dg-type-content-group-heading" style={{ marginBottom: 10 }}>
                     Details
                   </div>
                   <div
@@ -1209,6 +1191,7 @@ export function ManagementStaffPanel({
         </div>
 
         {unsavedChangesDialog}
+        <ScrollOverflowCue />
       </div>
     </>,
     document.body,

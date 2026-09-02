@@ -217,13 +217,9 @@ export default function CoverageBySectionCard({
         {sections.length > 0 && sections[0].daily.length > 0 && (
           <div style={{ marginTop: 20 }}>
             <div
+              className="dg-type-content-group-heading"
               style={{
-                fontSize: "var(--dg-type-field-title-size)",
-                fontWeight: "var(--dg-type-field-title-weight)",
-                color: "var(--dg-type-field-title-color)",
                 marginBottom: 10,
-                textTransform: "none",
-                letterSpacing: "var(--dg-type-field-title-letter-spacing)",
               }}
             >
               Day-by-day staffing

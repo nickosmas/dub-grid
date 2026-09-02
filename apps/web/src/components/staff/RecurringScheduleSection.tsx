@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
@@ -134,6 +135,7 @@ function ShiftCellPopover({
           borderRadius: "var(--dg-radius-lg)",
           boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           width: isMobileView ? "calc(100vw - 16px)" : "max-content",
@@ -160,20 +162,10 @@ function ShiftCellPopover({
               borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
-            <span
-              style={{
-                fontSize: "var(--dg-type-field-title-size)",
-                fontWeight: "var(--dg-type-field-title-weight)",
-                color: "var(--dg-type-field-title-color)",
-                textTransform: "none",
-                letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-              }}
-            >
-              Select Shift
-            </span>
+            <span className="dg-type-component-heading">Select Shift</span>
             <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px" }}>
             <ShiftPicker
               assignments={assignments}
               shiftCategories={shiftCategories}
@@ -242,6 +234,7 @@ function ShiftCellPopover({
             )}
           </div>
         </div>
+        <ScrollOverflowCue />
       </PopoverContent>
     </Popover>
   );

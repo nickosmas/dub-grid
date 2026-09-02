@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from "react";
 import { NamedItem, Department } from "@/types";
 import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -10,6 +10,10 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
+import { SelectableTag } from "@/components/ui/selectable-tag";
+import { StatusPill } from "@/components/ui/status-pill";
 import { SectionCard } from "./shared";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
@@ -21,7 +25,6 @@ import {
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCompactNamedItemLabel } from "@/lib/utils";
-import { describeCertificationRequirement } from "@/lib/credential-requirements";
 import { toast } from "sonner";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
@@ -239,9 +242,7 @@ export default function StringListSettings({
           maxLength: 20,
         }) || getCompactNamedItemLabel(it),
       isScheduleRole: showScheduleRoleToggle ? (it.isScheduleRole ?? true) : it.isScheduleRole,
-      // Also applied here, not just on toggle, so rows that predate the rule
-      // are normalized rather than persisting a second spelling of org-wide.
-      departmentIds: collapseIfEveryDepartment(it.departmentIds ?? []),
+      departmentIds: it.departmentIds ?? [],
       requiredCertificationIds: showRequiredCertifications
         ? (it.requiredCertificationIds ?? [])
         : it.requiredCertificationIds,
@@ -350,22 +351,6 @@ export default function StringListSettings({
     setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)));
   };
 
-  /**
-   * Selecting every department says the same thing as org-wide, so store the
-   * org-wide form. They are not merely equivalent today: org-wide also picks up
-   * departments added later, which is what someone selecting all of them means.
-   *
-   * Skipped when there is only one department, where "all" and "that one" are
-   * the same set and collapsing would leave the picker unable to scope at all.
-   */
-  const collapseIfEveryDepartment = useCallback(
-    (departmentIds: number[]): number[] =>
-      activeDepts.length > 1 && activeDepts.every((d) => departmentIds.includes(d.id))
-        ? []
-        : departmentIds,
-    [activeDepts],
-  );
-
   const handleDeptToggle = (i: number, departmentId: number) => {
     setLocal((prev) =>
       prev.map((item, idx) => {
@@ -374,7 +359,7 @@ export default function StringListSettings({
         const next = current.includes(departmentId)
           ? current.filter((id) => id !== departmentId)
           : [...current, departmentId];
-        return { ...item, departmentIds: collapseIfEveryDepartment(next) };
+        return { ...item, departmentIds: next };
       }),
     );
   };
@@ -393,12 +378,6 @@ export default function StringListSettings({
   const certMap = useMemo(() => new Map(activeCerts.map((c) => [c.id, c])), [activeCerts]);
   const showCerts = showRequiredCertifications && activeCerts.length > 0;
 
-  /**
-   * Unlike departments, selecting every certification is not collapsed to the
-   * empty "no requirement" form. "Anyone may hold this role" and "each of these
-   * certifications qualifies" are different rules, and only the latter should
-   * keep excluding staff who hold no certification at all.
-   */
   const handleCertToggle = (i: number, certificationId: number) => {
     setLocal((prev) =>
       prev.map((item, idx) => {
@@ -492,30 +471,41 @@ export default function StringListSettings({
 
   const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
+  const useBalancedRoleColumns = showCerts;
   const deptCol = showDept
-    ? isMobile
-      ? " minmax(100px, 1fr)"
-      : wideTable
-        ? " minmax(130px, 160px)"
-        : " minmax(140px, 1fr)"
+    ? useBalancedRoleColumns
+      ? " minmax(0, 0.75fr)"
+      : isMobile
+        ? " minmax(100px, 1fr)"
+        : wideTable
+          ? " minmax(130px, 160px)"
+          : " minmax(140px, 1fr)"
     : "";
   const scheduleRoleCol = showScheduleRoleToggle
-    ? wideTable && !isMobile
-      ? " 150px"
-      : " 160px"
+    ? useBalancedRoleColumns
+      ? " minmax(0, 1fr)"
+      : wideTable && !isMobile
+        ? " 150px"
+        : " 160px"
     : "";
   const certCol = showCerts
-    ? isMobile
-      ? " minmax(100px, 1fr)"
-      : wideTable
-        ? " minmax(150px, 180px)"
-        : " minmax(140px, 1fr)"
+    ? useBalancedRoleColumns
+      ? " minmax(0, 2fr)"
+      : isMobile
+        ? " minmax(100px, 1fr)"
+        : wideTable
+          ? " minmax(150px, 180px)"
+          : " minmax(140px, 1fr)"
     : "";
   const rankCol = "";
-  const nameCol = wideTable && !isMobile ? " minmax(200px, 1fr)" : " 2fr";
-  // Keep these tables only as wide as their useful columns. A small viewport
-  // may scroll rather than squeezing controls.
-  const tableMinWidth = wideTable && !isMobile ? 820 : undefined;
+  const nameCol = useBalancedRoleColumns
+    ? " minmax(0, 1.25fr)"
+    : wideTable && !isMobile
+      ? " minmax(200px, 1fr)"
+      : " 2fr";
+  // Role settings share the available table width evenly. Their cell content
+  // truncates or wraps within the track rather than making individual rows scroll.
+  const tableMinWidth = !useBalancedRoleColumns && wideTable && !isMobile ? 820 : undefined;
   const gridCols = hideAbbrFields
     ? isEditing
       ? `24px${nameCol}${scheduleRoleCol}${deptCol}${certCol}${rankCol} auto`
@@ -771,6 +761,17 @@ export default function StringListSettings({
                       </div>
                     ) : null}
                   </div>
+                ) : item.name && showScheduleRoleToggle ? (
+                  <div style={{ minWidth: 0 }}>
+                    <StatusPill
+                      tone="neutral"
+                      variant="category"
+                      className="dg-role-name-view-pill max-w-full whitespace-normal"
+                      title={item.name}
+                    >
+                      {item.name}
+                    </StatusPill>
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -888,32 +889,14 @@ export default function StringListSettings({
                       <span>Use for job eligibility</span>
                     </label>
                   ) : (
-                    <div>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "2px 8px",
-                          borderRadius: 20,
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 600,
-                          background:
-                            item.isScheduleRole === false
-                              ? "var(--dg-color-bg-secondary)"
-                              : "var(--dg-color-brand-bg)",
-                          border:
-                            item.isScheduleRole === false
-                              ? "1px solid var(--dg-color-border-light)"
-                              : "1px solid var(--dg-color-brand-border)",
-                          color:
-                            item.isScheduleRole === false
-                              ? "var(--dg-color-text-muted)"
-                              : "var(--dg-color-brand)",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {item.isScheduleRole === false ? "Cosmetic only" : "Schedule eligible"}
-                      </span>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 500,
+                        color: "var(--dg-color-text-primary)",
+                      }}
+                    >
+                      {item.isScheduleRole === false ? "No" : "Yes"}
                     </div>
                   ))}
 
@@ -923,22 +906,26 @@ export default function StringListSettings({
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       draggable={false}
-                      style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
+                      className="dg-role-department-edit-pills"
                     >
-                      {/* Multi-select: an item can belong to several
-                          departments, and selecting none means org-wide. */}
-                      <DeptToggle
-                        label="Org-wide"
+                      {/* Multi-select: an item can belong to several departments.
+                          Org-wide is the explicit empty-list state. */}
+                      <SelectableTag
                         selected={(item.departmentIds ?? []).length === 0}
                         onClick={() => handleDeptClear(i)}
-                      />
+                        title="Org-wide"
+                      >
+                        Org-wide
+                      </SelectableTag>
                       {activeDepts.map((d) => (
-                        <DeptToggle
+                        <SelectableTag
                           key={d.id}
-                          label={d.name}
                           selected={(item.departmentIds ?? []).includes(d.id)}
                           onClick={() => handleDeptToggle(i, d.id)}
-                        />
+                          title={d.name}
+                        >
+                          {d.name}
+                        </SelectableTag>
                       ))}
                     </div>
                   ) : (
@@ -985,59 +972,38 @@ export default function StringListSettings({
                       draggable={false}
                       style={{ display: "flex", flexDirection: "column", gap: 6 }}
                     >
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      <div className="dg-role-requirement-edit-pills">
                         {/* Selecting none leaves the role assignable to anyone;
                             any selected certification qualifies on its own. */}
-                        <DeptToggle
-                          label="Anyone"
+                        <SelectableTag
                           selected={(item.requiredCertificationIds ?? []).length === 0}
                           onClick={() => handleCertClear(i)}
-                        />
+                          title="Anyone"
+                        >
+                          Anyone
+                        </SelectableTag>
                         {activeCerts.map((c) => (
-                          <DeptToggle
+                          <SelectableTag
                             key={c.id}
-                            label={c.name}
                             selected={(item.requiredCertificationIds ?? []).includes(c.id)}
                             onClick={() => handleCertToggle(i, c.id)}
-                          />
+                            title={c.name}
+                          >
+                            {c.name}
+                          </SelectableTag>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {(item.requiredCertificationIds ?? []).length > 0 ? (
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-label)",
-                            fontWeight: 500,
-                            color: "var(--dg-color-text-secondary)",
-                          }}
-                        >
-                          {describeCertificationRequirement({
-                            requiredIds: item.requiredCertificationIds ?? [],
-                            itemsById: certMap,
-                            emptyText: "—",
-                          })}
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            padding: "2px 8px",
-                            borderRadius: 20,
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            background: "var(--dg-color-brand-bg)",
-                            border: "1px solid var(--dg-color-brand-border)",
-                            color: "var(--dg-color-brand)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Anyone
-                        </span>
-                      )}
-                    </div>
+                    <RoleRequirementPills
+                      requirements={
+                        (item.requiredCertificationIds ?? []).length > 0
+                          ? (item.requiredCertificationIds ?? []).map(
+                              (id) => certMap.get(id)?.name ?? "Unknown certification",
+                            )
+                          : ["Anyone"]
+                      }
+                    />
                   ))}
 
                 {isEditing && (
@@ -1198,37 +1164,146 @@ export default function StringListSettings({
   return content;
 }
 
-/**
- * One department in the multi-select. A pill rather than a checkbox row so the
- * whole set stays readable inside a table cell.
- */
-function DeptToggle({
-  label,
-  selected,
-  onClick,
+export function getTwoRowRequirementFit({
+  containerWidth,
+  pillWidths,
+  overflowWidths,
+  gap = 6,
 }: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
+  containerWidth: number;
+  pillWidths: number[];
+  overflowWidths: Map<number, number>;
+  gap?: number;
+}): number {
+  if (containerWidth <= 0 || pillWidths.length === 0) return pillWidths.length;
+
+  const fitsInTwoRows = (widths: number[]) => {
+    let rows = 1;
+    let usedWidth = 0;
+
+    for (const width of widths) {
+      if (width > containerWidth) return false;
+      if (usedWidth === 0) {
+        usedWidth = width;
+      } else if (usedWidth + gap + width <= containerWidth) {
+        usedWidth += gap + width;
+      } else {
+        rows += 1;
+        usedWidth = width;
+      }
+      if (rows > 2) return false;
+    }
+
+    return true;
+  };
+
+  for (let visibleCount = pillWidths.length; visibleCount >= 0; visibleCount -= 1) {
+    const hiddenCount = pillWidths.length - visibleCount;
+    const widths = pillWidths.slice(0, visibleCount);
+    if (hiddenCount > 0) widths.push(overflowWidths.get(hiddenCount) ?? 0);
+    if (fitsInTwoRows(widths)) return visibleCount;
+  }
+
+  return 0;
+}
+
+function RoleRequirementPills({ requirements }: { requirements: string[] }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const pillMeasureRefs = useRef(new Map<number, HTMLSpanElement>());
+  const overflowMeasureRefs = useRef(new Map<number, HTMLSpanElement>());
+  const [visibleCount, setVisibleCount] = useState(Math.min(2, requirements.length));
+
+  const recalculate = useCallback(() => {
+    const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 0;
+    const pillWidths = requirements.map(
+      (_, index) => pillMeasureRefs.current.get(index)?.getBoundingClientRect().width ?? 0,
+    );
+    const overflowWidths = new Map<number, number>();
+    for (let hiddenCount = 1; hiddenCount <= requirements.length; hiddenCount += 1) {
+      overflowWidths.set(
+        hiddenCount,
+        overflowMeasureRefs.current.get(hiddenCount)?.getBoundingClientRect().width ?? 0,
+      );
+    }
+
+    if (containerWidth <= 0 || pillWidths.some((width) => width <= 0)) return;
+    setVisibleCount(getTwoRowRequirementFit({ containerWidth, pillWidths, overflowWidths }));
+  }, [requirements]);
+
+  useLayoutEffect(() => {
+    recalculate();
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(recalculate);
+    observer.observe(container);
+    void document.fonts?.ready.then(recalculate);
+    return () => observer.disconnect();
+  }, [recalculate]);
+
+  const visibleRequirements = requirements.slice(0, visibleCount);
+  const hiddenRequirements = requirements.slice(visibleCount);
+
   return (
-    <Button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      style={{
-        padding: "2px 8px",
-        borderRadius: 20,
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-        cursor: "pointer",
-        background: selected ? "var(--dg-color-brand-bg)" : "var(--dg-color-bg-secondary)",
-        border: `1px solid ${selected ? "var(--dg-color-brand-border)" : "var(--dg-color-border-light)"}`,
-        color: selected ? "var(--dg-color-brand)" : "var(--dg-color-text-secondary)",
-      }}
-    >
-      {label}
-    </Button>
+    <div className="dg-role-requirement-cell">
+      <div ref={containerRef} className="dg-role-requirement-pills dg-role-requirement-pills--view">
+        {visibleRequirements.map((requirement, index) => (
+          <StatusPill
+            key={`${index}-${requirement}`}
+            tone="neutral"
+            variant="category"
+            className="dg-role-requirement-view-pill"
+            title={requirement}
+          >
+            <span className="dg-role-requirement-pill-label">{requirement}</span>
+          </StatusPill>
+        ))}
+        {hiddenRequirements.length > 0 ? (
+          <Hint content={hint(hiddenRequirements.join(", "))} side="top">
+            <button
+              type="button"
+              className="dg-role-requirement-overflow-trigger"
+              aria-label={`${hiddenRequirements.length} more requirements: ${hiddenRequirements.join(", ")}`}
+            >
+              <StatusPill tone="neutral" variant="category">
+                +{hiddenRequirements.length} more
+              </StatusPill>
+            </button>
+          </Hint>
+        ) : null}
+      </div>
+
+      <div className="dg-role-requirement-measurer" aria-hidden="true">
+        {requirements.map((requirement, index) => (
+          <span
+            key={`pill-${index}-${requirement}`}
+            ref={(node) => {
+              if (node) pillMeasureRefs.current.set(index, node);
+              else pillMeasureRefs.current.delete(index);
+            }}
+          >
+            <StatusPill tone="neutral" variant="category">
+              <span className="dg-role-requirement-pill-label">{requirement}</span>
+            </StatusPill>
+          </span>
+        ))}
+        {requirements.map((_, index) => {
+          const hiddenCount = index + 1;
+          return (
+            <span
+              key={`overflow-${hiddenCount}`}
+              ref={(node) => {
+                if (node) overflowMeasureRefs.current.set(hiddenCount, node);
+                else overflowMeasureRefs.current.delete(hiddenCount);
+              }}
+            >
+              <StatusPill tone="neutral" variant="category">
+                +{hiddenCount} more
+              </StatusPill>
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }

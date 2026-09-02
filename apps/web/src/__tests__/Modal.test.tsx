@@ -44,6 +44,9 @@ describe("Modal — Rendering", () => {
     renderModal();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("Modal content");
+    expect(dialog.querySelector(".dg-modal-scroll-region")).toContainElement(
+      screen.getByText("Modal content"),
+    );
   });
 });
 

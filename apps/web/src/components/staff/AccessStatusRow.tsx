@@ -27,20 +27,32 @@ export function AccessStatusRow({
   onAction,
   disabled,
 }: AccessStatusRowProps) {
+  const hasConsequentialNote = Boolean(note);
+
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-4 py-3">
+    <div
+      role={hasConsequentialNote ? "note" : undefined}
+      aria-label={hasConsequentialNote ? `${label}: ${statusText}` : undefined}
+      className="flex items-center justify-between gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-4 py-3"
+    >
       <div className="min-w-0">
         <div className="dg-type-field-title">{label}</div>
         <div
-          className={`mt-0.5 text-[13px] font-medium ${
-            tone === "active"
+          className={`mt-0.5 ${
+            hasConsequentialNote ? "text-[14px] font-semibold" : "text-[13px] font-medium"
+          } ${
+            tone === "active" || hasConsequentialNote
               ? "text-[var(--dg-color-text-primary)]"
               : "text-[var(--dg-color-text-muted)]"
           }`}
         >
           {statusText}
         </div>
-        {note && <div className="mt-1 text-[12px] text-[var(--dg-color-text-muted)]">{note}</div>}
+        {note && (
+          <div className="mt-1 text-[13px] font-medium leading-[1.45] text-[var(--dg-color-danger)]">
+            {note}
+          </div>
+        )}
       </div>
       {actionLabel && onAction && (
         <Button

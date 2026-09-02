@@ -6,11 +6,12 @@ import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronDown, Import as ImportIcon, Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
   fetchOrganizationInvitations,
+  replaceOrganizationInvitationAccessGuarded,
   resendInvitation,
   revokeInvitation,
   updateAppOnlyUser,
@@ -81,6 +82,7 @@ import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -520,6 +522,7 @@ export function MembersSection({
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
   const [, setRevokingId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<{
     action: BulkStaffAction;
@@ -536,6 +539,7 @@ export function MembersSection({
     fetchOrganizationInvitations(orgId)
       .then((invites) => {
         if (cancelled) return;
+        loadedInvitationsForOrgIdRef.current = orgId;
         setPendingInvitations(
           invites.filter(
             (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
@@ -543,13 +547,19 @@ export function MembersSection({
         );
       })
       .catch((err) => {
+        if (cancelled) return;
         Sentry.captureException(err);
+        loadedInvitationsForOrgIdRef.current = orgId;
+        setPendingInvitations([]);
       });
 
     return () => {
       cancelled = true;
     };
   }, [orgId, regularUserMode]);
+
+  const invitationStateReady =
+    regularUserMode || !orgId || loadedInvitationsForOrgIdRef.current === orgId;
 
   // Re-derive against "now" on a slow tick so invitations that cross their
   // 72h expiry while the page is open stop rendering as "Pending". Without
@@ -598,9 +608,33 @@ export function MembersSection({
     }
     return map;
   }, [directory]);
+  const replacePendingInvitationRole = (
+    pendingInvitation: Invitation | null | undefined,
+  ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
+    if (!canManageManagementAccess || !orgId || !pendingInvitation?.updatedAt) return undefined;
+    const expectedUpdatedAt = pendingInvitation.updatedAt;
+    return async (newRole) => {
+      const replacement = await replaceOrganizationInvitationAccessGuarded({
+        orgId,
+        invitationId: pendingInvitation.id,
+        expectedUpdatedAt,
+        roleToAssign: newRole,
+      });
+      setPendingInvitations((current) => [
+        replacement.invitation,
+        ...current.filter((invitation) => invitation.id !== pendingInvitation.id),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.org.invitations(orgId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
+      ]);
+    };
+  };
+
   // Returns an inline role-change handler when the viewer may manage access and
-  // the person has an editable login; otherwise undefined (read-only cell).
+  // the person has an editable login or pending invitation.
   const roleChangeHandlerFor = (
+    employeeId: string,
     userId: string | null | undefined,
     membershipUpdatedAt: string | null | undefined,
   ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
@@ -609,12 +643,15 @@ export function MembersSection({
     if (
       !canManageManagementAccess ||
       !orgId ||
-      !userId ||
-      !membershipUpdatedAt ||
-      isSelfAction(currentUserId, userId)
+      (userId ? isSelfAction(currentUserId, userId) : false)
     ) {
       return undefined;
     }
+    const pendingInvitation = pendingInviteByEmployeeId.get(employeeId);
+    if (!userId) {
+      return replacePendingInvitationRole(pendingInvitation);
+    }
+    if (!membershipUpdatedAt) return undefined;
     const oid = orgId;
     const uid = userId;
     const expectedUpdatedAt = membershipUpdatedAt;
@@ -640,6 +677,22 @@ export function MembersSection({
   const [showManagement, setShowManagement] = useState(false);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
   const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
+  const [managementAccessDirty, setManagementAccessDirty] = useState(false);
+  const closeManagementAccessPopup = useCallback(() => {
+    setManagementAccessDirty(false);
+    setManagementAccessEmployee(null);
+  }, []);
+  const openManagementAccessPopup = useCallback((employee: Employee) => {
+    setManagementAccessDirty(false);
+    setManagementAccessEmployee(employee);
+  }, []);
+  const {
+    requestClose: requestManagementAccessClose,
+    unsavedChangesDialog: managementAccessUnsavedChangesDialog,
+  } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: managementAccessDirty,
+    onDiscard: closeManagementAccessPopup,
+  });
   const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(
     null,
   );
@@ -1072,8 +1125,8 @@ export function MembersSection({
                   }}
                   style={{ minWidth: 180 }}
                   fontSize="var(--dg-fs-navigation-item)"
-                  fontWeight={400}
-                  activeFontWeight={400}
+                  fontWeight="var(--dg-type-control-weight)"
+                  activeFontWeight="var(--dg-type-control-weight)"
                   letterSpacing="normal"
                 />
               )}
@@ -1224,6 +1277,9 @@ export function MembersSection({
               <Button
                 ref={filterBtnRef}
                 onClick={() => setFilterOpen((current) => !current)}
+                aria-label="Filter"
+                aria-expanded={filterOpen}
+                aria-haspopup="dialog"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 style={{ position: "relative" }}
               >
@@ -1250,6 +1306,7 @@ export function MembersSection({
                     setPage(1);
                   }}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
+                  aria-label="Reorder"
                   disabled={!hasReorderableStaffRows}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -1359,7 +1416,8 @@ export function MembersSection({
                     aria-haspopup="menu"
                     className="dg-btn dg-btn-primary dg-btn-sm"
                   >
-                    + Add
+                    <Plus size={14} />
+                    Add
                     <ChevronDown size={14} />
                   </Button>
                   {addMenuOpen && (
@@ -1403,7 +1461,8 @@ export function MembersSection({
 
               {canAddScheduled && !canAddManagement && (
                 <Button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
-                  + Add
+                  <Plus size={14} />
+                  Add
                 </Button>
               )}
 
@@ -1412,7 +1471,8 @@ export function MembersSection({
                   onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  + Add
+                  <Plus size={14} />
+                  Add
                 </Button>
               )}
             </div>
@@ -1600,7 +1660,12 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
+                              orgRole={
+                                orgRoleByEmployeeId.get(employee.id) ??
+                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
+                                null
+                              }
+                              invitationStateReady={invitationStateReady}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={() => undefined}
@@ -1717,11 +1782,17 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
+                              orgRole={
+                                orgRoleByEmployeeId.get(employee.id) ??
+                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
+                                null
+                              }
                               onRoleChange={roleChangeHandlerFor(
+                                employee.id,
                                 directoryByEmployeeId.get(employee.id)?.userId,
                                 directoryByEmployeeId.get(employee.id)?.membershipUpdatedAt,
                               )}
+                              invitationStateReady={invitationStateReady}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>
@@ -1952,11 +2023,22 @@ export function MembersSection({
                             <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                               <InlineRoleSelect
                                 orgRole={person.orgRole}
-                                onChange={roleChangeHandlerFor(
-                                  person.userId,
-                                  person.membershipUpdatedAt,
-                                )}
+                                onChange={
+                                  person.userId
+                                    ? roleChangeHandlerFor(
+                                        person.employeeId ?? "",
+                                        person.userId,
+                                        person.membershipUpdatedAt,
+                                      )
+                                    : replacePendingInvitationRole(
+                                        pendingInvitations.find(
+                                          (invitation) =>
+                                            invitation.id === person.personId.replace("inv:", ""),
+                                        ),
+                                      )
+                                }
                                 isSelf={isSelfAction(currentUserId, person.userId)}
+                                pendingInvitationEmail={person.userId ? undefined : person.email}
                               />
                             </TableCell>
                           )}
@@ -2139,83 +2221,73 @@ export function MembersSection({
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={selectedEmployeeHasPendingManagementInvite}
           onManageManagementAccess={
-            canManageManagementAccess
-              ? (employee) => setManagementAccessEmployee(employee)
-              : undefined
+            canManageManagementAccess ? openManagementAccessPopup : undefined
           }
-          managementAccessEditor={
-            managementAccessEmployee?.id === selectedEmployee.id && orgId
-              ? (onDirtyChange) => (
-                  <div className="flex flex-col gap-6">
-                    {selectedEmployeeDirectoryPerson?.orgRole ? (
-                      <MemberAccessControls
-                        orgRole={selectedEmployeeDirectoryPerson.orgRole}
-                        adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
-                        isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
-                        onRoleChange={
-                          canManageManagementAccess &&
-                          selectedEmployeeDirectoryPerson.userId &&
-                          selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                            ? async (newRole) => {
-                                const person = selectedEmployeeDirectoryPerson;
-                                if (!person.userId || !person.membershipUpdatedAt) return;
-                                const membership = await updateOrganizationMembershipGuarded({
-                                  orgId,
-                                  userId: person.userId,
-                                  expectedUpdatedAt: person.membershipUpdatedAt,
-                                  orgRole: newRole,
-                                });
-                                syncMembershipInCaches(membership);
-                                await Promise.all([
-                                  queryClient.invalidateQueries({
-                                    queryKey: queryKeys.org.directory(orgId),
-                                  }),
-                                  queryClient.invalidateQueries({
-                                    queryKey: queryKeys.org.users(orgId),
-                                  }),
-                                ]);
-                              }
-                            : undefined
+          onRevoke={handleRevokeInvitation}
+        />
+      )}
+
+      {managementAccessEmployee && selectedEmployee && orgId && (
+        <Modal
+          title={
+            selectedEmployeeDirectoryPerson?.isManagementUser ||
+            selectedEmployeeHasPendingManagementInvite
+              ? "Edit management access"
+              : "Add to management"
+          }
+          onClose={closeManagementAccessPopup}
+          onRequestClose={requestManagementAccessClose}
+          style={{ maxWidth: 560, width: "100%" }}
+        >
+          <div className="flex flex-col gap-6">
+            {selectedEmployeeDirectoryPerson?.orgRole ? (
+              <MemberAccessControls
+                orgRole={selectedEmployeeDirectoryPerson.orgRole}
+                adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
+                isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
+                pendingInvitationEmail={
+                  pendingInviteByEmployeeId.get(managementAccessEmployee.id)?.email
+                }
+                onRoleChange={
+                  !canManageManagementAccess
+                    ? undefined
+                    : selectedEmployeeDirectoryPerson.userId &&
+                        selectedEmployeeDirectoryPerson.membershipUpdatedAt
+                      ? async (newRole) => {
+                          const person = selectedEmployeeDirectoryPerson;
+                          if (!person.userId || !person.membershipUpdatedAt) return;
+                          const membership = await updateOrganizationMembershipGuarded({
+                            orgId,
+                            userId: person.userId,
+                            expectedUpdatedAt: person.membershipUpdatedAt,
+                            orgRole: newRole,
+                          });
+                          syncMembershipInCaches(membership);
+                          await Promise.all([
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.org.directory(orgId),
+                            }),
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.org.users(orgId),
+                            }),
+                          ]);
                         }
-                        onPermissionsChange={
-                          canManageManagementAccess &&
-                          selectedEmployeeDirectoryPerson.userId &&
-                          selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                            ? async (permissions) => {
-                                const person = selectedEmployeeDirectoryPerson;
-                                if (!person.userId || !person.membershipUpdatedAt) return;
-                                const membership = await updateOrganizationMembershipGuarded({
-                                  orgId,
-                                  userId: person.userId,
-                                  expectedUpdatedAt: person.membershipUpdatedAt,
-                                  adminPermissions: permissions,
-                                });
-                                syncMembershipInCaches(membership);
-                                await Promise.all([
-                                  queryClient.invalidateQueries({
-                                    queryKey: queryKeys.org.directory(orgId),
-                                  }),
-                                  queryClient.invalidateQueries({
-                                    queryKey: queryKeys.org.users(orgId),
-                                  }),
-                                ]);
-                              }
-                            : undefined
-                        }
-                      />
-                    ) : null}
-                    <EmployeeManagementAccessEditor
-                      employee={managementAccessEmployee}
-                      orgId={orgId}
-                      orgName={orgName || "your organization"}
-                      managementDepartments={managementDepts}
-                      directoryPerson={selectedEmployeeDirectoryPerson}
-                      pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
-                      onDirtyChange={onDirtyChange}
-                      onClose={() => setManagementAccessEmployee(null)}
-                      onCompleted={async (updatedEmployee) => {
-                        syncExistingEmployeeInCaches(updatedEmployee);
-                        await refreshInvitations();
+                      : roleChangeHandlerFor(managementAccessEmployee.id, null, null)
+                }
+                onPermissionsChange={
+                  canManageManagementAccess &&
+                  selectedEmployeeDirectoryPerson.userId &&
+                  selectedEmployeeDirectoryPerson.membershipUpdatedAt
+                    ? async (permissions) => {
+                        const person = selectedEmployeeDirectoryPerson;
+                        if (!person.userId || !person.membershipUpdatedAt) return;
+                        const membership = await updateOrganizationMembershipGuarded({
+                          orgId,
+                          userId: person.userId,
+                          expectedUpdatedAt: person.membershipUpdatedAt,
+                          adminPermissions: permissions,
+                        });
+                        syncMembershipInCaches(membership);
                         await Promise.all([
                           queryClient.invalidateQueries({
                             queryKey: queryKeys.org.directory(orgId),
@@ -2223,19 +2295,41 @@ export function MembersSection({
                           queryClient.invalidateQueries({
                             queryKey: queryKeys.org.users(orgId),
                           }),
-                          queryClient.invalidateQueries({
-                            queryKey: queryKeys.employees.all(orgId),
-                          }),
                         ]);
-                      }}
-                    />
-                  </div>
-                )
-              : undefined
-          }
-          onRevoke={handleRevokeInvitation}
-        />
+                      }
+                    : undefined
+                }
+              />
+            ) : null}
+            <EmployeeManagementAccessEditor
+              employee={managementAccessEmployee}
+              orgId={orgId}
+              orgName={orgName || "your organization"}
+              managementDepartments={managementDepts}
+              directoryPerson={selectedEmployeeDirectoryPerson}
+              pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+              onDirtyChange={setManagementAccessDirty}
+              onClose={closeManagementAccessPopup}
+              onCompleted={async (updatedEmployee) => {
+                syncExistingEmployeeInCaches(updatedEmployee);
+                await refreshInvitations();
+                await Promise.all([
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  }),
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  }),
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.employees.all(orgId),
+                  }),
+                ]);
+              }}
+            />
+          </div>
+        </Modal>
       )}
+      {managementAccessUnsavedChangesDialog}
 
       {selectedPerson && canSeeManagementUsers && (
         <ManagementStaffPanel
@@ -2247,25 +2341,33 @@ export function MembersSection({
           canManageManagementAccess={canManageManagementAccess}
           isSelf={isSelfAction(currentUserId, selectedPerson.userId)}
           onRoleChange={
-            canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt
-              ? async (newRole) => {
-                  const userId = selectedPerson.userId;
-                  const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
-                  if (!orgId || !userId || !expectedUpdatedAt) return;
-                  await updateOrganizationMembershipGuarded({
-                    orgId,
-                    userId,
-                    expectedUpdatedAt,
-                    orgRole: newRole,
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.directory(orgId),
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.users(orgId),
-                  });
-                }
-              : undefined
+            !canManageManagementAccess
+              ? undefined
+              : selectedPerson.userId && selectedPerson.membershipUpdatedAt
+                ? async (newRole) => {
+                    const userId = selectedPerson.userId;
+                    const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
+                    if (!orgId || !userId || !expectedUpdatedAt) return;
+                    await updateOrganizationMembershipGuarded({
+                      orgId,
+                      userId,
+                      expectedUpdatedAt,
+                      orgRole: newRole,
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: queryKeys.org.directory(orgId),
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: queryKeys.org.users(orgId),
+                    });
+                  }
+                : selectedPerson.employeeId
+                  ? roleChangeHandlerFor(selectedPerson.employeeId, null, null)
+                  : replacePendingInvitationRole(
+                      pendingInvitations.find(
+                        (item) => item.id === selectedPerson.personId.replace("inv:", ""),
+                      ),
+                    )
           }
           onPermissionsChange={
             canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt

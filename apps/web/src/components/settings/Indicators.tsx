@@ -242,7 +242,7 @@ function IndicatorRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-faint)",
+            color: "var(--dg-color-text-primary)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}

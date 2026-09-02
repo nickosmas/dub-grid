@@ -278,7 +278,7 @@ export default function StaffView({
                         <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
                           {link.icon}
                         </span>
-                        <span className="text-[length:var(--dg-type-navigation-size)] font-normal tracking-normal">
+                        <span className="text-[length:var(--dg-type-navigation-size)] font-medium tracking-normal">
                           {link.label}
                         </span>
                       </SidebarMenuButton>
@@ -315,7 +315,7 @@ export default function StaffView({
                       <polyline points="6 17 11 12 6 7" />
                     </svg>
                   </span>
-                  <span className="ml-2 text-[length:var(--dg-type-navigation-size)] font-normal tracking-normal">
+                  <span className="ml-2 text-[length:var(--dg-type-navigation-size)] font-medium tracking-normal">
                     Collapse Menu
                   </span>
                 </SidebarMenuButton>

@@ -559,6 +559,7 @@ export default function PersonDetailScreen() {
         bottomPaddingMode="tabbed"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
+        scrollEnabled={false}
       >
         <StatusBanner
           actionLabel="Try again"
@@ -580,6 +581,7 @@ export default function PersonDetailScreen() {
         bottomPaddingMode="tabbed"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
+        scrollEnabled={false}
       >
         <EmptyStateCard
           fillScreen
