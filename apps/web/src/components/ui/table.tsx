@@ -3,15 +3,97 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  showScrollCues = false,
+  scrollLabel = "table",
+  ...props
+}: React.ComponentProps<"table"> & {
+  showScrollCues?: boolean;
+  scrollLabel?: string;
+}) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+  const [canScrollRight, setCanScrollRight] = React.useState(false);
+
+  const updateScrollState = React.useCallback(() => {
+    const element = scrollRef.current;
+    if (!element || !showScrollCues) return;
+    setCanScrollLeft(element.scrollLeft > 4);
+    setCanScrollRight(element.scrollLeft < element.scrollWidth - element.clientWidth - 4);
+  }, [showScrollCues]);
+
+  React.useEffect(() => {
+    updateScrollState();
+    const element = scrollRef.current;
+    if (!element || !showScrollCues) return;
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollState);
+    observer?.observe(element);
+    element.addEventListener("scroll", updateScrollState, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      observer?.disconnect();
+      element.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [updateScrollState, showScrollCues]);
+
+  const scroll = (direction: -1 | 1) => {
+    const element = scrollRef.current;
+    if (!element) return;
+    element.scrollBy({
+      left: direction * Math.max(160, Math.floor(element.clientWidth * 0.8)),
+      behavior: "smooth",
+    });
+  };
+
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      />
+    <div data-slot="table-scroll-shell" className="relative w-full">
+      <div ref={scrollRef} data-slot="table-container" className="relative w-full overflow-x-auto">
+        <table
+          data-slot="table"
+          className={cn("w-full caption-bottom text-sm", className)}
+          {...props}
+        />
+      </div>
+      {showScrollCues && canScrollLeft && (
+        <TableScrollCue
+          direction="left"
+          label={`Scroll ${scrollLabel} left`}
+          onClick={() => scroll(-1)}
+        />
+      )}
+      {showScrollCues && canScrollRight && (
+        <TableScrollCue
+          direction="right"
+          label={`Scroll ${scrollLabel} right`}
+          onClick={() => scroll(1)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TableScrollCue({
+  direction,
+  label,
+  onClick,
+}: {
+  direction: "left" | "right";
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      className="absolute top-1/2 z-10 -translate-y-1/2"
+      style={{
+        [direction]: 12,
+      }}
+    >
+      <ScrollCueButton direction={direction} label={label} onClick={onClick} />
     </div>
   );
 }

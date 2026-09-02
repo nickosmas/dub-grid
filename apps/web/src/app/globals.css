@@ -1671,7 +1671,9 @@ textarea {
 .dg-staff-directory-header,
 .dg-staff-directory-row {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 110px 110px 40px;
+  grid-template-columns:
+    100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
   align-items: stretch;
 }
 
@@ -1680,7 +1682,7 @@ textarea {
   .dg-staff-directory-row {
     grid-template-columns:
       100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      40px;
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
   }
 }
 
@@ -1823,7 +1825,9 @@ textarea {
    repeat information the selected tab already provides. */
 .dg-staff-directory-table--without-status .dg-staff-directory-header,
 .dg-staff-directory-table--without-status .dg-staff-directory-row {
-  grid-template-columns: 100px minmax(0, 1fr) 110px 40px;
+  grid-template-columns:
+    100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+    minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
 }
 
 .dg-staff-directory-table--without-status
@@ -1840,7 +1844,7 @@ textarea {
   .dg-staff-directory-table--without-status .dg-staff-directory-row {
     grid-template-columns:
       100px minmax(180px, 2fr) 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
-      40px;
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
   }
 
   .dg-staff-directory-table--without-status
@@ -1893,6 +1897,44 @@ textarea {
     > .dg-staff-directory-cell:nth-child(9) {
     border-right: none;
   }
+}
+
+/* Every directory column stays in the stable-width horizontal table at every
+   viewport. Breakpoints no longer remove data; the outer container scrolls. */
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4),
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+  border-right: 1px solid var(--dg-color-border-light);
+}
+
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
+  border-right: none;
+}
+
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(3),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(5),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(5) {
+  border-right: 1px solid var(--dg-color-border-light);
+}
+
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-header
+  > .dg-staff-directory-head-cell:nth-child(9),
+.dg-staff-directory-table--without-status
+  .dg-staff-directory-row
+  > .dg-staff-directory-cell:nth-child(9) {
+  border-right: none;
 }
 
 .dg-staff-directory-cell--date-joined {
@@ -4256,6 +4298,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* ── Responsive: Mobile ────────────────────────────────── */
 @media (max-width: 767px) {
+  .dg-app-header-desktop {
+    display: none !important;
+  }
+
   /* Typography — responsive overrides */
   :root {
     --dg-toolbar-h: var(--dg-toolbar-h-mobile);

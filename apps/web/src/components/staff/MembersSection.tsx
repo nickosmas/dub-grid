@@ -40,7 +40,7 @@ import type {
   OrganizationRole,
   OrganizationUser,
 } from "@/types";
-import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import Modal from "@/components/Modal";
@@ -83,6 +83,7 @@ import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import ScrollableTabs from "@/components/ScrollableTabs";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -155,7 +156,6 @@ export function MembersSection({
   managementDepartmentLabel = "Management Departments",
 }: MembersSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const isTablet = useMediaQuery(TABLET);
   const featureFlags = useClientFeatureFlags();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -1101,8 +1101,33 @@ export function MembersSection({
             />
           )}
 
-          <div className="dg-toolbar-type flex items-center gap-3 overflow-x-auto overflow-y-visible py-1">
-            <div className="flex min-w-0 items-center gap-2">
+          <div
+            data-testid="people-toolbar"
+            className="dg-toolbar-type"
+            style={
+              isMobile
+                ? { display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }
+                : {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    rowGap: 8,
+                    flexWrap: "wrap",
+                    paddingBottom: 4,
+                  }
+            }
+          >
+            <div
+              data-testid="people-toolbar-controls"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                minWidth: 0,
+                maxWidth: "100%",
+                ...(isMobile ? { width: "100%", flexWrap: "wrap" } : {}),
+              }}
+            >
               {canSeeManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
@@ -1132,7 +1157,14 @@ export function MembersSection({
               )}
 
               {!showManagement && (
-                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                <ScrollableTabs
+                  className="dg-span-tabs dg-span-tabs--light"
+                  style={{
+                    flex: isMobile ? "1 1 180px" : "0 1 auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                  }}
+                >
                   {tabs.map((tab, index) => {
                     const active = activeTab === tab.key;
                     const prevActive = index > 0 && activeTab === tabs[index - 1].key;
@@ -1187,11 +1219,18 @@ export function MembersSection({
                       </span>
                     );
                   })}
-                </div>
+                </ScrollableTabs>
               )}
 
               {showManagement && departmentItems.length > 0 && (
-                <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
+                <ScrollableTabs
+                  className="dg-span-tabs dg-span-tabs--light"
+                  style={{
+                    flex: isMobile ? "1 1 180px" : "0 1 auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                  }}
+                >
                   <Button
                     onClick={() => setDeptFilterId(null)}
                     className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
@@ -1271,7 +1310,7 @@ export function MembersSection({
                         </span>
                       );
                     })}
-                </div>
+                </ScrollableTabs>
               )}
 
               <Button
@@ -1321,7 +1360,15 @@ export function MembersSection({
                 </Button>
               )}
 
-              <div className="relative" style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}>
+              <div
+                data-testid="people-search"
+                className="relative"
+                style={{
+                  minWidth: 0,
+                  flex: isMobile ? "1 1 160px" : "1 1 300px",
+                  maxWidth: isMobile ? undefined : 380,
+                }}
+              >
                 <svg
                   width="14"
                   height="14"
@@ -1368,7 +1415,16 @@ export function MembersSection({
               </div>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div
+              style={{
+                marginLeft: isMobile ? 0 : "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: isMobile ? "flex-end" : undefined,
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
               {!showManagement && canManageEmployees && orgId && !isMobile && (
                 <MaybeHint
                   content={
@@ -1599,10 +1655,10 @@ export function MembersSection({
                 <div
                   data-tour="staff-table"
                   data-testid="staff-table"
-                  className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
+                  className="overflow-x-auto rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
                 >
                   {isReordering ? (
-                    <div className="dg-staff-directory-table dg-staff-directory-table--without-status">
+                    <div className="dg-staff-directory-table dg-staff-directory-table--without-status min-w-[1280px]">
                       <div className="dg-staff-directory-header bg-[var(--dg-color-bg)]">
                         <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex select-none items-center gap-1">
@@ -1620,18 +1676,14 @@ export function MembersSection({
                           </span>
                         </div>
                         <div className="dg-staff-directory-head-cell flex">Employment</div>
-                        <div className="dg-staff-directory-head-cell hidden md:flex">
-                          {focusAreaLabel}
-                        </div>
-                        <div className="dg-staff-directory-head-cell hidden md:flex">
+                        <div className="dg-staff-directory-head-cell flex">{focusAreaLabel}</div>
+                        <div className="dg-staff-directory-head-cell flex">
                           {certificationLabel}
                         </div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Roles</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Account</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">Access</div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">
-                          Date Joined
-                        </div>
+                        <div className="dg-staff-directory-head-cell flex">Roles</div>
+                        <div className="dg-staff-directory-head-cell flex">Account</div>
+                        <div className="dg-staff-directory-head-cell flex">Access</div>
+                        <div className="dg-staff-directory-head-cell flex">Date Joined</div>
                         <div className="dg-staff-directory-head-cell flex" />
                       </div>
                       <div className="dg-staff-directory-body">
@@ -1681,7 +1733,11 @@ export function MembersSection({
                       </div>
                     </div>
                   ) : (
-                    <Table>
+                    <Table
+                      className={canViewEmployeeDetails ? "min-w-[1280px]" : "min-w-[720px]"}
+                      showScrollCues
+                      scrollLabel="People roster"
+                    >
                       <TableHeader>
                         <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
                           {canViewEmployeeDetails && (
@@ -1733,29 +1789,27 @@ export function MembersSection({
                               Status
                             </TableHead>
                           )}
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] md:table-cell md:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             {focusAreaLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] md:table-cell lg:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             {certificationLabel}
                           </TableHead>
-                          <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
+                          <TableHead className="border-r border-[var(--dg-color-border-light)]">
                             Roles
                           </TableHead>
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
+                            <TableHead className="border-r border-[var(--dg-color-border-light)]">
                               Account
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden border-[var(--dg-color-border-light)] lg:table-cell lg:border-r">
+                            <TableHead className="border-r border-[var(--dg-color-border-light)]">
                               Access
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
-                            <TableHead className="hidden w-[140px] lg:table-cell">
-                              Date joined
-                            </TableHead>
+                            <TableHead className="w-[140px]">Date joined</TableHead>
                           )}
                           <TableHead className="w-[40px] pr-6" />
                         </UITableRow>
@@ -1827,8 +1881,8 @@ export function MembersSection({
           {canSeeManagementUsers &&
             showManagement &&
             (filteredDeptUsers.length > 0 ? (
-              <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]">
-                <Table>
+              <div className="overflow-x-auto rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]">
+                <Table className="min-w-[900px]" showScrollCues scrollLabel="People roster">
                   <TableHeader>
                     <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
                       <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
@@ -1837,17 +1891,13 @@ export function MembersSection({
                       <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Name
                       </TableHead>
-                      {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                          {managementDepartmentLabel}
-                        </TableHead>
-                      )}
-                      {!isMobile && !isTablet && (
-                        <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                          Role
-                        </TableHead>
-                      )}
-                      {!isMobile && !isTablet && <TableHead>Status</TableHead>}
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
+                        {managementDepartmentLabel}
+                      </TableHead>
+                      <TableHead className="border-r border-[var(--dg-color-border-light)]">
+                        Role
+                      </TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="w-[40px] pr-6" />
                     </UITableRow>
                   </TableHeader>
@@ -2009,50 +2059,44 @@ export function MembersSection({
                             </div>
                           </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
-                              <span className="text-[13px] text-[var(--dg-color-text-muted)]">
-                                {personDepts.length > 0
-                                  ? personDepts.map((department) => department.name).join(", ")
-                                  : "\u2014"}
-                              </span>
-                            </TableCell>
-                          )}
+                          <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
+                            <span className="text-[13px] text-[var(--dg-color-text-muted)]">
+                              {personDepts.length > 0
+                                ? personDepts.map((department) => department.name).join(", ")
+                                : "\u2014"}
+                            </span>
+                          </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
-                              <InlineRoleSelect
-                                orgRole={person.orgRole}
-                                onChange={
-                                  person.userId
-                                    ? roleChangeHandlerFor(
-                                        person.employeeId ?? "",
-                                        person.userId,
-                                        person.membershipUpdatedAt,
-                                      )
-                                    : replacePendingInvitationRole(
-                                        pendingInvitations.find(
-                                          (invitation) =>
-                                            invitation.id === person.personId.replace("inv:", ""),
-                                        ),
-                                      )
-                                }
-                                isSelf={isSelfAction(currentUserId, person.userId)}
-                                pendingInvitationEmail={person.userId ? undefined : person.email}
-                              />
-                            </TableCell>
-                          )}
+                          <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
+                            <InlineRoleSelect
+                              orgRole={person.orgRole}
+                              onChange={
+                                person.userId
+                                  ? roleChangeHandlerFor(
+                                      person.employeeId ?? "",
+                                      person.userId,
+                                      person.membershipUpdatedAt,
+                                    )
+                                  : replacePendingInvitationRole(
+                                      pendingInvitations.find(
+                                        (invitation) =>
+                                          invitation.id === person.personId.replace("inv:", ""),
+                                      ),
+                                    )
+                              }
+                              isSelf={isSelfAction(currentUserId, person.userId)}
+                              pendingInvitationEmail={person.userId ? undefined : person.email}
+                            />
+                          </TableCell>
 
-                          {!isMobile && !isTablet && (
-                            <TableCell className="py-4">
-                              <span
-                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
-                                style={statusColors}
-                              >
-                                {statusLabel}
-                              </span>
-                            </TableCell>
-                          )}
+                          <TableCell className="py-4">
+                            <span
+                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
+                              style={statusColors}
+                            >
+                              {statusLabel}
+                            </span>
+                          </TableCell>
 
                           <TableCell className="w-[40px] py-4 pr-6 text-right">
                             <div

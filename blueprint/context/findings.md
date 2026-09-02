@@ -56,4 +56,15 @@ capable of hiding timing-dependent regressions.
 MembersSection test harness, or await the initial responsive update inside an
 `act`-aware helper before asserting. Keep separate targeted coverage for actual
 media-query transitions.
+**Resolution:** Re-reviewed 2026-09-02 by `/audit current`: the focused 29-test
+MembersSection run still emits the same eight unwrapped-update warnings. The
+test mock continues to spread the real hooks module without replacing
+`useMediaQuery`, so the original timing defect remains open.
+
+### F-45 [P2] open - Tablet user dashboard mixes a stacked shell with a desktop top grid
+
+**File:** apps/web/src/components/dashboard/UserDashboard.tsx:363-420
+**Found:** 2026-09-02 by /audit (scope: full web; lenses: quality, tests)
+**Why it matters:** At 768-1024px, `stackLayout` deliberately switches the page to normal-flow tablet layout, but `topGrid` still uses a two-column hero/requests composition because only `isMobile` selects one column. This leaves the main dashboard surface at its narrowest sustained desktop layout during viewport resizes rather than the intended tablet stack. The existing unit test asserts only the desktop grid, and authenticated browser validation is currently unavailable locally.
+**Suggested fix:** Use the same tablet-or-smaller condition for `topGrid` and its child placement as `stackLayout`, then add a tablet-width regression case alongside the existing desktop layout assertion.
 **Resolution:**

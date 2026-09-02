@@ -11,6 +11,10 @@ const dispatchNotificationEvent = vi.fn();
 const buildInvitationChanges = vi.fn();
 const invitationSelectMaybeSingle = vi.fn();
 const invitationUpdateMaybeSingle = vi.fn();
+const invitationUpdateOperations: Array<{
+  values: Record<string, unknown>;
+  filters: Array<[string, unknown]>;
+}> = [];
 const organizationMaybeSingle = vi.fn();
 const serviceRpc = vi.fn();
 const auditInsert = vi.fn();
@@ -94,13 +98,20 @@ vi.mock("@/lib/supabase-service", () => ({
         select: () => chain,
         eq: () => chain,
         maybeSingle: () => invitationSelectMaybeSingle(),
-        update: () => updateChain,
-      };
-      const updateChain: Record<string, unknown> = {
-        eq: () => updateChain,
-        is: () => updateChain,
-        select: () => updateChain,
-        maybeSingle: () => invitationUpdateMaybeSingle(),
+        update: (values: Record<string, unknown>) => {
+          const operation = { values, filters: [] as Array<[string, unknown]> };
+          invitationUpdateOperations.push(operation);
+          const updateChain: Record<string, unknown> = {
+            eq: (column: string, value: unknown) => {
+              operation.filters.push([column, value]);
+              return updateChain;
+            },
+            is: () => updateChain,
+            select: () => updateChain,
+            maybeSingle: () => invitationUpdateMaybeSingle(),
+          };
+          return updateChain;
+        },
       };
       return chain;
     },
@@ -117,6 +128,7 @@ const CURRENT_INVITATION_ROW = {
   invited_by: null,
   email: "old@test.com",
   role_to_assign: "user",
+  token: "original-token",
   expires_at: "2026-02-01T00:00:00.000Z",
   accepted_at: null,
   revoked_at: null,
@@ -150,6 +162,7 @@ async function importRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  invitationUpdateOperations.length = 0;
   validateCsrfOrigin.mockReturnValue(null);
   forbidIfSandboxCookie.mockReturnValue(null);
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1", email: "actor@test.com" } });
@@ -283,6 +296,50 @@ describe("POST /api/organizations/invitations", () => {
     expect(response.status).toBe(200);
     expect(sendInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ token: expect.any(String), email: "old@test.com" }),
+    );
+  });
+
+  it("restores the previous token and expiry when a resend email cannot be delivered", async () => {
+    const refreshedAt = "2026-01-01T00:01:00.000Z";
+    invitationSelectMaybeSingle.mockResolvedValue({ data: pendingInvitation, error: null });
+    invitationUpdateMaybeSingle
+      .mockResolvedValueOnce({
+        data: { ...pendingInvitation, token: "fresh-token", updated_at: refreshedAt },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: INVITATION_ID }, error: null });
+    sendInvitationEmail.mockRejectedValue(new Error("provider down"));
+
+    const { POST } = await importRoute();
+    const response = await POST(
+      makePostRequest({
+        action: "resend",
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    expect(invitationUpdateOperations).toHaveLength(2);
+    const rotatedToken = invitationUpdateOperations[0].values.token;
+    expect(rotatedToken).toEqual(expect.any(String));
+    expect(invitationUpdateOperations[1]).toEqual({
+      values: {
+        token: "original-token",
+        expires_at: pendingInvitation.expires_at,
+        revoked_at: null,
+      },
+      filters: expect.arrayContaining([
+        ["org_id", ORG_ID],
+        ["id", INVITATION_ID],
+        ["updated_at", refreshedAt],
+        ["token", rotatedToken],
+      ]),
+    });
+    expect(dispatchNotificationEvent).not.toHaveBeenCalledWith(
+      "actor-1",
+      expect.objectContaining({ action: "invitation_resent" }),
     );
   });
 });

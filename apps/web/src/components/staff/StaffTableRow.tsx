@@ -314,8 +314,8 @@ function StaffRowCells({
       {/* Focus Areas — neutral StatusPills, cap at 2 visible + "+N more" overflow chip. */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] md:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
         <div className="flex gap-1">
           {(() => {
@@ -349,8 +349,8 @@ function StaffRowCells({
       {/* Certification */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
         {(() => {
           const certAbbr = getCertAbbr(
@@ -373,8 +373,8 @@ function StaffRowCells({
       {/* Roles */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+        tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+        gridClassName="dg-staff-directory-cell flex py-4"
       >
         <span className="text-[12px] text-[var(--dg-color-text-primary)]">
           {emp.roleIds.length > 0
@@ -387,8 +387,8 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+          gridClassName="dg-staff-directory-cell flex py-4"
         >
           {(() => {
             if (!invitationStateReady && !emp.userId && emp.email) return null;
@@ -424,8 +424,8 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 border-[var(--dg-color-border-light)] lg:border-r"
-          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
+          gridClassName="dg-staff-directory-cell flex py-4"
         >
           {!invitationStateReady && !emp.userId ? null : (
             <InlineRoleSelect
@@ -442,8 +442,8 @@ function StaffRowCells({
       {canViewEmployeeDetails && (
         <StaffCell
           variant={variant}
-          tableClassName="hidden lg:table-cell py-4 w-[140px]"
-          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
+          tableClassName="table-cell py-4 w-[140px]"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined flex py-4"
         >
           <span
             className="text-[12px] tabular-nums whitespace-nowrap text-[var(--dg-color-text-primary)]"

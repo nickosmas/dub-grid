@@ -85,6 +85,8 @@ const weekDates = [
   new Date("2026-05-16T00:00:00"),
   new Date("2026-05-17T00:00:00"),
 ];
+const dayDates = weekDates.slice(0, 1);
+const twoWeekDates = Array.from({ length: 14 }, (_, index) => new Date(2026, 4, 11 + index));
 
 describe("MyScheduleRow", () => {
   it("renders nothing when there is no linked employee", () => {
@@ -185,6 +187,77 @@ describe("MyScheduleRow", () => {
     expect(screen.getAllByText("—")).toHaveLength(weekDates.length - 2);
   });
 
+  it.each([
+    ["Week", weekDates, 7],
+    ["2 Weeks", twoWeekDates, 14],
+  ])("renders every day supplied by the dashboard %s view", (_label, dates, expectedCount) => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={dates}
+        periodLabel="selected period"
+      />,
+    );
+
+    expect(
+      screen.getByTestId("my-schedule-row").querySelectorAll("[data-schedule-day]"),
+    ).toHaveLength(expectedCount);
+  });
+
+  it("keeps a full populated week in Your schedule when the dashboard is on Today", () => {
+    const allShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+      "emp-1_2026-05-16": {
+        label: "N",
+        assignmentIds: [202],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [202],
+        publishedLabel: "N",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{ "emp-1_2026-05-11": allShifts["emp-1_2026-05-11"] }}
+        allShifts={allShifts}
+        viewMode="day"
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={dayDates}
+        periodLabel="today"
+      />,
+    );
+
+    expect(screen.getByText("this week")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("my-schedule-row").querySelectorAll("[data-schedule-day]"),
+    ).toHaveLength(7);
+    expect(screen.getByText("Night shift")).toBeInTheDocument();
+  });
+
   it("shows every segment of a double (split) shift, each with its own color and time", () => {
     const currentPeriodShifts: ShiftMap = {
       "emp-1_2026-05-11": {
@@ -207,8 +280,8 @@ describe("MyScheduleRow", () => {
         currentPeriodShifts={currentPeriodShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
-        periodDates={weekDates}
-        periodLabel="this week"
+        periodDates={twoWeekDates}
+        periodLabel="these 2 weeks"
       />,
     );
 
@@ -239,7 +312,7 @@ describe("MyScheduleRow", () => {
         currentPeriodShifts={currentPeriodShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
-        periodDates={weekDates}
+        periodDates={twoWeekDates}
         periodLabel="this week"
       />,
     );
@@ -248,7 +321,144 @@ describe("MyScheduleRow", () => {
     expect(screen.queryByText("Night shift")).not.toBeInTheDocument();
   });
 
-  it("shows a scroll chevron only when the strip overflows its container", () => {
+  it("shows matching inset arrow cues only in directions with more days", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={twoWeekDates}
+        periodLabel="these 2 weeks"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Scroll later days" })).not.toBeInTheDocument();
+
+    const scrollShell = screen.getByTestId("schedule-scroll-shell");
+    const scrollContainer = screen.getByTestId("schedule-day-strip");
+    expect(scrollShell.parentElement).toHaveStyle({ padding: "16px 0" });
+    expect(scrollShell).toHaveStyle({ position: "relative" });
+    expect(screen.getByTestId("schedule-scroll-slot-left")).toBeInTheDocument();
+    expect(screen.getByTestId("schedule-scroll-slot-right")).toBeInTheDocument();
+    expect(screen.getByTestId("schedule-scroll-slot-left")).toHaveStyle({
+      position: "absolute",
+      left: "12px",
+      top: "calc(50% + 13px)",
+    });
+    expect(screen.getByTestId("schedule-scroll-slot-right")).toHaveStyle({
+      position: "absolute",
+      right: "12px",
+      top: "calc(50% + 13px)",
+    });
+
+    Object.defineProperty(scrollContainer, "scrollWidth", { value: 2000, configurable: true });
+    Object.defineProperty(scrollContainer, "clientWidth", { value: 500, configurable: true });
+    Object.defineProperty(scrollContainer, "scrollLeft", {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+    const scrollBySpy = vi.fn();
+    scrollContainer.scrollBy = scrollBySpy;
+    fireEvent.scroll(scrollContainer);
+
+    const rightChevron = screen.getByRole("button", { name: "Scroll later days" });
+    expect(rightChevron).toBeInTheDocument();
+    expect(rightChevron.querySelector(".lucide-arrow-right")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Scroll earlier days" })).not.toBeInTheDocument();
+
+    fireEvent.click(rightChevron);
+    expect(scrollBySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ left: 510, behavior: "smooth" }),
+    );
+
+    scrollContainer.scrollLeft = 340;
+    fireEvent.scroll(scrollContainer);
+    expect(screen.getByRole("button", { name: "Scroll earlier days" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scroll later days" })).toBeInTheDocument();
+    const leftCue = screen.getByRole("button", { name: "Scroll earlier days" });
+    const rightCue = screen.getByRole("button", { name: "Scroll later days" });
+    expect(leftCue.querySelector(".lucide-arrow-left")).toBeInTheDocument();
+    expect(leftCue).toHaveStyle({
+      width: "28px",
+      height: "28px",
+      borderRadius: "50%",
+    });
+    expect(rightCue).toHaveStyle({
+      width: "28px",
+      height: "28px",
+      borderRadius: "50%",
+    });
+
+    scrollContainer.scrollLeft = 1500;
+    fireEvent.scroll(scrollContainer);
+    expect(screen.getByRole("button", { name: "Scroll earlier days" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Scroll later days" })).not.toBeInTheDocument();
+  });
+
+  it("uses readable cells and wraps every visible shift field instead of truncating it", () => {
+    const longAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 303,
+      name: "Very long overnight medication support shift",
+      label: "VL",
+      categoryId: null,
+      shiftId: null,
+      defaultStartTime: "00:00",
+      defaultEndTime: "08:00",
+    };
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "VL",
+        assignmentIds: [303],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [303],
+        publishedLabel: "VL",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={new Map([[longAssignment.id, longAssignment]])}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={twoWeekDates}
+        periodLabel="these 2 weeks"
+      />,
+    );
+
+    const day = screen.getByText(longAssignment.name).closest("[data-schedule-day]");
+    const pill = screen.getByText(longAssignment.name).parentElement as HTMLElement;
+    expect(day?.firstElementChild).toHaveStyle({
+      width: "160px",
+      padding: "0 10px",
+      flex: "1",
+    });
+    expect(pill).toHaveStyle({ minHeight: "62px", overflowWrap: "anywhere" });
+    for (const value of [longAssignment.name, job.name, "12:00 AM - 8:00 AM"]) {
+      const field = screen.getByText(value);
+      expect(field.style.textOverflow).toBe("");
+      expect(field.style.whiteSpace).toBe("");
+      expect(field).toHaveStyle({ overflowWrap: "anywhere" });
+    }
+  });
+
+  it("fills the available width with all seven week cells and disables horizontal scrolling", () => {
     const currentPeriodShifts: ShiftMap = {
       "emp-1_2026-05-11": {
         label: "D",
@@ -271,24 +481,76 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Scroll later days" })).not.toBeInTheDocument();
+    const strip = screen.getByTestId("schedule-day-strip");
+    expect(strip).toHaveStyle({ overflowX: "hidden", alignItems: "stretch" });
+    expect(screen.queryByRole("button", { name: /Scroll/ })).not.toBeInTheDocument();
+    for (const day of strip.querySelectorAll<HTMLElement>("[data-schedule-day]")) {
+      expect(day).toHaveStyle({ flexGrow: "1", flexBasis: "0", minWidth: "0" });
+      expect(day.firstElementChild).toHaveStyle({ width: "100%", flex: "1" });
+    }
+  });
 
-    const scrollContainer = screen
-      .getByTestId("my-schedule-row")
-      .querySelector(".dg-no-scrollbar") as HTMLDivElement;
-    Object.defineProperty(scrollContainer, "scrollWidth", { value: 2000, configurable: true });
-    Object.defineProperty(scrollContainer, "clientWidth", { value: 500, configurable: true });
-    const scrollBySpy = vi.fn();
-    scrollContainer.scrollBy = scrollBySpy;
-    fireEvent.scroll(scrollContainer);
+  it("keeps seven readable fixed-width cells horizontally scrollable on mobile", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
 
-    const rightChevron = screen.getByRole("button", { name: "Scroll later days" });
-    expect(rightChevron).toBeInTheDocument();
-
-    fireEvent.click(rightChevron);
-    expect(scrollBySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ left: 450, behavior: "smooth" }),
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+        isMobile
+      />,
     );
+
+    const strip = screen.getByTestId("schedule-day-strip");
+    expect(strip).toHaveStyle({ overflowX: "auto" });
+    for (const day of strip.querySelectorAll<HTMLElement>("[data-schedule-day]")) {
+      expect(day).toHaveStyle({ flexGrow: "0", flexBasis: "auto" });
+      expect(day.firstElementChild).toHaveStyle({ width: "160px" });
+    }
+  });
+
+  it("never opens shift popup cards on hover or keyboard focus", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const day = document.querySelector('[data-schedule-day="2026-05-11"]') as HTMLElement;
+    fireEvent.pointerEnter(day);
+    fireEvent.focus(day);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/schedule-day-details-/)).not.toBeInTheDocument();
   });
 
   it("shows the job name under the shift name, and reserves the same space for shifts/absences without one", () => {

@@ -294,6 +294,14 @@ export default function DashboardView({
     () => getDatesInRange(periodStart, periodDays),
     [periodStart, periodDays],
   );
+  const myScheduleStart = useMemo(
+    () => (effectiveViewMode === "day" ? alignPeriodStart(periodStart, "week") : periodStart),
+    [alignPeriodStart, effectiveViewMode, periodStart],
+  );
+  const myScheduleEnd = useMemo(
+    () => addDays(myScheduleStart, effectiveViewMode === "2weeks" ? 13 : 6),
+    [effectiveViewMode, myScheduleStart],
+  );
   const prevPeriodStart = useMemo(
     () => addDays(periodStart, -periodDays),
     [periodStart, periodDays],
@@ -358,11 +366,16 @@ export default function DashboardView({
     // next upcoming shift even when it falls outside the period being browsed.
     const today = new Date(`${todayKey}T00:00:00`);
     const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const earliestDashboardDate =
+      myScheduleStart < prevPeriodStart ? myScheduleStart : prevPeriodStart;
+    const latestDashboardDate = myScheduleEnd > periodEnd ? myScheduleEnd : periodEnd;
     const fetchStart = formatDateKey(
-      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
+      isUserDashboardMode && today < earliestDashboardDate ? today : earliestDashboardDate,
     );
     const fetchEnd = formatDateKey(
-      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
+      isUserDashboardMode && lookaheadEnd > latestDashboardDate
+        ? lookaheadEnd
+        : latestDashboardDate,
     );
     Promise.all([
       fetchShifts(
@@ -417,6 +430,8 @@ export default function DashboardView({
     periodEndKey,
     periodStartKey,
     prevPeriodStart,
+    myScheduleEnd,
+    myScheduleStart,
   ]);
 
   // Shift requests
@@ -994,7 +1009,7 @@ export default function DashboardView({
     // page so the logo stays put across routes (see globals.css).
     paddingLeft: "var(--dg-page-gutter)",
     paddingRight: "var(--dg-page-gutter)",
-    maxWidth: isUserDashboardMode ? 1560 : 1300,
+    maxWidth: 1560,
     margin: "0 auto",
     width: "100%" as const,
     boxSizing: "border-box" as const,

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
  * (globals.css), and these tests keep it that way.
  */
 
-const webSrc = path.resolve(process.cwd(), "src");
+const webSrc = existsSync(path.resolve(process.cwd(), "apps/web/src"))
+  ? path.resolve(process.cwd(), "apps/web/src")
+  : path.resolve(process.cwd(), "src");
 const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".css"]);
 
 /** Retired bespoke gutters — each one is a page drifting off the shared token. */
@@ -55,6 +57,16 @@ describe("canonical page gutter", () => {
 
     // Desktop paddingLeft + paddingRight, and the mobile bar's shorthand.
     expect(header.match(/var\(--dg-page-gutter\)/g) ?? []).toHaveLength(3);
+  });
+
+  it("hides the desktop header at the mobile breakpoint before media-query hydration", () => {
+    const header = readFileSync(path.join(webSrc, "components", "Header.tsx"), "utf8");
+    const globals = readFileSync(path.join(webSrc, "app", "globals.css"), "utf8");
+
+    expect(header).toContain('className="dg-app-header-desktop"');
+    expect(globals).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.dg-app-header-desktop\s*\{\s*display:\s*none !important;/,
+    );
   });
 
   it("never derives header padding from the current route", () => {

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@/components/Button";
+import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
+import { filterShiftsByWeek, getDatesInRange } from "@/lib/dashboard-stats";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import type {
@@ -19,16 +20,11 @@ import type {
 } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_BOX_WIDTH = 132;
-const DAY_BOX_MIN_HEIGHT = 78;
-// Explicit (not content-derived) height, shared by ShiftPill and
-// EmptyDayPlaceholder. With box-sizing: border-box, an explicit height makes
-// border/padding/font-metric differences between the two irrelevant to their
-// total size — they're guaranteed pixel-equal by construction, not by
-// carefully mirroring internals. Sized for 3 stacked lines (name/job/time)
-// so every pill is the same height regardless of whether a given shift has
-// a job name to show.
-const SHIFT_PILL_HEIGHT = 54;
+const DAY_BOX_WIDTH = 160;
+const DAY_BOX_MIN_HEIGHT = 86;
+const DAY_GAP = 10;
+const SCROLL_CONTROL_SLOT_WIDTH = 32;
+const SHIFT_PILL_MIN_HEIGHT = 62;
 
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
@@ -41,6 +37,9 @@ type MyScheduleRowProps = Pick<
 > & {
   jobs?: DashboardContentProps["jobs"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
+  allShifts?: DashboardContentProps["allShifts"];
+  viewMode?: DashboardContentProps["viewMode"];
+  isMobile?: DashboardContentProps["isMobile"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
@@ -282,58 +281,61 @@ function useHorizontalScrollState(dependency: unknown) {
     updateScrollState();
     const el = scrollRef.current;
     if (!el) return;
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollState);
+    resizeObserver?.observe(el);
     el.addEventListener("scroll", updateScrollState, { passive: true });
     window.addEventListener("resize", updateScrollState);
     return () => {
+      resizeObserver?.disconnect();
       el.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateScrollState, dependency]);
 
   const scrollByPage = useCallback((direction: 1 | -1) => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction * el.clientWidth * 0.9, behavior: "smooth" });
+    const cellStride = DAY_BOX_WIDTH + DAY_GAP;
+    const visibleCellCount = Math.max(1, Math.floor((el.clientWidth + DAY_GAP) / cellStride));
+    el.scrollBy({ left: direction * visibleCellCount * cellStride, behavior: "smooth" });
   }, []);
 
   return { scrollRef, canScrollLeft, canScrollRight, scrollByPage };
 }
 
-function ScrollChevron({
+function ScrollCue({
   direction,
+  visible,
   onClick,
 }: {
   direction: "left" | "right";
+  visible: boolean;
   onClick: () => void;
 }) {
-  const Icon = direction === "left" ? ChevronLeft : ChevronRight;
   return (
-    <Button
-      type="button"
-      onClick={onClick}
-      aria-label={direction === "left" ? "Scroll earlier days" : "Scroll later days"}
+    <div
+      data-testid={`schedule-scroll-slot-${direction}`}
       style={{
         position: "absolute",
-        top: "50%",
-        [direction]: -4,
+        top: "calc(50% + 13px)",
+        [direction]: 12,
         transform: "translateY(-50%)",
+        zIndex: 1,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 28,
-        height: 28,
-        borderRadius: "50%",
-        border: "1px solid var(--dg-color-border)",
-        background: "var(--dg-color-bg)",
-        color: "var(--dg-color-text-secondary)",
-        boxShadow: "var(--shadow-raised)",
-        cursor: "pointer",
-        zIndex: 1,
+        width: SCROLL_CONTROL_SLOT_WIDTH,
       }}
     >
-      <Icon size={16} />
-    </Button>
+      {visible ? (
+        <ScrollCueButton
+          direction={direction}
+          onClick={onClick}
+          label={direction === "left" ? "Scroll earlier days" : "Scroll later days"}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -341,34 +343,30 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
   return (
     <div
       style={{
-        height: SHIFT_PILL_HEIGHT,
+        minHeight: SHIFT_PILL_MIN_HEIGHT,
+        flex: 1,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
-        padding: "0 6px",
+        padding: "8px",
         borderRadius: "var(--dg-radius-sm, 6px)",
         border: `1px solid ${shift.border}`,
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
-        overflow: "hidden",
+        overflowWrap: "anywhere",
       }}
     >
       <div
         style={{
           fontSize: "var(--dg-type-badge-size)",
           fontWeight: 600,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          lineHeight: 1.25,
+          overflowWrap: "anywhere",
         }}
       >
         {shift.label}
       </div>
-      {/* Job name and time lines are always rendered (even when absent) so
-          every pill has the same three-line height — hiding a line
-          visually, not removing it, keeps its reserved space, unlike an
-          absence pill or job-less shift that would otherwise be shorter. */}
       <div
         aria-hidden={!shift.jobName}
         style={{
@@ -376,9 +374,8 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           fontWeight: 500,
           marginTop: 1,
           opacity: 0.8,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          lineHeight: 1.25,
+          overflowWrap: "anywhere",
           visibility: shift.jobName ? "visible" : "hidden",
         }}
       >
@@ -389,9 +386,8 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
         style={{
           fontSize: "var(--dg-type-metadata-size)",
           marginTop: 1,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          lineHeight: 1.25,
+          overflowWrap: "anywhere",
           visibility: shift.timeRange ? "visible" : "hidden",
         }}
       >
@@ -401,14 +397,12 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
   );
 }
 
-// Same explicit height as ShiftPill (see SHIFT_PILL_HEIGHT), so the dash is
-// guaranteed to center against the exact box a real pill would occupy —
-// border-box sizing means padding/border differences can't throw this off.
 function EmptyDayPlaceholder() {
   return (
     <div
       style={{
-        height: SHIFT_PILL_HEIGHT,
+        minHeight: SHIFT_PILL_MIN_HEIGHT,
+        flex: 1,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -424,23 +418,29 @@ function EmptyDayPlaceholder() {
   );
 }
 
-function DayBox({ day }: { day: MyScheduleDay }) {
+function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailableWidth: boolean }) {
   return (
     <Link
       href="/schedule"
+      data-schedule-day={day.dateKey}
       style={{
         textDecoration: "none",
         color: "inherit",
         flexShrink: 0,
+        flexGrow: fillAvailableWidth ? 1 : 0,
+        flexBasis: fillAvailableWidth ? 0 : "auto",
+        minWidth: 0,
         display: "flex",
         alignSelf: "stretch",
+        scrollSnapAlign: "start",
+        scrollSnapStop: "always",
       }}
     >
       <div
         style={{
-          width: DAY_BOX_WIDTH,
+          width: fillAvailableWidth ? "100%" : DAY_BOX_WIDTH,
           minHeight: DAY_BOX_MIN_HEIGHT,
-          height: "100%",
+          flex: 1,
           display: "flex",
           flexDirection: "column",
           textAlign: "center",
@@ -487,6 +487,9 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
+  allShifts,
+  viewMode,
+  isMobile = false,
   periodDates,
   periodLabel,
   isManagementOnly = false,
@@ -498,32 +501,50 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
+  const displayDates = useMemo(() => {
+    if (viewMode !== "day" || !periodDates[0]) return periodDates;
+    const weekStart = new Date(periodDates[0]);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    return getDatesInRange(weekStart, 7);
+  }, [periodDates, viewMode]);
+  const displayShifts = useMemo(() => {
+    if (viewMode !== "day" || !allShifts || displayDates.length === 0) {
+      return currentPeriodShifts;
+    }
+    return filterShiftsByWeek(
+      allShifts,
+      formatDateKey(displayDates[0]),
+      formatDateKey(displayDates[displayDates.length - 1]),
+    );
+  }, [allShifts, currentPeriodShifts, displayDates, viewMode]);
   const days = useMemo(
     () =>
       currentEmpId
         ? buildMyScheduleDays({
             currentEmpId,
-            currentPeriodShifts,
+            currentPeriodShifts: displayShifts,
             assignmentById,
             absenceTypeById,
             jobById,
             shiftById,
-            periodDates,
+            periodDates: displayDates,
             isDarkTheme,
           })
         : [],
     [
       currentEmpId,
-      currentPeriodShifts,
+      displayShifts,
       assignmentById,
       absenceTypeById,
       jobById,
       shiftById,
-      periodDates,
+      displayDates,
       isDarkTheme,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
+  const fillsWithoutScrolling = days.length <= 7 && !isMobile;
   const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(
     days.length,
   );
@@ -535,10 +556,10 @@ export default function MyScheduleRow({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Your schedule</div>
-          <div className="dg-card-subtitle">{periodLabel}</div>
+          <div className="dg-card-subtitle">{viewMode === "day" ? "this week" : periodLabel}</div>
         </div>
       </div>
-      <div className="dg-card-body">
+      <div className="dg-card-body" style={hasAnySchedule ? { padding: "16px 0" } : undefined}>
         {!hasAnySchedule ? (
           <EmptyState
             size="inline"
@@ -547,18 +568,31 @@ export default function MyScheduleRow({
             description="When your shifts get published, they'll show up right here."
           />
         ) : (
-          <div style={{ position: "relative" }}>
-            {canScrollLeft && <ScrollChevron direction="left" onClick={() => scrollByPage(-1)} />}
+          <div
+            data-testid="schedule-scroll-shell"
+            style={{
+              position: "relative",
+            }}
+          >
+            <ScrollCue direction="left" visible={canScrollLeft} onClick={() => scrollByPage(-1)} />
             <div
               ref={scrollRef}
               className="dg-no-scrollbar"
-              style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2 }}
+              data-testid="schedule-day-strip"
+              style={{
+                display: "flex",
+                alignItems: "stretch",
+                gap: DAY_GAP,
+                overflowX: fillsWithoutScrolling ? "hidden" : "auto",
+                paddingBottom: 2,
+                scrollSnapType: "x proximity",
+              }}
             >
               {days.map((day) => (
-                <DayBox key={day.key} day={day} />
+                <DayBox key={day.key} day={day} fillAvailableWidth={fillsWithoutScrolling} />
               ))}
             </div>
-            {canScrollRight && <ScrollChevron direction="right" onClick={() => scrollByPage(1)} />}
+            <ScrollCue direction="right" visible={canScrollRight} onClick={() => scrollByPage(1)} />
           </div>
         )}
       </div>

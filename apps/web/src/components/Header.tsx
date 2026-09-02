@@ -510,6 +510,7 @@ export default function Header({ orgName }: HeaderProps) {
       ) : null}
       {logoutConfirmDialog}
       <div
+        className="dg-app-header-desktop"
         style={{
           background: "var(--dg-color-surface)",
           // The logo sits on the canonical page gutter on every route, with no

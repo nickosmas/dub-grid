@@ -114,6 +114,28 @@ async function fetchInvitation(orgId: string, invitationId: string): Promise<Inv
   return data ? rowToInvitation(data as DbInvitation) : null;
 }
 
+async function fetchInvitationWithToken(
+  orgId: string,
+  invitationId: string,
+): Promise<{ invitation: Invitation; token: string } | null> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select(
+      "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+    )
+    .eq("org_id", orgId)
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as DbInvitation;
+  if (!row.token) throw new Error("Invitation token is missing");
+  return { invitation: rowToInvitation(row), token: row.token };
+}
+
 /**
  * `one_pending_invite_per_email` is a partial unique index on
  * invitations(org_id, email) WHERE accepted_at IS NULL AND revoked_at IS
@@ -554,10 +576,11 @@ export async function POST(req: NextRequest) {
     const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
-    const currentInvitation = await fetchInvitation(orgId, invitationId);
-    if (!currentInvitation) {
+    const currentSnapshot = await fetchInvitationWithToken(orgId, invitationId);
+    if (!currentSnapshot) {
       return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     }
+    const { invitation: currentInvitation, token: previousToken } = currentSnapshot;
 
     if (!timestampsMatch(currentInvitation.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentInvitation);
@@ -764,6 +787,26 @@ export async function POST(req: NextRequest) {
         inviterName: user.email ?? null,
       });
     } catch (emailError) {
+      const { data: restoredInvitation, error: rollbackError } = await serviceClient
+        .from("invitations")
+        .update({
+          token: previousToken,
+          expires_at: currentInvitation.expiresAt,
+          revoked_at: currentInvitation.revokedAt,
+        })
+        .eq("org_id", orgId)
+        .eq("id", invitationId)
+        .eq("updated_at", latestInvitation.updatedAt)
+        .eq("token", token)
+        .is("accepted_at", null)
+        .select("id")
+        .maybeSingle();
+      if (rollbackError || !restoredInvitation) {
+        logger.error(
+          { error: rollbackError, orgId, invitationId },
+          "Failed to restore invitation after resend email failure",
+        );
+      }
       Sentry.captureException(emailError, {
         extra: { context: "invitation-resend-email", orgId, invitationId },
       });
