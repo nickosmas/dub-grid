@@ -1,0 +1,117 @@
+import { describe, expect, it } from "vitest";
+import { resolveOnboardingDecision, type OnboardingDecisionInput } from "./onboarding-decision";
+
+function input(overrides: Partial<OnboardingDecisionInput> = {}): OnboardingDecisionInput {
+  return {
+    bootstrapUnavailable: false,
+    completedThisSession: false,
+    appAlreadyShown: false,
+    orgLoading: false,
+    entryGate: { onboardingCompleted: false, billingLocked: null },
+    onBillingRecoveryRoute: false,
+    setupComplete: true,
+    canCompleteSetup: false,
+    orgDataReliable: true,
+    frozenPhase: null,
+    ...overrides,
+  };
+}
+
+describe("resolveOnboardingDecision", () => {
+  it("shows the orientation wizard to a member who has not onboarded", () => {
+    expect(resolveOnboardingDecision(input())).toEqual({
+      kind: "wizard",
+      isOrgSetup: true,
+      freezePhase: null,
+    });
+  });
+
+  it("shows the config wizard to setup-capable users while org setup is incomplete", () => {
+    expect(
+      resolveOnboardingDecision(input({ setupComplete: false, canCompleteSetup: true })),
+    ).toEqual({ kind: "wizard", isOrgSetup: false, freezePhase: "config" });
+  });
+
+  it("holds users who cannot advance setup on the pending screen", () => {
+    expect(resolveOnboardingDecision(input({ setupComplete: false }))).toEqual({
+      kind: "setup-pending",
+    });
+  });
+
+  it("keeps an onboarded member in the app when org setup goes incomplete", () => {
+    const entryGate = { onboardingCompleted: true, billingLocked: null };
+    expect(resolveOnboardingDecision(input({ entryGate, setupComplete: false }))).toEqual({
+      kind: "app",
+      settled: true,
+    });
+    expect(
+      resolveOnboardingDecision(input({ entryGate, setupComplete: false, canCompleteSetup: true })),
+    ).toEqual({ kind: "app", settled: true });
+  });
+
+  it("keeps the app once it has been shown, even if setup completeness flips", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({ appAlreadyShown: true, setupComplete: false, canCompleteSetup: true }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+  });
+
+  it("does not latch the app while the answer is still unsettled", () => {
+    expect(resolveOnboardingDecision(input({ orgLoading: true }))).toEqual({
+      kind: "app",
+      settled: false,
+    });
+    expect(resolveOnboardingDecision(input({ entryGate: null }))).toEqual({
+      kind: "app",
+      settled: false,
+    });
+  });
+
+  it("still enforces the billing lock after the app has been shown", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          appAlreadyShown: true,
+          entryGate: { onboardingCompleted: true, billingLocked: true },
+        }),
+      ),
+    ).toEqual({ kind: "billing-redirect" });
+  });
+
+  it("lets a billing-locked super admin stay on the recovery route", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          onBillingRecoveryRoute: true,
+          entryGate: { onboardingCompleted: false, billingLocked: true },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+  });
+
+  it("prefers the frozen phase over live setup completeness", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({ frozenPhase: "config", setupComplete: true, canCompleteSetup: true }),
+      ),
+    ).toEqual({ kind: "wizard", isOrgSetup: false, freezePhase: null });
+  });
+
+  it("only asks to freeze a phase for setup-capable users with reliable org data", () => {
+    expect(
+      resolveOnboardingDecision(input({ canCompleteSetup: true, orgDataReliable: false })),
+    ).toEqual({ kind: "wizard", isOrgSetup: true, freezePhase: null });
+    expect(resolveOnboardingDecision(input({ canCompleteSetup: true }))).toEqual({
+      kind: "wizard",
+      isOrgSetup: true,
+      freezePhase: "orientation",
+    });
+  });
+
+  it("recovers from an unusable bootstrap before anything else", () => {
+    expect(
+      resolveOnboardingDecision(input({ bootstrapUnavailable: true, appAlreadyShown: true })),
+    ).toEqual({ kind: "bootstrap-recovery" });
+  });
+});

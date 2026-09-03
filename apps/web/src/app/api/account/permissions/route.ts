@@ -91,7 +91,9 @@ async function handleGET(req: NextRequest, timer: Timer) {
     const claimOrgRole = (auth.claims.org_role as string) || "user";
     const effectiveRole = auth.claims.platform_role === "gridmaster" ? "gridmaster" : claimOrgRole;
     const orgId = claimOrgId;
-    const mfaNagRequired = MFA_NAGGED_ROLES.has(effectiveRole) && !hasVerifiedTotpFactor(auth.user);
+    const hasTotp = hasVerifiedTotpFactor(auth.user);
+    const mfaNagFor = (role: string) => MFA_NAGGED_ROLES.has(role) && !hasTotp;
+    const mfaNagRequired = mfaNagFor(effectiveRole);
 
     if (impersonation && auth.claims.platform_role === "gridmaster") {
       // The cookie is client-writable — cross-check its sessionId against
@@ -157,13 +159,24 @@ async function handleGET(req: NextRequest, timer: Timer) {
       getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
     ]);
 
-    if (effectiveRole === "admin" && orgId) {
+    // The org_role claim trails the database after a promotion: the membership
+    // row is written immediately, but an access token that is already issued
+    // cannot be re-minted, so the claim can still say "user" for up to a
+    // refresh interval after someone is made an admin. Resolve the role from
+    // the membership row for the effective org rather than trusting the claim,
+    // or the client renders the wrong tier, including the wrong onboarding
+    // flow, then the right one the moment the token catches up.
+    //
+    // A missing row fails closed to "user": the JWT hook only issues an org
+    // claim while the membership is valid, so no row here means it was archived
+    // after the token was minted.
+    if (orgId) {
       const { data } = await serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
         .eq("user_id", auth.user.id)
         .eq("org_id", orgId)
-        .single();
+        .maybeSingle();
 
       const dbRole = (data?.org_role as OrganizationRole | null) ?? "user";
       return NextResponse.json({
@@ -173,10 +186,13 @@ async function handleGET(req: NextRequest, timer: Timer) {
           false,
           (data?.admin_permissions as AdminPermissions | null) ?? null,
           false,
-          inactive,
+          // Super_admins bypass the inactive check (they're the ones who'd be
+          // doing the deactivating, and the people page UI already prevents
+          // deactivating admin/super_admin roles).
+          dbRole === "super_admin" ? false : inactive,
         ),
         ...employmentFlags,
-        mfaNagRequired,
+        mfaNagRequired: mfaNagFor(dbRole),
       });
     }
 

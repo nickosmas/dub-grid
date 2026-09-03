@@ -28,17 +28,21 @@ interface OnboardingState {
   isLastStep: boolean;
 }
 
-function storageKey(userId: string, orgId: string) {
-  return `dg_onboarding:${userId}:${orgId}`;
+// Scoped by variant: the flows have different lengths and different steps, so
+// a position saved in one is meaningless in another. Without the variant in the
+// key, a wizard that changed flow mid-visit resumed at the other flow's index.
+function storageKey(userId: string, orgId: string, variant: string) {
+  return `dg_onboarding:${userId}:${orgId}:${variant}`;
 }
 
 export function useOnboardingState(
   userId: string,
   orgId: string,
   steps: StepConfig[],
+  variant: string,
 ): OnboardingState {
   const queryClient = useQueryClient();
-  const key = storageKey(userId, orgId);
+  const key = storageKey(userId, orgId, variant);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(() => {
     if (typeof window === "undefined") return 0;

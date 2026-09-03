@@ -112,11 +112,16 @@ function renderWithQueryClient(ui: React.ReactElement) {
 }
 
 function renderGate() {
-  return renderWithQueryClient(
-    <OnboardingGate>
-      <div>Protected app</div>
-    </OnboardingGate>,
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const gate = () => (
+    <QueryClientProvider client={queryClient}>
+      <OnboardingGate>
+        <div>Protected app</div>
+      </OnboardingGate>
+    </QueryClientProvider>
   );
+  const result = render(gate());
+  return { ...result, rerenderGate: () => result.rerender(gate()) };
 }
 
 beforeEach(() => {
@@ -174,15 +179,71 @@ beforeEach(() => {
 });
 
 describe("OnboardingGate setup lock", () => {
-  it("shows setup pending for regular users even when onboarding is completed", async () => {
+  it("shows setup pending for regular users who have not completed onboarding", async () => {
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+
+    renderGate();
+
+    expect(await screen.findByText("Setup pending")).toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+  });
+
+  it("keeps onboarded members in the app while org config is incomplete", async () => {
     mockPermissions.role = "user";
     mockPermissions.canManageOrg = false;
     mockOrganizationData.entryGate.onboardingCompleted = true;
 
     renderGate();
 
-    expect(await screen.findByText("Setup pending")).toBeInTheDocument();
-    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
+  it("keeps onboarded setup-capable users in the app while org config is incomplete", async () => {
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+
+    renderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+  });
+
+  it("does not replace the app with onboarding when setup completeness flips mid-session", async () => {
+    // An admin adding a focus area, shift, or job makes setupStatus incomplete
+    // for the whole org until they finish placing it, and the bootstrap refetch
+    // that carries it reaches every open tab.
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+
+    const { rerenderGate } = renderGate();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+
+    mockOrganizationData.entryGate = { onboardingCompleted: false, billingLocked: null };
+    mockOrganizationData.setupStatus = {
+      isComplete: false,
+      missing: {
+        focusAreas: true,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    rerenderGate();
+
+    expect(screen.getByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
   });
 
   it("renders the onboarding wizard inline for setup-capable users while setup is incomplete", async () => {

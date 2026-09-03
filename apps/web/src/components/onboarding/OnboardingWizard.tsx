@@ -66,15 +66,24 @@ export default function OnboardingWizard({
   const isOrgSetupAtMountRef = useRef(isOrgSetup);
   const effectiveIsOrgSetup = isOrgSetupAtMountRef.current;
 
-  const steps = useMemo(() => {
-    if (role === "super_admin") {
-      return effectiveIsOrgSetup ? SA_ORIENTATION_STEPS : SUPER_ADMIN_STEPS;
+  // The role is frozen for the same reason. usePermissions re-resolves on the
+  // organization_memberships change event, which is exactly what a promotion
+  // fires, so an unfrozen role turned a user part-way through the 2-step user
+  // flow into the admin flow under them, mid-wizard.
+  const roleAtMountRef = useRef(role);
+  const effectiveRole = roleAtMountRef.current;
+
+  const { steps, variant } = useMemo(() => {
+    if (effectiveRole === "super_admin") {
+      return effectiveIsOrgSetup
+        ? { steps: SA_ORIENTATION_STEPS, variant: "sa-orientation" }
+        : { steps: SUPER_ADMIN_STEPS, variant: "sa-config" };
     }
-    if (role === "admin") return ADMIN_STEPS;
-    return USER_STEPS;
-  }, [role, effectiveIsOrgSetup]);
+    if (effectiveRole === "admin") return { steps: ADMIN_STEPS, variant: "admin" };
+    return { steps: USER_STEPS, variant: "user" };
+  }, [effectiveRole, effectiveIsOrgSetup]);
   const { currentStepIndex, currentStep, goNext, goBack, completeOnboarding, isFirstStep } =
-    useOnboardingState(userId, orgId, steps);
+    useOnboardingState(userId, orgId, steps, variant);
 
   const [skipLoading, setSkipLoading] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
@@ -97,7 +106,9 @@ export default function OnboardingWizard({
 
     switch (id) {
       case "welcome":
-        return <WelcomeStep role={role} onNext={goNext} isOrgSetup={effectiveIsOrgSetup} />;
+        return (
+          <WelcomeStep role={effectiveRole} onNext={goNext} isOrgSetup={effectiveIsOrgSetup} />
+        );
       case "identity":
         return <IdentityStep onNext={goNext} onBack={goBack} />;
       case "structure":
@@ -113,7 +124,7 @@ export default function OnboardingWizard({
       case "completion":
         return (
           <CompletionStep
-            role={role}
+            role={effectiveRole}
             onComplete={completeOnboarding}
             isOrgSetup={effectiveIsOrgSetup}
           />
