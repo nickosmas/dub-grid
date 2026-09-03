@@ -181,7 +181,6 @@ interface PrintSectionProps {
   splitAtIndex?: number;
   fontSize: number;
   shiftDisplayMode?: ShiftDisplayMode;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 function PrintSection({
@@ -204,7 +203,6 @@ function PrintSection({
   splitAtIndex,
   fontSize,
   shiftDisplayMode = "code",
-  useCompactRoleCertificationLabels = false,
 }: PrintSectionProps) {
   const isNameMode = shiftDisplayMode === "name";
   // Bind focus-area context so label lookups resolve the section-specific definition first.
@@ -393,11 +391,9 @@ function PrintSection({
         {/* Employee rows */}
         <tbody>
           {employees.map((emp, ri) => {
-            const certAbbr = getCertAbbr(
-              emp.certificationId,
-              certifications,
-              useCompactRoleCertificationLabels,
-            );
+            // Always compact: a printed name cell has no room for a full
+            // certification name, and DESIGNATION_COLORS is keyed by abbreviation.
+            const certAbbr = getCertAbbr(emp.certificationId, certifications, true);
             const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
             return (
@@ -459,11 +455,7 @@ function PrintSection({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {getRoleAbbrs(
-                            emp.roleIds,
-                            orgRoles,
-                            useCompactRoleCertificationLabels,
-                          ).join(", ")}
+                          {getRoleAbbrs(emp.roleIds, orgRoles, true).join(", ")}
                         </div>
                       )}
                     </div>
@@ -1023,7 +1015,6 @@ interface PrintScheduleViewProps {
   onClose: () => void;
   focusAreaLabel?: string;
   shiftDisplayMode?: ShiftDisplayMode;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 export default function PrintScheduleView({
@@ -1047,7 +1038,6 @@ export default function PrintScheduleView({
   onClose,
   focusAreaLabel = "Focus Areas",
   shiftDisplayMode = "code",
-  useCompactRoleCertificationLabels = false,
 }: PrintScheduleViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
@@ -1329,7 +1319,6 @@ export default function PrintScheduleView({
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
                 shiftDisplayMode={shiftDisplayMode}
-                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               />
             );
           })}

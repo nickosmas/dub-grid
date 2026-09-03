@@ -490,7 +490,6 @@ export interface RecurringScheduleSectionProps {
   absenceTypes?: AbsenceType[];
   shiftDisplayMode?: ShiftDisplayMode;
   defaultShiftEnabled?: boolean;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 export function RecurringScheduleSection({
@@ -508,7 +507,6 @@ export function RecurringScheduleSection({
   absenceTypes = [],
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
-  useCompactRoleCertificationLabels = false,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -1177,11 +1175,10 @@ export function RecurringScheduleSection({
             const rowBg = isCurrentUser ? "var(--dg-color-today-bg)" : "var(--dg-color-surface)";
             const certAbbr =
               employee.certificationId != null
-                ? getCertAbbr(
-                    employee.certificationId,
-                    certifications,
-                    useCompactRoleCertificationLabels,
-                  )
+                ? // Always compact here: the name column is a fixed 220px (140px on
+                  // mobile), so a full certification name overruns the employee
+                  // name beside it. DESIGNATION_COLORS is keyed by abbreviation too.
+                  getCertAbbr(employee.certificationId, certifications, true)
                 : null;
             const designationColors = certAbbr
               ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR)

@@ -963,14 +963,12 @@ function SchedulerContent() {
   const [isCoverageGapVolunteerPending, setIsCoverageGapVolunteerPending] = useState(false);
 
   const realtimeChannelRef = useRef<BrowserRealtimeChannel | null>(null);
-  const [realtimeUnavailable, setRealtimeUnavailable] = useState(false);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     sendBroadcast: sendReliableBroadcast,
     flushPendingBroadcasts,
     clearPendingBroadcast,
     resetPendingBroadcasts,
-    isBroadcastDegraded,
   } = useReliableRealtimeBroadcasts(realtimeChannelRef);
 
   // Refs for values used by the realtime channel — reading from refs avoids
@@ -1218,7 +1216,6 @@ function SchedulerContent() {
     onlineUsers,
     sameAccountSessions,
     isSessionEnded,
-    isPresenceDegraded,
     syncPresence,
     handleLockBroadcast,
     handleUnlockBroadcast,
@@ -1230,11 +1227,6 @@ function SchedulerContent() {
     isScheduleEditor,
     sendReliableBroadcast,
   );
-  // The banner covers collaboration health as a whole: the channel dropping,
-  // presence failing to publish, or broadcasts failing to send all mean other
-  // editors are no longer seeing this one.
-  const realtimeCollaborationDegraded =
-    realtimeUnavailable || isPresenceDegraded || isBroadcastDegraded;
   const localSessionEndedRef = useRef(isSessionEnded);
   localSessionEndedRef.current = isSessionEnded;
 
@@ -1832,7 +1824,6 @@ function SchedulerContent() {
     const settled = new Promise<void>((resolve) => {
       settle = resolve;
     });
-    setRealtimeUnavailable(false);
 
     // Every mount gets its own channel. Handlers close over this mount's refs,
     // so a channel kept across mounts would keep dispatching into the unmounted
@@ -1994,7 +1985,6 @@ function SchedulerContent() {
             settle();
           }
           if (status === "SUBSCRIBED") {
-            if (!disposed) setRealtimeUnavailable(false);
             // Refetch on reconnection to catch events missed during downtime
             if (hadError) {
               hadError = false;
@@ -2025,7 +2015,6 @@ function SchedulerContent() {
             await flushPendingBroadcasts();
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             hadError = true;
-            if (!disposed) setRealtimeUnavailable(true);
             console.warn("[Realtime] Channel error (auto-retrying):", err ?? "unknown");
           }
         });
@@ -6238,27 +6227,6 @@ function SchedulerContent() {
                 onEndOtherSessions={handleEndOtherScheduleSessions}
                 onSignOutThisDevice={() => signOut({ scope: "local" })}
               />
-            )}
-            {realtimeCollaborationDegraded && !isSessionEnded && (
-              <div
-                className="dg-draft-banner no-print"
-                role="status"
-                style={{
-                  background: "var(--dg-color-warning-bg)",
-                  borderColor: "var(--dg-color-warning-border)",
-                  color: "var(--dg-color-warning-text)",
-                }}
-              >
-                <div
-                  className="dg-draft-banner-dot"
-                  style={{ background: "var(--dg-color-warning-text)" }}
-                />
-                <strong>Live collaboration unavailable</strong>
-                <span>
-                  You can keep working. Online status and live cell locks may be delayed; saved
-                  changes still use conflict checks.
-                </span>
-              </div>
             )}
             {isBulkDeleteMode && (
               <div

@@ -385,7 +385,6 @@ export default function StaffView({
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}
                 defaultShiftEnabled={defaultShiftEnabled}
-                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               />
             )}
           </div>

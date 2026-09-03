@@ -281,7 +281,10 @@ export function OverviewTab({
               </div>
             ) : (
               <div>
-                <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="mb-4 flex h-6 overflow-hidden rounded-full bg-muted"
+                  style={{ border: "0.5px solid var(--dg-color-border-strong)" }}
+                >
                   {shiftDistribution.map((item, index) => (
                     <div
                       key={item.assignmentId}
@@ -289,6 +292,13 @@ export function OverviewTab({
                       style={{
                         width: `${totalDistributionShifts > 0 ? (item.count / totalDistributionShifts) * 100 : 0}%`,
                         backgroundColor: item.color,
+                        // One line per seam: the outline lives on the track, and
+                        // each segment but the last draws the single divider it
+                        // shares with its neighbor.
+                        borderRight:
+                          index < shiftDistribution.length - 1
+                            ? "0.5px solid var(--dg-color-border-strong)"
+                            : undefined,
                         borderRadius:
                           index === 0 && shiftDistribution.length === 1
                             ? "9999px"
@@ -308,7 +318,10 @@ export function OverviewTab({
                       <div className="flex items-center gap-2.5">
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                          style={{ backgroundColor: item.color }}
+                          style={{
+                            backgroundColor: item.color,
+                            boxShadow: "0 0 0 0.5px var(--dg-color-border-strong)",
+                          }}
                         />
                         <span className="text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                           {item.name}

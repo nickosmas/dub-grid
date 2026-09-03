@@ -46,29 +46,20 @@ export function StaffDetailHeader({ employee, actions }: StaffDetailHeaderProps)
     <header className="pb-2">
       <div className="flex flex-col gap-4 sm:gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 shrink-0 ring-1 ring-[var(--dg-color-border)]">
               <AvatarFallback className="bg-[var(--dg-color-bg-secondary)] text-xl font-bold text-[var(--dg-color-text-secondary)]">
                 {getInitials(displayName)}
               </AvatarFallback>
             </Avatar>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="px-2 font-semibold" style={statusConfig.style}>
-                  {statusConfig.label}
-                </Badge>
-                <span
-                  className="font-mono text-[13px] font-medium text-[var(--dg-color-text-faint)]"
-                  aria-label="Employee ID"
-                >
-                  #{employee.employeeNumber}
-                </span>
-              </div>
-
-              <h1 className="mt-3 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="min-w-0 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                 {displayName}
               </h1>
+              <Badge variant="outline" className="px-2 font-semibold" style={statusConfig.style}>
+                {statusConfig.label}
+              </Badge>
             </div>
           </div>
 
