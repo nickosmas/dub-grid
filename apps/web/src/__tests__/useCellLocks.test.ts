@@ -532,6 +532,12 @@ describe("useCellLocks", () => {
     });
 
     expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.sameAccountSessions).toEqual([
+      {
+        editorSessionId: "session-2",
+        editingCell: "emp-5_2026-04-12",
+      },
+    ]);
     expect(result.current.getCellLock("emp-5_2026-04-12")).toEqual(
       expect.objectContaining({
         userId: "user-1",
@@ -579,7 +585,70 @@ describe("useCellLocks", () => {
     });
 
     expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.sameAccountSessions).toEqual([
+      {
+        editorSessionId: "session-2",
+        editingCell: null,
+      },
+    ]);
     expect(result.current.lockedCells.size).toBe(0);
+  });
+
+  it("represents each same-account editor session once and removes ended sessions", () => {
+    const channel = createChannel();
+    channel.setPresenceState({
+      "user-1": [
+        {
+          editingCell: null,
+          userId: "user-1",
+          userName: "Alex Admin",
+          editorSessionId: "session-3",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 1,
+        },
+        {
+          editingCell: "emp-6_2026-04-12",
+          userId: "user-1",
+          userName: "Alex Admin",
+          editorSessionId: "session-2",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 4,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.sameAccountSessions).toEqual([
+      {
+        editorSessionId: "session-2",
+        editingCell: "emp-6_2026-04-12",
+      },
+      { editorSessionId: "session-3", editingCell: null },
+    ]);
+
+    act(() => {
+      result.current.removeRemoteSession("session-2");
+    });
+
+    expect(result.current.sameAccountSessions).toEqual([
+      { editorSessionId: "session-3", editingCell: null },
+    ]);
   });
 
   it("deduplicates multiple sessions for the same user into one avatar entry", () => {

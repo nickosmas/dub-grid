@@ -28,6 +28,7 @@ import BulkDeleteReviewContent, {
 import {
   ScheduleSessionConflictDialog,
   ScheduleSessionEndedDialog,
+  ScheduleSessionWarning,
 } from "./_components/ScheduleSessionDialogs";
 import { resolveGridAuditLabel } from "./_lib/grid-audit-label";
 import {
@@ -109,6 +110,7 @@ import {
   deleteShiftSeries,
   discardScheduleDrafts,
   endScheduleEditorSession,
+  endScheduleEditorSessions,
   fetchCalloffOpenShifts,
   fetchPublishedDateRanges,
   fetchRecentPublishHistory,
@@ -1151,6 +1153,7 @@ function SchedulerContent() {
     getCurrentCell,
     lockedCells,
     onlineUsers,
+    sameAccountSessions,
     isSessionEnded,
     syncPresence,
     handleLockBroadcast,
@@ -1522,6 +1525,70 @@ function SchedulerContent() {
       );
     }
   }, [org, pendingSessionTakeover, removeRemoteSession]);
+
+  const handleEndOtherScheduleSessions = useCallback(async () => {
+    if (!org || sameAccountSessions.length === 0) return;
+
+    if (sameAccountSessions.length > 20) {
+      toast.error(
+        "Too many schedule sessions were detected to end safely at once. Close unused tabs, then try again.",
+      );
+      return;
+    }
+    const targetEditorSessionIds = sameAccountSessions.map((session) => session.editorSessionId);
+
+    try {
+      await endScheduleEditorSessions({
+        orgId: org.id,
+        targetEditorSessionIds,
+        endingEditorSessionId: editorSessionIdRef.current,
+      });
+    } catch (error) {
+      Sentry.captureException(error);
+      toast.error("We couldn't end the other schedule sessions. Try again.");
+      return;
+    }
+
+    // The single API write above commits every durable marker before any
+    // best-effort Realtime notification is sent.
+    for (const targetEditorSessionId of targetEditorSessionIds) {
+      removeRemoteSession(targetEditorSessionId);
+    }
+
+    const channel = realtimeChannelRef.current;
+    const deliveryStatuses =
+      channel?.state === "joined"
+        ? await Promise.all(
+            targetEditorSessionIds.map(async (targetEditorSessionId) => {
+              try {
+                return await channel.send({
+                  type: "broadcast",
+                  event: "editor_session_ended",
+                  payload: {
+                    userId: currentUserRef.current?.id,
+                    targetEditorSessionId,
+                    endingEditorSessionId: editorSessionIdRef.current,
+                  },
+                });
+              } catch (error) {
+                Sentry.captureException(error);
+                return null;
+              }
+            }),
+          )
+        : [];
+
+    if (
+      deliveryStatuses.length === targetEditorSessionIds.length &&
+      deliveryStatuses.every((status) => status === "ok")
+    ) {
+      toast.success("The other schedule sessions were ended. You can use this tab now.");
+    } else {
+      toast.warning(
+        "The other schedule sessions were ended. Their warnings may be delayed until they reconnect.",
+      );
+    }
+  }, [org, removeRemoteSession, sameAccountSessions]);
 
   // Refs for realtime callbacks — allows the channel effect to depend only on
   // [org] while still calling the latest versions of these functions.
@@ -5820,6 +5887,13 @@ function SchedulerContent() {
                   </Button>
                 </div>
               </div>
+            )}
+            {sameAccountSessions.length > 0 && !isSessionEnded && (
+              <ScheduleSessionWarning
+                sessionCount={sameAccountSessions.length}
+                onEndOtherSessions={handleEndOtherScheduleSessions}
+                onSignOutThisDevice={() => signOut({ scope: "local" })}
+              />
             )}
             {realtimeUnavailable && !isSessionEnded && (
               <div

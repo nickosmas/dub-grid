@@ -74,7 +74,19 @@ export function endScheduleEditorSession(input: {
   orgId: string;
   targetEditorSessionId: string;
   endingEditorSessionId: string;
-}): Promise<{ ended: true; endedAt: string }> {
+}): Promise<{ ended: true; endedAt: string; endedEditorSessionIds: string[] }> {
+  return endScheduleEditorSessions({
+    orgId: input.orgId,
+    targetEditorSessionIds: [input.targetEditorSessionId],
+    endingEditorSessionId: input.endingEditorSessionId,
+  });
+}
+
+export function endScheduleEditorSessions(input: {
+  orgId: string;
+  targetEditorSessionIds: string[];
+  endingEditorSessionId: string;
+}): Promise<{ ended: true; endedAt: string; endedEditorSessionIds: string[] }> {
   return requestScheduleJson("/api/schedule/editor-sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -10,11 +10,29 @@ const querySchema = z.object({
   orgId: z.string().uuid(),
   editorSessionId: sessionIdSchema,
 });
-const endSessionSchema = z.object({
-  orgId: z.string().uuid(),
-  targetEditorSessionId: sessionIdSchema,
-  endingEditorSessionId: sessionIdSchema,
-});
+const MAX_SESSION_TERMINATIONS = 20;
+const endSessionSchema = z
+  .object({
+    orgId: z.string().uuid(),
+    targetEditorSessionIds: z.array(sessionIdSchema).min(1).max(MAX_SESSION_TERMINATIONS),
+    endingEditorSessionId: sessionIdSchema,
+  })
+  .superRefine((value, context) => {
+    if (value.targetEditorSessionIds.includes(value.endingEditorSessionId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetEditorSessionIds"],
+        message: "The current editor session cannot end itself.",
+      });
+    }
+    if (new Set(value.targetEditorSessionIds).size !== value.targetEditorSessionIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetEditorSessionIds"],
+        message: "Editor session ids must be unique.",
+      });
+    }
+  });
 
 const canUseScheduleEditor = (permissions: {
   isGridmaster: boolean;
@@ -74,7 +92,7 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = endSessionSchema.safeParse(body);
-  if (!parsed.success || parsed.data.targetEditorSessionId === parsed.data.endingEditorSessionId) {
+  if (!parsed.success) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
@@ -86,19 +104,23 @@ export async function POST(req: NextRequest) {
     if ("response" in auth) return auth.response;
 
     const endedAt = new Date().toISOString();
-    const { error } = await auth.serviceClient.from("schedule_editor_session_terminations").upsert(
-      {
-        org_id: auth.orgId,
-        user_id: auth.actor.id,
-        editor_session_id: parsed.data.targetEditorSessionId,
-        ended_by_editor_session_id: parsed.data.endingEditorSessionId,
-        ended_at: endedAt,
-      },
-      { onConflict: "org_id,user_id,editor_session_id" },
-    );
+    const terminations = parsed.data.targetEditorSessionIds.map((editorSessionId) => ({
+      org_id: auth.orgId,
+      user_id: auth.actor.id,
+      editor_session_id: editorSessionId,
+      ended_by_editor_session_id: parsed.data.endingEditorSessionId,
+      ended_at: endedAt,
+    }));
+    const { error } = await auth.serviceClient
+      .from("schedule_editor_session_terminations")
+      .upsert(terminations, { onConflict: "org_id,user_id,editor_session_id" });
 
     if (error) throw error;
-    return NextResponse.json({ ended: true, endedAt });
+    return NextResponse.json({
+      ended: true,
+      endedAt,
+      endedEditorSessionIds: parsed.data.targetEditorSessionIds,
+    });
   } catch (error) {
     logger.error({ error }, "schedule editor session termination failed");
     return NextResponse.json(

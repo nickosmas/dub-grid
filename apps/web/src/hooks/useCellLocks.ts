@@ -24,6 +24,11 @@ export interface OnlineUser {
   sessionCount: number;
 }
 
+export interface SameAccountEditorSession {
+  editorSessionId: string;
+  editingCell: string | null;
+}
+
 interface PresencePayload {
   editingCell: string | null;
   userId: string;
@@ -88,6 +93,7 @@ interface UseCellLocksReturn {
   getCurrentCell: () => string | null;
   lockedCells: Map<string, CellLock>;
   onlineUsers: OnlineUser[];
+  sameAccountSessions: SameAccountEditorSession[];
   isSessionEnded: boolean;
   syncPresence: () => void;
   handleLockBroadcast: (payload: {
@@ -552,6 +558,24 @@ export function useCellLocks(
       .sort((a, b) => a.userName.localeCompare(b.userName));
   }, [remoteSessions, currentUser?.id]);
 
+  const sameAccountSessions = useMemo(() => {
+    const currentUserId = currentUser?.id ?? null;
+    if (!currentUserId) return [];
+
+    return Array.from(remoteSessions.values())
+      .filter(
+        (session) =>
+          session.isScheduleEditor &&
+          session.userId === currentUserId &&
+          session.editorSessionId !== editorSessionId,
+      )
+      .map((session) => ({
+        editorSessionId: session.editorSessionId,
+        editingCell: session.editingCell,
+      }))
+      .sort((a, b) => a.editorSessionId.localeCompare(b.editorSessionId));
+  }, [editorSessionId, remoteSessions, currentUser?.id]);
+
   const lockedCells = useMemo(() => {
     const currentUserId = currentUser?.id ?? null;
     const next = new Map<string, CellLock>();
@@ -620,6 +644,7 @@ export function useCellLocks(
     getCurrentCell,
     lockedCells,
     onlineUsers,
+    sameAccountSessions,
     isSessionEnded,
     syncPresence,
     handleLockBroadcast,

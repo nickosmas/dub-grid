@@ -5,6 +5,59 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import Modal from "@/components/Modal";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
+export function ScheduleSessionWarning({
+  sessionCount,
+  onEndOtherSessions,
+  onSignOutThisDevice,
+}: {
+  sessionCount: number;
+  onEndOtherSessions: () => Promise<unknown>;
+  onSignOutThisDevice: () => void;
+}) {
+  const endOtherSessions = useAsyncAction(onEndOtherSessions);
+  const sessionLabel =
+    sessionCount === 1 ? "1 other tab or device" : `${sessionCount} other tabs or devices`;
+
+  return (
+    <div
+      className="dg-draft-banner no-print"
+      role="alert"
+      style={{
+        background: "var(--dg-color-danger-bg)",
+        borderColor: "var(--dg-color-danger-border)",
+        color: "var(--dg-color-danger-text)",
+      }}
+    >
+      <div className="dg-draft-banner-dot" style={{ background: "var(--dg-color-danger)" }} />
+      <strong>Schedule open elsewhere</strong>
+      <span>
+        Your account has this schedule open in {sessionLabel}. End those schedule sessions before
+        editing here to avoid conflicting unsaved changes. Those devices will stay signed in.
+      </span>
+      <div className="dg-draft-banner-actions">
+        <Button
+          type="button"
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+          onClick={onSignOutThisDevice}
+          disabled={endOtherSessions.isRunning}
+        >
+          Sign out this device
+        </Button>
+        <Button
+          type="button"
+          className="dg-btn dg-btn-danger dg-btn-sm"
+          onClick={endOtherSessions.run}
+          disabled={endOtherSessions.isRunning}
+        >
+          <ButtonLoading loading={endOtherSessions.isRunning} spinnerSize={14}>
+            End other schedule sessions
+          </ButtonLoading>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ScheduleSessionConflictDialog({
   onUseThisTab,
   onCancel,

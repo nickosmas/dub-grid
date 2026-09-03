@@ -21,6 +21,7 @@ import { GET, POST } from "./route";
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const TARGET_ID = "22222222-2222-4222-8222-222222222222";
 const ENDING_ID = "33333333-3333-4333-8333-333333333333";
+const SECOND_TARGET_ID = "44444444-4444-4444-8444-444444444444";
 
 function post(body: unknown) {
   return POST(
@@ -46,7 +47,7 @@ describe("/api/schedule/editor-sessions", () => {
   it("stores an opaque target session under the authenticated user before responding", async () => {
     const response = await post({
       orgId: ORG_ID,
-      targetEditorSessionId: TARGET_ID,
+      targetEditorSessionIds: [TARGET_ID, SECOND_TARGET_ID],
       endingEditorSessionId: ENDING_ID,
       userId: "user-2",
     });
@@ -54,24 +55,58 @@ describe("/api/schedule/editor-sessions", () => {
     expect(response.status).toBe(200);
     expect(from).toHaveBeenCalledWith("schedule_editor_session_terminations");
     expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: ORG_ID,
-        user_id: "user-1",
-        editor_session_id: TARGET_ID,
-        ended_by_editor_session_id: ENDING_ID,
-      }),
+      [
+        expect.objectContaining({
+          org_id: ORG_ID,
+          user_id: "user-1",
+          editor_session_id: TARGET_ID,
+          ended_by_editor_session_id: ENDING_ID,
+        }),
+        expect.objectContaining({
+          org_id: ORG_ID,
+          user_id: "user-1",
+          editor_session_id: SECOND_TARGET_ID,
+          ended_by_editor_session_id: ENDING_ID,
+        }),
+      ],
       { onConflict: "org_id,user_id,editor_session_id" },
+    );
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        endedEditorSessionIds: [TARGET_ID, SECOND_TARGET_ID],
+      }),
     );
   });
 
   it("cannot end the caller's own current editor session", async () => {
     const response = await post({
       orgId: ORG_ID,
-      targetEditorSessionId: TARGET_ID,
+      targetEditorSessionIds: [TARGET_ID],
       endingEditorSessionId: TARGET_ID,
     });
 
     expect(response.status).toBe(400);
+    expect(requireOrgPermissions).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate or unbounded target sets before authorization", async () => {
+    const duplicateResponse = await post({
+      orgId: ORG_ID,
+      targetEditorSessionIds: [TARGET_ID, TARGET_ID],
+      endingEditorSessionId: ENDING_ID,
+    });
+    const unboundedResponse = await post({
+      orgId: ORG_ID,
+      targetEditorSessionIds: Array.from(
+        { length: 21 },
+        (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      ),
+      endingEditorSessionId: ENDING_ID,
+    });
+
+    expect(duplicateResponse.status).toBe(400);
+    expect(unboundedResponse.status).toBe(400);
     expect(requireOrgPermissions).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
   });
@@ -83,7 +118,7 @@ describe("/api/schedule/editor-sessions", () => {
 
     const response = await post({
       orgId: ORG_ID,
-      targetEditorSessionId: TARGET_ID,
+      targetEditorSessionIds: [TARGET_ID],
       endingEditorSessionId: ENDING_ID,
     });
 
