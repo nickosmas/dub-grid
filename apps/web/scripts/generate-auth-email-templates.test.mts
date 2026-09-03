@@ -41,6 +41,10 @@ import { MagicLinkEmail } from "../src/emails/auth/MagicLinkEmail";
 import { AuthInviteEmail } from "../src/emails/auth/AuthInviteEmail";
 import { EmailChangeEmail } from "../src/emails/auth/EmailChangeEmail";
 import { ReauthenticationEmail } from "../src/emails/auth/ReauthenticationEmail";
+import { PasswordChangedEmail } from "../src/emails/auth/PasswordChangedEmail";
+import { EmailChangedNotificationEmail } from "../src/emails/auth/EmailChangedNotificationEmail";
+import { MfaFactorEnrolledEmail } from "../src/emails/auth/MfaFactorEnrolledEmail";
+import { MfaFactorUnenrolledEmail } from "../src/emails/auth/MfaFactorUnenrolledEmail";
 
 const TEMPLATES = [
   {
@@ -72,6 +76,26 @@ const TEMPLATES = [
     file: "reauthentication.html",
     Component: ReauthenticationEmail,
     expects: ["{{ .Token }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "password_changed_notification.html",
+    Component: PasswordChangedEmail,
+    expects: ["{{ .SiteURL }}"],
+  },
+  {
+    file: "email_changed_notification.html",
+    Component: EmailChangedNotificationEmail,
+    expects: ["{{ .OldEmail }}", "{{ .NewEmail }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "mfa_factor_enrolled_notification.html",
+    Component: MfaFactorEnrolledEmail,
+    expects: ["{{ .FactorType }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "mfa_factor_unenrolled_notification.html",
+    Component: MfaFactorUnenrolledEmail,
+    expects: ["{{ .FactorType }}", "{{ .SiteURL }}"],
   },
 ] as const;
 
