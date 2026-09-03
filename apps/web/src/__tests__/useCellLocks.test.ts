@@ -803,6 +803,268 @@ describe("useCellLocks", () => {
     );
   });
 
+  it("does not let stale presence resurrect a cell released before we knew the session", () => {
+    // The release can land before this client has ever seen that session, e.g.
+    // mounting while someone closes a cell. Dropping it let the next presence
+    // snapshot, still advertising the old cell, lock a cell nobody holds.
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.handleUnlockBroadcast({
+        userId: "user-2",
+        editorSessionId: "session-2",
+        cellKey: "emp-4_2026-04-12",
+        lockRevision: 5,
+      });
+    });
+
+    act(() => {
+      channel.setPresenceState({
+        "user-2": [
+          {
+            editingCell: "emp-4_2026-04-12",
+            userId: "user-2",
+            userName: "Riley RN",
+            editorSessionId: "session-2",
+            isScheduleEditor: true,
+            lockRevision: 4,
+          },
+        ],
+      });
+      result.current.syncPresence();
+    });
+
+    expect(result.current.getCellLock("emp-4_2026-04-12")).toBeNull();
+    // The placeholder must not surface as a nameless editor.
+    expect(result.current.onlineUsers).toEqual([]);
+  });
+
+  it("does not republish presence when releasing a cell it never held", () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    channel.track.mockClear();
+    act(() => result.current.unlockCell());
+    expect(channel.track).not.toHaveBeenCalled();
+
+    // Removing presence must still go through, even with nothing held.
+    act(() => result.current.unlockCell({ removePresence: true }));
+    expect(channel.untrack).toHaveBeenCalled();
+  });
+
+  it("keeps lock revisions moving forward across remounts of one session id", () => {
+    // The editor session id outlives a single mount. Peers reject any revision
+    // below the one they already hold for that id, so a counter that restarted
+    // at zero made a returning editor's locks silently ignored, and the longer
+    // they had edited before leaving the longer they stayed invisible.
+    const channel = createChannel();
+    const first = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      first.result.current.lockCell("emp-1_2026-04-12");
+      first.result.current.unlockCell();
+      first.result.current.lockCell("emp-2_2026-04-12");
+    });
+    const revisionsBefore = channel.send.mock.calls
+      .map((call) => call[0]?.payload?.lockRevision)
+      .filter((value): value is number => typeof value === "number");
+    const highestBefore = Math.max(...revisionsBefore);
+    first.unmount();
+
+    // A fresh mount reusing the same editor session id.
+    const channelAfter = createChannel();
+    const second = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channelAfter),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+    act(() => second.result.current.lockCell("emp-3_2026-04-12"));
+
+    const revisionAfter = channelAfter.send.mock.calls
+      .map((call) => call[0]?.payload?.lockRevision)
+      .find((value): value is number => typeof value === "number");
+
+    expect(revisionAfter).toBeGreaterThan(highestBefore);
+  });
+
+  describe("hardening", () => {
+    const peer = (overrides: Partial<PresenceRecord> = {}): PresenceRecord => ({
+      editingCell: null,
+      userId: "user-2",
+      userName: "Riley RN",
+      editorSessionId: "session-2",
+      canLockCells: true,
+      isScheduleEditor: true,
+      lockRevision: 1,
+      ...overrides,
+    });
+    const mount = (channel: ReturnType<typeof createChannel>) =>
+      renderHook(() =>
+        useCellLocks(
+          createChannelRef(channel),
+          { id: "user-1", name: "Alex Admin" },
+          "session-1",
+          true,
+          true,
+        ),
+      );
+
+    it("keeps lockedCells identity when nothing about the locks changed", () => {
+      // These feed memoised grid sections. A fresh Map on every presence event
+      // defeats that memo and re-renders the whole schedule, which with many
+      // editors is continuous.
+      const channel = createChannel();
+      channel.setPresenceState({ "user-2": [peer({ editingCell: "emp-1_2026-04-12" })] });
+      const { result } = mount(channel);
+
+      act(() => result.current.syncPresence());
+      const first = result.current.lockedCells;
+      const firstOnline = result.current.onlineUsers;
+
+      act(() => result.current.syncPresence());
+
+      expect(result.current.lockedCells).toBe(first);
+      expect(result.current.onlineUsers).toBe(firstOnline);
+    });
+
+    it("produces a new lockedCells identity when a lock actually moves", () => {
+      const channel = createChannel();
+      channel.setPresenceState({ "user-2": [peer({ editingCell: "emp-1_2026-04-12" })] });
+      const { result } = mount(channel);
+
+      act(() => result.current.syncPresence());
+      const first = result.current.lockedCells;
+
+      act(() => {
+        channel.setPresenceState({
+          "user-2": [peer({ editingCell: "emp-2_2026-04-12", lockRevision: 2 })],
+        });
+        result.current.syncPresence();
+      });
+
+      expect(result.current.lockedCells).not.toBe(first);
+      expect(result.current.getCellLock("emp-2_2026-04-12")).not.toBeNull();
+      expect(result.current.getCellLock("emp-1_2026-04-12")).toBeNull();
+    });
+
+    it("resolves a contested cell the same way on every client", () => {
+      // Two editors claiming one cell with equal revisions must not produce
+      // different answers on different machines.
+      const channel = createChannel();
+      channel.setPresenceState({
+        "user-2": [peer({ editorSessionId: "aaa", editingCell: "c1", lockRevision: 5 })],
+        "user-3": [
+          peer({
+            userId: "user-3",
+            userName: "Jamie",
+            editorSessionId: "zzz",
+            editingCell: "c1",
+            lockRevision: 5,
+          }),
+        ],
+      });
+      const { result } = mount(channel);
+      act(() => result.current.syncPresence());
+
+      expect(result.current.getCellLock("c1")?.editorSessionId).toBe("zzz");
+    });
+
+    it("prefers the newer lock when revisions differ", () => {
+      const channel = createChannel();
+      channel.setPresenceState({
+        "user-2": [peer({ editorSessionId: "zzz", editingCell: "c1", lockRevision: 1 })],
+        "user-3": [
+          peer({
+            userId: "user-3",
+            userName: "Jamie",
+            editorSessionId: "aaa",
+            editingCell: "c1",
+            lockRevision: 9,
+          }),
+        ],
+      });
+      const { result } = mount(channel);
+      act(() => result.current.syncPresence());
+
+      expect(result.current.getCellLock("c1")?.editorSessionId).toBe("aaa");
+    });
+
+    it("retries presence instead of dropping it when the channel is not joined", () => {
+      vi.useFakeTimers();
+      try {
+        const channel = createChannel();
+        channel.state = "closed";
+        const { result } = mount(channel);
+
+        act(() => result.current.lockCell("emp-1_2026-04-12"));
+        expect(channel.track).not.toHaveBeenCalled();
+
+        // The channel finishes joining; the scheduled retry publishes.
+        channel.state = "joined";
+        act(() => {
+          vi.advanceTimersByTime(1_000);
+        });
+
+        expect(channel.track).toHaveBeenCalledWith(
+          expect.objectContaining({ editingCell: "emp-1_2026-04-12" }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("gives up and reports degraded presence rather than retrying forever", async () => {
+      vi.useFakeTimers();
+      try {
+        const channel = createChannel();
+        channel.track.mockResolvedValue("error");
+        const { result } = mount(channel);
+
+        act(() => result.current.lockCell("emp-1_2026-04-12"));
+        for (let i = 0; i < 12; i += 1) {
+          await act(async () => {
+            vi.advanceTimersByTime(20_000);
+          });
+        }
+
+        expect(result.current.isPresenceDegraded).toBe(true);
+        // Bounded, not unbounded: a flat retry would have kept going forever.
+        expect(channel.track.mock.calls.length).toBeLessThanOrEqual(12);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("presence reflects immediately", () => {
     const remotePresence = (overrides: Partial<PresenceRecord> = {}): PresenceRecord => ({
       editingCell: null,

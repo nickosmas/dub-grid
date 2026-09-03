@@ -154,6 +154,7 @@ import {
   type BrowserRealtimeChannel,
   createBrowserRealtimeChannel,
   fetchAccountIdentity,
+  getBrowserRealtimeChannels,
   removeBrowserRealtimeChannel,
 } from "@/features/account/client";
 import PresenceAvatars, { type PresenceProfile } from "@/components/PresenceAvatars";
@@ -279,6 +280,28 @@ function normalizeCustomTimeForSegmentCount(
     return getFirstCustomTimeSegment(time);
   }
   return time ?? null;
+}
+
+/**
+ * Editor session ids, keyed by organization and sharing the channel's lifetime.
+ *
+ * This identifies one editor to everyone else, and the channel's presence key is
+ * fixed when the channel is created. Minting a fresh id per mount therefore
+ * disagreed with the key the channel still publishes under, and a leftover entry
+ * from the previous mount read as a second session for the same account: the
+ * account saw a phantom "schedule open elsewhere" against itself. A separate
+ * browser tab is a separate module instance, so genuinely distinct sessions
+ * still get distinct ids.
+ */
+const scheduleEditorSessionIds = new Map<string, string>();
+
+/** How long teardown waits for a joining channel to settle before forcing it. */
+const CHANNEL_SETTLE_TIMEOUT_MS = 5_000;
+
+function newEditorSessionId(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function SchedulerContent() {
@@ -777,30 +800,44 @@ function SchedulerContent() {
       setCurrentUser(null);
       return;
     }
-    const fallbackName = authUser.email?.split("@")[0] || "Unknown";
-    setCurrentUser((prev) =>
-      prev?.id === authUser.id ? prev : { id: authUser.id, name: fallbackName },
-    );
 
+    // Publish presence exactly once per identity. Each track() adds its own
+    // presence entry rather than replacing the previous one, so announcing a
+    // provisional name and then correcting it left two entries for one editor,
+    // and untracking on leave only cleared one. The leftover kept that person
+    // looking present to everyone else. Resolving the name first still shows
+    // the avatar promptly: this is one short call, not the whole grid load.
     let cancelled = false;
     void fetchAccountIdentity()
       .then((identity) => {
         if (cancelled) return;
-        const name = identity.displayName || fallbackName;
+        const name = identity.displayName || authUser.email?.split("@")[0] || "Unknown";
         setCurrentUser((prev) =>
-          prev?.id === authUser.id && prev.name !== name ? { id: authUser.id, name } : prev,
+          prev?.id === authUser.id && prev.name === name ? prev : { id: authUser.id, name },
         );
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        const fallback = authUser.email?.split("@")[0] || "Unknown";
+        setCurrentUser((prev) =>
+          prev?.id === authUser.id ? prev : { id: authUser.id, name: fallback },
+        );
+      });
     return () => {
       cancelled = true;
     };
   }, [authUser]);
-  const editorSessionIdRef = useRef(
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
+  const orgIdForSession = org?.id ?? null;
+  const editorSessionId = useMemo(() => {
+    if (!orgIdForSession) return newEditorSessionId();
+    const existing = scheduleEditorSessionIds.get(orgIdForSession);
+    if (existing) return existing;
+    const created = newEditorSessionId();
+    scheduleEditorSessionIds.set(orgIdForSession, created);
+    return created;
+  }, [orgIdForSession]);
+  const editorSessionIdRef = useRef(editorSessionId);
+  editorSessionIdRef.current = editorSessionId;
   const [pendingSessionTakeover, setPendingSessionTakeover] = useState<CellLock | null>(null);
   const [pendingCellBusy, setPendingCellBusy] = useState<{
     conflict: CellLock;
@@ -933,6 +970,7 @@ function SchedulerContent() {
     flushPendingBroadcasts,
     clearPendingBroadcast,
     resetPendingBroadcasts,
+    isBroadcastDegraded,
   } = useReliableRealtimeBroadcasts(realtimeChannelRef);
 
   // Refs for values used by the realtime channel — reading from refs avoids
@@ -1180,17 +1218,23 @@ function SchedulerContent() {
     onlineUsers,
     sameAccountSessions,
     isSessionEnded,
+    isPresenceDegraded,
     syncPresence,
     handleLockBroadcast,
     handleUnlockBroadcast,
   } = useCellLocks(
     realtimeChannelRef,
     currentUser,
-    editorSessionIdRef.current,
+    editorSessionId,
     isScheduleEditor,
     isScheduleEditor,
     sendReliableBroadcast,
   );
+  // The banner covers collaboration health as a whole: the channel dropping,
+  // presence failing to publish, or broadcasts failing to send all mean other
+  // editors are no longer seeing this one.
+  const realtimeCollaborationDegraded =
+    realtimeUnavailable || isPresenceDegraded || isBroadcastDegraded;
   const localSessionEndedRef = useRef(isSessionEnded);
   localSessionEndedRef.current = isSessionEnded;
 
@@ -1532,15 +1576,6 @@ function SchedulerContent() {
     return counts;
   }, [publishChangesMap]);
 
-  // Defensive bookkeeping: when the banner that hosts the toggle unmounts,
-  // clear the overlay state so it doesn't come back on stuck-true the next
-  // time a publish appears.
-  useEffect(() => {
-    if (inWindowPublishHistory.length === 0 && showPublishDiff) {
-      setShowPublishDiff(false);
-    }
-  }, [inWindowPublishHistory.length, showPublishDiff]);
-
   // Dismissals persist for the tab session via useDismissibleBanner — no
   // auto-reset on data change. The X means "hide this for the rest of the
   // session"; sign-out wipes it.
@@ -1570,6 +1605,13 @@ function SchedulerContent() {
 
   const endLocalScheduleEditor = useCallback(() => {
     localSessionEndedRef.current = true;
+    // Retire this editor session id. The termination marker is durable and
+    // keyed by that id, so reusing it meant every later mount read the same
+    // marker and ended itself again: leaving and returning to the schedule
+    // never recovered, and only a full reload did. Ending applies to this
+    // visit; coming back mints a fresh identity, which also stops peers
+    // matching it against the session they tombstoned.
+    if (orgIdForSession) scheduleEditorSessionIds.delete(orgIdForSession);
     endCurrentSession();
     setEditPanel(null);
     setEditSessionDraft(null);
@@ -1586,7 +1628,7 @@ function SchedulerContent() {
     setAutoFillPreview(null);
     cancelImportConfirm();
     setShowSessionEndedDialog(true);
-  }, [cancelImportConfirm, endCurrentSession]);
+  }, [cancelImportConfirm, endCurrentSession, orgIdForSession]);
 
   const checkCurrentScheduleEditorSession = useCallback(async (): Promise<boolean> => {
     if (!org || !isScheduleEditor) return isSessionEnded;
@@ -1771,175 +1813,225 @@ function SchedulerContent() {
   useEffect(() => {
     if (!org) return;
 
-    let hadError = false;
+    const channelName = `schedule:${org.id}`;
+    // Both flags belong to this effect run, not to the component. They were
+    // briefly refs, which meant a later run reset the flag an earlier run's
+    // pending async setup was about to check: the stale run then built a second
+    // channel for the same topic, and whichever lost the race was handed the
+    // already-subscribed one and threw while attaching handlers, killing that
+    // mount's realtime. Strict Mode reuses one component instance across
+    // mount/cleanup/mount, so shared refs are exactly the wrong lifetime here.
     let disposed = false;
+    let hadError = false;
+    // Resolves once subscribe() reports a terminal status. Tearing a channel
+    // down while it is still joining drops it locally without a clean leave,
+    // and the join then lands server-side with nobody left to untrack it. Those
+    // stranded entries accumulate under this client's presence key, which is
+    // what kept an editor looking present after the first navigation away.
+    let settle: () => void = () => {};
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
     setRealtimeUnavailable(false);
 
-    const channel = createBrowserRealtimeChannel(
-      `schedule:${org.id}`,
-      getScheduleRealtimeChannelOptions(editorSessionIdRef.current),
-    )
-      .on("broadcast", { event: "schedule_published" }, async () => {
+    // Every mount gets its own channel. Handlers close over this mount's refs,
+    // so a channel kept across mounts would keep dispatching into the unmounted
+    // one: the new page would receive no presence or broadcast events at all
+    // and sit frozen on whatever it last saw.
+    //
+    // Channels are cached by topic, and attaching handlers to one that is still
+    // subscribed throws and aborts this effect, so wait for any survivor from a
+    // previous mount to actually go away first.
+    let channel: ReturnType<typeof createBrowserRealtimeChannel> | null = null;
+    void (async () => {
+      for (const stale of getBrowserRealtimeChannels()) {
+        if (stale.topic !== channelName && stale.topic !== `realtime:${channelName}`) continue;
         try {
-          await refetchScheduleDataRef.current();
-          await refetchPublishedRangesRef.current();
-          const history = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
-          setPublishHistory(history);
-        } catch (err) {
-          Sentry.captureException(err);
+          await removeBrowserRealtimeChannel(stale);
+        } catch {
+          // Best effort; creation below still yields a usable channel.
         }
-      })
-      .on("broadcast", { event: "drafts_discarded" }, async () => {
-        try {
-          await refetchScheduleDataRef.current();
-        } catch (err) {
-          Sentry.captureException(err);
-        }
-      })
-      .on("broadcast", { event: "draft_changed" }, (msg: { payload?: Record<string, unknown> }) => {
-        if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
-          return;
-        }
+      }
+      if (disposed) return;
 
-        const p = msg.payload;
-        if (p?.shifts) {
-          const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
-          setShifts((prev) => {
-            const next = { ...prev };
-            for (const [key, value] of Object.entries(shiftUpdates)) {
-              if (value === null) delete next[key];
-              else next[key] = value;
-            }
-            return next;
-          });
-        }
-        if (p?.notes) {
-          const noteUpdates = p.notes as ScheduleNoteMap;
-          setNotes((prev) => ({ ...prev, ...noteUpdates }));
-        }
-        // A broadcast that carried a diff has already been applied above, and
-        // the sender built it from the cells the server handed back, so it is
-        // authoritative — there is nothing left to ask for. Refetching anyway
-        // meant one scheduler editing one cell made every other open tab pull
-        // the org's whole loaded window two seconds later.
-        //
-        // A payload-less broadcast is the gap case: the sender is telling us
-        // something changed without saying what, so that one still refetches.
-        // Reconnect and tab-visibility refetches remain the recovery path for
-        // a tab that missed broadcasts entirely.
-        if (p?.shifts || p?.notes) return;
-
-        if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
-        draftChangedDebounceRef.current = setTimeout(async () => {
+      channel = createBrowserRealtimeChannel(
+        channelName,
+        getScheduleRealtimeChannelOptions(editorSessionIdRef.current),
+      )
+        .on("broadcast", { event: "schedule_published" }, async () => {
+          try {
+            await refetchScheduleDataRef.current();
+            await refetchPublishedRangesRef.current();
+            const history = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
+            setPublishHistory(history);
+          } catch (err) {
+            Sentry.captureException(err);
+          }
+        })
+        .on("broadcast", { event: "drafts_discarded" }, async () => {
           try {
             await refetchScheduleDataRef.current();
           } catch (err) {
             Sentry.captureException(err);
           }
-        }, 150);
-      })
-      .on(
-        "broadcast",
-        { event: "cell_locked" },
-        (msg: {
-          payload?: {
-            cellKey: string;
-            userId: string;
-            userName: string;
-            editorSessionId: string;
-            lockRevision: number;
-            canLockCells?: boolean;
-            seriesId?: string | null;
-          };
-        }) => {
-          if (msg.payload) handleLockBroadcastRef.current(msg.payload);
-        },
-      )
-      .on(
-        "broadcast",
-        { event: "cell_unlocked" },
-        (msg: {
-          payload?: {
-            userId: string;
-            editorSessionId: string;
-            cellKey: string | null;
-            lockRevision: number;
-          };
-        }) => {
-          if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
-        },
-      )
-      .on(
-        "broadcast",
-        { event: "editor_session_ended" },
-        async (msg: {
-          payload?: {
-            userId: string;
-            targetEditorSessionId: string;
-            endingEditorSessionId: string;
-          };
-        }) => {
-          const payload = msg.payload;
-          if (!payload) return;
-
-          if (payload.targetEditorSessionId === editorSessionIdRef.current) {
-            try {
-              // Broadcast payloads are hints, not authority. The target only
-              // shuts down after its owner-scoped durable marker is confirmed.
-              await checkCurrentScheduleEditorSessionRef.current();
-            } catch (error) {
-              Sentry.captureException(error);
+        })
+        .on(
+          "broadcast",
+          { event: "draft_changed" },
+          (msg: { payload?: Record<string, unknown> }) => {
+            if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
+              return;
             }
-            return;
-          }
 
-          if (payload.endingEditorSessionId === editorSessionIdRef.current) {
-            removeRemoteSessionRef.current(payload.targetEditorSessionId);
-          }
-        },
-      )
-      .on("presence", { event: "sync" }, () => syncPresenceRef.current())
-      .on("presence", { event: "join" }, () => syncPresenceRef.current())
-      .on("presence", { event: "leave" }, () => syncPresenceRef.current())
-      .subscribe(async (status: string, err?: Error) => {
-        if (status === "SUBSCRIBED") {
-          if (!disposed) setRealtimeUnavailable(false);
-          // Refetch on reconnection to catch events missed during downtime
-          if (hadError) {
-            hadError = false;
-            Promise.all([
-              refetchScheduleDataRef.current(),
-              refetchPublishedRangesRef.current(),
-            ]).catch(() => {});
-          }
-          if (currentUserRef.current && (canEditShiftsRef.current || canEditNotesRef.current)) {
-            // Track presence immediately rather than behind the termination
-            // check. That check is an HTTP round trip, and awaiting it meant
-            // nobody else saw this editor until it returned. It is not needed
-            // as a gate: when it does find the session ended it calls
-            // endLocalScheduleEditor, which untracks presence on its own.
-            void refreshPresenceRef.current();
-            void (async () => {
+            const p = msg.payload;
+            if (p?.shifts) {
+              const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
+              setShifts((prev) => {
+                const next = { ...prev };
+                for (const [key, value] of Object.entries(shiftUpdates)) {
+                  if (value === null) delete next[key];
+                  else next[key] = value;
+                }
+                return next;
+              });
+            }
+            if (p?.notes) {
+              const noteUpdates = p.notes as ScheduleNoteMap;
+              setNotes((prev) => ({ ...prev, ...noteUpdates }));
+            }
+            // A broadcast that carried a diff has already been applied above, and
+            // the sender built it from the cells the server handed back, so it is
+            // authoritative — there is nothing left to ask for. Refetching anyway
+            // meant one scheduler editing one cell made every other open tab pull
+            // the org's whole loaded window two seconds later.
+            //
+            // A payload-less broadcast is the gap case: the sender is telling us
+            // something changed without saying what, so that one still refetches.
+            // Reconnect and tab-visibility refetches remain the recovery path for
+            // a tab that missed broadcasts entirely.
+            if (p?.shifts || p?.notes) return;
+
+            if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+            draftChangedDebounceRef.current = setTimeout(async () => {
               try {
+                await refetchScheduleDataRef.current();
+              } catch (err) {
+                Sentry.captureException(err);
+              }
+            }, 150);
+          },
+        )
+        .on(
+          "broadcast",
+          { event: "cell_locked" },
+          (msg: {
+            payload?: {
+              cellKey: string;
+              userId: string;
+              userName: string;
+              editorSessionId: string;
+              lockRevision: number;
+              canLockCells?: boolean;
+              seriesId?: string | null;
+            };
+          }) => {
+            if (msg.payload) handleLockBroadcastRef.current(msg.payload);
+          },
+        )
+        .on(
+          "broadcast",
+          { event: "cell_unlocked" },
+          (msg: {
+            payload?: {
+              userId: string;
+              editorSessionId: string;
+              cellKey: string | null;
+              lockRevision: number;
+            };
+          }) => {
+            if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
+          },
+        )
+        .on(
+          "broadcast",
+          { event: "editor_session_ended" },
+          async (msg: {
+            payload?: {
+              userId: string;
+              targetEditorSessionId: string;
+              endingEditorSessionId: string;
+            };
+          }) => {
+            const payload = msg.payload;
+            if (!payload) return;
+
+            if (payload.targetEditorSessionId === editorSessionIdRef.current) {
+              try {
+                // Broadcast payloads are hints, not authority. The target only
+                // shuts down after its owner-scoped durable marker is confirmed.
                 await checkCurrentScheduleEditorSessionRef.current();
               } catch (error) {
-                // Realtime remains an availability aid. If the status endpoint
-                // is temporarily unavailable, normal version checks still keep
-                // writes safe and the durable marker is checked again later.
                 Sentry.captureException(error);
               }
-            })();
-          }
-          syncPresenceRef.current();
-          await flushPendingBroadcasts();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          hadError = true;
-          if (!disposed) setRealtimeUnavailable(true);
-          console.warn("[Realtime] Channel error (auto-retrying):", err ?? "unknown");
-        }
-      });
+              return;
+            }
 
-    realtimeChannelRef.current = channel;
+            if (payload.endingEditorSessionId === editorSessionIdRef.current) {
+              removeRemoteSessionRef.current(payload.targetEditorSessionId);
+            }
+          },
+        )
+        .on("presence", { event: "sync" }, () => syncPresenceRef.current())
+        .on("presence", { event: "join" }, () => syncPresenceRef.current())
+        .on("presence", { event: "leave" }, () => syncPresenceRef.current())
+        .subscribe(async (status: string, err?: Error) => {
+          if (
+            status === "SUBSCRIBED" ||
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            settle();
+          }
+          if (status === "SUBSCRIBED") {
+            if (!disposed) setRealtimeUnavailable(false);
+            // Refetch on reconnection to catch events missed during downtime
+            if (hadError) {
+              hadError = false;
+              Promise.all([
+                refetchScheduleDataRef.current(),
+                refetchPublishedRangesRef.current(),
+              ]).catch(() => {});
+            }
+            if (currentUserRef.current && (canEditShiftsRef.current || canEditNotesRef.current)) {
+              // Track presence immediately rather than behind the termination
+              // check. That check is an HTTP round trip, and awaiting it meant
+              // nobody else saw this editor until it returned. It is not needed
+              // as a gate: when it does find the session ended it calls
+              // endLocalScheduleEditor, which untracks presence on its own.
+              void refreshPresenceRef.current();
+              void (async () => {
+                try {
+                  await checkCurrentScheduleEditorSessionRef.current();
+                } catch (error) {
+                  // Realtime remains an availability aid. If the status endpoint
+                  // is temporarily unavailable, normal version checks still keep
+                  // writes safe and the durable marker is checked again later.
+                  Sentry.captureException(error);
+                }
+              })();
+            }
+            syncPresenceRef.current();
+            await flushPendingBroadcasts();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            hadError = true;
+            if (!disposed) setRealtimeUnavailable(true);
+            console.warn("[Realtime] Channel error (auto-retrying):", err ?? "unknown");
+          }
+        });
+
+      realtimeChannelRef.current = channel;
+    })();
 
     return () => {
       disposed = true;
@@ -1948,7 +2040,40 @@ function SchedulerContent() {
       realtimeChannelRef.current = null;
       resetPendingBroadcasts();
       if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
-      void removeBrowserRealtimeChannel(channel);
+
+      // Untrack directly on the captured channel rather than relying on the
+      // queued presence flush above: that flush is skipped whenever one is
+      // already in flight, and its deferred retry reads the channel ref this
+      // cleanup just cleared, so leaving could complete without telling anyone.
+      //
+      // Both calls are issued without awaiting, and removal is never delayed
+      // behind the untrack. Channels are cached by topic, and this topic is
+      // stable across mounts, so holding removal back means a remount is handed
+      // the still-subscribed channel and throws when it attaches handlers.
+      // Removal also unsubscribes, which is what makes the server drop this
+      // client's presence, so it is the reliable half of the leave anyway.
+      // Untrack first so peers see the leave, then remove. Removal is issued
+      // without awaiting: it also unsubscribes, and delaying it hands the next
+      // mount a still-subscribed channel.
+      const active = channel;
+      if (active) {
+        void (async () => {
+          if (active.state !== "joined") {
+            // Let the join finish (or fail) first, so the untrack below is a
+            // real leave rather than a no-op against a half-joined channel.
+            await Promise.race([
+              settled,
+              new Promise((resolve) => setTimeout(resolve, CHANNEL_SETTLE_TIMEOUT_MS)),
+            ]);
+          }
+          try {
+            await active.untrack();
+          } catch {
+            // Already gone; removal below still cleans up.
+          }
+          await removeBrowserRealtimeChannel(active);
+        })();
+      }
     };
   }, [
     clearPresenceState,
@@ -2063,9 +2188,16 @@ function SchedulerContent() {
 
   useEffect(() => {
     const releasePresence = () => {
-      // Untracking emits a presence leave, which removes this editor from every
-      // peer immediately.
       unlockCell({ removePresence: true });
+      // Also untrack straight on the channel. Sign-out and any other hard
+      // navigation tear the page down without a React cleanup, and the queued
+      // flush above is skipped whenever one is already in flight, so relying on
+      // it left peers showing the avatar until the socket itself timed out.
+      // Issuing the send here gives it a chance to leave before teardown.
+      const channel = realtimeChannelRef.current;
+      if (channel && channel.state === "joined") {
+        void channel.untrack().catch(() => {});
+      }
     };
     window.addEventListener("pagehide", releasePresence);
     window.addEventListener("beforeunload", releasePresence);
@@ -3423,21 +3555,39 @@ function SchedulerContent() {
     [sendReliableBroadcast],
   );
 
+  // Conflicts arrive in bursts once several people edit the same period, and a
+  // full window refetch per conflict is expensive. Share one in-flight refetch
+  // between them: they all want the same fresh state.
+  const conflictRefetchRef = useRef<Promise<void> | null>(null);
   const handleShiftWriteConflict = useCallback(async () => {
     const orgId = org?.id;
     if (!orgId) return;
-    toast.error("This shift was modified elsewhere. Refreshing now.");
-    const freshShifts = await fetchShifts(
-      orgId,
-      canEditShifts,
-      assignmentLabelMapRef.current,
-      absenceTypeMapRef.current,
-      shiftFetchStart,
-      shiftFetchEnd,
-      segmentCompatibility,
-    );
-    setShifts(freshShifts);
-  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
+    toast.error("This shift was modified elsewhere. Reloading the latest version.");
+
+    if (conflictRefetchRef.current) {
+      await conflictRefetchRef.current;
+      return;
+    }
+
+    const refetch = (async () => {
+      try {
+        const freshShifts = await fetchShifts(
+          orgId,
+          canEditShifts,
+          assignmentLabelMapRef.current,
+          absenceTypeMapRef.current,
+          shiftFetchStart,
+          shiftFetchEnd,
+          segmentCompatibility,
+        );
+        setShifts(freshShifts);
+      } finally {
+        conflictRefetchRef.current = null;
+      }
+    })();
+    conflictRefetchRef.current = refetch;
+    await refetch;
+  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd, segmentCompatibility]);
 
   /**
    * Serializes a write behind every write already pending on the cells it
@@ -6089,7 +6239,7 @@ function SchedulerContent() {
                 onSignOutThisDevice={() => signOut({ scope: "local" })}
               />
             )}
-            {realtimeUnavailable && !isSessionEnded && (
+            {realtimeCollaborationDegraded && !isSessionEnded && (
               <div
                 className="dg-draft-banner no-print"
                 role="status"

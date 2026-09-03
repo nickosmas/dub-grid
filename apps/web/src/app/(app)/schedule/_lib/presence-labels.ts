@@ -32,7 +32,14 @@ export function describeEditingCell(
     // midnight, which formats as the previous day for negative offsets.
     const [year, month, day] = dateKey.split("-").map(Number);
     const parsed = new Date(year, month - 1, day, 12);
-    if (!Number.isNaN(parsed.getTime())) dateLabel = CELL_DATE_FORMATTER.format(parsed);
+    // Out-of-range days roll forward silently, so 2026-02-31 would render as
+    // "Mar 3". Confirm the date survives the round trip rather than showing a
+    // confidently wrong one.
+    const roundTrips =
+      parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+    if (!Number.isNaN(parsed.getTime()) && roundTrips) {
+      dateLabel = CELL_DATE_FORMATTER.format(parsed);
+    }
   }
 
   if (employeeName && dateLabel) return `${employeeName}, ${dateLabel}`;

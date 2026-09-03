@@ -32,4 +32,10 @@ describe("describeEditingCell", () => {
     // day west of Greenwich. The label must show the date the user picked.
     expect(describeEditingCell("emp-1_2026-01-01", directory)).toBe("Jane Doe, Thu, Jan 1");
   });
+
+  it("refuses to invent a date that does not exist", () => {
+    // Out-of-range days roll forward in the Date constructor, so this used to
+    // render as "Mar 3" instead of admitting the date is unusable.
+    expect(describeEditingCell("emp-1_2026-02-31", directory)).toBe("Jane Doe");
+  });
 });
