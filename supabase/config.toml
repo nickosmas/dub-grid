@@ -250,6 +250,27 @@ content_path = "./supabase/templates/recovery.html"
 subject = "Confirm your identity"
 content_path = "./supabase/templates/reauthentication.html"
 
+# Security notifications: after-the-fact alerts (no confirmation link) sent
+# only when the corresponding notification is enabled on the project. Phone
+# number and identity linked/unlinked notifications are skipped - this app
+# doesn't enable phone auth or external OAuth providers, so those could never
+# fire. See scripts/push-auth-templates.ts for how these reach production.
+[auth.email.template.password_changed_notification]
+subject = "Your password was changed"
+content_path = "./supabase/templates/password_changed_notification.html"
+
+[auth.email.template.email_changed_notification]
+subject = "Your email address was changed"
+content_path = "./supabase/templates/email_changed_notification.html"
+
+[auth.email.template.mfa_factor_enrolled_notification]
+subject = "A new sign-in verification method was added"
+content_path = "./supabase/templates/mfa_factor_enrolled_notification.html"
+
+[auth.email.template.mfa_factor_unenrolled_notification]
+subject = "A sign-in verification method was removed"
+content_path = "./supabase/templates/mfa_factor_unenrolled_notification.html"
+
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
 enable_signup = false
