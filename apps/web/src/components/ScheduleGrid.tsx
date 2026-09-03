@@ -1991,8 +1991,7 @@ const SectionBlock = memo(function SectionBlock({
                                   const labels = cellAbsenceType
                                     ? [shiftLabel]
                                     : shiftLabel.split("/");
-                                  const isPubDiff =
-                                    !draftKind && showsPublishDiff ? publishDiff : null;
+                                  const isPubDiff = showsPublishDiff ? publishDiff : null;
                                   const publishFrom =
                                     publishDiff?.from ??
                                     assignmentIdsFromPublishState(

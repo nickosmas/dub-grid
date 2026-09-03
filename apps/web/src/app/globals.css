@@ -654,7 +654,8 @@ textarea {
     color 150ms ease,
     transform 80ms ease,
     opacity 150ms ease,
-    filter 150ms ease;
+    filter 150ms ease,
+    outline-color 150ms ease;
   white-space: nowrap;
   text-decoration: none;
 }
@@ -673,6 +674,7 @@ textarea {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+  outline: none;
 }
 
 .dg-btn:focus-visible {
@@ -4354,6 +4356,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
   .dg-span-tabs {
     height: var(--dg-toolbar-h);
+  }
+
+  .dg-span-tab {
+    padding: 0 8px;
   }
 
   .dg-nav-tab {

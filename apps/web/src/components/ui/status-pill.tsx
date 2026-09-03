@@ -64,7 +64,11 @@ export function StatusPill({
   const showDot = dot ?? (variant === "status" && tone !== "neutral");
   const style: CSSProperties = {
     background:
-      variant === "category" ? `color-mix(in srgb, ${vars.bg} 96%, ${vars.text})` : vars.bg,
+      variant === "category"
+        ? tone === "neutral"
+          ? "var(--dg-color-bg-secondary)"
+          : `color-mix(in srgb, ${vars.bg} 96%, ${vars.text})`
+        : vars.bg,
     color: vars.text,
     ...(bordered ? { border: `1px solid ${vars.border}` } : {}),
   };

@@ -2007,6 +2007,103 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
+  it("still shows the publish-diff badge when a concurrent draft has no badge of its own", () => {
+    observedWidth = 1600;
+
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      assignments[0],
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "S",
+        name: "South Shift",
+        color: "#DBEAFE",
+        border: "#2563EB",
+        text: "#1E3A8A",
+        categoryId: 1,
+        focusAreaId: 2,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      draftKindForKey: () => "new",
+      showPublishDiffOverlay: true,
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "S",
+      assignmentIdsForKey: () => [2],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        from: [1],
+        to: [2],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const draftBadge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const publishBadge = firstCell.querySelector(
+      '[data-publish-badge="modified"]',
+    ) as HTMLElement | null;
+
+    expect(draftBadge).toBeNull();
+    expect(publishBadge).not.toBeNull();
+  });
+
+  it("prefers the draft badge over a publish-diff badge on the same cell", () => {
+    observedWidth = 1600;
+
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      assignments: localAssignmentDefinitions,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "deleted",
+        from: [1],
+        to: [],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const draftBadge = firstCell.querySelector(
+      '[data-draft-badge="modified"]',
+    ) as HTMLElement | null;
+    const publishBadge = firstCell.querySelector("[data-publish-badge]") as HTMLElement | null;
+
+    expect(draftBadge).not.toBeNull();
+    expect(publishBadge).toBeNull();
+  });
+
   it("uses segment labels for publish replacement badges when they include job text", () => {
     observedWidth = 1600;
 

@@ -29,9 +29,7 @@ describe("StatusPill", () => {
     expect(pill.className).toContain("font-semibold");
     expect(pill.className).toContain("text-[length:var(--dg-fs-footnote)]");
     expect(pill).toHaveAttribute("data-status-pill-variant", "category");
-    expect(pill.getAttribute("style")).toContain(
-      "background: color-mix(in srgb, var(--dg-color-surface) 96%, var(--dg-color-text-label))",
-    );
+    expect(pill.getAttribute("style")).toContain("background: var(--dg-color-bg-secondary)");
     expect(pill.getAttribute("style")).toContain("color: var(--dg-color-text-label)");
     expect(pill.getAttribute("style")).toContain("border: 1px solid var(--dg-color-border)");
     expect(container.querySelector('[aria-hidden="true"]')).toBeNull();

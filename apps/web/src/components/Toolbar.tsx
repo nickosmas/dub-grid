@@ -891,6 +891,7 @@ export default function Toolbar({
             display: "flex",
             alignItems: "center",
             gap: 8,
+            flex: isTablet ? undefined : "1 1 auto",
             minWidth: 0,
             maxWidth: "100%",
             ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%", flexWrap: "wrap" } : {}),
@@ -900,11 +901,11 @@ export default function Toolbar({
           {focusAreaOptions.length > 1 && (
             <div
               data-tour="schedule-focus-filter"
-              style={{ flex: isTablet ? "1 1 240px" : 1, minWidth: 0 }}
+              style={{ flex: isTablet ? "1 1 240px" : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
             >
               <ScrollableTabs
                 className="dg-span-tabs dg-span-tabs--light"
-                style={{ flex: 1, minWidth: 0 }}
+                style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
               >
                 {focusAreaOptions.map((w, i) => {
                   const isActive = activeFocusArea === w.id;
@@ -943,8 +944,9 @@ export default function Toolbar({
           <div
             style={{
               position: "relative",
-              minWidth: 0,
-              flex: isTablet ? "1 1 160px" : undefined,
+              minWidth: isTablet ? 0 : 200,
+              maxWidth: isTablet ? undefined : 320,
+              flex: isTablet ? "1 1 160px" : "1 1 220px",
             }}
           >
             <svg
@@ -976,7 +978,7 @@ export default function Toolbar({
               className="dg-input"
               style={{
                 paddingLeft: 30,
-                width: isTablet ? "100%" : 160,
+                width: "100%",
                 borderRadius: "var(--dg-btn-radius)",
               }}
             />

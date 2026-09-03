@@ -359,18 +359,18 @@ export default function Header({ orgName }: HeaderProps) {
     Boolean(orgId) && !isUserViewActive && !isImpersonating && (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
-    // In sandbox mode, signing out would orphan the sandbox, so confirm the
-    // exit first (it discards the sandbox) and only then complete logout.
-    if (isInSandbox) {
-      setLogoutConfirmOpen(true);
-      return;
-    }
+    // Always confirm before signing out — in sandbox mode the confirmation
+    // also warns that it permanently discards the sandbox.
+    setLogoutConfirmOpen(true);
+  }, []);
+
+  const handleConfirmSignOut = useCallback(() => {
     // signOut() hard-navigates to /goodbye?scope=local; the destination owns
     // the actual session teardown. No teardown happens here, so there's no
     // race with ProtectedRoute, no Supabase auth-lock contention, no need to
     // pre-clear view-as-user.
     signOut();
-  }, [isInSandbox, signOut]);
+  }, [signOut]);
 
   const handleExitAndSignOut = useCallback(async () => {
     setExitingForLogout(true);
@@ -386,16 +386,28 @@ export default function Header({ orgName }: HeaderProps) {
   }, [signOut]);
 
   const logoutConfirmDialog = logoutConfirmOpen ? (
-    <ConfirmDialog
-      title="Exit sandbox to sign out"
-      message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
-      confirmLabel="Exit & sign out"
-      cancelLabel="Cancel"
-      variant="danger"
-      isLoading={exitingForLogout}
-      onConfirm={handleExitAndSignOut}
-      onCancel={() => setLogoutConfirmOpen(false)}
-    />
+    isInSandbox ? (
+      <ConfirmDialog
+        title="Exit sandbox to sign out"
+        message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
+        confirmLabel="Exit & sign out"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={exitingForLogout}
+        onConfirm={handleExitAndSignOut}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
+    ) : (
+      <ConfirmDialog
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign out"
+        cancelLabel="Cancel"
+        variant="info"
+        onConfirm={handleConfirmSignOut}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
+    )
   ) : null;
 
   /* ── Mobile Header ─────────────────────────────────────── */

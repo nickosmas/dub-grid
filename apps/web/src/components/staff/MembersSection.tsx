@@ -1166,9 +1166,11 @@ export function MembersSection({
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                flex: isMobile ? undefined : "1 1 auto",
                 minWidth: 0,
                 maxWidth: "100%",
-                ...(isMobile ? { width: "100%", flexWrap: "wrap" } : {}),
+                flexWrap: "wrap",
+                ...(isMobile ? { width: "100%" } : {}),
               }}
             >
               {canSeeManagementUsers && managementDepts.length > 0 && (
@@ -1203,8 +1205,7 @@ export function MembersSection({
                 <ScrollableTabs
                   className="dg-span-tabs dg-span-tabs--light"
                   style={{
-                    flex: isMobile ? "1 1 180px" : "0 1 auto",
-                    minWidth: 0,
+                    flex: "0 0 auto",
                     maxWidth: "100%",
                   }}
                 >
@@ -1269,8 +1270,7 @@ export function MembersSection({
                 <ScrollableTabs
                   className="dg-span-tabs dg-span-tabs--light"
                   style={{
-                    flex: isMobile ? "1 1 180px" : "0 1 auto",
-                    minWidth: 0,
+                    flex: isMobile ? "1 1 180px" : "0 0 auto",
                     maxWidth: "100%",
                   }}
                 >
@@ -1362,7 +1362,7 @@ export function MembersSection({
                 aria-label="Filter"
                 aria-expanded={filterOpen}
                 aria-haspopup="dialog"
-                className="dg-btn dg-btn-secondary dg-btn-sm"
+                className="dg-btn dg-btn-secondary"
                 style={{ position: "relative" }}
               >
                 <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
@@ -1387,7 +1387,7 @@ export function MembersSection({
                     setExpandedEmpId(null);
                     setPage(1);
                   }}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  className="dg-btn dg-btn-secondary"
                   aria-label="Reorder"
                   disabled={!hasReorderableStaffRows}
                 >
@@ -1407,7 +1407,7 @@ export function MembersSection({
                 data-testid="people-search"
                 className="relative"
                 style={{
-                  minWidth: 0,
+                  minWidth: isMobile ? 0 : 280,
                   flex: isMobile ? "1 1 160px" : "1 1 300px",
                   maxWidth: isMobile ? undefined : 380,
                 }}
@@ -1437,7 +1437,6 @@ export function MembersSection({
                       : "Search by name, email, or phone..."
                   }
                   style={{
-                    height: 32,
                     paddingLeft: 32,
                     paddingRight: searchQuery ? 30 : 12,
                   }}
@@ -1478,7 +1477,7 @@ export function MembersSection({
                 >
                   <Button
                     onClick={() => setShowImport(true)}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    className="dg-btn dg-btn-secondary"
                     disabled={!featureFlags.csvImport}
                   >
                     <ImportIcon size={14} />
@@ -1497,7 +1496,7 @@ export function MembersSection({
                 >
                   <Button
                     onClick={() => setExportConfirm(true)}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    className="dg-btn dg-btn-secondary"
                     disabled={!hasExportableStaffRows || !featureFlags.csvExport}
                   >
                     <Upload size={14} />
@@ -1513,7 +1512,7 @@ export function MembersSection({
                     onClick={() => setAddMenuOpen((open) => !open)}
                     aria-expanded={addMenuOpen}
                     aria-haspopup="menu"
-                    className="dg-btn dg-btn-primary dg-btn-sm"
+                    className="dg-btn dg-btn-primary"
                   >
                     <Plus size={14} />
                     Add
@@ -1559,7 +1558,7 @@ export function MembersSection({
               )}
 
               {canAddScheduled && !canAddManagement && (
-                <Button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
+                <Button onClick={onAdd} className="dg-btn dg-btn-primary">
                   <Plus size={14} />
                   Add
                 </Button>
@@ -1568,7 +1567,7 @@ export function MembersSection({
               {!canAddScheduled && canAddManagement && (
                 <Button
                   onClick={() => setShowManagementInvite(true)}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
+                  className="dg-btn dg-btn-primary"
                 >
                   <Plus size={14} />
                   Add

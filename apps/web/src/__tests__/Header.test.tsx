@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi, describe, it, expect, beforeEach } from "vitest";
@@ -357,23 +357,37 @@ describe("Header sign out in sandbox mode", () => {
     return user;
   }
 
-  it("signs out directly when not in sandbox", async () => {
+  it("prompts to confirm before signing out when not in sandbox", async () => {
     mockAuthUser = { id: "u-1", email: "a@b.com" };
     renderHeader(<Header />, { inSandbox: false });
 
     await openSignOut();
 
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockSetUserViewActive).not.toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: /sign out/i })).toBeInTheDocument();
     expect(screen.queryByText(/exit sandbox to sign out/i)).not.toBeInTheDocument();
   });
 
-  it("signs out in one sweep from view-as-user, with no confirm prompt", async () => {
+  it("signs out directly when not in sandbox, on confirm", async () => {
+    mockAuthUser = { id: "u-1", email: "a@b.com" };
+    renderHeader(<Header />, { inSandbox: false });
+
+    const user = await openSignOut();
+    const dialog = screen.getByRole("dialog", { name: /sign out/i });
+    await user.click(within(dialog).getByRole("button", { name: /sign out/i }));
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetUserViewActive).not.toHaveBeenCalled();
+  });
+
+  it("signs out in one sweep from view-as-user, on confirm", async () => {
     mockAuthUser = { id: "u-1", email: "a@b.com" };
     mockPermissions.isUserViewActive = true;
     renderHeader(<Header />, { inSandbox: false });
 
-    await openSignOut();
+    const user = await openSignOut();
+    const dialog = screen.getByRole("dialog", { name: /sign out/i });
+    await user.click(within(dialog).getByRole("button", { name: /sign out/i }));
 
     // Logout is a single sweep: signOutLocal tears down the session and clears
     // the view-as-user flag (dg_user_view) during teardown, so the handler must
@@ -381,7 +395,6 @@ describe("Header sign out in sandbox mode", () => {
     // the admin context mid-logout and could leave the user still logged in.
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockSetUserViewActive).not.toHaveBeenCalled();
-    expect(screen.queryByText(/exit sandbox to sign out/i)).not.toBeInTheDocument();
   });
 
   it("prompts to exit the sandbox before signing out", async () => {
