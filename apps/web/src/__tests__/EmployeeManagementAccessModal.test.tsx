@@ -442,7 +442,7 @@ describe("EmployeeManagementAccessEditor", () => {
     });
   });
 
-  it("does not show Remove from Management for someone with no existing management access", async () => {
+  it("skips the redundant access-status summary and Remove action for someone with no existing management access", async () => {
     render(
       <EmployeeManagementAccessEditor
         employee={employee}
@@ -455,7 +455,13 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    expect(await screen.findByText("No management access")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+
+    // The "Management departments *" field below is already the empty-state
+    // answer, so a second "No management access" summary above it is noise.
+    expect(screen.queryByText("No management access")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /remove from management/i }),
     ).not.toBeInTheDocument();
@@ -517,6 +523,124 @@ describe("EmployeeManagementAccessEditor", () => {
     await user.click(screen.getByRole("button", { name: "Leadership" }));
     expect(screen.getByRole("button", { name: "Send Invitation" })).toBeDisabled();
     expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
+  });
+
+  // Previously the role picker lived only in MemberAccessControls, which
+  // only renders once there's a real org_role to show — so a brand-new hire
+  // being added to management before they had ever been invited had no way
+  // to set what role the invitation would grant.
+  // Regression: the invite-only role picker used to gate on `matchedUser`,
+  // which only resolves once fetchOrganizationUsers finishes. For someone who
+  // already has a role, that meant it flashed in on open and then vanished as
+  // soon as the fetch settled - two Role fields visible at once in between.
+  it("never shows the invite-only role picker for someone who already has an org role", async () => {
+    let resolveUsers: (users: OrganizationUser[]) => void = () => undefined;
+    fetchOrganizationUsersMock.mockImplementationOnce(
+      () =>
+        new Promise<OrganizationUser[]>((resolve) => {
+          resolveUsers = resolve;
+        }),
+    );
+
+    render(
+      <EmployeeManagementAccessEditor
+        employee={{ ...employee, userId: "user-1" }}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        directoryPerson={makeDirectoryPerson({
+          userId: "user-1",
+          orgRole: "super_admin",
+          managementDepartmentIds: [10],
+        })}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    // Before the async lookup resolves...
+    expect(screen.queryAllByText("Role")).toHaveLength(0);
+
+    await act(async () => {
+      resolveUsers([makeOrganizationUser({ id: "user-1", orgRole: "super_admin" })]);
+      await Promise.resolve();
+    });
+
+    // ...and after.
+    expect(screen.queryAllByText("Role")).toHaveLength(0);
+  });
+
+  // Regression: submitLabel used to key off matchedUser too, so a linked
+  // employee's button read "Send Invitation" until the same async lookup
+  // resolved, then relabeled itself to "Save Access" - a visible flash.
+  it("never shows Send Invitation for a linked employee, even before the user lookup resolves", async () => {
+    let resolveUsers: (users: OrganizationUser[]) => void = () => undefined;
+    fetchOrganizationUsersMock.mockImplementationOnce(
+      () =>
+        new Promise<OrganizationUser[]>((resolve) => {
+          resolveUsers = resolve;
+        }),
+    );
+
+    render(
+      <EmployeeManagementAccessEditor
+        employee={{ ...employee, userId: "user-1" }}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        directoryPerson={makeDirectoryPerson({
+          userId: "user-1",
+          orgRole: "admin",
+          managementDepartmentIds: [10],
+        })}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Save Access" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /send invitation/i })).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveUsers([makeOrganizationUser({ id: "user-1", orgRole: "admin" })]);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("button", { name: "Save Access" })).toBeInTheDocument();
+  });
+
+  it("lets the invite role be chosen before a brand-new hire has ever been invited", async () => {
+    const editorRef = createRef<EmployeeManagementAccessEditorHandle>();
+
+    render(
+      <EmployeeManagementAccessEditor
+        ref={editorRef}
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Leadership" }));
+    await user.click(screen.getByRole("button", { name: "User" }));
+    await user.click(screen.getByRole("option", { name: "Admin" }));
+    await act(async () => {
+      await editorRef.current?.save();
+    });
+
+    await waitFor(() => {
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "admin" }),
+      );
+    });
   });
 
   it("uses the Profile details email when inviting someone", async () => {

@@ -3,7 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MembersSection, type MembersSectionProps } from "@/components/staff/MembersSection";
-import type { DirectoryPerson, Employee, Invitation } from "@/types";
+import type {
+  AdminPermissions,
+  DirectoryPerson,
+  Employee,
+  Invitation,
+  OrganizationRole,
+} from "@/types";
 import {
   fetchOrganizationInvitations,
   replaceOrganizationInvitationAccessGuarded,
@@ -120,6 +126,9 @@ let lastManagementStaffPanelSave:
 let lastStaffDetailPanelProps: {
   employee: Employee;
   onManageManagementAccess?: (employee: Employee) => void;
+  orgRole?: OrganizationRole | null;
+  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
 } | null = null;
 
 vi.mock("@/components/staff/ManagementStaffPanel", () => ({
@@ -156,6 +165,9 @@ vi.mock("@/components/staff/StaffDetailPanel", () => ({
   StaffDetailPanel: (props: {
     employee: Employee;
     onManageManagementAccess?: (employee: Employee) => void;
+    orgRole?: OrganizationRole | null;
+    onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+    onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
   }) => {
     lastStaffDetailPanelProps = props;
     return <div data-testid="staff-detail-panel" />;
@@ -412,6 +424,68 @@ describe("MembersSection — management-only view access", () => {
 
     expect(screen.getByTestId("management-staff-panel")).toBeInTheDocument();
     expect(screen.queryByTestId("staff-detail-panel")).not.toBeInTheDocument();
+  });
+});
+
+// Access is the directory table's own column, so the panel a row opens has to
+// answer it too. It used to be reachable only through the management-access
+// modal, which meant plain staff had no access control anywhere but the table.
+describe("MembersSection — staff panel access controls", () => {
+  it("hands the staff panel the same access role the table row shows", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({
+        employeeId: "emp-1",
+        orgRole: "user",
+        managementDepartmentIds: [],
+        departmentIds: [],
+        isManagementUser: false,
+        membershipUpdatedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: [makeEmployee({ id: "emp-1", userId: "user-1" })],
+    });
+
+    const row = screen.getByText("Pat Doe").closest("tr");
+    if (!row) throw new Error("Expected to find the employee row");
+    await user.click(row);
+
+    expect(lastStaffDetailPanelProps?.orgRole).toBe("user");
+    expect(lastStaffDetailPanelProps?.onRoleChange).toBeTypeOf("function");
+  });
+
+  it("gives a staff manager who is not a super admin no way to change access", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({
+        employeeId: "emp-1",
+        orgRole: "user",
+        managementDepartmentIds: [],
+        departmentIds: [],
+        isManagementUser: false,
+        membershipUpdatedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ];
+
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: false,
+      employees: [makeEmployee({ id: "emp-1", userId: "user-1" })],
+    });
+
+    const row = screen.getByText("Pat Doe").closest("tr");
+    if (!row) throw new Error("Expected to find the employee row");
+    await user.click(row);
+
+    expect(lastStaffDetailPanelProps?.orgRole).toBe("user");
+    expect(lastStaffDetailPanelProps?.onRoleChange).toBeUndefined();
+    expect(lastStaffDetailPanelProps?.onPermissionsChange).toBeUndefined();
   });
 });
 

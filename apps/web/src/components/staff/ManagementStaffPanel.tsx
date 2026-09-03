@@ -446,8 +446,9 @@ export function ManagementStaffPanel({
     outline: "none",
   };
 
-  // Role + permission controls, shared with the on-schedule staff panel.
-  // Self-gates on the callbacks, which the parent passes only to managers.
+  // Role + permission controls, the same ones StaffDetailPanel renders for
+  // on-schedule staff. Self-gates on the callbacks, which the parent passes
+  // only to managers.
   const accessControls = (
     <MemberAccessControls
       orgRole={person.orgRole}

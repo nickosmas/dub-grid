@@ -15,6 +15,8 @@ export interface EmployeeStatusActionsProps {
   onActivate: (empId: string) => void;
   onRemove: (empId: string, note?: string) => void;
   variant: "panel" | "page";
+  /** Stretches the active button to fill its container, for an equal-width row of actions. */
+  fillWidth?: boolean;
 }
 
 type DeactivateOutcome = "inactive" | "remove";
@@ -27,6 +29,7 @@ export function EmployeeStatusActions({
   onActivate,
   onRemove,
   variant,
+  fillWidth = false,
 }: EmployeeStatusActionsProps) {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
@@ -178,15 +181,16 @@ export function EmployeeStatusActions({
                 ? "dg-btn dg-btn-secondary dg-btn-sm"
                 : "dg-btn dg-btn-ghost dg-btn-xs"
             }
-            style={
-              variant === "page"
+            style={{
+              ...(variant === "page"
                 ? {
                     color: "var(--dg-color-success)",
                     borderColor: "var(--dg-color-success-border)",
                     background: "var(--dg-color-success-bg)",
                   }
-                : { color: "var(--dg-color-success)" }
-            }
+                : { color: "var(--dg-color-success)" }),
+              ...(fillWidth ? { flex: 1, width: "100%" } : null),
+            }}
           >
             <svg
               width="12"
@@ -222,10 +226,14 @@ export function EmployeeStatusActions({
           <Button
             onClick={() => setShowDeactivateConfirm(true)}
             className="dg-btn dg-btn-warning-filled"
-            style={{
-              flex: variant === "page" ? "0 0 auto" : 1,
-              minWidth: variant === "page" ? 160 : undefined,
-            }}
+            style={
+              fillWidth
+                ? { flex: 1, width: "100%" }
+                : {
+                    flex: variant === "page" ? "0 0 auto" : 1,
+                    minWidth: variant === "page" ? 160 : undefined,
+                  }
+            }
           >
             <svg
               width="12"

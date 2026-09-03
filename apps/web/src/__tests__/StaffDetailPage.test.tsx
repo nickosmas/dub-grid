@@ -1,9 +1,10 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
+import type { DirectoryPerson } from "@/types";
 import {
   fetchEmployeeById,
   fetchEmployeeShifts,
@@ -161,6 +162,36 @@ const mockedFetchEmployeeShifts = vi.mocked(fetchEmployeeShifts);
 const mockedFetchRecurringShifts = vi.mocked(fetchRecurringShifts);
 const mockedFetchEmployeeInvitations = vi.mocked(fetchEmployeeInvitations);
 const mockedFetchEmployeeRoleHistory = vi.mocked(fetchEmployeeRoleHistory);
+
+function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
+  return {
+    personId: "person-1",
+    source: "employee",
+    employeeId: "emp-1",
+    userId: null,
+    firstName: "Margaret",
+    lastName: "Sullivan",
+    email: "margaret@example.com",
+    phone: "",
+    employeeStatus: "active",
+    orgRole: null,
+    hasAppAccess: false,
+    focusAreaIds: [],
+    certificationId: null,
+    roleIds: [],
+    seniority: 1,
+    lastSignInAt: null,
+    invitationStatus: null,
+    scheduledDepartmentIds: [],
+    scheduledDeptAdminIds: [],
+    managementDepartmentIds: [],
+    managementDeptAdminIds: [],
+    departmentIds: [],
+    deptAdminIds: [],
+    isManagementUser: false,
+    ...overrides,
+  } as DirectoryPerson;
+}
 
 const mockEmployee = makeEmployee({
   id: "emp-1",
@@ -447,9 +478,11 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
+    // Management settings always open in a popup, never inline in the card.
     fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
-    expect(screen.getByText("Management access editor")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText("Management access editor")).toBeInTheDocument();
   });
 
   it("keeps the work-details form focused on biodata, without invite UI leaking in", async () => {
@@ -461,6 +494,79 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("link", { name: "Back to People" })).toHaveAttribute("href", "/people");
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();
+  });
+
+  // Access used to live only inside the management card, so a plain staff
+  // member with a login had no access field on this page at all.
+  it("shows the access control for a linked staff member who is not a management user", async () => {
+    mockUsePermissions.mockReturnValue({
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: false,
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockedFetchEmployeeById.mockResolvedValue({ ...mockEmployee, userId: "user-1" });
+    mockedFetchEmployeeInvitations.mockResolvedValue([]);
+    mockUseDirectory.mockReturnValue({
+      directory: [
+        makeDirectoryPerson({
+          userId: "user-1",
+          orgRole: "user",
+          hasAppAccess: true,
+          managementDepartmentIds: [],
+          departmentIds: [],
+          isManagementUser: false,
+        }),
+      ],
+      loading: false,
+      error: null,
+    });
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    expect(screen.getByText("Access")).toBeInTheDocument();
+    expect(screen.getByText("Role")).toBeInTheDocument();
+    // Not a management user, so the management card stays away entirely.
+    expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+  });
+
+  it("leaves the role out of the management card, which now covers departments only", async () => {
+    mockUsePermissions.mockReturnValue({
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: false,
+      canManageEmployees: true,
+      isSuperAdmin: true,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockedFetchEmployeeById.mockResolvedValue({ ...mockEmployee, userId: "user-1" });
+    mockedFetchEmployeeInvitations.mockResolvedValue([]);
+    mockUseDirectory.mockReturnValue({
+      directory: [
+        makeDirectoryPerson({
+          userId: "user-1",
+          orgRole: "admin",
+          hasAppAccess: true,
+          managementDepartmentIds: [1],
+          departmentIds: [1],
+          isManagementUser: true,
+        }),
+      ],
+      loading: false,
+      error: null,
+    });
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    expect(screen.getByText("Management departments")).toBeInTheDocument();
+    // One Role label, in the Access card, not duplicated in the card below.
+    expect(screen.getAllByText("Role")).toHaveLength(1);
   });
 
   it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {

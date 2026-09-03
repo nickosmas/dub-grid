@@ -11,6 +11,8 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
+import Modal from "@/components/Modal";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import {
@@ -98,6 +100,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditingManagementAccess, setIsEditingManagementAccess] = useState(false);
+  const [managementAccessDirty, setManagementAccessDirty] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
 
@@ -545,6 +548,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
   const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
+  const closeManagementAccessEditor = useCallback(() => {
+    setManagementAccessDirty(false);
+    setIsEditingManagementAccess(false);
+  }, []);
+  const {
+    requestClose: requestManagementAccessClose,
+    unsavedChangesDialog: managementAccessUnsavedChangesDialog,
+  } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: managementAccessDirty,
+    onDiscard: closeManagementAccessEditor,
+  });
   const directoryPerson = useMemo(
     () => directory.find((person) => person.employeeId === employee?.id) ?? null,
     [directory, employee?.id],
@@ -592,6 +606,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ],
     [],
   );
+  // Matches the directory table's Access column: the membership's role, or the
+  // role a pending invitation will grant once it is accepted.
+  const effectiveOrgRole = directoryPerson?.orgRole ?? pendingInvite?.roleToAssign ?? null;
   const hasPendingManagementInvite =
     !!directoryPerson &&
     directoryPerson.managementDepartmentIds.length > 0 &&
@@ -791,21 +808,57 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 </div>
               </section>
 
+              {(effectiveOrgRole || employee.userId || pendingInvite) && (
+                <section>
+                  <div className="dg-card">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Access</div>
+                        <div className="dg-card-subtitle">
+                          Organization role and the permissions it carries.
+                        </div>
+                      </div>
+                    </div>
+                    {canManageManagementAccess && effectiveOrgRole ? (
+                      <div className="dg-card-body flex flex-col gap-6">
+                        <MemberAccessControls
+                          orgRole={effectiveOrgRole}
+                          adminPermissions={directoryPerson?.adminPermissions}
+                          onRoleChange={handleRoleChange}
+                          onPermissionsChange={
+                            directoryPerson?.userId ? handlePermissionsChange : undefined
+                          }
+                          isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                          pendingInvitationEmail={pendingInvite?.email}
+                        />
+                      </div>
+                    ) : (
+                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
+                        <ProfileField
+                          label="Role"
+                          value={
+                            effectiveOrgRole
+                              ? formatOrganizationRole(effectiveOrgRole)
+                              : "No app access"
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
               {canManageManagementAccess &&
                 orgId &&
-                (directoryPerson?.isManagementUser ||
-                  hasPendingManagementInvite ||
-                  isEditingManagementAccess) && (
+                (directoryPerson?.isManagementUser || hasPendingManagementInvite) && (
                   <section>
                     <div className="dg-card">
                       <div className="dg-card-header">
                         <div>
-                          <div className="dg-card-title">Management access</div>
-                          <div className="dg-card-subtitle">
-                            Organization role and management department assignment.
-                          </div>
+                          <div className="dg-card-title">Management departments</div>
+                          <div className="dg-card-subtitle">Management department assignment.</div>
                         </div>
-                        {!isEditingManagementAccess && employee.status !== "removed" ? (
+                        {employee.status !== "removed" ? (
                           <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -815,74 +868,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           </Button>
                         ) : null}
                       </div>
-                      {isEditingManagementAccess ? (
-                        <div className="dg-card-body flex flex-col gap-6">
-                          {directoryPerson?.orgRole ? (
-                            <MemberAccessControls
-                              orgRole={directoryPerson.orgRole}
-                              adminPermissions={directoryPerson.adminPermissions}
-                              onRoleChange={handleRoleChange}
-                              onPermissionsChange={
-                                directoryPerson.userId ? handlePermissionsChange : undefined
-                              }
-                              isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                              pendingInvitationEmail={pendingInvite?.email}
-                            />
-                          ) : null}
-                          <EmployeeManagementAccessEditor
-                            employee={employee}
-                            orgId={orgId}
-                            orgName={org.name || "your organization"}
-                            managementDepartments={(departments ?? []).filter(
-                              (department) => department.type === "management",
-                            )}
-                            directoryPerson={directoryPerson}
-                            pendingInvitation={pendingInvite ?? undefined}
-                            onClose={() => setIsEditingManagementAccess(false)}
-                            onCompleted={async (updatedEmployee) => {
-                              if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
-                              await refreshInvitations();
-                              await Promise.all([
-                                queryClient.invalidateQueries({
-                                  queryKey: queryKeys.org.directory(orgId),
-                                }),
-                                queryClient.invalidateQueries({
-                                  queryKey: queryKeys.org.users(orgId),
-                                }),
-                                queryClient.invalidateQueries({
-                                  queryKey: queryKeys.employees.all(orgId),
-                                }),
-                              ]);
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                          <ProfileField
-                            label="Role"
-                            value={
-                              directoryPerson?.orgRole
-                                ? formatOrganizationRole(directoryPerson.orgRole)
-                                : "No app access"
-                            }
-                          />
-                          <ProfileField
-                            label="Management departments"
-                            value={
-                              directoryPerson?.managementDepartmentIds.length
-                                ? directoryPerson.managementDepartmentIds
-                                    .map(
-                                      (id) =>
-                                        departments.find((department) => department.id === id)
-                                          ?.name,
-                                    )
-                                    .filter(Boolean)
-                                    .join(", ")
-                                : "—"
-                            }
-                          />
-                        </div>
-                      )}
+                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
+                        <ProfileField
+                          label="Departments"
+                          value={
+                            directoryPerson?.managementDepartmentIds.length
+                              ? directoryPerson.managementDepartmentIds
+                                  .map(
+                                    (id) =>
+                                      departments.find((department) => department.id === id)?.name,
+                                  )
+                                  .filter(Boolean)
+                                  .join(", ")
+                              : "—"
+                          }
+                        />
+                      </div>
                     </div>
                   </section>
                 )}
@@ -975,6 +976,41 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         </SettingsShell>
       )}
 
+      {isEditingManagementAccess && orgId && org && employee && (
+        <Modal
+          title={
+            directoryPerson?.isManagementUser || hasPendingManagementInvite
+              ? "Edit management access"
+              : "Add to management"
+          }
+          onClose={closeManagementAccessEditor}
+          onRequestClose={requestManagementAccessClose}
+          style={{ maxWidth: 560, width: "100%" }}
+        >
+          <EmployeeManagementAccessEditor
+            employee={employee}
+            orgId={orgId}
+            orgName={org.name || "your organization"}
+            managementDepartments={(departments ?? []).filter(
+              (department) => department.type === "management",
+            )}
+            directoryPerson={directoryPerson}
+            pendingInvitation={pendingInvite ?? undefined}
+            onDirtyChange={setManagementAccessDirty}
+            onClose={closeManagementAccessEditor}
+            onCompleted={async (updatedEmployee) => {
+              if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
+              await refreshInvitations();
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
+              ]);
+            }}
+          />
+        </Modal>
+      )}
+      {managementAccessUnsavedChangesDialog}
       {showInviteModal && employee && orgId && org && (
         <InviteEmployeeModal
           employee={employee}

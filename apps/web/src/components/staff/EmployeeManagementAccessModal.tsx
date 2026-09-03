@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { AccessStatusRow } from "@/components/staff/AccessStatusRow";
+import CustomSelect from "@/components/CustomSelect";
 import type {
   AssignableOrganizationRole,
   Department,
@@ -46,10 +47,18 @@ export interface EmployeeManagementAccessEditorHandle {
   discard: () => void;
 }
 
+const INVITE_ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
+  { value: "user", label: "User" },
+  { value: "admin", label: "Admin" },
+];
+
 /**
- * In-place editor shared by the staff slide-over and detail page. Role changes
- * deliberately live in MemberAccessControls, so this editor owns only
- * management departments and the invitation/access plumbing around them.
+ * In-place editor shared by the staff slide-over and detail page. For an
+ * existing membership, role changes live in MemberAccessControls, rendered
+ * alongside this editor by the caller. There's no membership to patch for an
+ * invitation, though, so this editor owns the role picker itself whenever it
+ * is creating, updating, or revoking one (`!matchedUser`) - otherwise a
+ * brand-new hire had no way to set the role they'd get once invited.
  */
 export const EmployeeManagementAccessEditor = forwardRef<
   EmployeeManagementAccessEditorHandle,
@@ -107,6 +116,16 @@ export const EmployeeManagementAccessEditor = forwardRef<
   // intentionally don't surface an "email-matches-another-user" sidecar
   // anymore — that path silently rewrote someone else's membership.
   const matchedUser = linkedUser;
+  // directoryPerson.orgRole is a prop, present on first render. matchedUser
+  // depends on fetchOrganizationUsers resolving, so gating the invite-only
+  // role picker on matchedUser alone let it flash in before that fetch
+  // finished for anyone who, in fact, already has a role.
+  const hasKnownOrgRole = Boolean(directoryPerson?.orgRole) || Boolean(matchedUser);
+  // Same flash, different symptom: employee.userId is known synchronously
+  // and, for a linked employee, always ends up resolving to a matchedUser
+  // once fetchOrganizationUsers settles - so copy that reads the eventual
+  // outcome can use it immediately instead of guessing "invite" first.
+  const isLinkedUser = Boolean(employee.userId);
   useEffect(() => {
     if (matchedUser?.orgRole === "admin" || matchedUser?.orgRole === "user") {
       setRole(matchedUser.orgRole);
@@ -157,7 +176,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
     (directoryPerson?.managementDepartmentIds.length ?? 0) > 0 || !!pendingInvitation;
   const isCreating = !isEditingExistingAccess;
   const dismissLabel = getEditorDismissLabel({ hasUnsavedChanges, isCreating });
-  const submitLabel = matchedUser
+  const submitLabel = isLinkedUser
     ? "Save Access"
     : inviteSaveAction === "revoke"
       ? "Revoke Invitation"
@@ -329,34 +348,46 @@ export const EmployeeManagementAccessEditor = forwardRef<
         aria-label={isEditingExistingAccess ? "Edit management access" : "Add to management"}
         style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
-        <AccessStatusRow
-          label="Management access"
-          statusText={
-            managementDepartmentIds.length > 0
-              ? `Active — ${managementDepartmentIds.length} department${
-                  managementDepartmentIds.length === 1 ? "" : "s"
-                }`
-              : "No management access"
-          }
-          tone={managementDepartmentIds.length > 0 ? "active" : "neutral"}
-          note={
-            managementDepartmentIds.length === 0 && hasExistingManagementAccess
-              ? isRevokeOnSave
-                ? "Saving now revokes the pending invitation."
-                : "Saving now removes their management access. They'll stay on the schedule."
-              : undefined
-          }
-          actionLabel={
-            hasExistingManagementAccess && managementDepartmentIds.length > 0
-              ? "Remove from Management"
-              : undefined
-          }
-          onAction={
-            hasExistingManagementAccess && managementDepartmentIds.length > 0
-              ? () => setManagementDepartmentIds([])
-              : undefined
-          }
-        />
+        {!hasKnownOrgRole && (
+          <div>
+            <label style={fieldLabelStyle}>Role</label>
+            <div style={{ maxWidth: 200 }}>
+              <CustomSelect
+                value={role}
+                options={INVITE_ROLE_OPTIONS}
+                onChange={(value) => setRole(value as AssignableOrganizationRole)}
+              />
+            </div>
+          </div>
+        )}
+
+        {hasExistingManagementAccess && (
+          // Only meaningful once there's existing access to summarize or
+          // remove - on the create path this just repeated the empty state
+          // the required Management departments field below already shows.
+          <AccessStatusRow
+            label="Management access"
+            statusText={
+              managementDepartmentIds.length > 0
+                ? `Active — ${managementDepartmentIds.length} department${
+                    managementDepartmentIds.length === 1 ? "" : "s"
+                  }`
+                : "No management access"
+            }
+            tone={managementDepartmentIds.length > 0 ? "active" : "neutral"}
+            note={
+              managementDepartmentIds.length === 0
+                ? isRevokeOnSave
+                  ? "Saving now revokes the pending invitation."
+                  : "Saving now removes their management access. They'll stay on the schedule."
+                : undefined
+            }
+            actionLabel={managementDepartmentIds.length > 0 ? "Remove from Management" : undefined}
+            onAction={
+              managementDepartmentIds.length > 0 ? () => setManagementDepartmentIds([]) : undefined
+            }
+          />
+        )}
 
         {!loadingUsers && !linkedUser && !effectiveEmail.trim() && (
           <FieldError message="Add an email address in Profile details before inviting them." />

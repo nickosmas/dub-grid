@@ -31,6 +31,7 @@ import {
   mergeEmployeeIntoDirectoryPerson,
 } from "@/lib/staff-directory";
 import type {
+  AdminPermissions,
   Department,
   DirectoryPerson,
   Employee,
@@ -1024,6 +1025,48 @@ export function MembersSection({
     },
     [orgId, syncDirectoryPersonInCaches, syncExistingEmployeeInCaches],
   );
+
+  const patchSelectedMembership = async (patch: {
+    orgRole?: OrganizationRole;
+    adminPermissions?: AdminPermissions;
+  }) => {
+    const person = selectedEmployeeDirectoryPerson;
+    if (!orgId || !person?.userId || !person.membershipUpdatedAt) return;
+    const membership = await updateOrganizationMembershipGuarded({
+      orgId,
+      userId: person.userId,
+      expectedUpdatedAt: person.membershipUpdatedAt,
+      ...patch,
+    });
+    syncMembershipInCaches(membership);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
+    ]);
+  };
+
+  const canWriteSelectedMembership = Boolean(
+    canManageManagementAccess &&
+    orgId &&
+    selectedEmployeeDirectoryPerson?.userId &&
+    selectedEmployeeDirectoryPerson.membershipUpdatedAt,
+  );
+
+  // Access writes for whoever's detail panel is open, so the slide-over and the
+  // management-access modal share one handler instead of each carrying a copy.
+  // Someone with no login yet holds their access on the pending invitation, so
+  // that branch replaces the invite rather than patching a membership.
+  const selectedEmployeeRoleChange = !canManageManagementAccess
+    ? undefined
+    : canWriteSelectedMembership
+      ? (newRole: OrganizationRole) => patchSelectedMembership({ orgRole: newRole })
+      : selectedEmployee
+        ? roleChangeHandlerFor(selectedEmployee.id, null, null)
+        : undefined;
+
+  const selectedEmployeePermissionsChange = canWriteSelectedMembership
+    ? (permissions: AdminPermissions) => patchSelectedMembership({ adminPermissions: permissions })
+    : undefined;
 
   // The `employees` prop is the on-schedule list (parent filters out rows with
   // no focus areas). Management-only members have an employees row but no
@@ -2261,6 +2304,12 @@ export function MembersSection({
           onInvite={
             canManageManagementAccess ? (employee) => setInviteEmployee(employee) : undefined
           }
+          orgRole={
+            orgRoleByEmployeeId.get(selectedEmployee.id) ??
+            pendingInviteByEmployeeId.get(selectedEmployee.id)?.roleToAssign ??
+            null
+          }
+          onRoleChange={selectedEmployeeRoleChange}
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={selectedEmployeeHasPendingManagementInvite}
@@ -2292,57 +2341,8 @@ export function MembersSection({
                 pendingInvitationEmail={
                   pendingInviteByEmployeeId.get(managementAccessEmployee.id)?.email
                 }
-                onRoleChange={
-                  !canManageManagementAccess
-                    ? undefined
-                    : selectedEmployeeDirectoryPerson.userId &&
-                        selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                      ? async (newRole) => {
-                          const person = selectedEmployeeDirectoryPerson;
-                          if (!person.userId || !person.membershipUpdatedAt) return;
-                          const membership = await updateOrganizationMembershipGuarded({
-                            orgId,
-                            userId: person.userId,
-                            expectedUpdatedAt: person.membershipUpdatedAt,
-                            orgRole: newRole,
-                          });
-                          syncMembershipInCaches(membership);
-                          await Promise.all([
-                            queryClient.invalidateQueries({
-                              queryKey: queryKeys.org.directory(orgId),
-                            }),
-                            queryClient.invalidateQueries({
-                              queryKey: queryKeys.org.users(orgId),
-                            }),
-                          ]);
-                        }
-                      : roleChangeHandlerFor(managementAccessEmployee.id, null, null)
-                }
-                onPermissionsChange={
-                  canManageManagementAccess &&
-                  selectedEmployeeDirectoryPerson.userId &&
-                  selectedEmployeeDirectoryPerson.membershipUpdatedAt
-                    ? async (permissions) => {
-                        const person = selectedEmployeeDirectoryPerson;
-                        if (!person.userId || !person.membershipUpdatedAt) return;
-                        const membership = await updateOrganizationMembershipGuarded({
-                          orgId,
-                          userId: person.userId,
-                          expectedUpdatedAt: person.membershipUpdatedAt,
-                          adminPermissions: permissions,
-                        });
-                        syncMembershipInCaches(membership);
-                        await Promise.all([
-                          queryClient.invalidateQueries({
-                            queryKey: queryKeys.org.directory(orgId),
-                          }),
-                          queryClient.invalidateQueries({
-                            queryKey: queryKeys.org.users(orgId),
-                          }),
-                        ]);
-                      }
-                    : undefined
-                }
+                onRoleChange={selectedEmployeeRoleChange}
+                onPermissionsChange={selectedEmployeePermissionsChange}
               />
             ) : null}
             <EmployeeManagementAccessEditor
