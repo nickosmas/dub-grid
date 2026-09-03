@@ -275,7 +275,7 @@ interface RenderGridOptions {
     publishedAt: string;
     publishedBy: string;
   } | null;
-  cellLocks?: Map<string, { userName: string }>;
+  cellLocks?: Map<string, { userName: string; owner?: "same_account" | "other_account" }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   coverageRequirements?: CoverageRequirement[];
@@ -2670,6 +2670,41 @@ describe("ScheduleGrid", () => {
     );
 
     expect(activeCells).toHaveLength(1);
+  });
+
+  it("activates same-account locked cells so the caller can offer session takeover", () => {
+    const onActivateCell = vi.fn();
+    renderGrid({
+      cellLocks: new Map([
+        ["emp-1_2024-01-07", { userName: "Current user", owner: "same_account" }],
+      ]),
+      onActivateCell,
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    fireEvent.click(firstCell);
+
+    expect(firstCell.dataset.locked).toBe("true");
+    expect(onActivateCell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cellId: { empId: "emp-1", dateKey: "2024-01-07", sectionId: 1 },
+        trigger: "click",
+      }),
+    );
+  });
+
+  it("keeps other-account locked cells non-activatable", () => {
+    const onActivateCell = vi.fn();
+    renderGrid({
+      cellLocks: new Map([
+        ["emp-1_2024-01-07", { userName: "Another user", owner: "other_account" }],
+      ]),
+      onActivateCell,
+    });
+
+    fireEvent.click(screen.getAllByRole("gridcell")[0]!);
+
+    expect(onActivateCell).not.toHaveBeenCalled();
   });
 
   it("toggles selectable cells in bulk delete mode instead of opening the editor", () => {

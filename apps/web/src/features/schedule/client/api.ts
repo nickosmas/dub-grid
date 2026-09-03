@@ -62,6 +62,26 @@ export function fetchScheduleActorNames(input: {
   });
 }
 
+export function fetchScheduleEditorSessionStatus(input: {
+  orgId: string;
+  editorSessionId: string;
+}): Promise<{ ended: boolean; endedAt: string | null }> {
+  const params = new URLSearchParams(input);
+  return requestScheduleJson(`/api/schedule/editor-sessions?${params}`);
+}
+
+export function endScheduleEditorSession(input: {
+  orgId: string;
+  targetEditorSessionId: string;
+  endingEditorSessionId: string;
+}): Promise<{ ended: true; endedAt: string }> {
+  return requestScheduleJson("/api/schedule/editor-sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchRepeatOverwriteCount(input: {
   empId: string;
   dates: string[];

@@ -10,6 +10,8 @@ export interface CellLock {
   userName: string;
   cellKey: string;
   lockRevision: number;
+  owner: "same_account" | "other_account";
+  seriesId: string | null;
 }
 
 export interface OnlineUser {
@@ -30,6 +32,7 @@ interface PresencePayload {
   canLockCells?: boolean;
   isScheduleEditor?: boolean;
   lockRevision?: number;
+  editingSeriesId?: string | null;
 }
 
 interface RemoteEditorSession {
@@ -40,12 +43,14 @@ interface RemoteEditorSession {
   canLockCells: boolean;
   isScheduleEditor: boolean;
   lockRevision: number;
+  editingSeriesId: string | null;
 }
 
 interface LocalPresenceState {
   editingCell: string | null;
   lockRevision: number;
   removePresence: boolean;
+  editingSeriesId: string | null;
 }
 
 function remoteSessionsEqual(
@@ -62,7 +67,8 @@ function remoteSessionsEqual(
     current.editingCell === next.editingCell &&
     current.canLockCells === next.canLockCells &&
     current.isScheduleEditor === next.isScheduleEditor &&
-    current.lockRevision === next.lockRevision
+    current.lockRevision === next.lockRevision &&
+    current.editingSeriesId === next.editingSeriesId
   );
 }
 
@@ -71,15 +77,18 @@ interface BroadcastSender {
 }
 
 interface UseCellLocksReturn {
-  lockCell: (cellKey: string) => void;
+  lockCell: (cellKey: string, options?: { seriesId?: string | null }) => void;
   unlockCell: (options?: { removePresence?: boolean }) => void;
   refreshPresence: (options?: { removePresence?: boolean }) => Promise<void>;
   clearPresenceState: () => void;
+  endCurrentSession: () => void;
+  removeRemoteSession: (editorSessionId: string) => void;
   getCellLock: (cellKey: string) => CellLock | null;
   getCellActivity: (cellKey: string) => OnlineUser | null;
   getCurrentCell: () => string | null;
   lockedCells: Map<string, CellLock>;
   onlineUsers: OnlineUser[];
+  isSessionEnded: boolean;
   syncPresence: () => void;
   handleLockBroadcast: (payload: {
     cellKey: string;
@@ -88,6 +97,7 @@ interface UseCellLocksReturn {
     editorSessionId: string;
     lockRevision: number;
     canLockCells?: boolean;
+    seriesId?: string | null;
   }) => void;
   handleUnlockBroadcast: (payload: {
     userId: string;
@@ -108,15 +118,20 @@ export function useCellLocks(
   const [remoteSessions, setRemoteSessions] = useState<Map<string, RemoteEditorSession>>(
     () => new Map(),
   );
+  const [isSessionEnded, setIsSessionEnded] = useState(false);
+  const sessionEndedRef = useRef(false);
+  const removedRemoteSessionIdsRef = useRef(new Set<string>());
   const currentUserRef = useLatestRef(currentUser);
   const canTrackPresenceRef = useLatestRef(canTrackPresence);
   const canLockCellsRef = useLatestRef(canLockCells);
   const currentCellRef = useRef<string | null>(null);
+  const currentSeriesIdRef = useRef<string | null>(null);
   const lockRevisionRef = useRef(0);
   const desiredPresenceRef = useRef<LocalPresenceState>({
     editingCell: null,
     lockRevision: 0,
     removePresence: false,
+    editingSeriesId: null,
   });
   const presenceVersionRef = useRef(0);
   const presenceFlushInFlightRef = useRef(false);
@@ -142,19 +157,21 @@ export function useCellLocks(
     const desiredPresence = desiredPresenceRef.current;
 
     try {
-      const status = desiredPresence.removePresence
-        ? await channel.untrack()
-        : user
-          ? await channel.track({
-              editingCell: desiredPresence.editingCell,
-              userId: user.id,
-              userName: user.name,
-              editorSessionId,
-              canLockCells: canLockCellsRef.current,
-              isScheduleEditor: canTrackPresenceRef.current,
-              lockRevision: desiredPresence.lockRevision,
-            })
-          : null;
+      const status =
+        desiredPresence.removePresence || sessionEndedRef.current
+          ? await channel.untrack()
+          : user
+            ? await channel.track({
+                editingCell: desiredPresence.editingCell,
+                userId: user.id,
+                userName: user.name,
+                editorSessionId,
+                canLockCells: canLockCellsRef.current,
+                isScheduleEditor: canTrackPresenceRef.current,
+                lockRevision: desiredPresence.lockRevision,
+                editingSeriesId: desiredPresence.editingSeriesId,
+              })
+            : null;
 
       if (!status) {
         return;
@@ -187,11 +204,16 @@ export function useCellLocks(
   }, [channelRef, clearPresenceRetry, editorSessionId]);
 
   const queuePresence = useCallback(
-    (editingCell: string | null, lockRevision: number, options?: { removePresence?: boolean }) => {
+    (
+      editingCell: string | null,
+      lockRevision: number,
+      options?: { removePresence?: boolean; seriesId?: string | null },
+    ) => {
       desiredPresenceRef.current = {
-        editingCell,
+        editingCell: sessionEndedRef.current ? null : editingCell,
         lockRevision,
-        removePresence: options?.removePresence === true,
+        removePresence: sessionEndedRef.current || options?.removePresence === true,
+        editingSeriesId: sessionEndedRef.current ? null : (options?.seriesId ?? null),
       };
       presenceVersionRef.current += 1;
       void flushPresence();
@@ -202,9 +224,12 @@ export function useCellLocks(
   const refreshPresence = useCallback(
     async (options?: { removePresence?: boolean }) => {
       desiredPresenceRef.current = {
-        editingCell: options?.removePresence ? null : currentCellRef.current,
+        editingCell:
+          sessionEndedRef.current || options?.removePresence ? null : currentCellRef.current,
         lockRevision: lockRevisionRef.current,
-        removePresence: options?.removePresence === true,
+        removePresence: sessionEndedRef.current || options?.removePresence === true,
+        editingSeriesId:
+          sessionEndedRef.current || options?.removePresence ? null : currentSeriesIdRef.current,
       };
       presenceVersionRef.current += 1;
       await flushPresence();
@@ -248,6 +273,7 @@ export function useCellLocks(
       for (const p of presences as PresencePayload[]) {
         if (!p.userId || !p.editorSessionId) continue;
         if (p.editorSessionId === editorSessionId) continue;
+        if (removedRemoteSessionIdsRef.current.has(p.editorSessionId)) continue;
         if (p.isScheduleEditor === false) continue;
 
         const existing = presenceSessions.get(p.editorSessionId);
@@ -259,6 +285,7 @@ export function useCellLocks(
           canLockCells: p.canLockCells === false ? false : true,
           isScheduleEditor: true,
           lockRevision: p.lockRevision ?? 0,
+          editingSeriesId: p.editingSeriesId ?? null,
         };
         if (!existing || candidate.lockRevision >= existing.lockRevision) {
           presenceSessions.set(p.editorSessionId, candidate);
@@ -292,16 +319,27 @@ export function useCellLocks(
     setRemoteSessions(new Map());
   }, []);
 
+  const removeRemoteSession = useCallback(
+    (editorSessionIdToRemove: string) => {
+      removedRemoteSessionIdsRef.current.add(editorSessionIdToRemove);
+      applyRemoteSessionUpdate(editorSessionIdToRemove, () => undefined);
+    },
+    [applyRemoteSessionUpdate],
+  );
+
   const lockCell = useCallback(
-    (cellKey: string) => {
+    (cellKey: string, options?: { seriesId?: string | null }) => {
+      if (sessionEndedRef.current) return;
       const channel = channelRef.current;
       const user = currentUserRef.current;
       if (!user) return;
 
       const prev = currentCellRef.current;
+      const nextSeriesId = options?.seriesId ?? null;
       if (prev === cellKey) {
         const revision = lockRevisionRef.current;
-        queuePresence(cellKey, revision);
+        currentSeriesIdRef.current = nextSeriesId;
+        queuePresence(cellKey, revision, { seriesId: nextSeriesId });
         return;
       }
 
@@ -338,9 +376,10 @@ export function useCellLocks(
       }
 
       currentCellRef.current = cellKey;
+      currentSeriesIdRef.current = nextSeriesId;
       const lockRevision = ++lockRevisionRef.current;
 
-      queuePresence(cellKey, lockRevision);
+      queuePresence(cellKey, lockRevision, { seriesId: nextSeriesId });
       if (canLockCellsRef.current) {
         if (sendBroadcast) {
           sendBroadcast(
@@ -352,6 +391,7 @@ export function useCellLocks(
               editorSessionId,
               lockRevision,
               canLockCells: canLockCellsRef.current,
+              seriesId: nextSeriesId,
             },
             { key: cellStateBroadcastKey },
           );
@@ -367,6 +407,7 @@ export function useCellLocks(
                 editorSessionId,
                 lockRevision,
                 canLockCells: canLockCellsRef.current,
+                seriesId: nextSeriesId,
               },
             });
           }
@@ -383,6 +424,7 @@ export function useCellLocks(
       const prev = currentCellRef.current;
 
       currentCellRef.current = null;
+      currentSeriesIdRef.current = null;
       const lockRevision = ++lockRevisionRef.current;
 
       queuePresence(null, lockRevision, options);
@@ -420,6 +462,13 @@ export function useCellLocks(
     [channelRef, cellStateBroadcastKey, editorSessionId, queuePresence, sendBroadcast],
   );
 
+  const endCurrentSession = useCallback(() => {
+    if (sessionEndedRef.current) return;
+    sessionEndedRef.current = true;
+    setIsSessionEnded(true);
+    unlockCell({ removePresence: true });
+  }, [unlockCell]);
+
   const handleLockBroadcast = useCallback(
     (payload: {
       cellKey: string;
@@ -428,7 +477,9 @@ export function useCellLocks(
       editorSessionId: string;
       lockRevision: number;
       canLockCells?: boolean;
+      seriesId?: string | null;
     }) => {
+      if (removedRemoteSessionIdsRef.current.has(payload.editorSessionId)) return;
       applyRemoteSessionUpdate(payload.editorSessionId, (current) => {
         if (current && payload.lockRevision < current.lockRevision) {
           return current;
@@ -441,6 +492,7 @@ export function useCellLocks(
           canLockCells: payload.canLockCells !== false,
           isScheduleEditor: true,
           lockRevision: payload.lockRevision,
+          editingSeriesId: payload.seriesId ?? null,
         };
       });
     },
@@ -464,6 +516,7 @@ export function useCellLocks(
           ...current,
           editingCell: null,
           lockRevision: payload.lockRevision,
+          editingSeriesId: null,
         };
       });
     },
@@ -475,6 +528,7 @@ export function useCellLocks(
     const grouped = new Map<string, RemoteEditorSession[]>();
     for (const session of remoteSessions.values()) {
       if (!session.isScheduleEditor) continue;
+      if (currentUserId != null && session.userId === currentUserId) continue;
       const list = grouped.get(session.userId) ?? [];
       list.push(session);
       grouped.set(session.userId, list);
@@ -491,7 +545,7 @@ export function useCellLocks(
           userName: latest.userName,
           editingCell: editingSession.editingCell,
           canLockCells: sorted.some((session) => session.canLockCells),
-          isSameUser: currentUserId != null && latest.userId === currentUserId,
+          isSameUser: false,
           sessionCount: sessions.length,
         };
       })
@@ -502,8 +556,7 @@ export function useCellLocks(
     const currentUserId = currentUser?.id ?? null;
     const next = new Map<string, CellLock>();
     for (const session of remoteSessions.values()) {
-      if (!session.editingCell || !session.canLockCells) continue;
-      if (currentUserId != null && session.userId === currentUserId) continue;
+      if (!session.editingCell) continue;
       const existing = next.get(session.editingCell);
       if (!existing || session.lockRevision >= existing.lockRevision) {
         next.set(session.editingCell, {
@@ -512,6 +565,11 @@ export function useCellLocks(
           userName: session.userName,
           cellKey: session.editingCell,
           lockRevision: session.lockRevision,
+          owner:
+            currentUserId != null && session.userId === currentUserId
+              ? "same_account"
+              : "other_account",
+          seriesId: session.editingSeriesId,
         });
       }
     }
@@ -555,11 +613,14 @@ export function useCellLocks(
     unlockCell,
     refreshPresence,
     clearPresenceState,
+    endCurrentSession,
+    removeRemoteSession,
     getCellLock,
     getCellActivity,
     getCurrentCell,
     lockedCells,
     onlineUsers,
+    isSessionEnded,
     syncPresence,
     handleLockBroadcast,
     handleUnlockBroadcast,

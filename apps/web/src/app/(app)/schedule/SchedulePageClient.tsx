@@ -25,7 +25,17 @@ import ImportResultsModal from "@/components/ImportResultsModal";
 import BulkDeleteReviewContent, {
   type BulkDeleteReviewTarget,
 } from "./_components/BulkDeleteReviewContent";
+import {
+  ScheduleSessionConflictDialog,
+  ScheduleSessionEndedDialog,
+} from "./_components/ScheduleSessionDialogs";
 import { resolveGridAuditLabel } from "./_lib/grid-audit-label";
+import {
+  findConflictingCellLock,
+  formatCellLockMessage,
+  getLockedCellKeysInRange,
+} from "./_lib/cell-lock-preflight";
+import { generateSeriesDates } from "@/lib/series-dates";
 import {
   buildGridCalloffOpenShiftsFromRequests,
   countPendingVolunteerRequestsForCoverageGap,
@@ -98,11 +108,13 @@ import {
   deleteShiftBatch,
   deleteShiftSeries,
   discardScheduleDrafts,
+  endScheduleEditorSession,
   fetchCalloffOpenShifts,
   fetchPublishedDateRanges,
   fetchRecentPublishHistory,
   fetchRecurringShifts,
   fetchScheduleActorNames,
+  fetchScheduleEditorSessionStatus,
   fetchScheduleNotes,
   fetchShifts,
   getScheduleLastViewed,
@@ -138,6 +150,8 @@ import {
   useReliableRealtimeBroadcasts,
   useShiftRequests,
   useDismissibleBanner,
+  useLogout,
+  type CellLock,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -159,6 +173,7 @@ import { useMediaQuery, MOBILE, AUTO_ONE_WEEK } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { mergeDraftChangedBroadcastPayload } from "./_lib/draft-broadcast";
 import { shouldRenderScheduleAuthorNames } from "./_lib/editor-visibility";
+import { getScheduleRealtimeChannelOptions } from "./_lib/realtime-channel";
 import {
   cloneDraftNotes,
   cloneShiftEntry,
@@ -263,6 +278,7 @@ function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
   const shouldAutoUseOneWeek = useMediaQuery(AUTO_ONE_WEEK);
   const { user: authUser } = useAuth();
+  const { signOut } = useLogout();
   const {
     canEditShifts,
     canEditNotes,
@@ -457,6 +473,7 @@ function SchedulerContent() {
   const [autoFillPreview, setAutoFillPreview] = useState<{
     count: number;
     dateRange: string;
+    cellKeys: string[];
   } | null>(null);
   const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{
     seriesId: string;
@@ -740,6 +757,8 @@ function SchedulerContent() {
       ? crypto.randomUUID()
       : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
+  const [pendingSessionTakeover, setPendingSessionTakeover] = useState<CellLock | null>(null);
+  const [showSessionEndedDialog, setShowSessionEndedDialog] = useState(false);
   const isScheduleEditor = canEditShifts || canEditNotes;
 
   // Audit mode: toggle to show who created each shift under grid cells
@@ -859,6 +878,7 @@ function SchedulerContent() {
   const [isCoverageGapVolunteerPending, setIsCoverageGapVolunteerPending] = useState(false);
 
   const realtimeChannelRef = useRef<BrowserRealtimeChannel | null>(null);
+  const [realtimeUnavailable, setRealtimeUnavailable] = useState(false);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     sendBroadcast: sendReliableBroadcast,
@@ -928,28 +948,6 @@ function SchedulerContent() {
     },
     [org, shiftFetchStart, shiftFetchEnd],
   );
-
-  const {
-    importPreview,
-    importResults,
-    showImportConfirm,
-    showImportResults,
-    isImportingPrevious,
-    handleImportPreviousPreview,
-    handleImportPrevious,
-    cancelImportConfirm,
-    closeImportResults,
-  } = useScheduleImport({
-    org,
-    spanWeeks,
-    weekStart,
-    employeeNameById,
-    refetchScheduleData,
-    startScheduleOperation,
-    updateScheduleOperation,
-    finishScheduleOperation,
-    clearScheduleOperation,
-  });
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -1147,11 +1145,13 @@ function SchedulerContent() {
     unlockCell,
     refreshPresence,
     clearPresenceState,
+    endCurrentSession,
+    removeRemoteSession,
     getCellLock,
-    getCellActivity,
     getCurrentCell,
     lockedCells,
     onlineUsers,
+    isSessionEnded,
     syncPresence,
     handleLockBroadcast,
     handleUnlockBroadcast,
@@ -1160,9 +1160,60 @@ function SchedulerContent() {
     currentUser,
     editorSessionIdRef.current,
     isScheduleEditor,
-    canEditShifts,
+    isScheduleEditor,
     sendReliableBroadcast,
   );
+  const localSessionEndedRef = useRef(isSessionEnded);
+  localSessionEndedRef.current = isSessionEnded;
+  const guardUnlockedCells = useCallback(
+    (cellKeys: Iterable<string>, seriesIds: Iterable<string> = []): boolean => {
+      if (localSessionEndedRef.current) {
+        setShowSessionEndedDialog(true);
+        return false;
+      }
+      const conflict = findConflictingCellLock(
+        lockedCells.values(),
+        cellKeys,
+        seriesIds,
+        (cellKey) => shiftsRef.current[cellKey]?.seriesId ?? null,
+      );
+      if (!conflict) return true;
+      if (conflict.owner === "same_account") {
+        setPendingSessionTakeover(conflict);
+      } else {
+        toast.info(formatCellLockMessage(conflict));
+      }
+      return false;
+    },
+    [isSessionEnded, lockedCells],
+  );
+  const guardUnlockedRange = useCallback(
+    (range: { startDateKey: string; endDateKey: string }): boolean =>
+      guardUnlockedCells(getLockedCellKeysInRange(lockedCells.values(), range)),
+    [guardUnlockedCells, lockedCells],
+  );
+  const {
+    importPreview,
+    importResults,
+    showImportConfirm,
+    showImportResults,
+    isImportingPrevious,
+    handleImportPreviousPreview,
+    handleImportPrevious,
+    cancelImportConfirm,
+    closeImportResults,
+  } = useScheduleImport({
+    org,
+    spanWeeks,
+    weekStart,
+    employeeNameById,
+    refetchScheduleData,
+    startScheduleOperation,
+    updateScheduleOperation,
+    finishScheduleOperation,
+    clearScheduleOperation,
+    canMutateCells: guardUnlockedCells,
+  });
   const canRenderAuthorNames = shouldRenderScheduleAuthorNames({
     showAudit,
     onlineUsers,
@@ -1388,6 +1439,90 @@ function SchedulerContent() {
     setEditSessionDraft(null);
   }, [unlockCell]);
 
+  const endLocalScheduleEditor = useCallback(() => {
+    localSessionEndedRef.current = true;
+    endCurrentSession();
+    setEditPanel(null);
+    setEditSessionDraft(null);
+    setPendingPasteOver(null);
+    setPendingClearShift(null);
+    setPendingSeriesDelete(null);
+    setPendingSessionTakeover(null);
+    setContextMenu(null);
+    setIsBulkDeleteMode(false);
+    setShowBulkDeleteReview(false);
+    setShowDiscardConfirm(false);
+    setShowPublishConfirm(false);
+    setShowAutoFillConfirm(false);
+    setAutoFillPreview(null);
+    cancelImportConfirm();
+    setShowSessionEndedDialog(true);
+  }, [cancelImportConfirm, endCurrentSession]);
+
+  const checkCurrentScheduleEditorSession = useCallback(async (): Promise<boolean> => {
+    if (!org || !isScheduleEditor) return isSessionEnded;
+    if (localSessionEndedRef.current) return true;
+
+    const status = await fetchScheduleEditorSessionStatus({
+      orgId: org.id,
+      editorSessionId: editorSessionIdRef.current,
+    });
+    if (status.ended) {
+      endLocalScheduleEditor();
+      return true;
+    }
+    return false;
+  }, [endLocalScheduleEditor, isScheduleEditor, isSessionEnded, org]);
+
+  const handleUseThisTab = useCallback(async () => {
+    const conflict = pendingSessionTakeover;
+    if (!org || !conflict || conflict.owner !== "same_account") return;
+
+    try {
+      await endScheduleEditorSession({
+        orgId: org.id,
+        targetEditorSessionId: conflict.editorSessionId,
+        endingEditorSessionId: editorSessionIdRef.current,
+      });
+    } catch (error) {
+      Sentry.captureException(error);
+      toast.error("We couldn't end the other schedule session. Try again.");
+      return;
+    }
+
+    // The durable marker exists before notification. Removing the lock here
+    // makes this tab usable even if the target is temporarily offline; that
+    // session checks the marker before it can track or write again.
+    removeRemoteSession(conflict.editorSessionId);
+    setPendingSessionTakeover(null);
+
+    const channel = realtimeChannelRef.current;
+    let deliveryStatus: string | null = null;
+    if (channel?.state === "joined") {
+      try {
+        deliveryStatus = await channel.send({
+          type: "broadcast",
+          event: "editor_session_ended",
+          payload: {
+            userId: conflict.userId,
+            targetEditorSessionId: conflict.editorSessionId,
+            endingEditorSessionId: editorSessionIdRef.current,
+          },
+        });
+      } catch (error) {
+        Sentry.captureException(error);
+      }
+    }
+
+    if (deliveryStatus === "ok") {
+      toast.success("The other schedule editor was ended. You can use this tab now.");
+    } else {
+      toast.warning(
+        "The other schedule editor was ended. Its warning may be delayed until it reconnects.",
+      );
+    }
+  }, [org, pendingSessionTakeover, removeRemoteSession]);
+
   // Refs for realtime callbacks — allows the channel effect to depend only on
   // [org] while still calling the latest versions of these functions.
   const syncPresenceRef = useRef(syncPresence);
@@ -1400,6 +1535,10 @@ function SchedulerContent() {
   getCurrentCellRef.current = getCurrentCell;
   const refreshPresenceRef = useRef(refreshPresence);
   refreshPresenceRef.current = refreshPresence;
+  const checkCurrentScheduleEditorSessionRef = useRef(checkCurrentScheduleEditorSession);
+  checkCurrentScheduleEditorSessionRef.current = checkCurrentScheduleEditorSession;
+  const removeRemoteSessionRef = useRef(removeRemoteSession);
+  removeRemoteSessionRef.current = removeRemoteSession;
   const refetchScheduleDataRef = useRef(refetchScheduleData);
   refetchScheduleDataRef.current = refetchScheduleData;
   const refetchPublishedRangesRef = useRef<() => Promise<void>>(async () => {});
@@ -1440,8 +1579,13 @@ function SchedulerContent() {
     if (!org) return;
 
     let hadError = false;
+    let disposed = false;
+    setRealtimeUnavailable(false);
 
-    const channel = createBrowserRealtimeChannel(`schedule:${org.id}`)
+    const channel = createBrowserRealtimeChannel(
+      `schedule:${org.id}`,
+      getScheduleRealtimeChannelOptions(editorSessionIdRef.current),
+    )
       .on("broadcast", { event: "schedule_published" }, async () => {
         try {
           await refetchScheduleDataRef.current();
@@ -1518,6 +1662,7 @@ function SchedulerContent() {
             editorSessionId: string;
             lockRevision: number;
             canLockCells?: boolean;
+            seriesId?: string | null;
           };
         }) => {
           if (msg.payload) handleLockBroadcastRef.current(msg.payload);
@@ -1537,11 +1682,41 @@ function SchedulerContent() {
           if (msg.payload) handleUnlockBroadcastRef.current(msg.payload);
         },
       )
+      .on(
+        "broadcast",
+        { event: "editor_session_ended" },
+        async (msg: {
+          payload?: {
+            userId: string;
+            targetEditorSessionId: string;
+            endingEditorSessionId: string;
+          };
+        }) => {
+          const payload = msg.payload;
+          if (!payload) return;
+
+          if (payload.targetEditorSessionId === editorSessionIdRef.current) {
+            try {
+              // Broadcast payloads are hints, not authority. The target only
+              // shuts down after its owner-scoped durable marker is confirmed.
+              await checkCurrentScheduleEditorSessionRef.current();
+            } catch (error) {
+              Sentry.captureException(error);
+            }
+            return;
+          }
+
+          if (payload.endingEditorSessionId === editorSessionIdRef.current) {
+            removeRemoteSessionRef.current(payload.targetEditorSessionId);
+          }
+        },
+      )
       .on("presence", { event: "sync" }, () => syncPresenceRef.current())
       .on("presence", { event: "join" }, () => syncPresenceRef.current())
       .on("presence", { event: "leave" }, () => syncPresenceRef.current())
       .subscribe(async (status: string, err?: Error) => {
         if (status === "SUBSCRIBED") {
+          if (!disposed) setRealtimeUnavailable(false);
           // Refetch on reconnection to catch events missed during downtime
           if (hadError) {
             hadError = false;
@@ -1551,12 +1726,22 @@ function SchedulerContent() {
             ]).catch(() => {});
           }
           if (currentUserRef.current && (canEditShiftsRef.current || canEditNotesRef.current)) {
-            await refreshPresenceRef.current();
+            let ended = false;
+            try {
+              ended = await checkCurrentScheduleEditorSessionRef.current();
+            } catch (error) {
+              // Realtime remains an availability aid. If the status endpoint
+              // is temporarily unavailable, normal version checks still keep
+              // writes safe and the durable marker is checked again later.
+              Sentry.captureException(error);
+            }
+            if (!ended) await refreshPresenceRef.current();
           }
           syncPresenceRef.current();
           await flushPendingBroadcasts();
-        } else if (status === "CHANNEL_ERROR") {
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           hadError = true;
+          if (!disposed) setRealtimeUnavailable(true);
           console.warn("[Realtime] Channel error (auto-retrying):", err ?? "unknown");
         }
       });
@@ -1564,6 +1749,7 @@ function SchedulerContent() {
     realtimeChannelRef.current = channel;
 
     return () => {
+      disposed = true;
       unlockCell({ removePresence: true });
       clearPresenceState();
       realtimeChannelRef.current = null;
@@ -1588,22 +1774,39 @@ function SchedulerContent() {
     if (!channel || !currentUser || !isScheduleEditor) return;
     if (channel.state !== "joined") return;
 
-    void refreshPresence();
-  }, [currentUser, isScheduleEditor, refreshPresence]);
+    void checkCurrentScheduleEditorSession()
+      .then((ended) => {
+        if (!ended) return refreshPresence();
+      })
+      .catch((error) => {
+        Sentry.captureException(error);
+        return refreshPresence();
+      });
+  }, [checkCurrentScheduleEditorSession, currentUser, isScheduleEditor, refreshPresence]);
 
   // Refetch when the tab regains focus — catches any missed broadcasts
   // (e.g. browser throttled WebSocket while tab was backgrounded).
   // Also re-tracks presence to recover from server-side expiry.
   useEffect(() => {
     if (!org) return;
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       const channel = realtimeChannelRef.current;
       const isVisible = document.visibilityState === "visible";
+      let ended = isSessionEnded;
+
+      if (isVisible && !ended && (canEditShiftsRef.current || canEditNotesRef.current)) {
+        try {
+          ended = await checkCurrentScheduleEditorSessionRef.current();
+        } catch (error) {
+          Sentry.captureException(error);
+        }
+      }
 
       if (
         channel &&
         channel.state === "joined" &&
         isVisible &&
+        !ended &&
         currentUserRef.current &&
         (canEditShiftsRef.current || canEditNotesRef.current)
       ) {
@@ -1612,11 +1815,13 @@ function SchedulerContent() {
 
       // Coming back with the editor still open: retake the lock we dropped on
       // hide, unless someone else claimed the cell in the meantime.
-      if (isVisible && canEditShiftsRef.current) {
+      if (isVisible && !ended && (canEditShiftsRef.current || canEditNotesRef.current)) {
         const openPanel = editPanelRef.current;
         if (openPanel && !getCurrentCellRef.current()) {
           const cellKey = `${openPanel.empId}_${formatDateKey(openPanel.date)}`;
-          if (!getCellLock(cellKey)) lockCell(cellKey);
+          if (!getCellLock(cellKey)) {
+            lockCell(cellKey, { seriesId: shiftsRef.current[cellKey]?.seriesId ?? null });
+          }
         }
       }
 
@@ -1640,7 +1845,7 @@ function SchedulerContent() {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [org, unlockCell, lockCell, getCellLock]);
+  }, [org, unlockCell, lockCell, getCellLock, isSessionEnded]);
 
   useEffect(() => {
     const releasePresence = () => {
@@ -3142,6 +3347,9 @@ function SchedulerContent() {
       options: { broadcast: boolean; failureMessage: string },
     ): Promise<{ deleted: number; failed: number }> => {
       if (updates.length === 0) return { deleted: 0, failed: 0 };
+      if (!guardUnlockedCells(updates.map((update) => update.key))) {
+        return { deleted: 0, failed: updates.length };
+      }
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
@@ -3220,19 +3428,27 @@ function SchedulerContent() {
       );
       return { deleted, failed: updates.length - deleted };
     },
-    [broadcastDraftChanged, deleteShiftBatch, enqueueShiftWrite, handleShiftWriteConflict, org?.id],
+    [
+      broadcastDraftChanged,
+      deleteShiftBatch,
+      enqueueShiftWrite,
+      guardUnlockedCells,
+      handleShiftWriteConflict,
+      org?.id,
+    ],
   );
 
   const setShift = useCallback(
-    (empId: string, date: Date, entry: ScheduleCellInput | null) => {
+    (empId: string, date: Date, entry: ScheduleCellInput | null): boolean => {
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
-        return;
+        return false;
       }
 
       const dateKey = formatDateKey(date);
       const key = `${empId}_${dateKey}`;
+      if (!guardUnlockedCells([key])) return false;
       // Read from ref to get the latest version, not the stale closure value
       const existing = shiftsRef.current[key];
       const existingVersion = existing?.version;
@@ -3243,11 +3459,12 @@ function SchedulerContent() {
 
       if (isDelete) {
         const deleteUpdate = buildShiftDeleteUpdate(empId, dateKey);
-        if (!deleteUpdate) return;
+        if (!deleteUpdate) return false;
         void applyShiftDeleteUpdates([deleteUpdate], {
           broadcast: true,
           failureMessage: "We couldn't delete shift. Try again.",
         });
+        return true;
       } else {
         const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
         // Filter out any stale/archived shift code IDs
@@ -3257,11 +3474,11 @@ function SchedulerContent() {
           (derivedCodeIds.length === 0 || derivedCodeIds.length !== entry.segments.length)
         ) {
           toast.error("That assignment is no longer available.");
-          return;
+          return false;
         }
         if (validCodeIds.length < derivedCodeIds.length) {
           toast.warning("Removed assignments that are no longer available.");
-          return;
+          return false;
         }
         if (
           entry.kind === "absence" &&
@@ -3269,7 +3486,7 @@ function SchedulerContent() {
           !absenceTypeMapRef.current.has(entry.absenceTypeId)
         ) {
           toast.error("That absence type is no longer available.");
-          return;
+          return false;
         }
         const ex = shiftsRef.current[key];
         const normalizedEntry: ScheduleCellInput =
@@ -3301,7 +3518,7 @@ function SchedulerContent() {
         });
         if (!provisional) {
           toast.error("We couldn't match that assignment.");
-          return;
+          return false;
         }
         const dk = computeScheduleEntryDraftKind(provisional);
         const upsertValue = buildScheduleCellEntryFromInput({
@@ -3316,7 +3533,7 @@ function SchedulerContent() {
           createdAt: ex?.createdAt ?? null,
           updatedAt: ex?.updatedAt ?? null,
         });
-        if (!upsertValue) return;
+        if (!upsertValue) return false;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
         void enqueueShiftWrite(key, async () => {
           try {
@@ -3331,6 +3548,7 @@ function SchedulerContent() {
           }
         });
         broadcastDraftChanged({ shifts: { [key]: upsertValue } });
+        return true;
       }
     },
     [
@@ -3342,6 +3560,7 @@ function SchedulerContent() {
       enqueueShiftWrite,
       getInputAssignmentDefinitionIds,
       getPublishedSnapshot,
+      guardUnlockedCells,
       handleShiftWriteConflict,
       segmentCompatibility,
       absenceTypeMap,
@@ -3389,17 +3608,8 @@ function SchedulerContent() {
       if (!canEditCell && !canOpenRequestPanel && !canOpenDetails) return;
       const cellKey = `${emp.id}_${formatDateKey(date)}`;
       if (canEditCell) {
-        const activity = getCellActivity(cellKey);
-        const lock = getCellLock(cellKey);
-        if (lock) {
-          toast.info(`Being edited by ${lock.userName}`);
-          return;
-        }
-        if (activity?.isSameUser) {
-          toast.error("This cell is already open in another tab for your account");
-          return;
-        }
-        lockCell(cellKey);
+        if (!guardUnlockedCells([cellKey])) return;
+        lockCell(cellKey, { seriesId: shiftsRef.current[cellKey]?.seriesId ?? null });
       }
       const activeFaId = focusAreaName
         ? (focusAreas.find((fa) => fa.name === focusAreaName)?.id ?? null)
@@ -3419,8 +3629,7 @@ function SchedulerContent() {
       canOpenOwnShiftDetails,
       canOpenOwnRequestPanel,
       focusAreas,
-      getCellActivity,
-      getCellLock,
+      guardUnlockedCells,
       lockCell,
       startEditSession,
     ],
@@ -3592,6 +3801,8 @@ function SchedulerContent() {
         const previousShifts = shiftsRef.current;
         const previousNotes = notesRef.current;
         await (pendingShiftWrites.current.get(session.cellKey) ?? Promise.resolve());
+        const seriesId = seriesScope === "all" ? (session.baseShift?.seriesId ?? null) : null;
+        if (!guardUnlockedCells([session.cellKey], seriesId ? [seriesId] : [])) return;
 
         const currentShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
         const currentNotes = collectCellNotesSnapshot(panel.empId, panel.date);
@@ -3892,6 +4103,7 @@ function SchedulerContent() {
       closeEditPanel,
       collectCellNotesSnapshot,
       editPanel,
+      guardUnlockedCells,
       org?.id,
       broadcastDraftChanged,
       shiftFetchEnd,
@@ -3901,6 +4113,7 @@ function SchedulerContent() {
 
   const handleConfirmSeriesDelete = useCallback(async () => {
     if (!pendingSeriesDelete || !org) return;
+    if (!guardUnlockedCells([], [pendingSeriesDelete.seriesId])) return;
     try {
       const prevShifts = shifts;
       const { deletedCount } = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
@@ -3943,6 +4156,7 @@ function SchedulerContent() {
     shifts,
     broadcastDraftChanged,
     closeEditPanel,
+    guardUnlockedCells,
     shiftFetchStart,
     shiftFetchEnd,
   ]);
@@ -3971,6 +4185,14 @@ function SchedulerContent() {
       if (!seriesInput || (seriesInput.kind === "worked" && seriesInput.segments.length === 0)) {
         return;
       }
+      const occurrenceCellKeys = generateSeriesDates(
+        frequency,
+        daysOfWeek,
+        startDate,
+        endDate,
+        maxOccurrences,
+      ).map((dateKey) => `${editPanel.empId}_${dateKey}`);
+      if (!guardUnlockedCells([cellKey, ...occurrenceCellKeys])) return;
       setIsCreatingRepeatSeries(true);
       startScheduleOperation({
         kind: "repeat_series",
@@ -4082,6 +4304,7 @@ function SchedulerContent() {
       broadcastDraftChanged,
       shiftFetchStart,
       shiftFetchEnd,
+      guardUnlockedCells,
     ],
   );
 
@@ -4174,11 +4397,7 @@ function SchedulerContent() {
       const targetKey = `${targetCellId.empId}_${targetCellId.dateKey}`;
       if (sourceKey === targetKey) return;
 
-      const targetLock = getCellLock(targetKey);
-      if (targetLock) {
-        toast.info(`Cell is being edited by ${targetLock.userName}`);
-        return;
-      }
+      if (!guardUnlockedCells(mode === "move" ? [sourceKey, targetKey] : [targetKey])) return;
 
       const payloadAssignmentDefinitionIds = getInputAssignmentDefinitionIds(payload);
       if (payloadAssignmentDefinitionIds.length > 0) {
@@ -4326,7 +4545,7 @@ function SchedulerContent() {
     [
       shifts,
       org,
-      getCellLock,
+      guardUnlockedCells,
       getInputAssignmentDefinitionIds,
       getPublishedSnapshot,
       checkQualification,
@@ -4360,11 +4579,7 @@ function SchedulerContent() {
     (empId: string, date: Date) => {
       if (!clipboard) return;
       const cellKey = `${empId}_${formatDateKey(date)}`;
-      const lock = getCellLock(cellKey);
-      if (lock) {
-        toast.info(`Cell is being edited by ${lock.userName}`);
-        return;
-      }
+      if (!guardUnlockedCells([cellKey])) return;
 
       // Check if target employee qualifies for the pasted shift
       const clipboardAssignmentDefinitionIds = getInputAssignmentDefinitionIds(clipboard);
@@ -4392,26 +4607,30 @@ function SchedulerContent() {
         return;
       }
 
-      setShift(empId, date, clipboard);
-      toast.success("Entry pasted");
+      if (setShift(empId, date, clipboard)) {
+        toast.success("Entry pasted");
+      }
     },
-    [clipboard, setShift, getCellLock, getInputAssignmentDefinitionIds, checkQualification, shifts],
+    [
+      clipboard,
+      setShift,
+      guardUnlockedCells,
+      getInputAssignmentDefinitionIds,
+      checkQualification,
+      shifts,
+    ],
   );
 
   const handleClearShift = useCallback(
     (empId: string, date: Date) => {
       const cellKey = `${empId}_${formatDateKey(date)}`;
-      const lock = getCellLock(cellKey);
-      if (lock) {
-        toast.info(`Cell is being edited by ${lock.userName}`);
-        return;
-      }
+      if (!guardUnlockedCells([cellKey])) return;
       const emp = employees.find((e) => e.id === empId);
       const empName = emp ? getEmployeeDisplayName(emp) : "";
       const label = shiftForKey(empId, date) ?? "";
       setPendingClearShift({ empId, date, empName, shiftLabel: label });
     },
-    [getCellLock, employees, shiftForKey],
+    [guardUnlockedCells, employees, shiftForKey],
   );
 
   const getDateFromCellId = useCallback(
@@ -4517,6 +4736,7 @@ function SchedulerContent() {
     }
 
     let count = 0;
+    const cellKeys: string[] = [];
     // DST-safe iteration using UTC arithmetic
     for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
       for (const [empId, empShifts] of Object.entries(byEmp)) {
@@ -4540,13 +4760,17 @@ function SchedulerContent() {
                 activeJobIds.has(segment.jobId) &&
                 (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
             );
-            if (isActive) count++;
+            if (isActive) {
+              count++;
+              cellKeys.push(`${empId}_${dateKey}`);
+            }
           } else if (
             match.input.kind === "absence" &&
             match.input.absenceTypeId != null &&
             absenceTypes.some((at) => at.id === match.input.absenceTypeId)
           ) {
             count++;
+            cellKeys.push(`${empId}_${dateKey}`);
           }
         }
       }
@@ -4558,13 +4782,14 @@ function SchedulerContent() {
     }
 
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
-    setAutoFillPreview({ count, dateRange });
+    setAutoFillPreview({ count, dateRange, cellKeys });
     setShowAutoFillConfirm(true);
   }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
-    if (!org) return;
+    if (!org || !autoFillPreview) return;
+    if (!guardUnlockedCells(autoFillPreview.cellKeys)) return;
     const { startDate, endDate } = getAutoFillRange();
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     startScheduleOperation({
@@ -4632,6 +4857,7 @@ function SchedulerContent() {
     updateScheduleOperation,
     finishScheduleOperation,
     clearScheduleOperation,
+    guardUnlockedCells,
   ]);
 
   // ── Import Previous Schedule ────────────────────────────────────────────────
@@ -4745,6 +4971,7 @@ function SchedulerContent() {
 
   const handlePublish = useCallback(async () => {
     if (!org) return;
+    if (!guardUnlockedRange(publishWindowDateRange)) return;
     setIsPublishing(true);
     try {
       let startDate: Date;
@@ -4815,12 +5042,15 @@ function SchedulerContent() {
     closeEditPanel,
     clearPendingBroadcast,
     sendReliableBroadcast,
+    guardUnlockedRange,
+    publishWindowDateRange,
   ]);
 
   const handleCancelChanges = useCallback(
     async (discardAll = false) => {
       const user = currentUserRef.current;
       if (!org || !user) return;
+      if (!guardUnlockedRange(publishWindowDateRange)) return;
       setCancelingMode(discardAll ? "all" : "mine");
       try {
         const previousShifts = shiftsRef.current;
@@ -4883,6 +5113,7 @@ function SchedulerContent() {
       sendReliableBroadcast,
       publishWindowDateRange.startDateKey,
       publishWindowDateRange.endDateKey,
+      guardUnlockedRange,
     ],
   );
 
@@ -5331,13 +5562,17 @@ function SchedulerContent() {
   }, [isBulkDeleteMode, visibleBulkDeleteTargetByKey, renderedCellKeys]);
 
   useEffect(() => {
-    if (canEditShifts && !isMobile && spanWeeks !== "month") return;
+    if (canEditShifts && !isSessionEnded && !isMobile && spanWeeks !== "month") return;
     setIsBulkDeleteMode(false);
     setShowBulkDeleteReview(false);
     setBulkDeleteSelectedKeys(new Set());
-  }, [canEditShifts, isMobile, spanWeeks]);
+  }, [canEditShifts, isMobile, isSessionEnded, spanWeeks]);
 
   const handleToggleBulkDeleteMode = useCallback(() => {
+    if (isSessionEnded) {
+      setShowSessionEndedDialog(true);
+      return;
+    }
     setContextMenu(null);
     setPendingClearShift(null);
     setShowBulkDeleteReview(false);
@@ -5353,7 +5588,7 @@ function SchedulerContent() {
     // Bulk mode replaces the publish banner, which is where the overlay's
     // only toggle lives — leaving it on would strand it behind the swap.
     setShowPublishDiff(false);
-  }, [closeEditPanel, isBulkDeleteMode]);
+  }, [closeEditPanel, isBulkDeleteMode, isSessionEnded]);
 
   const handleToggleBulkDeleteCell = useCallback((cellId: GridCellId) => {
     const key = `${cellId.empId}_${cellId.dateKey}`;
@@ -5423,6 +5658,7 @@ function SchedulerContent() {
       setBulkDeleteSelectedKeys(new Set());
       return;
     }
+    if (!guardUnlockedCells(updates.map((update) => update.key))) return;
 
     setIsBulkDeleting(true);
     try {
@@ -5453,7 +5689,12 @@ function SchedulerContent() {
     } finally {
       setIsBulkDeleting(false);
     }
-  }, [applyShiftDeleteUpdates, buildShiftDeleteUpdate, bulkDeleteSelectedTargets]);
+  }, [
+    applyShiftDeleteUpdates,
+    buildShiftDeleteUpdate,
+    bulkDeleteSelectedTargets,
+    guardUnlockedCells,
+  ]);
 
   const scheduleGridInteractionState = useMemo<ScheduleGridInteractionState>(() => {
     const editPanelSectionId =
@@ -5487,23 +5728,28 @@ function SchedulerContent() {
 
   const scheduleGridHandlers = useMemo<ScheduleGridHandlers>(
     () => ({
-      onActivateCell: handleGridCellActivate,
-      onOpenCellMenu: isBulkDeleteMode ? undefined : handleGridCellContextMenu,
-      onMoveEntry: isBulkDeleteMode ? undefined : handleMoveGridEntry,
+      onActivateCell: isSessionEnded
+        ? () => setShowSessionEndedDialog(true)
+        : handleGridCellActivate,
+      onOpenCellMenu: isSessionEnded || isBulkDeleteMode ? undefined : handleGridCellContextMenu,
+      onMoveEntry: isSessionEnded || isBulkDeleteMode ? undefined : handleMoveGridEntry,
       onCopyCell: canEditShifts && !isBulkDeleteMode ? handleCopyGridCell : undefined,
-      onPasteCell: canEditShifts && !isBulkDeleteMode ? handlePasteGridCell : undefined,
+      onPasteCell:
+        canEditShifts && !isSessionEnded && !isBulkDeleteMode ? handlePasteGridCell : undefined,
       onClearCell:
-        canEditShifts && !isBulkDeleteMode
+        canEditShifts && !isSessionEnded && !isBulkDeleteMode
           ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
           : undefined,
-      onToggleBulkDeleteCell: isBulkDeleteMode ? handleToggleBulkDeleteCell : undefined,
-      onClaimOpenShift: handleOpenShiftClick,
+      onToggleBulkDeleteCell:
+        isBulkDeleteMode && !isSessionEnded ? handleToggleBulkDeleteCell : undefined,
+      onClaimOpenShift: isSessionEnded ? undefined : handleOpenShiftClick,
     }),
     [
       handleGridCellActivate,
       handleGridCellContextMenu,
       handleMoveGridEntry,
       canEditShifts,
+      isSessionEnded,
       isBulkDeleteMode,
       handleCopyGridCell,
       handlePasteGridCell,
@@ -5557,6 +5803,45 @@ function SchedulerContent() {
               background: "var(--dg-color-bg)",
             }}
           >
+            {isSessionEnded && (
+              <div className="dg-draft-banner no-print" role="status">
+                <div className="dg-draft-banner-dot" />
+                <strong>Schedule session ended</strong>
+                <span>
+                  This tab is read-only. Any unsaved schedule changes here were not saved.
+                </span>
+                <div className="dg-draft-banner-actions">
+                  <Button
+                    type="button"
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload to start a new session
+                  </Button>
+                </div>
+              </div>
+            )}
+            {realtimeUnavailable && !isSessionEnded && (
+              <div
+                className="dg-draft-banner no-print"
+                role="status"
+                style={{
+                  background: "var(--dg-color-warning-bg)",
+                  borderColor: "var(--dg-color-warning-border)",
+                  color: "var(--dg-color-warning-text)",
+                }}
+              >
+                <div
+                  className="dg-draft-banner-dot"
+                  style={{ background: "var(--dg-color-warning-text)" }}
+                />
+                <strong>Live collaboration unavailable</strong>
+                <span>
+                  You can keep working. Online status and live cell locks may be delayed; saved
+                  changes still use conflict checks.
+                </span>
+              </div>
+            )}
             {isBulkDeleteMode && (
               <div
                 className="dg-draft-banner no-print"
@@ -6110,17 +6395,10 @@ function SchedulerContent() {
                     const emp = employees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
                     const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
-                    const activity = getCellActivity(cellKey);
-                    const lock = getCellLock(cellKey);
-                    if (lock) {
-                      toast.info(`Being edited by ${lock.userName}`);
-                      return;
-                    }
-                    if (activity?.isSameUser) {
-                      toast.error("This cell is already open in another tab for your account");
-                      return;
-                    }
-                    lockCell(cellKey);
+                    if (!guardUnlockedCells([cellKey])) return;
+                    lockCell(cellKey, {
+                      seriesId: shiftsRef.current[cellKey]?.seriesId ?? null,
+                    });
                     startEditSession({
                       empId: emp.id,
                       empName: getEmployeeDisplayName(emp),
@@ -6159,8 +6437,9 @@ function SchedulerContent() {
                 confirmLabel="Remove"
                 variant="danger"
                 onConfirm={() => {
-                  setShift(pendingClearShift.empId, pendingClearShift.date, null);
-                  setPendingClearShift(null);
+                  if (setShift(pendingClearShift.empId, pendingClearShift.date, null)) {
+                    setPendingClearShift(null);
+                  }
                 }}
                 onCancel={() => setPendingClearShift(null)}
               />
@@ -6461,13 +6740,16 @@ function SchedulerContent() {
                 confirmLabel="Replace"
                 variant="warning"
                 onConfirm={() => {
-                  setShift(
-                    pendingPasteOver.empId,
-                    pendingPasteOver.date,
-                    pendingPasteOver.pasteEntry,
-                  );
-                  setPendingPasteOver(null);
-                  toast.success("Entry pasted");
+                  if (
+                    setShift(
+                      pendingPasteOver.empId,
+                      pendingPasteOver.date,
+                      pendingPasteOver.pasteEntry,
+                    )
+                  ) {
+                    setPendingPasteOver(null);
+                    toast.success("Entry pasted");
+                  }
                 }}
                 onCancel={() => setPendingPasteOver(null)}
               />
@@ -6820,6 +7102,18 @@ function SchedulerContent() {
                 showOrganizationDiscardScope ? () => handleCancelChanges(true) : undefined
               }
             />
+          )}
+
+          {pendingSessionTakeover && (
+            <ScheduleSessionConflictDialog
+              onUseThisTab={handleUseThisTab}
+              onCancel={() => setPendingSessionTakeover(null)}
+              onSignOutThisDevice={() => signOut({ scope: "local" })}
+            />
+          )}
+
+          {showSessionEndedDialog && (
+            <ScheduleSessionEndedDialog onClose={() => setShowSessionEndedDialog(false)} />
           )}
 
           {showPublishConfirm && (

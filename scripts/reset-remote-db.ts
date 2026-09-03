@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { createInterface } from "node:readline/promises";
 import { connectSqlClient } from "./lib/db-client";
 
@@ -23,7 +23,7 @@ async function confirmDestructiveReset(ref: string): Promise<void> {
 
 /**
  * Resets the remote Supabase database by dropping the public schema
- * and re-running all 4 consolidated migration files.
+ * and re-running every numbered migration file in lexical order.
  *
  * Called by `npm run db:reset:remote` which loads .env.remote via --env-file.
  */
@@ -62,13 +62,16 @@ async function main() {
   await db.query("GRANT ALL ON SCHEMA public TO postgres");
   await db.query("GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role");
 
-  // Run each migration file in order
-  const migrations = [
-    "supabase/migrations/001_schema.sql",
-    "supabase/migrations/002_functions_triggers.sql",
-    "supabase/migrations/003_rls_policies.sql",
-    "supabase/migrations/004_grants.sql",
-  ];
+  // Run every numbered migration in lexical order. Keeping discovery here
+  // prevents remote resets from silently omitting forward migrations.
+  const migrationsDirectory = "supabase/migrations";
+  const migrations = readdirSync(migrationsDirectory)
+    .filter((file) => /^\d{3}_[a-z0-9_]+\.sql$/.test(file))
+    .sort()
+    .map((file) => `${migrationsDirectory}/${file}`);
+  if (migrations.length === 0) {
+    throw new Error(`No numbered migrations found in ${migrationsDirectory}.`);
+  }
 
   for (const file of migrations) {
     const sql = readFileSync(file, "utf-8");

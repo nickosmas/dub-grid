@@ -14,6 +14,7 @@ import {
   type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "../_lib/operations";
+import { getImportTargetCellKeys } from "../_lib/cell-lock-preflight";
 
 export type ImportPreviewState = {
   sourceRange: string;
@@ -49,6 +50,7 @@ export function useScheduleImport({
   updateScheduleOperation,
   finishScheduleOperation,
   clearScheduleOperation,
+  canMutateCells,
 }: {
   org: { id: string } | null;
   spanWeeks: 1 | 2 | "month";
@@ -66,6 +68,7 @@ export function useScheduleImport({
   ) => void;
   finishScheduleOperation: (kind: ScheduleOperation["kind"], detail?: string) => void;
   clearScheduleOperation: (kind: ScheduleOperation["kind"]) => void;
+  canMutateCells: (cellKeys: string[]) => boolean;
 }) {
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
@@ -130,6 +133,7 @@ export function useScheduleImport({
 
   const handleImportPrevious = useCallback(async () => {
     if (!org || spanWeeks === "month" || !importPreview) return;
+    if (!canMutateCells(getImportTargetCellKeys(importPreview.outcomes))) return;
 
     const expected = importPreview.breakdown.imported;
     startScheduleOperation({
@@ -223,6 +227,7 @@ export function useScheduleImport({
     updateScheduleOperation,
     finishScheduleOperation,
     clearScheduleOperation,
+    canMutateCells,
   ]);
 
   const cancelImportConfirm = useCallback(() => {

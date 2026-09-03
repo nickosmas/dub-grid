@@ -883,6 +883,27 @@ CREATE TABLE public.schedule_draft_sessions (
 );
 
 
+-- ── schedule_editor_session_terminations ────────────────────────────────────
+-- Durable, owner-scoped tombstones for schedule editor instances. These end
+-- only an opaque browser editor session; they never revoke an auth session.
+
+CREATE TABLE public.schedule_editor_session_terminations (
+  id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                       UUID NOT NULL,
+  user_id                      UUID NOT NULL,
+  editor_session_id            UUID NOT NULL,
+  ended_by_editor_session_id   UUID NOT NULL,
+  ended_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (org_id, user_id, editor_session_id),
+  CONSTRAINT schedule_editor_termination_not_self
+    CHECK (editor_session_id <> ended_by_editor_session_id)
+);
+
+CREATE INDEX idx_schedule_editor_terminations_owner
+  ON public.schedule_editor_session_terminations(user_id, org_id, ended_at DESC);
+
+
 -- ── publish_history ──────────────────────────────────────────────────────────
 
 CREATE TABLE public.publish_history (
@@ -1212,6 +1233,11 @@ ALTER TABLE public.shift_requests
 ALTER TABLE public.schedule_draft_sessions
   ADD CONSTRAINT schedule_draft_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT schedule_draft_sessions_saved_by_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- schedule_editor_session_terminations
+ALTER TABLE public.schedule_editor_session_terminations
+  ADD CONSTRAINT schedule_editor_terminations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_editor_terminations_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- recurring_shifts_draft_sessions
 ALTER TABLE public.recurring_shifts_draft_sessions

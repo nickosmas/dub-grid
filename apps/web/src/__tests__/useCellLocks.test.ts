@@ -12,6 +12,7 @@ type PresenceRecord = {
   canLockCells?: boolean;
   isScheduleEditor?: boolean;
   lockRevision?: number;
+  editingSeriesId?: string | null;
 };
 
 function createChannel() {
@@ -69,7 +70,7 @@ describe("useCellLocks", () => {
     expect(channel.untrack).toHaveBeenCalledTimes(1);
   });
 
-  it("tracks presence for note-only editors without broadcasting a hard lock", () => {
+  it("tracks presence and broadcasts a hard lock for note-only editors", () => {
     const channel = createChannel();
     const { result } = renderHook(() =>
       useCellLocks(
@@ -77,7 +78,7 @@ describe("useCellLocks", () => {
         { id: "user-1", name: "Alex Admin" },
         "session-1",
         true,
-        false,
+        true,
       ),
     );
 
@@ -90,10 +91,19 @@ describe("useCellLocks", () => {
         editingCell: "emp-1_2026-04-12",
         editorSessionId: "session-1",
         isScheduleEditor: true,
-        canLockCells: false,
+        canLockCells: true,
       }),
     );
-    expect(channel.send).not.toHaveBeenCalled();
+    expect(channel.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "broadcast",
+        event: "cell_locked",
+        payload: expect.objectContaining({
+          cellKey: "emp-1_2026-04-12",
+          editorSessionId: "session-1",
+        }),
+      }),
+    );
   });
 
   it("replays the latest presence after the channel reconnects", async () => {
@@ -130,7 +140,76 @@ describe("useCellLocks", () => {
     );
   });
 
-  it("shows note-only editors online without hard-locking their cells", () => {
+  it("permanently untracks an ended local editor session and refuses to relock", async () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12");
+      result.current.endCurrentSession();
+    });
+
+    expect(result.current.isSessionEnded).toBe(true);
+    expect(result.current.getCurrentCell()).toBeNull();
+    await act(async () => {
+      await result.current.refreshPresence();
+      result.current.lockCell("emp-1_2026-04-13");
+    });
+
+    expect(result.current.getCurrentCell()).toBeNull();
+    expect(channel.track).toHaveBeenCalledTimes(1);
+    expect(channel.untrack).toHaveBeenCalled();
+  });
+
+  it("removes a terminated remote session and its lock immediately", () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.handleLockBroadcast({
+        cellKey: "emp-2_2026-04-12",
+        userId: "user-1",
+        userName: "Alex Admin",
+        editorSessionId: "session-2",
+        lockRevision: 1,
+      });
+      result.current.removeRemoteSession("session-2");
+    });
+
+    expect(result.current.getCellLock("emp-2_2026-04-12")).toBeNull();
+
+    channel.setPresenceState({
+      "user-1": [
+        {
+          editingCell: "emp-2_2026-04-12",
+          userId: "user-1",
+          userName: "Alex Admin",
+          editorSessionId: "session-2",
+          lockRevision: 1,
+        },
+      ],
+    });
+    act(() => result.current.syncPresence());
+    expect(result.current.getCellLock("emp-2_2026-04-12")).toBeNull();
+  });
+
+  it("shows note-only editors online and hard-locks their whole cell", () => {
     const channel = createChannel();
     channel.setPresenceState({
       "user-2": [
@@ -169,7 +248,12 @@ describe("useCellLocks", () => {
         sessionCount: 1,
       }),
     ]);
-    expect(result.current.getCellLock("emp-2_2026-04-12")).toBeNull();
+    expect(result.current.getCellLock("emp-2_2026-04-12")).toEqual(
+      expect.objectContaining({
+        userId: "user-2",
+        owner: "other_account",
+      }),
+    );
   });
 
   it("ignores stale unlock broadcasts for a newer lock revision", () => {
@@ -417,7 +501,7 @@ describe("useCellLocks", () => {
     expect(result.current.getCellLock("emp-7_2026-04-12")).toBeNull();
   });
 
-  it("shows another tab for the same user in presence without hard-blocking the cell", () => {
+  it("hides another tab for the same user from presence and hard-locks its cell", () => {
     const channel = createChannel();
     channel.setPresenceState({
       "user-1": [
@@ -447,16 +531,14 @@ describe("useCellLocks", () => {
       result.current.syncPresence();
     });
 
-    expect(result.current.onlineUsers).toEqual([
+    expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.getCellLock("emp-5_2026-04-12")).toEqual(
       expect.objectContaining({
         userId: "user-1",
         editorSessionId: "session-2",
-        isSameUser: true,
-        editingCell: "emp-5_2026-04-12",
-        sessionCount: 1,
+        owner: "same_account",
       }),
-    ]);
-    expect(result.current.getCellLock("emp-5_2026-04-12")).toBeNull();
+    );
     expect(result.current.getCellActivity("emp-5_2026-04-12")).toEqual(
       expect.objectContaining({
         userId: "user-1",
@@ -464,6 +546,40 @@ describe("useCellLocks", () => {
         sessionCount: 1,
       }),
     );
+  });
+
+  it("hides an idle same-account tab without creating a lock", () => {
+    const channel = createChannel();
+    channel.setPresenceState({
+      "user-1": [
+        {
+          editingCell: null,
+          userId: "user-1",
+          userName: "Alex Admin",
+          editorSessionId: "session-2",
+          canLockCells: true,
+          isScheduleEditor: true,
+          lockRevision: 2,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.syncPresence();
+    });
+
+    expect(result.current.onlineUsers).toEqual([]);
+    expect(result.current.lockedCells.size).toBe(0);
   });
 
   it("deduplicates multiple sessions for the same user into one avatar entry", () => {
@@ -512,6 +628,47 @@ describe("useCellLocks", () => {
         editingCell: "emp-6_2026-04-12",
         sessionCount: 2,
       }),
+    );
+  });
+
+  it("carries a recurring-series identity into presence and remote locks", () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12", { seriesId: "series-1" });
+    });
+
+    expect(channel.track).toHaveBeenCalledWith(
+      expect.objectContaining({ editingSeriesId: "series-1" }),
+    );
+    expect(channel.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ seriesId: "series-1" }),
+      }),
+    );
+
+    act(() => {
+      result.current.handleLockBroadcast({
+        cellKey: "emp-2_2026-04-13",
+        userId: "user-2",
+        userName: "Riley RN",
+        editorSessionId: "session-2",
+        lockRevision: 3,
+        seriesId: "series-2",
+      });
+    });
+
+    expect(result.current.getCellLock("emp-2_2026-04-13")).toEqual(
+      expect.objectContaining({ seriesId: "series-2" }),
     );
   });
 });

@@ -205,7 +205,7 @@ interface LegacyScheduleGridProps {
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
-  cellLocks?: Map<string, { userName: string }>;
+  cellLocks?: Map<string, { userName: string; owner?: "same_account" | "other_account" }>;
   /** When true, show who created each shift below the cell */
   showAudit?: boolean;
   /** Returns the creator's first name for compact grid display */
@@ -310,7 +310,7 @@ interface SectionBlockProps {
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  cellLocks?: Map<string, { userName: string }>;
+  cellLocks?: Map<string, { userName: string; owner?: "same_account" | "other_account" }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   onCellHover?: (cellId: GridCellId) => void;
@@ -1682,6 +1682,7 @@ const SectionBlock = memo(function SectionBlock({
                       const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
                       const cellLock = cellLocks?.get(cellKey);
                       const isLocked = !!cellLock;
+                      const isActivationBlocked = isLocked && cellLock?.owner !== "same_account";
                       const auditName = createdByNameForKey?.(emp.id, date) ?? null;
                       const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                       const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
@@ -1862,7 +1863,7 @@ const SectionBlock = memo(function SectionBlock({
                             triggerCellActivation(
                               emp,
                               date,
-                              isLocked || !isCellInteractive,
+                              isActivationBlocked || !isCellInteractive,
                               "click",
                             )
                           }
@@ -1875,7 +1876,7 @@ const SectionBlock = memo(function SectionBlock({
                               triggerCellActivation(
                                 emp,
                                 date,
-                                isLocked || !isCellInteractive,
+                                isActivationBlocked || !isCellInteractive,
                                 "keyboard",
                               );
                             }

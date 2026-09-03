@@ -2,8 +2,8 @@
 
 Scope: `supabase/`.
 
-Local Supabase configuration, exactly four migration files, seed SQL, and
-compiled auth email templates.
+Local Supabase configuration, canonical migrations plus numbered forward
+migrations, seed SQL, and compiled auth email templates.
 
 ## Verified Structure
 
@@ -15,6 +15,7 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
+    005_*.sql ...                 # Ordered, idempotent forward migrations
   seed_arden_wood.sql             # Local seed: Arden Wood org
   seed_calm_haven.sql             # Local seed: Calm Haven org
   seed_gridmaster.sql             # Local seed: gridmaster user
@@ -26,13 +27,15 @@ supabase/
 
 ## Migration Rules (CRITICAL)
 
-- **Never create a 5th migration file.** All schema changes go into the existing
-  4 files according to their purpose:
+- Keep the first four migrations as the canonical clean-install definition:
   - `001_schema.sql` — enums, tables, foreign keys, indexes, realtime publication
   - `002_functions_triggers.sql` — functions, triggers, RPCs, JWT hook logic
   - `003_rls_policies.sql` — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + all policies
   - `004_grants.sql` — grants to `anon`, `authenticated`, `service_role`,
     `supabase_auth_admin`, and default privileges
+- Existing databases receive changes through ordered, idempotent forward
+  migrations (`005_...sql` and later). Keep the canonical files synchronized
+  so clean installs and upgraded databases converge.
 
 ## config.toml: JWT Hook (CRITICAL)
 
@@ -124,11 +127,11 @@ The Next.js request proxy (`apps/web/src/proxy.ts`) reads these via `jwtVerify`
 
 - `seed_arden_wood.sql`, `seed_calm_haven.sql`, `seed_gridmaster.sql` are local-only.
 - They are NOT run on production. The remote reset script (`scripts/reset-remote-db.ts`)
-  runs all 4 migration files then a separate seed path.
+  runs every numbered migration in lexical order, then a separate seed path.
 
 ## Verification
 
-- Inspect all four migration files before editing.
+- Inspect the canonical files and relevant forward migrations before editing.
 - For schema/RLS changes, run `npm run db:reset` locally when possible (resets local DB).
 - Run `npm run gen:types` when schema changes affect generated types (`apps/web/src/lib/database.types.ts`).
 - Do not run `npm run db:reset:remote` unless the user explicitly requests it and

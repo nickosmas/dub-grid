@@ -23,7 +23,8 @@ import {
 } from "@/types";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import * as Sentry from "@/lib/sentry";
-import { addDays, cn, iterateDateRange } from "@/lib/utils";
+import { addDays, cn } from "@/lib/utils";
+import { generateSeriesDates } from "@/lib/series-dates";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 
@@ -297,7 +298,6 @@ function CalendarField({
   );
 }
 
-/** Compute occurrence dates (mirrors generateSeriesDates in db.ts). DST-safe. */
 function countOccurrences(
   frequency: SeriesFrequency,
   daysOfWeek: number[] | null,
@@ -305,39 +305,7 @@ function countOccurrences(
   endDate: string | null,
   maxOccurrences: number | null,
 ): string[] {
-  const dates: string[] = [];
-  const start = new Date(startDate + "T00:00:00");
-  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
-
-  const maxEnd = endDate
-    ? new Date(endDate + "T00:00:00")
-    : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate());
-  const startDayOfWeek = new Date(
-    Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()),
-  ).getUTCDay();
-
-  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
-    if (dates.length >= cap) break;
-
-    let include = false;
-    const dayMatch =
-      daysOfWeek === null || daysOfWeek.length === 0
-        ? dayOfWeek === startDayOfWeek
-        : daysOfWeek.includes(dayOfWeek);
-
-    if (frequency === "daily") {
-      include = true;
-    } else if (frequency === "weekly") {
-      include = dayMatch;
-    } else if (frequency === "biweekly") {
-      const weekNum = Math.floor(dayIndex / 7);
-      include = weekNum % 2 === 0 && dayMatch;
-    }
-
-    if (include) dates.push(dateKey);
-  }
-
-  return dates;
+  return generateSeriesDates(frequency, daysOfWeek, startDate, endDate, maxOccurrences);
 }
 
 const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function RepeatForm(

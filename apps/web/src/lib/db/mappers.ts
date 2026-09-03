@@ -14,7 +14,6 @@ import type {
   RecurringShift,
   ResolvedSchedulePresentation,
   ScheduleCellInput,
-  SeriesFrequency,
   ShiftCategory,
   ShiftJobSegment,
   ShiftRequest,
@@ -47,7 +46,8 @@ import type {
   DbOrganizationMembership,
   DbShiftRequest,
 } from "@dubgrid/db-types";
-import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
+import { trimTime, resolveCodeLabels } from "./shared";
+export { generateSeriesDates } from "@/lib/series-dates";
 import {
   deriveAssignmentDefinitionIdsFromAssignments,
   joinShiftJobSegmentLabels,
@@ -764,51 +764,4 @@ export function rowToShiftRequest(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-// ── Series Date Generation ────────────────────────────────────────────────────
-
-export function generateSeriesDates(
-  frequency: SeriesFrequency,
-  daysOfWeek: number[] | null,
-  startDate: string,
-  endDate: string | null,
-  maxOccurrences: number | null,
-): string[] {
-  const dates: string[] = [];
-  const start = new Date(startDate + "T00:00:00");
-  const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
-
-  // Compute an upper-bound end date for iteration if none specified
-  const maxEnd = endDate
-    ? new Date(endDate + "T00:00:00")
-    : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate()); // ~7 months
-  const startDayOfWeek = new Date(
-    Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()),
-  ).getUTCDay();
-
-  // DST-safe iteration using UTC arithmetic
-  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
-    if (dates.length >= cap) break;
-
-    let include = false;
-    const dayMatch =
-      daysOfWeek === null || daysOfWeek.length === 0
-        ? dayOfWeek === startDayOfWeek
-        : daysOfWeek.includes(dayOfWeek);
-
-    if (frequency === "daily") {
-      include = true;
-    } else if (frequency === "weekly") {
-      include = dayMatch;
-    } else if (frequency === "biweekly") {
-      // dayIndex is a reliable day counter (immune to DST)
-      const weekNum = Math.floor(dayIndex / 7);
-      include = weekNum % 2 === 0 && dayMatch;
-    }
-
-    if (include) dates.push(dateKey);
-  }
-
-  return dates;
 }

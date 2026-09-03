@@ -18,18 +18,19 @@ interface PresenceAvatarsProps {
 }
 
 function displayPresenceName(user: OnlineUser): string {
-  return user.isSameUser ? "Me" : user.userName;
+  return user.userName;
 }
 
 export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const otherUsers = onlineUsers.filter((user) => !user.isSameUser);
 
-  if (onlineUsers.length === 0) return null;
+  if (otherUsers.length === 0) return null;
 
-  const visible = onlineUsers.slice(0, MAX_VISIBLE);
-  const overflow = onlineUsers.length - MAX_VISIBLE;
-  const hoveredUserData = onlineUsers.find((u) => u.editorSessionId === hoveredUser);
+  const visible = otherUsers.slice(0, MAX_VISIBLE);
+  const overflow = otherUsers.length - MAX_VISIBLE;
+  const hoveredUserData = otherUsers.find((u) => u.editorSessionId === hoveredUser);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
@@ -54,7 +55,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             background: "var(--dg-color-success)",
           }}
         />
-        <span role="status">{onlineUsers.length} online</span>
+        <span role="status">{otherUsers.length} online</span>
       </span>
 
       {visible.map((user, i) => (
@@ -171,9 +172,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
                   marginLeft: 6,
                 }}
               >
-                {hoveredUserData.isSameUser
-                  ? "another session open"
-                  : `${hoveredUserData.sessionCount} sessions`}
+                {`${hoveredUserData.sessionCount} sessions`}
               </span>
             )}
           </div>,
