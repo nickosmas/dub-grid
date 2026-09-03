@@ -90,12 +90,12 @@ const TEMPLATES = [
   {
     file: "mfa_factor_enrolled_notification.html",
     Component: MfaFactorEnrolledEmail,
-    expects: ["{{ .FactorType }}", "{{ .SiteURL }}"],
+    expects: ["{{ .SiteURL }}"],
   },
   {
     file: "mfa_factor_unenrolled_notification.html",
     Component: MfaFactorUnenrolledEmail,
-    expects: ["{{ .FactorType }}", "{{ .SiteURL }}"],
+    expects: ["{{ .SiteURL }}"],
   },
 ] as const;
 
