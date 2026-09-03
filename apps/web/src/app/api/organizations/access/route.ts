@@ -350,7 +350,13 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
-    if (permissionsChanged) {
+    // A role change already carries the whole story ("your role changed from
+    // User to Super Admin"), and the permission rows it drags along are
+    // bookkeeping: leaving admin nulls the per-key grants, so enumerating them
+    // reads as a punitive list of revoked access to someone who was just
+    // promoted. Only a permission-only edit (still an admin, keys retuned) is
+    // worth spelling out.
+    if (permissionsChanged && !roleChanged) {
       void dispatchNotificationEvent(user.id, {
         action: "admin_permissions_changed",
         orgId,

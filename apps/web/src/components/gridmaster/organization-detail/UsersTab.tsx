@@ -11,7 +11,6 @@ import {
 } from "@/features/organization/client";
 import { buildMembershipAccessChanges } from "@/lib/access-management";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { queueNotification } from "@/lib/notify";
 import { labelStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import {
   type AdminPermissions,
@@ -92,7 +91,9 @@ export function UsersTab({
       if (!target?.updatedAt) {
         throw new Error("User access data is out of date. Refresh and try again.");
       }
-      const oldRole = target?.orgRole ?? "user";
+      // The access endpoint dispatches role_changed itself; queueing one here
+      // too landed two identical "Your role changed" alerts in the target's
+      // inbox.
       await updateOrganizationMembershipGuarded({
         orgId,
         userId: target.id,
@@ -102,13 +103,6 @@ export function UsersTab({
       });
       toast.success("Role updated");
       setRoleChangeConfirm(null);
-      queueNotification({
-        action: "role_changed",
-        orgId,
-        targetUserId: target.id,
-        fromRole: oldRole,
-        toRole: newRole,
-      });
       onUsersChanged();
     } catch (err: unknown) {
       if (err instanceof OrganizationAccessConflictError) {

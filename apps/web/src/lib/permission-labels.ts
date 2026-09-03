@@ -51,10 +51,24 @@ function joinWithAnd(items: string[]): string {
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
+/** Past three names the sentence stops being readable in an inbox row. */
+const MAX_LISTED_PERMISSIONS = 3;
+
+function summarizeList(items: string[]): string {
+  if (items.length <= MAX_LISTED_PERMISSIONS) return joinWithAnd(items);
+  const shown = items.slice(0, MAX_LISTED_PERMISSIONS);
+  const remaining = items.length - shown.length;
+  return `${shown.join(", ")}, and ${remaining} more`;
+}
+
 /**
  * Describe what a permission change actually did, as a sentence fragment:
  * "gave you access to publish schedule" / "removed your access to edit shifts".
  * Returns null when nothing meaningful changed, so the caller can fall back.
+ *
+ * Only meant for a permission-only edit on someone who stays an admin. A role
+ * change says what it needs to on its own; pairing it with a permission list
+ * tells a freshly promoted user what they "lost".
  */
 export function summarizePermissionChanges(
   before: Record<string, boolean> | null | undefined,
@@ -74,7 +88,7 @@ export function summarizePermissionChanges(
   if (granted.length === 0 && revoked.length === 0) return null;
 
   const parts: string[] = [];
-  if (granted.length > 0) parts.push(`gave you access to ${joinWithAnd(granted)}`);
-  if (revoked.length > 0) parts.push(`removed your access to ${joinWithAnd(revoked)}`);
+  if (granted.length > 0) parts.push(`gave you access to ${summarizeList(granted)}`);
+  if (revoked.length > 0) parts.push(`removed your access to ${summarizeList(revoked)}`);
   return parts.join(", and ");
 }

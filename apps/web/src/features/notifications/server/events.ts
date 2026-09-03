@@ -1,5 +1,6 @@
 import { getServiceClient } from "@/lib/supabase-service";
 import { summarizePermissionChanges } from "@/lib/permission-labels";
+import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
 import { sendNotification } from "./sender";
@@ -688,7 +689,9 @@ async function dispatchNotificationEventInternal(
           event.orgId,
           "system" as NotificationType,
           "Your role changed",
-          `${await getActorName(actorUserId)} changed your role from ${titleCaseWords(event.fromRole)} to ${titleCaseWords(event.toRole)}.`,
+          `${await getActorName(actorUserId)} changed your role from ${formatOrganizationRoleLabel(
+            event.fromRole,
+          )} to ${formatOrganizationRoleLabel(event.toRole)}.`,
           {
             fromRole: event.fromRole,
             toRole: event.toRole,
@@ -746,7 +749,7 @@ async function dispatchNotificationEventInternal(
       const joinerName =
         (await getUserName(event.acceptedUserId)) ?? invitation?.email ?? "Someone";
       const joinedAs = invitation?.roleToAssign
-        ? ` as ${titleCaseWords(invitation.roleToAssign)}`
+        ? ` as ${formatOrganizationRoleLabel(invitation.roleToAssign)}`
         : "";
       const recipients = new Set<string>(superAdmins);
       if (inviter) recipients.add(inviter);
