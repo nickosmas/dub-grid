@@ -24,8 +24,8 @@ export type SecurityNotificationEmailProps = {
 /**
  * Shared no-CTA layout for Supabase's security-notification auth emails
  * (password changed, email changed, MFA factor added/removed). Unlike
- * AuthActionEmail these have no confirmation link — they're after-the-fact
- * alerts — so there's just a heading, a body line, and a "what to do next"
+ * AuthActionEmail these have no confirmation link - they're after-the-fact
+ * alerts, so there's just a heading, a body line, and a "what to do next"
  * fine-print footer. These render to static HTML for supabase/templates/*.html.
  */
 export function SecurityNotificationEmail({

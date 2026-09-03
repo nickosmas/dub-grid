@@ -1,6 +1,22 @@
 import * as React from "react";
-import { Body, Container, Font, Head, Html, Img, Preview, Section } from "@react-email/components";
-import { styles } from "./theme";
+import {
+  Body,
+  Container,
+  Font,
+  Head,
+  Html,
+  Img,
+  Link,
+  Preview,
+  Section,
+  Text,
+} from "@react-email/components";
+import { emailTheme, styles } from "./theme";
+
+// Go templates have no date function, so this can't be computed at send
+// time like the site footer's `{new Date().getFullYear()}` - bump it once
+// a year.
+const COPYRIGHT_YEAR = 2026;
 
 export type EmailLayoutProps = {
   /**
@@ -68,6 +84,24 @@ export function EmailLayout({ logoUrl, preview, children }: EmailLayoutProps) {
               alt="dubgrid"
               style={{ display: "inline-block" }}
             />
+            <Text style={{ ...styles.footerText, margin: "12px 0 6px" }}>
+              &copy; {COPYRIGHT_YEAR} DubGrid
+            </Text>
+            <Text style={styles.footerText}>
+              <Link
+                href={`${logoUrl}/privacy`}
+                style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
+              >
+                Privacy Policy
+              </Link>
+              {"  "}&middot;{"  "}
+              <Link
+                href={`${logoUrl}/terms`}
+                style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
+              >
+                Terms of Service
+              </Link>
+            </Text>
           </Section>
         </Container>
       </Body>
