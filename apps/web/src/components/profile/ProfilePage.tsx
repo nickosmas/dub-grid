@@ -54,7 +54,6 @@ export function ProfilePage() {
     refetch: refetchProfile,
     setProfile,
     setEmployee,
-    setManagementDepartmentIds,
   } = useSelfProfileData({ orgId });
 
   // Management-only employees have a row in `employees` but no focus
@@ -123,7 +122,7 @@ export function ProfilePage() {
           roleLabel={org?.roleLabel}
           setProfile={setProfile}
           setEmployee={setEmployee}
-          setManagementDepartmentIds={setManagementDepartmentIds}
+          refetchProfile={refetchProfile}
         />
       )}
 
