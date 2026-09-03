@@ -126,6 +126,7 @@ export function useCellLocks(
   );
   const [isSessionEnded, setIsSessionEnded] = useState(false);
   const sessionEndedRef = useRef(false);
+  /** Force-ended sessions. Permanent: an ended editor must never come back. */
   const removedRemoteSessionIdsRef = useRef(new Set<string>());
   const currentUserRef = useLatestRef(currentUser);
   const canTrackPresenceRef = useLatestRef(canTrackPresence);
@@ -305,6 +306,8 @@ export function useCellLocks(
 
       for (const [sessionId, presenceSession] of presenceSessions) {
         const current = prev.get(sessionId);
+        // A newer local revision from a broadcast still wins over a stale
+        // presence snapshot, so a just-taken lock is not rolled back.
         const nextSession =
           current && current.lockRevision > presenceSession.lockRevision
             ? current
@@ -434,6 +437,7 @@ export function useCellLocks(
       const lockRevision = ++lockRevisionRef.current;
 
       queuePresence(null, lockRevision, options);
+
       if (!user) return;
       if (!prev) return;
       if (!canLockCellsRef.current) return;

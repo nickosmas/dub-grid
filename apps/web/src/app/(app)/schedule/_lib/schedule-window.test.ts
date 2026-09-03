@@ -12,6 +12,7 @@ function note(overrides: Partial<ScheduleNote>): ScheduleNote {
     focusAreaId: 5,
     status: "published",
     createdBy: null,
+    updatedBy: null,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
     ...overrides,
@@ -47,8 +48,8 @@ describe("buildScheduleNoteMap", () => {
 
     expect(map).toEqual({
       "emp-1_2026-08-03_5": [
-        { indicatorTypeId: 10, status: "published" },
-        { indicatorTypeId: 11, status: "draft" },
+        { indicatorTypeId: 10, status: "published", updatedBy: null },
+        { indicatorTypeId: 11, status: "draft", updatedBy: null },
       ],
     });
   });
@@ -68,13 +69,32 @@ describe("buildScheduleNoteMap", () => {
       note({ id: 2, focusAreaId: 5 }),
     ]);
 
-    expect(map["emp-1_2026-08-03"]).toEqual([{ indicatorTypeId: 10, status: "published" }]);
-    expect(map["emp-1_2026-08-03_5"]).toEqual([{ indicatorTypeId: 10, status: "published" }]);
+    expect(map["emp-1_2026-08-03"]).toEqual([
+      { indicatorTypeId: 10, status: "published", updatedBy: null },
+    ]);
+    expect(map["emp-1_2026-08-03_5"]).toEqual([
+      { indicatorTypeId: 10, status: "published", updatedBy: null },
+    ]);
   });
 
   it("carries draft_deleted through, since the grid renders it distinctly", () => {
     const map = buildScheduleNoteMap([note({ status: "draft_deleted" })]);
-    expect(map["emp-1_2026-08-03_5"]).toEqual([{ indicatorTypeId: 10, status: "draft_deleted" }]);
+    expect(map["emp-1_2026-08-03_5"]).toEqual([
+      { indicatorTypeId: 10, status: "draft_deleted", updatedBy: null },
+    ]);
+  });
+
+  it("carries note authorship through so drafts can be attributed", () => {
+    const map = buildScheduleNoteMap([
+      note({ id: 1, indicatorTypeId: 10, status: "draft", updatedBy: "user-1" }),
+      // An older note may predate authorship tracking; it must still map.
+      note({ id: 2, indicatorTypeId: 11, status: "draft", updatedBy: null }),
+    ]);
+
+    expect(map["emp-1_2026-08-03_5"]).toEqual([
+      { indicatorTypeId: 10, status: "draft", updatedBy: "user-1" },
+      { indicatorTypeId: 11, status: "draft", updatedBy: null },
+    ]);
   });
 
   it("preserves row order within a cell", () => {

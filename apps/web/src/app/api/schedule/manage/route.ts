@@ -709,7 +709,7 @@ export async function POST(req: NextRequest) {
           let query = auth.serviceClient
             .from("schedule_notes")
             .select(
-              "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+              "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, updated_by, created_at, updated_at",
             )
             .eq("org_id", data.orgId);
           if (data.startDate) {
@@ -735,6 +735,7 @@ export async function POST(req: NextRequest) {
             focusAreaId: row.focus_area_id,
             status: row.status,
             createdBy: row.created_by,
+            updatedBy: row.updated_by,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
           })),

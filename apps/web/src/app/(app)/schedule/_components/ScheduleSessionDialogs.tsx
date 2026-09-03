@@ -58,6 +58,59 @@ export function ScheduleSessionWarning({
   );
 }
 
+/**
+ * Escape hatch for a cell another person holds.
+ *
+ * Unlike the same-account takeover this ends nothing: the other editor keeps
+ * their session and their work. It only lets this user into the same cell, so
+ * an advisory lock can never become a dead end. The database version check
+ * remains the real guard against a conflicting write.
+ */
+export function ScheduleCellBusyDialog({
+  editorName,
+  cellDescription,
+  onEditAnyway,
+  onCancel,
+}: {
+  editorName: string;
+  cellDescription: string | null;
+  onEditAnyway: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal
+      title="Someone else is editing this cell"
+      onClose={onCancel}
+      aria-describedby="schedule-cell-busy-description"
+    >
+      <div className="space-y-5 p-1">
+        <div
+          id="schedule-cell-busy-description"
+          className="space-y-2 text-sm leading-6 text-[var(--dg-color-text-secondary)]"
+        >
+          <p>
+            {cellDescription
+              ? `${editorName} is editing ${cellDescription} right now.`
+              : `${editorName} is editing this cell right now.`}
+          </p>
+          <p>
+            You can wait for them to finish, or edit it anyway. If you both save, whoever saves last
+            will be asked to review the other person's changes first.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" className="dg-btn dg-btn-primary" onClick={onEditAnyway}>
+            Edit anyway
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function ScheduleSessionConflictDialog({
   onUseThisTab,
   onCancel,

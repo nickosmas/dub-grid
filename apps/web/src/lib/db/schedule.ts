@@ -237,7 +237,7 @@ export async function fetchScheduleNotes(
     let query = supabase
       .from("schedule_notes")
       .select(
-        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, updated_by, created_at, updated_at",
       )
       .eq("org_id", orgId);
     if (startDate) query = query.gte("date", startDate);
@@ -260,6 +260,7 @@ export async function fetchScheduleNotes(
     focusAreaId: row.focus_area_id,
     status: row.status,
     createdBy: row.created_by,
+    updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));

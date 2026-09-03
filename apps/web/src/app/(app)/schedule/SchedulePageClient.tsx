@@ -26,16 +26,13 @@ import BulkDeleteReviewContent, {
   type BulkDeleteReviewTarget,
 } from "./_components/BulkDeleteReviewContent";
 import {
+  ScheduleCellBusyDialog,
   ScheduleSessionConflictDialog,
   ScheduleSessionEndedDialog,
   ScheduleSessionWarning,
 } from "./_components/ScheduleSessionDialogs";
 import { resolveGridAuditLabel } from "./_lib/grid-audit-label";
-import {
-  findConflictingCellLock,
-  formatCellLockMessage,
-  getLockedCellKeysInRange,
-} from "./_lib/cell-lock-preflight";
+import { findConflictingCellLock, formatCellLockMessage } from "./_lib/cell-lock-preflight";
 import { generateSeriesDates } from "@/lib/series-dates";
 import {
   buildGridCalloffOpenShiftsFromRequests,
@@ -116,6 +113,7 @@ import {
   fetchRecentPublishHistory,
   fetchRecurringShifts,
   fetchScheduleActorNames,
+  fetchSchedulePresenceProfiles,
   fetchScheduleEditorSessionStatus,
   fetchScheduleNotes,
   fetchShifts,
@@ -130,11 +128,7 @@ import {
   type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
-import {
-  computeDraftBreakdown,
-  computeOutOfWindowDraftGroups,
-  formatDraftBreakdownSummary,
-} from "@/lib/draft-utils";
+import { computeDraftBreakdown, computeOutOfWindowDraftGroups } from "@/lib/draft-utils";
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
@@ -162,7 +156,7 @@ import {
   fetchAccountIdentity,
   removeBrowserRealtimeChannel,
 } from "@/features/account/client";
-import PresenceAvatars from "@/components/PresenceAvatars";
+import PresenceAvatars, { type PresenceProfile } from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
@@ -201,10 +195,21 @@ import {
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
+import { describeEditingCell } from "./_lib/presence-labels";
+import {
+  PublishChangeSummary,
+  type PublishActiveEditor,
+  type PublishEditorRow,
+} from "./_components/PublishChangeSummary";
+import { UNATTRIBUTED_EDITOR_ID, computeEditorDraftBreakdowns } from "@/lib/publish-attribution";
 import { useQueryClient } from "@tanstack/react-query";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { queryKeys } from "@/lib/query-keys";
-import { buildScheduleNoteMap, scheduleNoteKey } from "./_lib/schedule-window";
+import {
+  buildScheduleNoteMap,
+  scheduleNoteKey,
+  type ScheduleNoteMap,
+} from "./_lib/schedule-window";
 import {
   beginPublicationRangeLoad,
   completePublicationRangeLoad,
@@ -340,6 +345,16 @@ function SchedulerContent() {
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
   );
+  const describePresenceCell = useCallback(
+    (cellKey: string) => describeEditingCell(cellKey, employeeNameById),
+    [employeeNameById],
+  );
+  const [presenceProfiles, setPresenceProfiles] = useState<Map<string, PresenceProfile>>(
+    () => new Map(),
+  );
+  // Ids already looked up, successes and misses alike, so a member with no
+  // employee record is not re-requested every time the roster is opened.
+  const requestedPresenceProfileIdsRef = useRef(new Set<string>());
   const segmentCompatibility = useMemo(
     () =>
       createShiftJobCompatibilityMaps({
@@ -421,15 +436,7 @@ function SchedulerContent() {
   // Serializes DB writes per shift key to prevent race conditions (e.g. edit → undo
   // firing before the edit's DB write completes, causing an optimistic lock conflict).
   const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
-  const [notes, setNotes] = useState<
-    Record<
-      string,
-      {
-        indicatorTypeId: number;
-        status: "published" | "draft" | "draft_deleted";
-      }[]
-    >
-  >({});
+  const [notes, setNotes] = useState<ScheduleNoteMap>({});
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
@@ -637,9 +644,9 @@ function SchedulerContent() {
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
 
-  const publishSummary = useMemo(
-    () => formatDraftBreakdownSummary(draftBreakdown),
-    [draftBreakdown],
+  const editorBreakdowns = useMemo(
+    () => computeEditorDraftBreakdowns(shifts, notes, authUser?.id ?? null, publishWindowDateRange),
+    [shifts, notes, authUser?.id, publishWindowDateRange],
   );
   // Super admins see both "discard mine" and "discard all" options only when
   // the org actually has drafts from other editors (i.e. mine totals differ).
@@ -754,12 +761,51 @@ function SchedulerContent() {
     id: string;
     name: string;
   } | null>(null);
+
+  /**
+   * Establish the presence identity as early as possible.
+   *
+   * Presence and cell locking both key off this, and `lockCell` is a no-op
+   * without it. It used to be resolved at the tail of the schedule fetch, so
+   * every page load had a window where the editor published no avatar and
+   * clicking a cell silently took no lock. `authUser` already carries the id,
+   * which is the only part either mechanism needs; the display name starts as
+   * a readable fallback and is upgraded when the identity call returns.
+   */
+  useEffect(() => {
+    if (!authUser) {
+      setCurrentUser(null);
+      return;
+    }
+    const fallbackName = authUser.email?.split("@")[0] || "Unknown";
+    setCurrentUser((prev) =>
+      prev?.id === authUser.id ? prev : { id: authUser.id, name: fallbackName },
+    );
+
+    let cancelled = false;
+    void fetchAccountIdentity()
+      .then((identity) => {
+        if (cancelled) return;
+        const name = identity.displayName || fallbackName;
+        setCurrentUser((prev) =>
+          prev?.id === authUser.id && prev.name !== name ? { id: authUser.id, name } : prev,
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser]);
   const editorSessionIdRef = useRef(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `editor-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   const [pendingSessionTakeover, setPendingSessionTakeover] = useState<CellLock | null>(null);
+  const [pendingCellBusy, setPendingCellBusy] = useState<{
+    conflict: CellLock;
+    onOverride: () => void;
+  } | null>(null);
   const [showSessionEndedDialog, setShowSessionEndedDialog] = useState(false);
   const isScheduleEditor = canEditShifts || canEditNotes;
 
@@ -983,20 +1029,6 @@ function SchedulerContent() {
       setPaintedFromSnapshot(true);
     }
 
-    async function fetchCurrentUser(): Promise<{
-      id: string;
-      name: string;
-    } | null> {
-      try {
-        if (!authUser) return null;
-        const identity = await fetchAccountIdentity();
-        const name = identity.displayName || authUser.email?.split("@")[0] || "Unknown";
-        return { id: authUser.id, name };
-      } catch {
-        return null;
-      }
-    }
-
     async function loadSchedule() {
       try {
         // Fetch per-user last-viewed timestamp + critical data in parallel
@@ -1099,13 +1131,6 @@ function SchedulerContent() {
 
         // Fire-and-forget: update last-viewed timestamp for this user
         void updateScheduleLastViewed(orgId);
-
-        // Fetch current user in background — not needed for grid render
-        fetchCurrentUser()
-          .then((info) => {
-            if (info) setCurrentUser(info);
-          })
-          .catch(() => {});
       } catch (err) {
         Sentry.captureException(err);
       } finally {
@@ -1168,8 +1193,112 @@ function SchedulerContent() {
   );
   const localSessionEndedRef = useRef(isSessionEnded);
   localSessionEndedRef.current = isSessionEnded;
+
+  /**
+   * Editor display names for the publish confirmation, resolved only when that
+   * dialog is opened. Authors are user ids, and the people who left drafts
+   * behind are frequently not online, so their names cannot come from presence.
+   */
+  const [editorNames, setEditorNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!showPublishConfirm || !org) return;
+    const missing = editorBreakdowns
+      .filter((row) => !row.isCurrentUser && row.editorId !== UNATTRIBUTED_EDITOR_ID)
+      .map((row) => row.editorId)
+      .filter((id) => !(id in editorNames));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    void fetchScheduleActorNames({ ids: missing, orgId: org.id })
+      .then(({ names }) => {
+        if (cancelled) return;
+        setEditorNames((prev) => ({ ...prev, ...names }));
+      })
+      // Names are an enhancement; the dialog still shows correct counts without
+      // them, so a failure must not block publishing.
+      .catch((error) => Sentry.captureException(error));
+    return () => {
+      cancelled = true;
+    };
+  }, [showPublishConfirm, org, editorBreakdowns, editorNames]);
+
+  /**
+   * Everyone else on the schedule right now, drafts or not. Publish no longer
+   * blocks on cell locks, so this is what tells the publisher that someone is
+   * mid-change. Draft-based rows cannot cover it: a colleague who has just
+   * started has nothing attributed to them yet.
+   */
+  const publishActiveEditors = useMemo<PublishActiveEditor[]>(
+    () =>
+      onlineUsers
+        .filter((user) => !user.isSameUser)
+        .map((user) => ({ userId: user.userId, name: user.userName })),
+    [onlineUsers],
+  );
+
+  const publishEditorRows = useMemo<PublishEditorRow[]>(() => {
+    const onlineUserIds = new Set(onlineUsers.map((user) => user.userId));
+    return editorBreakdowns.map((row) => ({
+      ...row,
+      name: editorNames[row.editorId] ?? null,
+      isOnline: onlineUserIds.has(row.editorId),
+    }));
+  }, [editorBreakdowns, editorNames, onlineUsers]);
+
+  /**
+   * Loads role and email for the editors on screen, only once the roster is
+   * actually opened. A failure is silent by design: the card degrades to names,
+   * which is still useful, and a popover is no place for an error toast.
+   */
+  const handlePresenceRosterOpen = useCallback(() => {
+    if (!org) return;
+    const missing = onlineUsers
+      .filter((user) => !user.isSameUser)
+      .map((user) => user.userId)
+      .filter((userId) => !requestedPresenceProfileIdsRef.current.has(userId));
+    if (missing.length === 0) return;
+
+    for (const userId of missing) requestedPresenceProfileIdsRef.current.add(userId);
+
+    void fetchSchedulePresenceProfiles({ orgId: org.id, userIds: missing })
+      .then(({ profiles }) => {
+        if (profiles.length === 0) return;
+        setPresenceProfiles((prev) => {
+          const next = new Map(prev);
+          for (const profile of profiles) {
+            next.set(profile.userId, { orgRole: profile.orgRole, email: profile.email });
+          }
+          return next;
+        });
+      })
+      .catch((error) => {
+        // Allow a retry on the next open rather than caching the failure.
+        for (const userId of missing) requestedPresenceProfileIdsRef.current.delete(userId);
+        Sentry.captureException(error);
+      });
+  }, [onlineUsers, org]);
+  /**
+   * The half of the cell guard that is never negotiable: an ended editor
+   * session must not mutate anything. Split out so range-wide actions can
+   * enforce it without also inheriting per-cell lock blocking.
+   */
+  const guardActiveSession = useCallback((): boolean => {
+    if (localSessionEndedRef.current) {
+      setShowSessionEndedDialog(true);
+      return false;
+    }
+    return true;
+  }, []);
+
   const guardUnlockedCells = useCallback(
-    (cellKeys: Iterable<string>, seriesIds: Iterable<string> = []): boolean => {
+    (
+      cellKeys: Iterable<string>,
+      seriesIds: Iterable<string> = [],
+      // Supplied only by single-cell entry points. A blocked bulk action gets
+      // the plain notice, since overriding many cells at once is not something
+      // a user can meaningfully judge.
+      options?: { onOverride?: () => void },
+    ): boolean => {
       if (localSessionEndedRef.current) {
         setShowSessionEndedDialog(true);
         return false;
@@ -1183,17 +1312,14 @@ function SchedulerContent() {
       if (!conflict) return true;
       if (conflict.owner === "same_account") {
         setPendingSessionTakeover(conflict);
+      } else if (options?.onOverride) {
+        setPendingCellBusy({ conflict, onOverride: options.onOverride });
       } else {
         toast.info(formatCellLockMessage(conflict));
       }
       return false;
     },
     [isSessionEnded, lockedCells],
-  );
-  const guardUnlockedRange = useCallback(
-    (range: { startDateKey: string; endDateKey: string }): boolean =>
-      guardUnlockedCells(getLockedCellKeysInRange(lockedCells.values(), range)),
-    [guardUnlockedCells, lockedCells],
   );
   const {
     importPreview,
@@ -1688,13 +1814,7 @@ function SchedulerContent() {
           });
         }
         if (p?.notes) {
-          const noteUpdates = p.notes as Record<
-            string,
-            {
-              indicatorTypeId: number;
-              status: "published" | "draft" | "draft_deleted";
-            }[]
-          >;
+          const noteUpdates = p.notes as ScheduleNoteMap;
           setNotes((prev) => ({ ...prev, ...noteUpdates }));
         }
         // A broadcast that carried a diff has already been applied above, and
@@ -1793,16 +1913,22 @@ function SchedulerContent() {
             ]).catch(() => {});
           }
           if (currentUserRef.current && (canEditShiftsRef.current || canEditNotesRef.current)) {
-            let ended = false;
-            try {
-              ended = await checkCurrentScheduleEditorSessionRef.current();
-            } catch (error) {
-              // Realtime remains an availability aid. If the status endpoint
-              // is temporarily unavailable, normal version checks still keep
-              // writes safe and the durable marker is checked again later.
-              Sentry.captureException(error);
-            }
-            if (!ended) await refreshPresenceRef.current();
+            // Track presence immediately rather than behind the termination
+            // check. That check is an HTTP round trip, and awaiting it meant
+            // nobody else saw this editor until it returned. It is not needed
+            // as a gate: when it does find the session ended it calls
+            // endLocalScheduleEditor, which untracks presence on its own.
+            void refreshPresenceRef.current();
+            void (async () => {
+              try {
+                await checkCurrentScheduleEditorSessionRef.current();
+              } catch (error) {
+                // Realtime remains an availability aid. If the status endpoint
+                // is temporarily unavailable, normal version checks still keep
+                // writes safe and the durable marker is checked again later.
+                Sentry.captureException(error);
+              }
+            })();
           }
           syncPresenceRef.current();
           await flushPendingBroadcasts();
@@ -1841,15 +1967,32 @@ function SchedulerContent() {
     if (!channel || !currentUser || !isScheduleEditor) return;
     if (channel.state !== "joined") return;
 
-    void checkCurrentScheduleEditorSession()
-      .then((ended) => {
-        if (!ended) return refreshPresence();
-      })
-      .catch((error) => {
-        Sentry.captureException(error);
-        return refreshPresence();
-      });
-  }, [checkCurrentScheduleEditorSession, currentUser, isScheduleEditor, refreshPresence]);
+    // Presence goes out first. On a cold load the profile resolves after the
+    // channel subscribes, so this is the path that usually publishes presence,
+    // and gating it on the termination round trip is what kept avatars from
+    // appearing promptly. An ended session untracks itself from within the
+    // check, so running the two concurrently stays correct.
+    void refreshPresence();
+    void checkCurrentScheduleEditorSession().catch((error) => Sentry.captureException(error));
+
+    // `lockCell` needs an identity and does nothing without one, so a cell
+    // opened before this resolved is sitting unlocked. Claim it now rather
+    // than leaving an editor who is visibly in a cell holding no lock on it.
+    const openPanel = editPanelRef.current;
+    if (openPanel && !getCurrentCellRef.current()) {
+      const cellKey = `${openPanel.empId}_${formatDateKey(openPanel.date)}`;
+      if (!getCellLock(cellKey)) {
+        lockCell(cellKey, { seriesId: shiftsRef.current[cellKey]?.seriesId ?? null });
+      }
+    }
+  }, [
+    checkCurrentScheduleEditorSession,
+    currentUser,
+    getCellLock,
+    isScheduleEditor,
+    lockCell,
+    refreshPresence,
+  ]);
 
   // Refetch when the tab regains focus — catches any missed broadcasts
   // (e.g. browser throttled WebSocket while tab was backgrounded).
@@ -1859,25 +2002,29 @@ function SchedulerContent() {
     const handleVisibilityChange = async () => {
       const channel = realtimeChannelRef.current;
       const isVisible = document.visibilityState === "visible";
-      let ended = isSessionEnded;
+      const canEdit = canEditShiftsRef.current || canEditNotesRef.current;
 
-      if (isVisible && !ended && (canEditShiftsRef.current || canEditNotesRef.current)) {
+      // Re-publish presence the moment the tab is back, ahead of the
+      // termination round trip, so peers see this editor again immediately.
+      // An ended session untracks itself from inside that check.
+      if (
+        isVisible &&
+        !isSessionEnded &&
+        canEdit &&
+        channel &&
+        channel.state === "joined" &&
+        currentUserRef.current
+      ) {
+        void refreshPresenceRef.current();
+      }
+
+      let ended = isSessionEnded;
+      if (isVisible && !ended && canEdit) {
         try {
           ended = await checkCurrentScheduleEditorSessionRef.current();
         } catch (error) {
           Sentry.captureException(error);
         }
-      }
-
-      if (
-        channel &&
-        channel.state === "joined" &&
-        isVisible &&
-        !ended &&
-        currentUserRef.current &&
-        (canEditShiftsRef.current || canEditNotesRef.current)
-      ) {
-        void refreshPresenceRef.current();
       }
 
       // Coming back with the editor still open: retake the lock we dropped on
@@ -1916,6 +2063,8 @@ function SchedulerContent() {
 
   useEffect(() => {
     const releasePresence = () => {
+      // Untracking emits a presence leave, which removes this editor from every
+      // peer immediately.
       unlockCell({ removePresence: true });
     };
     window.addEventListener("pagehide", releasePresence);
@@ -3667,15 +3816,32 @@ function SchedulerContent() {
 
   // ── Event handlers ───────────────────────────────────────────────────────────
 
-  const handleCellClick = useCallback(
-    (emp: Employee, date: Date, focusAreaName?: string) => {
+  // `skipLockGuard` is a named option rather than another positional argument:
+  // the public `handleCellClick` already takes a 4th `trigger` parameter from
+  // the grid, and a truthy "click"/"keyboard" landing on an override flag would
+  // silently bypass cell locking on every click.
+  const openCellEditor = useCallback(
+    (
+      emp: Employee,
+      date: Date,
+      focusAreaName: string | undefined,
+      options?: { skipLockGuard?: boolean },
+    ) => {
       const canEditCell = canEditShiftsRef.current || canEditNotes;
       const canOpenRequestPanel = canOpenOwnRequestPanel(emp.id, date);
       const canOpenDetails = canOpenOwnShiftDetails(emp.id, date);
       if (!canEditCell && !canOpenRequestPanel && !canOpenDetails) return;
       const cellKey = `${emp.id}_${formatDateKey(date)}`;
       if (canEditCell) {
-        if (!guardUnlockedCells([cellKey])) return;
+        if (
+          !options?.skipLockGuard &&
+          !guardUnlockedCells([cellKey], [], {
+            onOverride: () =>
+              openCellEditorRef.current(emp, date, focusAreaName, { skipLockGuard: true }),
+          })
+        ) {
+          return;
+        }
         lockCell(cellKey, { seriesId: shiftsRef.current[cellKey]?.seriesId ?? null });
       }
       const activeFaId = focusAreaName
@@ -3700,6 +3866,20 @@ function SchedulerContent() {
       lockCell,
       startEditSession,
     ],
+  );
+  // Lets the busy-cell override re-enter without the callback depending on itself.
+  const openCellEditorRef = useRef(openCellEditor);
+  openCellEditorRef.current = openCellEditor;
+
+  /**
+   * Grid-facing handler. Keeps the exact signature the grid calls, including the
+   * trailing `trigger`, which is deliberately not forwarded to the editor.
+   */
+  const handleCellClick = useCallback(
+    (emp: Employee, date: Date, focusAreaName?: string, _trigger?: "click" | "keyboard") => {
+      openCellEditorRef.current(emp, date, focusAreaName);
+    },
+    [],
   );
 
   const buildDraftShiftFromInput = useCallback(
@@ -4104,8 +4284,12 @@ function SchedulerContent() {
               focusAreaId === -1 ? null : focusAreaId,
             );
             changedNoteKeys.add(noteKey);
-            if (entries.length > 0) nextNotes[noteKey] = entries;
-            else delete nextNotes[noteKey];
+            if (entries.length > 0) {
+              // The editor saving these notes is their author, which is what
+              // attributes them in the publish confirmation.
+              const author = currentUserRef.current?.id ?? null;
+              nextNotes[noteKey] = entries.map((entry) => ({ ...entry, updatedBy: author }));
+            } else delete nextNotes[noteKey];
           }
         }
 
@@ -5038,7 +5222,13 @@ function SchedulerContent() {
 
   const handlePublish = useCallback(async () => {
     if (!org) return;
-    if (!guardUnlockedRange(publishWindowDateRange)) return;
+    // Deliberately not gated on cell locks. Publishing commits every draft in
+    // the window whether or not anyone holds a cell, so blocking on a lock did
+    // not protect that work: it only meant one editor with one cell open could
+    // stop the whole publish. The confirmation now names whose changes are
+    // going live and flags editors who are on the schedule, which is the
+    // information the publisher actually needs to decide.
+    if (!guardActiveSession()) return;
     setIsPublishing(true);
     try {
       let startDate: Date;
@@ -5109,7 +5299,7 @@ function SchedulerContent() {
     closeEditPanel,
     clearPendingBroadcast,
     sendReliableBroadcast,
-    guardUnlockedRange,
+    guardActiveSession,
     publishWindowDateRange,
   ]);
 
@@ -5117,7 +5307,11 @@ function SchedulerContent() {
     async (discardAll = false) => {
       const user = currentUserRef.current;
       if (!org || !user) return;
-      if (!guardUnlockedRange(publishWindowDateRange)) return;
+      // Deliberately not gated on cell locks. Discarding is scoped server-side
+      // (by user id for "mine", by window for "all"), so another editor holding
+      // an unrelated cell says nothing about whether this discard is safe.
+      // Blocking on it left both buttons dead behind a lock notice.
+      if (!guardActiveSession()) return;
       setCancelingMode(discardAll ? "all" : "mine");
       try {
         const previousShifts = shiftsRef.current;
@@ -5180,7 +5374,7 @@ function SchedulerContent() {
       sendReliableBroadcast,
       publishWindowDateRange.startDateKey,
       publishWindowDateRange.endDateKey,
-      guardUnlockedRange,
+      guardActiveSession,
     ],
   );
 
@@ -6334,7 +6528,15 @@ function SchedulerContent() {
                     ? () => exportScheduleCSV(filteredEmployees, dates, shiftNameForKey)
                     : undefined
                 }
-                presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
+                presenceSlot={
+                  canEditShifts ? (
+                    <PresenceAvatars
+                      onlineUsers={onlineUsers}
+                      profiles={presenceProfiles}
+                      onRosterOpen={handlePresenceRosterOpen}
+                    />
+                  ) : null
+                }
                 showAudit={showAudit}
                 onAuditToggle={
                   canEditShifts && !isMobile ? () => setShowAudit((prev) => !prev) : undefined
@@ -7186,6 +7388,19 @@ function SchedulerContent() {
             />
           )}
 
+          {pendingCellBusy && (
+            <ScheduleCellBusyDialog
+              editorName={pendingCellBusy.conflict.userName}
+              cellDescription={describePresenceCell(pendingCellBusy.conflict.cellKey)}
+              onEditAnyway={() => {
+                const { onOverride } = pendingCellBusy;
+                setPendingCellBusy(null);
+                onOverride();
+              }}
+              onCancel={() => setPendingCellBusy(null)}
+            />
+          )}
+
           {showSessionEndedDialog && (
             <ScheduleSessionEndedDialog onClose={() => setShowSessionEndedDialog(false)} />
           )}
@@ -7194,10 +7409,16 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Publish Schedule?"
               message={
-                allCoverageGaps.length > 0
-                  ? `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}. ${allCoverageGaps.length} coverage gap${allCoverageGaps.length === 1 ? "" : "s"} remain${allCoverageGaps.length === 1 ? "s" : ""} in this period.`
-                  : `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
+                <PublishChangeSummary
+                  editorRows={publishEditorRows}
+                  activeEditors={publishActiveEditors}
+                  windowLabel={currentPublishWindow.label}
+                  totalChanges={draftBreakdown.totalChanges}
+                  coverageGapCount={allCoverageGaps.length}
+                />
               }
+              maxWidth={560}
+              wrapActions
               confirmLabel="Publish"
               variant={allCoverageGaps.length > 0 ? "warning" : "info"}
               isLoading={isPublishing}

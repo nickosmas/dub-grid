@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  ScheduleCellBusyDialog,
   ScheduleSessionConflictDialog,
   ScheduleSessionEndedDialog,
   ScheduleSessionWarning,
@@ -74,5 +75,55 @@ describe("ScheduleSessionDialogs", () => {
     render(<ScheduleSessionEndedDialog onClose={vi.fn()} />);
 
     expect(screen.getByText(/unsaved changes in this tab were not saved/i)).toBeTruthy();
+  });
+
+  describe("ScheduleCellBusyDialog", () => {
+    it("names the editor and the cell, and offers a way through", () => {
+      const editAnyway = vi.fn();
+      const cancel = vi.fn();
+      render(
+        <ScheduleCellBusyDialog
+          editorName="Casey Diaz"
+          cellDescription="Jane Doe, Tue, Mar 3"
+          onEditAnyway={editAnyway}
+          onCancel={cancel}
+        />,
+      );
+
+      expect(
+        screen.getByText(/Casey Diaz is editing Jane Doe, Tue, Mar 3 right now/i),
+      ).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Edit anyway" }));
+      expect(editAnyway).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reads correctly when the cell cannot be described", () => {
+      render(
+        <ScheduleCellBusyDialog
+          editorName="Casey Diaz"
+          cellDescription={null}
+          onEditAnyway={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/Casey Diaz is editing this cell right now/i)).toBeTruthy();
+    });
+
+    // The whole point of this dialog is that it never ends anyone's session.
+    it("offers no session-ending action", () => {
+      render(
+        <ScheduleCellBusyDialog
+          editorName="Casey Diaz"
+          cellDescription={null}
+          onEditAnyway={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: /end|sign out|use this tab/i })).toBeNull();
+    });
   });
 });

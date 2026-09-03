@@ -14,7 +14,9 @@ function snapshot(overrides: Partial<CachedScheduleWindow> = {}): CachedSchedule
   return {
     window: { start: "2026-05-25", end: "2026-11-21" },
     shifts,
-    notes: { "emp-1_2026-08-03_5": [{ indicatorTypeId: 10, status: "published" }] },
+    notes: {
+      "emp-1_2026-08-03_5": [{ indicatorTypeId: 10, status: "published", updatedBy: null }],
+    },
     canEditShifts: true,
     ...overrides,
   };

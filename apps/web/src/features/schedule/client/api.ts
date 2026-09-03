@@ -62,6 +62,23 @@ export function fetchScheduleActorNames(input: {
   });
 }
 
+export interface SchedulePresenceProfile {
+  userId: string;
+  orgRole: string;
+  email: string | null;
+}
+
+export function fetchSchedulePresenceProfiles(input: {
+  orgId: string;
+  userIds: string[];
+}): Promise<{ profiles: SchedulePresenceProfile[] }> {
+  const params = new URLSearchParams({
+    orgId: input.orgId,
+    userIds: input.userIds.join(","),
+  });
+  return requestScheduleJson(`/api/schedule/presence-profiles?${params}`);
+}
+
 export function fetchScheduleEditorSessionStatus(input: {
   orgId: string;
   editorSessionId: string;

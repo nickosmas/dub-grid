@@ -740,4 +740,161 @@ describe("useCellLocks", () => {
       expect.objectContaining({ seriesId: "series-2" }),
     );
   });
+
+  it("takes no lock until an identity exists, then locks once it arrives", () => {
+    // lockCell is a no-op without a user, so an identity that resolved late
+    // left the editor visibly in a cell while holding no lock on it.
+    const channel = createChannel();
+    type Props = { currentUser: { id: string; name: string } | null };
+    const { result, rerender } = renderHook(
+      ({ currentUser }: Props) =>
+        useCellLocks(createChannelRef(channel), currentUser, "session-1", true, true),
+      { initialProps: { currentUser: null } as Props },
+    );
+
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12");
+    });
+    expect(result.current.getCurrentCell()).toBeNull();
+    expect(channel.track).not.toHaveBeenCalled();
+
+    rerender({ currentUser: { id: "user-1", name: "Alex Admin" } });
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12");
+    });
+
+    expect(result.current.getCurrentCell()).toBe("emp-1_2026-04-12");
+    expect(channel.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "cell_locked",
+        payload: expect.objectContaining({ cellKey: "emp-1_2026-04-12" }),
+      }),
+    );
+  });
+
+  it("releases the held cell as soon as the editor closes it", () => {
+    const channel = createChannel();
+    const { result } = renderHook(() =>
+      useCellLocks(
+        createChannelRef(channel),
+        { id: "user-1", name: "Alex Admin" },
+        "session-1",
+        true,
+        true,
+      ),
+    );
+
+    act(() => {
+      result.current.lockCell("emp-1_2026-04-12");
+    });
+    expect(result.current.getCurrentCell()).toBe("emp-1_2026-04-12");
+
+    channel.send.mockClear();
+    act(() => {
+      result.current.unlockCell();
+    });
+
+    expect(result.current.getCurrentCell()).toBeNull();
+    expect(channel.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "cell_unlocked",
+        payload: expect.objectContaining({ cellKey: "emp-1_2026-04-12" }),
+      }),
+    );
+  });
+
+  describe("presence reflects immediately", () => {
+    const remotePresence = (overrides: Partial<PresenceRecord> = {}): PresenceRecord => ({
+      editingCell: null,
+      userId: "user-2",
+      userName: "Riley RN",
+      editorSessionId: "session-2",
+      canLockCells: true,
+      isScheduleEditor: true,
+      lockRevision: 1,
+      ...overrides,
+    });
+
+    const renderWithPresence = (channel: ReturnType<typeof createChannel>) =>
+      renderHook(() =>
+        useCellLocks(
+          createChannelRef(channel),
+          { id: "user-1", name: "Alex Admin" },
+          "session-1",
+          true,
+          true,
+        ),
+      );
+
+    it("shows an editor as soon as they appear in presence", () => {
+      const channel = createChannel();
+      const { result } = renderWithPresence(channel);
+
+      act(() => result.current.syncPresence());
+      expect(result.current.onlineUsers).toEqual([]);
+
+      act(() => {
+        channel.setPresenceState({ "user-2": [remotePresence()] });
+        result.current.syncPresence();
+      });
+
+      expect(result.current.onlineUsers).toEqual([
+        expect.objectContaining({ userId: "user-2", userName: "Riley RN" }),
+      ]);
+    });
+
+    it("removes an editor immediately when they leave presence", () => {
+      // No grace window: navigating away from the schedule untracks presence,
+      // and every peer reflects that on the next sync rather than holding a
+      // stale avatar.
+      const channel = createChannel();
+      channel.setPresenceState({ "user-2": [remotePresence()] });
+      const { result } = renderWithPresence(channel);
+
+      act(() => result.current.syncPresence());
+      expect(result.current.onlineUsers).toHaveLength(1);
+
+      act(() => {
+        channel.setPresenceState({});
+        result.current.syncPresence();
+      });
+
+      expect(result.current.onlineUsers).toEqual([]);
+    });
+
+    it("releases a departed editor's cell lock immediately", () => {
+      const channel = createChannel();
+      channel.setPresenceState({
+        "user-2": [remotePresence({ editingCell: "emp-9_2026-04-12" })],
+      });
+      const { result } = renderWithPresence(channel);
+
+      act(() => result.current.syncPresence());
+      expect(result.current.getCellLock("emp-9_2026-04-12")).not.toBeNull();
+
+      act(() => {
+        channel.setPresenceState({});
+        result.current.syncPresence();
+      });
+
+      expect(result.current.getCellLock("emp-9_2026-04-12")).toBeNull();
+    });
+
+    it("counts one person once across several of their sessions", () => {
+      const channel = createChannel();
+      channel.setPresenceState({
+        "user-2": [
+          remotePresence({ editorSessionId: "session-2a" }),
+          remotePresence({ editorSessionId: "session-2b" }),
+        ],
+      });
+      const { result } = renderWithPresence(channel);
+
+      act(() => result.current.syncPresence());
+
+      expect(result.current.onlineUsers).toEqual([
+        expect.objectContaining({ userId: "user-2", sessionCount: 2 }),
+      ]);
+    });
+  });
 });
