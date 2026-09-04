@@ -38,6 +38,7 @@ ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_editor_session_terminations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calendar_feed_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_publish_changes ENABLE ROW LEVEL SECURITY;
 

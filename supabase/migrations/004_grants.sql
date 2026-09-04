@@ -65,6 +65,11 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 -- guarded API route, but browser clients cannot alter or erase history.
 REVOKE UPDATE, DELETE ON TABLE public.schedule_editor_session_terminations FROM authenticated;
 
+-- Calendar feed tokens are capability secrets read only by the service role on
+-- behalf of an unauthenticated feed request. No browser client ever touches them.
+REVOKE ALL ON TABLE public.calendar_feed_tokens FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.calendar_feed_tokens TO service_role;
+
 -- public.platform_feature_flags and public.impersonation_sessions intentionally
 -- get no column-level carve-out below: both are gridmaster-only tables, so the
 -- blanket grant above plus their `is_gridmaster()` RLS policy is the entire

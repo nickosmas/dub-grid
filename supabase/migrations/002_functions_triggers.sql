@@ -8776,3 +8776,434 @@ BEGIN
     AND org_id = p_org_id;
 END;
 $$;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Functions added by later migrations
+--
+-- Mirrored here so this file stays the complete clean-install definition.
+-- Each is byte-identical to the forward migration that introduced it.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- from 007_filtered_audit_log.sql
+CREATE OR REPLACE FUNCTION public.get_filtered_audit_log(
+  p_org_id UUID DEFAULT NULL,
+  p_action TEXT DEFAULT NULL,
+  p_action_prefix TEXT DEFAULT NULL,
+  p_action_prefixes TEXT[] DEFAULT NULL,
+  p_resource_type TEXT DEFAULT NULL,
+  p_actor_id UUID DEFAULT NULL,
+  p_target TEXT DEFAULT NULL,
+  p_start_date TIMESTAMPTZ DEFAULT NULL,
+  p_end_date TIMESTAMPTZ DEFAULT NULL,
+  p_high_risk_only BOOLEAN DEFAULT FALSE,
+  p_limit INTEGER DEFAULT 50,
+  p_offset INTEGER DEFAULT 0
+)
+RETURNS SETOF public.audit_log
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT audit.*
+  FROM public.audit_log AS audit
+  LEFT JOIN public.employees AS employee
+    ON audit.resource_type = 'employee'
+    AND employee.id::text = audit.resource_id
+  LEFT JOIN public.invitations AS invitation
+    ON audit.resource_type = 'invitation'
+    AND invitation.id::text = audit.resource_id
+  LEFT JOIN public.profiles AS profile
+    ON audit.resource_type IN ('user', 'organization_membership')
+    AND profile.id::text = audit.resource_id
+  LEFT JOIN public.profiles AS actor_profile
+    ON actor_profile.id = audit.actor_id
+  WHERE (p_org_id IS NULL OR audit.org_id = p_org_id)
+    AND (p_action IS NULL OR audit.action = p_action)
+    AND (p_action_prefix IS NULL OR audit.action LIKE p_action_prefix || '%')
+    AND (
+      p_action_prefixes IS NULL
+      OR cardinality(p_action_prefixes) = 0
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(p_action_prefixes) AS prefix
+        WHERE audit.action LIKE prefix || '%'
+      )
+    )
+    AND (p_resource_type IS NULL OR audit.resource_type = p_resource_type)
+    AND (p_actor_id IS NULL OR audit.actor_id = p_actor_id)
+    AND (p_start_date IS NULL OR audit.created_at >= p_start_date)
+    AND (p_end_date IS NULL OR audit.created_at <= p_end_date)
+    AND (
+      NOT p_high_risk_only
+      OR audit.action IN (
+        'account.deleted', 'audit.exported', 'feature_flags.updated', 'org.archived',
+        'org.suspended', 'user.deactivated', 'user.force_logout', 'user.password_reset_sent'
+      )
+      OR audit.action LIKE ANY (ARRAY['billing.%', 'gdpr.%', 'gridmaster_account.%', 'impersonation.%'])
+    )
+    AND (
+      p_target IS NULL
+      OR concat_ws(
+        ' ',
+        audit.actor_email,
+        audit.action,
+        audit.resource_type,
+        audit.resource_id,
+        audit.details::text,
+        actor_profile.first_name,
+        actor_profile.last_name,
+        employee.first_name,
+        employee.last_name,
+        employee.email,
+        invitation.first_name,
+        invitation.last_name,
+        invitation.email,
+        profile.first_name,
+        profile.last_name
+      ) ILIKE '%' || p_target || '%'
+    )
+  ORDER BY audit.created_at DESC, audit.id DESC
+  LIMIT LEAST(GREATEST(p_limit, 1), 5000)
+  OFFSET GREATEST(p_offset, 0);
+$$;
+
+-- from 008_atomic_notification_mutations.sql
+CREATE OR REPLACE FUNCTION public.mutate_notifications_with_unread_count(
+  p_notification_ids UUID[],
+  p_action TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  updated_count INTEGER;
+  unread_count INTEGER;
+BEGIN
+  IF p_action NOT IN ('read', 'unread', 'archive', 'unarchive') THEN
+    RAISE EXCEPTION 'Unsupported notification action';
+  END IF;
+
+  UPDATE public.notifications
+  SET
+    read_at = CASE
+      WHEN p_action = 'read' THEN COALESCE(read_at, now())
+      WHEN p_action = 'unread' THEN NULL
+      ELSE read_at
+    END,
+    archived_at = CASE
+      WHEN p_action = 'archive' THEN COALESCE(archived_at, now())
+      WHEN p_action = 'unarchive' THEN NULL
+      ELSE archived_at
+    END
+  WHERE id = ANY(p_notification_ids)
+    AND user_id = auth.uid()
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+
+  SELECT COUNT(*)::INTEGER INTO unread_count
+  FROM public.notifications
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  RETURN jsonb_build_object(
+    'unreadCount', unread_count,
+    'updatedCount', updated_count
+  );
+END;
+$$;
+
+-- from 008_atomic_notification_mutations.sql
+CREATE OR REPLACE FUNCTION public.mark_notification_read_with_unread_count(
+  p_notification_id UUID
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  unread_count INTEGER;
+BEGIN
+  UPDATE public.notifications
+  SET read_at = COALESCE(read_at, now())
+  WHERE id = p_notification_id
+    AND user_id = auth.uid()
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  SELECT COUNT(*)::INTEGER INTO unread_count
+  FROM public.notifications
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  RETURN unread_count;
+END;
+$$;
+
+-- from 008_atomic_notification_mutations.sql
+CREATE OR REPLACE FUNCTION public.mark_all_notifications_read_with_unread_count()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  unread_count INTEGER;
+BEGIN
+  UPDATE public.notifications
+  SET read_at = now()
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  SELECT COUNT(*)::INTEGER INTO unread_count
+  FROM public.notifications
+  WHERE user_id = auth.uid()
+    AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
+
+  RETURN unread_count;
+END;
+$$;
+
+-- from 009_atomic_mobile_employee_audit.sql
+CREATE OR REPLACE FUNCTION public.update_mobile_employee_with_audit(
+  p_org_id UUID,
+  p_employee_id UUID,
+  p_expected_version INTEGER,
+  p_first_name TEXT,
+  p_last_name TEXT,
+  p_phone TEXT,
+  p_email TEXT,
+  p_contact_notes TEXT,
+  p_certification_id BIGINT,
+  p_focus_area_ids BIGINT[],
+  p_role_ids BIGINT[],
+  p_department_ids BIGINT[],
+  p_employment_type public.employee_employment_type,
+  p_actor_id UUID,
+  p_actor_email TEXT,
+  p_audit_details JSONB DEFAULT NULL,
+  p_ip_address INET DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL
+)
+RETURNS public.employees
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_employee public.employees%ROWTYPE;
+  v_is_gridmaster BOOLEAN := FALSE;
+  v_membership public.organization_memberships%ROWTYPE;
+  v_actor_employee_status public.employee_status;
+BEGIN
+  IF p_actor_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: missing actor identity';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = p_actor_id AND platform_role = 'gridmaster'
+  ) INTO v_is_gridmaster;
+
+  SELECT * INTO v_membership
+  FROM public.organization_memberships
+  WHERE user_id = p_actor_id AND org_id = p_org_id AND archived_at IS NULL
+  LIMIT 1;
+
+  SELECT status INTO v_actor_employee_status
+  FROM public.employees
+  WHERE user_id = p_actor_id AND org_id = p_org_id AND archived_at IS NULL
+  LIMIT 1;
+
+  IF NOT (
+    v_is_gridmaster
+    OR v_membership.org_role = 'super_admin'
+    OR (
+      v_membership.org_role = 'admin'
+      AND COALESCE((v_membership.admin_permissions->>'canManageEmployees')::BOOLEAN, FALSE)
+      AND COALESCE(v_actor_employee_status <> 'inactive'::public.employee_status, TRUE)
+    )
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized: insufficient permissions to manage employees';
+  END IF;
+
+  UPDATE public.employees
+  SET
+    first_name = p_first_name,
+    last_name = p_last_name,
+    phone = p_phone,
+    email = p_email,
+    contact_notes = p_contact_notes,
+    certification_id = p_certification_id,
+    focus_area_ids = p_focus_area_ids,
+    role_ids = p_role_ids,
+    department_ids = p_department_ids,
+    employment_type = COALESCE(p_employment_type, employment_type),
+    version = p_expected_version + 1
+  WHERE id = p_employee_id
+    AND org_id = p_org_id
+    AND version = p_expected_version
+  RETURNING * INTO v_employee;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  IF p_audit_details IS NOT NULL THEN
+    INSERT INTO public.audit_log (
+      org_id, actor_id, actor_email, action, resource_type, resource_id,
+      details, ip_address, user_agent
+    ) VALUES (
+      p_org_id, p_actor_id, p_actor_email, 'employee.updated', 'employee', p_employee_id::TEXT,
+      p_audit_details, p_ip_address, p_user_agent
+    );
+  END IF;
+
+  RETURN v_employee;
+END;
+$$;
+
+-- from 012_replace_pending_invitation_access.sql
+CREATE OR REPLACE FUNCTION public.replace_pending_invitation_access(
+  p_org_id UUID,
+  p_invitation_id UUID,
+  p_expected_updated_at TIMESTAMPTZ,
+  p_role TEXT,
+  p_invited_by UUID,
+  p_department_ids BIGINT[] DEFAULT NULL,
+  p_dept_admin_ids BIGINT[] DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_current public.invitations;
+  v_replacement public.invitations;
+BEGIN
+  IF p_role NOT IN ('admin', 'user', 'super_admin') THEN
+    RAISE EXCEPTION 'Invalid invitation role';
+  END IF;
+
+  SELECT * INTO v_current
+  FROM public.invitations
+  WHERE id = p_invitation_id
+    AND org_id = p_org_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invitation not found';
+  END IF;
+
+  IF v_current.accepted_at IS NOT NULL
+    OR v_current.revoked_at IS NOT NULL
+    OR v_current.expires_at < NOW()
+  THEN
+    RAISE EXCEPTION 'Invitation is no longer pending';
+  END IF;
+
+  IF v_current.updated_at IS DISTINCT FROM p_expected_updated_at THEN
+    RAISE EXCEPTION 'Invitation changed elsewhere';
+  END IF;
+
+  UPDATE public.invitations
+  SET revoked_at = NOW()
+  WHERE id = v_current.id;
+
+  INSERT INTO public.invitations (
+    org_id,
+    invited_by,
+    email,
+    role_to_assign,
+    employee_id,
+    first_name,
+    last_name,
+    phone,
+    department_ids,
+    dept_admin_ids
+  ) VALUES (
+    v_current.org_id,
+    COALESCE(p_invited_by, v_current.invited_by),
+    v_current.email,
+    p_role::public.org_role,
+    v_current.employee_id,
+    v_current.first_name,
+    v_current.last_name,
+    v_current.phone,
+    COALESCE(p_department_ids, v_current.department_ids),
+    COALESCE(p_dept_admin_ids, v_current.dept_admin_ids)
+  )
+  RETURNING * INTO v_replacement;
+
+  RETURN jsonb_build_object(
+    'previous_invitation_id', v_current.id,
+    'invitation_id', v_replacement.id,
+    'token', v_replacement.token,
+    'expires_at', v_replacement.expires_at
+  );
+END;
+$$;
+
+-- from 012_replace_pending_invitation_access.sql
+CREATE OR REPLACE FUNCTION public.rollback_pending_invitation_access_replacement(
+  p_org_id UUID,
+  p_previous_invitation_id UUID,
+  p_replacement_invitation_id UUID
+) RETURNS BOOLEAN
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_previous public.invitations;
+  v_replacement public.invitations;
+BEGIN
+  SELECT * INTO v_previous
+  FROM public.invitations
+  WHERE id = p_previous_invitation_id
+    AND org_id = p_org_id
+  FOR UPDATE;
+
+  SELECT * INTO v_replacement
+  FROM public.invitations
+  WHERE id = p_replacement_invitation_id
+    AND org_id = p_org_id
+  FOR UPDATE;
+
+  IF v_previous.id IS NULL
+    OR v_replacement.id IS NULL
+    OR v_previous.revoked_at IS NULL
+    OR v_previous.accepted_at IS NOT NULL
+    OR v_replacement.revoked_at IS NOT NULL
+    OR v_replacement.accepted_at IS NOT NULL
+  THEN
+    RETURN FALSE;
+  END IF;
+
+  UPDATE public.invitations
+  SET revoked_at = NOW()
+  WHERE id = v_replacement.id;
+
+  UPDATE public.invitations
+  SET revoked_at = NULL
+  WHERE id = v_previous.id;
+
+  RETURN TRUE;
+END;
+$$;

@@ -27,15 +27,28 @@ supabase/
 
 ## Migration Rules (CRITICAL)
 
-- Keep the first four migrations as the canonical clean-install definition:
-  - `001_schema.sql` — enums, tables, foreign keys, indexes, realtime publication
-  - `002_functions_triggers.sql` — functions, triggers, RPCs, JWT hook logic
-  - `003_rls_policies.sql` — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + all policies
-  - `004_grants.sql` — grants to `anon`, `authenticated`, `service_role`,
-    `supabase_auth_admin`, and default privileges
-- Existing databases receive changes through ordered, idempotent forward
-  migrations (`005_...sql` and later). Keep the canonical files synchronized
-  so clean installs and upgraded databases converge.
+**Every schema change is a new numbered migration. Nothing else.**
+
+- Add `NNN_name.sql` at the next number. Make it idempotent, so a retried
+  apply converges instead of failing halfway.
+- **Do not edit `001`-`004`.** They are a frozen historical baseline. Once a
+  migration is in a database's ledger it never runs again, so editing one is a
+  no-op for every environment that already has it, and the edit reaches only
+  future clean installs. That divergence is the bug, not the fix.
+- **Do not mirror a change back into the canonical files.** The old rule asked
+  for both a forward migration and a canonical edit, and every such pair was a
+  chance to do one and forget the other. Five migrations drifted that way
+  (`007`, `008`, `009`, `011`, `012`) before the gap was closed. The rule is
+  retired; the drift it caused cannot recur.
+
+`001`-`004` are still the clean-install definition and still describe the
+schema as it stood when they were written. They are simply no longer maintained
+by hand: a clean install applies every migration in order, so correctness comes
+from the sequence rather than from any one file being complete.
+
+This holds because migrations are applied by ledger now, through Supabase
+branching or `supabase db push`, rather than by dropping and replaying the
+whole schema.
 
 ## config.toml: JWT Hook (CRITICAL)
 
