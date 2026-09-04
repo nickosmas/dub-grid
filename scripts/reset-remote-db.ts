@@ -41,7 +41,9 @@ async function confirmDestructiveReset(ref: string): Promise<void> {
   if (process.env.CONFIRM_RESET === "yes") return;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   console.warn(
-    `\n⚠️  This will DROP SCHEMA public CASCADE on REMOTE project "${ref}" — ALL DATA IS LOST.`,
+    `\n⚠️  This will reset REMOTE project "${ref}" — ALL DATA IS LOST.\n` +
+      "   Drops the public schema, deletes every auth user, replays all migrations,\n" +
+      "   and records the migration ledger. Signed-in accounts will not survive.",
   );
   const answer = await rl.question(`Type the project ref "${ref}" to confirm: `);
   rl.close();
@@ -93,6 +95,15 @@ async function main() {
   await db.query("GRANT ALL ON SCHEMA public TO postgres");
   await db.query("GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role");
 
+  // Dropping `public` alone leaves auth.users fully populated, which is worse
+  // than either extreme: those accounts still authenticate, but the profile and
+  // membership rows the JWT hook reads to build their claims are gone. Clear
+  // them here, once the foreign keys that pointed at them no longer exist.
+  console.log("Clearing auth users...");
+  const { rows: authRows } = await db.query("SELECT count(*)::int AS cnt FROM auth.users");
+  await db.query("DELETE FROM auth.users");
+  console.log(`  ${authRows[0].cnt} auth user(s) removed`);
+
   // Run every numbered migration in lexical order. Keeping discovery here
   // prevents remote resets from silently omitting forward migrations.
   const migrationsDirectory = "supabase/migrations";
@@ -129,6 +140,31 @@ async function main() {
       process.exit(1);
     }
   }
+
+  // Replaying the files as raw SQL applies the schema but tells Supabase
+  // nothing, leaving the ledger empty. Branching and `supabase db push` both
+  // read that ledger to decide what to apply, so an unrecorded reset looks like
+  // a database that has received no migrations at all and the next push tries
+  // to replay 001 over a populated schema. Record what we just ran.
+  console.log("\nRecording the migration ledger...");
+  await db.query("CREATE SCHEMA IF NOT EXISTS supabase_migrations");
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+       version TEXT PRIMARY KEY, statements TEXT[], name TEXT
+     )`,
+  );
+  for (const file of migrations) {
+    const base = file.split("/").pop() ?? file;
+    const version = base.slice(0, 3);
+    const name = base.slice(4).replace(/\.sql$/, "");
+    await db.query(
+      `INSERT INTO supabase_migrations.schema_migrations (version, name)
+       VALUES ($1, $2)
+       ON CONFLICT (version) DO UPDATE SET name = EXCLUDED.name`,
+      [version, name],
+    );
+  }
+  console.log(`  ${migrations.length} migration(s) recorded`);
 
   // Verify grants are correct — this catches the exact bug where
   // DROP SCHEMA + CREATE SCHEMA wipes Supabase's default grants
