@@ -3357,8 +3357,11 @@ const SectionBlock = memo(function SectionBlock({
                                     background: cellEditorTone?.backgroundColor,
                                     border: `1px solid ${cellEditorTone?.borderColor}`,
                                     color: cellEditorTone?.textColor,
-                                    fontSize: "var(--dg-type-badge-size)",
-                                    fontWeight: 600,
+                                    // Two initials at the badge size run wider
+                                    // than this 20px circle, so the marker
+                                    // sizes its own text off the ring instead.
+                                    fontSize: 9,
+                                    fontWeight: 700,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
