@@ -17,7 +17,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { InlineRoleSelect } from "./InlineRoleSelect";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
@@ -161,7 +161,7 @@ function StaffRowCells({
 }: StaffRowCellsProps) {
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
-  const avatarTone = getAvatarTone(emp.id, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(resolveAvatarSeed(emp), resolvedTheme === "dark");
   const displayName = getEmployeeDisplayName(emp);
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);

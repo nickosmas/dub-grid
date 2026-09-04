@@ -22,6 +22,7 @@ import { Screen } from "../../../shared/components/Screen";
 import { SelectionCheck } from "../../../shared/components/SelectionCheck";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import {
   getProfile,
   getProfileChangeRequests,
@@ -108,6 +109,7 @@ export default function ProfileScreen() {
   const { preference, resolvedTheme } = useThemeMode();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
+  const handoff = useModalHandoff();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
   const [switchingOrg, setSwitchingOrg] = useState<OrganizationMembershipOption | null>(null);
@@ -171,7 +173,9 @@ export default function ProfileScreen() {
   // The hero's own badge, shared with both person pages: `ProfileHero` draws
   // the pill, so all this decides is the label and the tone.
   const orgRoleBadge = getMobileOrgRoleHeroBadge(profile?.effectiveRole);
-  const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
+  // Account id, matching every other surface. Seeding off the linked employee
+  // gave the same person a different color here than on the web header.
+  const avatarSeed = profile?.user.id ?? "";
   const avatarTone = avatarSeed ? getAvatarTone(avatarSeed, resolvedTheme === "dark") : null;
   const departmentLabel = profile?.currentOrg.labels.department ?? "Departments";
   // A management user is someone whose membership carries departments — an org
@@ -300,11 +304,19 @@ export default function ProfileScreen() {
     if (!action) return;
 
     if (action.kind === "switch-org") {
-      // Close the picker in the same tick as the confirmation: the
-      // refreshSession() cascade (new accessToken → query refetches → realtime
-      // channel rebuild) must not land while a sheet is still mounted over it.
-      setIsSwitchModalVisible(false);
-      return handleSwitchOrganization(action.membership);
+      // Two modals, one at a time. The confirmation leaves first (above), then
+      // the picker under it — dismissing both in one commit is the case iOS
+      // drops, and it left the picker on screen over the switched org.
+      //
+      // The switch still runs only once the picker is closed, which is what the
+      // same-tick version was protecting: the refreshSession() cascade (new
+      // accessToken → query refetches → realtime channel rebuild) must not land
+      // while a sheet is still mounted over it.
+      handoff(() => {
+        setIsSwitchModalVisible(false);
+        void handleSwitchOrganization(action.membership);
+      });
+      return;
     }
 
     return handleLogout();
@@ -342,7 +354,7 @@ export default function ProfileScreen() {
       onScroll={handleProfileScroll}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      scrollEnabled={!isFillScreenState && contentState.kind !== "loading"}
       scrollEventThrottle={16}
       // Passed only while a switch is in flight: `renderOverlay` costs the
       // screen its native scroll root, which is what drives the iOS large

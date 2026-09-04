@@ -59,11 +59,7 @@ import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import {
-  useIsDarkMode,
-  useMobileColors,
-  useThemeMode,
-} from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
@@ -185,6 +181,11 @@ import {
   getOpenShiftTimeRange,
 } from "../lib/openShiftPresentation";
 
+/**
+ * Shared by the two personal-scope sections that read the shift-requests query,
+ * so a single failure raises a single toast rather than one from each.
+ */
+const SCHEDULE_REQUESTS_ERROR_TOAST_KEY = "schedule-requests-error";
 const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
 const OPEN_SHIFT_STACK_SIDE_INSET = 6;
 const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
@@ -1669,7 +1670,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      scrollEnabled={!isFillScreenState && contentState.kind !== "loading"}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
@@ -1902,7 +1903,7 @@ function MonthDayCell({
       accessibilityLabel={accessible ? `Select ${dateLabel}` : undefined}
       accessibilityRole={accessible ? "button" : undefined}
       accessibilityState={accessible ? { selected: day.isSelected } : undefined}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       onPress={onPress}
       style={styles.monthCalendarDaySlot}
     >
@@ -1950,7 +1951,7 @@ function IconControlButton({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       hitSlop={10}
       onPress={onPress}
       style={({ pressed }) => [
@@ -1972,7 +1973,7 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
     <Pressable
       accessibilityLabel="Open alerts"
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       hitSlop={10}
       onPress={() => router.push("/alerts")}
       style={({ pressed }) => [
@@ -2204,8 +2205,7 @@ function MeTypePill({
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const mobileColors = useMobileColors();
-  const { resolvedTheme } = useThemeMode();
-  const isDark = resolvedTheme === "dark";
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (entries.length === 0) {
@@ -2713,8 +2713,12 @@ function OpenShiftsSection({
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load open shifts",
-        fallbackMessage: "We couldn't load open shifts right now.",
+        title: "Could not load shift requests",
+        fallbackMessage: "We couldn't load shift requests right now.",
+        // This section and the cover-requests section below render together in
+        // personal scope and read the same query, so one failure used to raise
+        // two differently-titled toasts. One failure, one toast.
+        dedupeKey: SCHEDULE_REQUESTS_ERROR_TOAST_KEY,
       });
     }
   }, [requestsError, pushToast]);
@@ -3096,14 +3100,14 @@ function ShiftCoverRequestsSection({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { resolvedTheme } = useThemeMode();
   const { pushToast } = useToast();
   useEffect(() => {
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load requests",
-        fallbackMessage: "We couldn't load cover requests right now.",
+        title: "Could not load shift requests",
+        fallbackMessage: "We couldn't load shift requests right now.",
+        dedupeKey: SCHEDULE_REQUESTS_ERROR_TOAST_KEY,
       });
     }
   }, [requestsError, pushToast]);
@@ -3118,13 +3122,8 @@ function ShiftCoverRequestsSection({
 
       <View style={styles.requestList}>
         {requests.map((request) => {
-          const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
-          const jobChip = getRequestJobChip(
-            mobileColors,
-            resolvedTheme === "dark",
-            request,
-            "requester",
-          );
+          const avatarTone = getAvatarTone(request.requesterEmpId, isDark);
+          const jobChip = getRequestJobChip(mobileColors, isDark, request, "requester");
           const shiftName = getRequestShiftName(request, "requester");
           const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
           const focusAreaName = getRequestFocusAreaName(request, "requester");
@@ -3228,13 +3227,12 @@ function TeamShiftMemberRow({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
-  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(entry.employeeId, isDark);
   const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
-  const roleChip = getTeamMemberRoleChip(mobileColors, resolvedTheme === "dark", entry, segment);
+  const roleChip = getTeamMemberRoleChip(mobileColors, isDark, entry, segment);
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));

@@ -114,7 +114,8 @@ export interface ScheduleGridModel {
   openShifts: GridOpenShift[];
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
-  cellLocks?: Map<string, { userName: string }>;
+  /** Purely informational: who else currently has each cell open. Never blocks. */
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   resolvePublisherName?: (userId: string) => string | null;
   accessors: ScheduleGridAccessors;
   options: ScheduleGridOptions;
@@ -187,7 +188,8 @@ export interface BuildScheduleGridModelInput {
   orgRoles?: NamedItem[];
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
-  cellLocks?: Map<string, { userName: string }>;
+  /** Purely informational: who else currently has each cell open. Never blocks. */
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
   activeFocusArea?: number | null;
@@ -227,7 +229,7 @@ export function buildScheduleGridModel({
   orgRoles = [],
   coverageRequirements,
   absenceTypeMap,
-  cellLocks,
+  cellEditors,
   resolvePublisherName,
   openShifts = [],
   activeFocusArea = null,
@@ -431,7 +433,7 @@ export function buildScheduleGridModel({
     openShifts,
     coverageRequirements,
     absenceTypeMap,
-    cellLocks,
+    cellEditors,
     resolvePublisherName,
     accessors,
     options: {

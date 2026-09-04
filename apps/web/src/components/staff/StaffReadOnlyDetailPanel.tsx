@@ -19,7 +19,7 @@ import type { Employee, FocusArea, NamedItem } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
-import { getAvatarTone, borderColorFromText } from "@dubgrid/design-tokens";
+import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 interface StaffReadOnlyDetailPanelProps {
   employee: Employee;
@@ -65,7 +65,7 @@ export function StaffReadOnlyDetailPanel({
   onClose,
 }: StaffReadOnlyDetailPanelProps) {
   const { resolvedTheme } = useTheme();
-  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(resolveAvatarSeed(employee), resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const onCloseRef = useLatestRef(onClose);
@@ -143,8 +143,7 @@ export function StaffReadOnlyDetailPanel({
                 fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
-                border: `2px solid ${avatarTone.borderColor}`,
-                boxShadow: `0 2px 8px ${borderColorFromText(avatarTone.textColor, 0.15)}`,
+                border: `1px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}

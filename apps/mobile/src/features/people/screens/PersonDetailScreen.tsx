@@ -3,7 +3,6 @@ import {
   Linking,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -49,13 +48,16 @@ import {
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import {
   getDepartmentNames,
   getScheduledDepartmentNames,
   MANAGEMENT_DEPARTMENT_LABELS,
 } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -203,6 +205,14 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  // Why the last write failed, shown inside the surface that failed. These
+  // confirmations and sheets all stay open on error, and they are `<Modal>`s —
+  // their own native windows — so the toasts these handlers used to push
+  // rendered in the root window behind them and were never seen. A failed save
+  // or deactivate simply stopped spinning and said nothing at all. Only one
+  // confirmation is ever open, so the two share one slot.
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
@@ -286,12 +296,11 @@ export default function PersonDetailScreen() {
   const updateMutation = useMutation({
     mutationFn: async (body: MobilePersonUpdateBody) =>
       updateMobilePerson(accessToken!, personId!, body),
+    onMutate: () => setConfirmationError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not save person",
-        fallbackMessage: "We couldn't save those staff details right now.",
-      });
+      setConfirmationError(
+        getClientFriendlyErrorMessage(error, "We couldn't save those staff details right now."),
+      );
     },
     onSuccess: async (result) => {
       updateCachedPerson(result.person);
@@ -316,12 +325,11 @@ export default function PersonDetailScreen() {
         expectedVersion: input.expectedVersion,
         note: input.note,
       }),
+    onMutate: () => setConfirmationError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update status",
-        fallbackMessage: "We couldn't update that teammate right now.",
-      });
+      setConfirmationError(
+        getClientFriendlyErrorMessage(error, "We couldn't update that teammate right now."),
+      );
     },
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
@@ -420,12 +428,14 @@ export default function PersonDetailScreen() {
             email: person.email || undefined,
           });
     },
+    onMutate: () => setManagementAccessError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update management access",
-        fallbackMessage: "We couldn't update their management access right now.",
-      });
+      setManagementAccessError(
+        getClientFriendlyErrorMessage(
+          error,
+          "We couldn't update their management access right now.",
+        ),
+      );
     },
     onSuccess: async (result) => {
       updateCachedPerson(result.person);
@@ -534,8 +544,9 @@ export default function PersonDetailScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
-        onRefresh={manualRefresh.refresh}
-        refreshing={manualRefresh.isRefreshing}
+        // A skeleton must not scroll, and there is nothing to pull-to-refresh
+        // while the profile is still loading.
+        scrollEnabled={false}
       >
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
@@ -641,7 +652,7 @@ export default function PersonDetailScreen() {
           tone: "neutral" as const,
           icon: "mail-open-outline" as const,
         };
-  const avatarTone = getAvatarTone(person.id, isDark);
+  const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
   // does comes from the selected option, not from which button opened it.
@@ -668,6 +679,7 @@ export default function PersonDetailScreen() {
   function closeStatusConfirmation() {
     setConfirmAction(null);
     setDeactivateOutcome("inactive");
+    setConfirmationError(null);
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
     setInactiveNote("");
@@ -1054,8 +1066,12 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body="The staff profile will be updated."
         confirmLabel="Save"
+        error={confirmationError}
         loading={updateMutation.isPending}
-        onCancel={() => setShowSaveConfirmation(false)}
+        onCancel={() => {
+          setConfirmationError(null);
+          setShowSaveConfirmation(false);
+        }}
         onConfirm={confirmSave}
         title="Save these changes?"
         visible={showSaveConfirmation}
@@ -1073,6 +1089,7 @@ export default function PersonDetailScreen() {
               ? "primary"
               : "danger"
         }
+        error={confirmationError}
         loading={statusMutation.isPending}
         onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
@@ -1100,23 +1117,28 @@ export default function PersonDetailScreen() {
           </SelectionSection>
         ) : null}
         {confirmAction === "deactivate" || confirmAction === "remove" ? (
-          <TextInput
-            onChangeText={setInactiveNote}
+          <ProfileTextInput
+            accessibilityLabel="Reason"
+            autoCapitalize="sentences"
+            label="Reason"
             placeholder={
               resolvedStatusAction === "remove"
                 ? "Reason (optional) - e.g. Left the company"
                 : "Reason (optional) - e.g. On leave until June"
             }
-            placeholderTextColor={mobileColors.textSubtle}
-            style={styles.input}
             value={inactiveNote}
+            onChangeText={setInactiveNote}
           />
         ) : null}
       </ConfirmationModal>
       <ManagementAccessSheet
+        error={managementAccessError}
         isPending={managementAccessMutation.isPending}
         managementDepartments={managementDepartments}
-        onDismiss={() => setShowManagementAccess(false)}
+        onDismiss={() => {
+          setManagementAccessError(null);
+          setShowManagementAccess(false);
+        }}
         onRemove={() =>
           new Promise<void>((resolve) => {
             managementAccessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
@@ -1352,6 +1374,8 @@ function EditPanel({
             error={fieldErrors.phone}
             focused={focusedField === "phone"}
             keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
             label="Phone"
             placeholder="Phone"
             value={draft.phone}
@@ -1371,6 +1395,9 @@ function EditPanel({
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
+            autoComplete="email"
+            autoCorrect={false}
+            textContentType="emailAddress"
             label="Email"
             placeholder="Email"
             value={draft.email}
@@ -1490,22 +1517,6 @@ const createStyles = (mobileColors: MobileColors) =>
     noteText: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
-    },
-    input: {
-      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-      // Omitting `fontFamily` also avoids the Android EditText
-      // non-interactive bug when DM Sans hasn't loaded.
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: "400",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      color: mobileColors.textPrimary,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
     },
     modalInfoPanel: {
       backgroundColor: mobileColors.surfaceSecondary,

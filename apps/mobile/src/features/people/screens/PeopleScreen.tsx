@@ -35,9 +35,12 @@ import {
   inviteMobileManagementUser,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import { getDepartmentNames } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -176,6 +179,7 @@ export default function PeopleScreen() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
   const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   /** The roster row whose actions sheet is open, for rows with no staff profile. */
   const [managementUserActions, setManagementUserActions] = useState<MobileManagementUser | null>(
     null,
@@ -235,12 +239,16 @@ export default function PeopleScreen() {
         message: "They'll join management once they accept.",
       });
     },
+    // Inline: the invite sheet stays open on failure, and it is a `<Modal>` —
+    // its own native window — so a toast renders behind it and is never seen.
+    onMutate: () => setInviteError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not send invitation",
-        fallbackMessage: "We couldn't send that management invitation right now.",
-      });
+      setInviteError(
+        getClientFriendlyErrorMessage(
+          error,
+          "We couldn't send that management invitation right now.",
+        ),
+      );
     },
   });
   const manualRefresh = useManualRefresh(() =>
@@ -503,8 +511,12 @@ export default function PeopleScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      // Loading is a non-scrolling state, not a scrolling one: the skeleton is a
+      // placeholder standing in for content, so letting it scroll (and letting a
+      // pull-to-refresh fire on something already loading) is wrong on both
+      // counts. This used to read `contentState.kind === "loading" ||`.
       scrollEnabled={
-        contentState.kind === "loading" ||
+        contentState.kind !== "loading" &&
         !(isManagementTab
           ? contentState.kind === "error" ||
             managementUsers.length === 0 ||
@@ -873,6 +885,10 @@ export default function PeopleScreen() {
                           : "App access"
                       }
                       id={managementUser.id}
+                      avatarSeed={resolveAvatarSeed({
+                        userId: managementUser.userId,
+                        id: managementUser.id,
+                      })}
                       employmentType={null}
                       isLast={index === filteredManagementUsers.length - 1}
                       name={getManagementUserName(managementUser)}
@@ -965,6 +981,7 @@ export default function PeopleScreen() {
                   <PersonRow
                     accessHint={canManageEmployees ? accessHint : null}
                     id={person.id}
+                    avatarSeed={resolveAvatarSeed(person)}
                     employmentType={canManageEmployees ? person.employmentType : null}
                     isLast={index === filteredPeople.length - 1}
                     name={getFullName(person)}
@@ -997,9 +1014,13 @@ export default function PeopleScreen() {
       />
 
       <ManagementUserInviteSheet
+        error={inviteError}
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
-        onDismiss={() => setShowInviteManagementUser(false)}
+        onDismiss={() => {
+          setInviteError(null);
+          setShowInviteManagementUser(false);
+        }}
         onSubmit={(body) =>
           new Promise<void>((resolve) => {
             inviteManagementUserMutation.mutate(body, { onSettled: () => resolve() });
@@ -1084,6 +1105,7 @@ function AddPersonButton({
 
 function PersonRow({
   id,
+  avatarSeed,
   employmentType,
   name,
   navigable,
@@ -1096,6 +1118,8 @@ function PersonRow({
   onPress,
 }: {
   id: string;
+  /** Prefers the linked account id, so a person keeps one color across apps. */
+  avatarSeed: string;
   /** Null for a management-only user, who was never on the schedule. */
   employmentType: MobilePerson["employmentType"] | null;
   name: string;
@@ -1118,7 +1142,7 @@ function PersonRow({
   ]
     .filter(Boolean)
     .join(" - ");
-  const avatarTone = getAvatarTone(id, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const initials =
     name

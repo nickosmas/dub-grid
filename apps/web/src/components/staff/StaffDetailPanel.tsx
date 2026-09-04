@@ -21,7 +21,7 @@ import { InlineRoleSelect } from "./InlineRoleSelect";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
@@ -97,7 +97,7 @@ export function StaffDetailPanel({
   const { resolvedTheme } = useTheme();
   const isInSandbox = useIsInSandbox();
   const isSelf = isSelfAction(currentUser?.id, employee.userId);
-  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(resolveAvatarSeed(employee), resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [open, setOpen] = useState(true);
@@ -222,7 +222,7 @@ export function StaffDetailPanel({
                 fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
-                border: `2px solid ${avatarTone.borderColor}`,
+                border: `1px solid ${avatarTone.borderColor}`,
               }}
             >
               {getInitials(getEmployeeDisplayName(employee))}

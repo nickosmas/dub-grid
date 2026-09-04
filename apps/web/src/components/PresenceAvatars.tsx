@@ -2,18 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { OnlineUser } from "@/hooks/useCellLocks";
+import type { OnlineUser } from "@/hooks/useSchedulePresence";
 import { getAvatarInitials } from "@/lib/utils";
-import { getAvatarGradientTone } from "@dubgrid/design-tokens";
+import { useAvatarTone } from "@/hooks/useAvatarTone";
 
 const MAX_VISIBLE = 4;
 /** Grace for the pointer to travel from the label onto the card without it closing. */
 const ROSTER_CLOSE_DELAY_MS = 160;
-
-function avatarGradient(userId: string): string {
-  const tone = getAvatarGradientTone(userId);
-  return `linear-gradient(135deg, ${tone.gradientFrom}, ${tone.gradientTo})`;
-}
 
 /** Extra detail the roster card shows when it has been loaded for a user. */
 export interface PresenceProfile {
@@ -41,20 +36,23 @@ function Avatar({
   size: number;
   showStatusDot: boolean;
 }) {
+  const tone = useAvatarTone(user.userId);
   return (
     <div
       style={{
         position: "relative",
         width: size,
         height: size,
+        boxSizing: "border-box",
         borderRadius: "50%",
-        background: avatarGradient(user.userId),
+        background: tone.backgroundColor,
+        border: `1px solid ${tone.borderColor}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 700,
-        color: "var(--dg-color-text-inverse)",
+        color: tone.textColor,
         flexShrink: 0,
       }}
     >

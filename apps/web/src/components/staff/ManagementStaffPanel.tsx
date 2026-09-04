@@ -7,7 +7,7 @@ import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
-import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { getInitials, formatRelativeTime, getDirectoryPersonAvatarSeed } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { validatePhone, validateRequired } from "@/components/FormField";
 import {
@@ -386,7 +386,7 @@ export function ManagementStaffPanel({
       ? `${person.firstName} ${person.lastName}`.trim()
       : person.email;
   const initials = getInitials(displayName);
-  const avatarTone = getAvatarTone(person.personId, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(getDirectoryPersonAvatarSeed(person), resolvedTheme === "dark");
 
   const statusConfig = isPending
     ? isExpired
@@ -502,7 +502,7 @@ export function ManagementStaffPanel({
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--dg-color-border-light)"
-                  : `2px solid ${avatarTone.borderColor}`,
+                  : `1px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}

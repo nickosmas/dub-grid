@@ -16,6 +16,7 @@ import dynamic from "next/dynamic";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
+import { useAvatarTone } from "@/hooks/useAvatarTone";
 import {
   SidebarProvider,
   Sidebar,
@@ -389,6 +390,7 @@ export default function GridmasterPortal() {
 
   const displayName = userName || "Gridmaster";
   const initials = getAvatarInitials(userName, "GM");
+  const avatarTone = useAvatarTone(authUser?.id ?? "");
 
   const handleSignOut = useCallback(() => {
     setSigningOut(true);
@@ -812,14 +814,16 @@ export default function GridmasterPortal() {
                 style={{
                   width: 28,
                   height: 28,
+                  boxSizing: "border-box",
                   borderRadius: "50%",
-                  background: "var(--dg-color-brand)",
+                  background: avatarTone.backgroundColor,
+                  border: `1px solid ${avatarTone.borderColor}`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--dg-color-text-inverse)",
+                  color: avatarTone.textColor,
                   flexShrink: 0,
                 }}
               >

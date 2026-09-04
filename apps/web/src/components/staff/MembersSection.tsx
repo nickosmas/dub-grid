@@ -51,7 +51,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
-import { getAvatarInitials } from "@/lib/utils";
+import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -1998,7 +1998,10 @@ export function MembersSection({
                           ? `${person.firstName} ${person.lastName}`.trim()
                           : person.email;
                       const initials = getAvatarInitials(displayName);
-                      const avatarTone = getAvatarTone(person.personId, isDarkTheme);
+                      const avatarTone = getAvatarTone(
+                        getDirectoryPersonAvatarSeed(person),
+                        isDarkTheme,
+                      );
                       const isYou = isSelfAction(currentUserId, person.userId);
 
                       return (

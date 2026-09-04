@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { NamedItem } from "@/types";
+import { NamedItem, type DirectoryPerson } from "@/types";
+import { resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { formatLocalDateKey } from "@dubgrid/schedule-core";
 
 export function cn(...inputs: ClassValue[]) {
@@ -29,6 +30,18 @@ export function getAvatarInitials(name?: string | null, fallback = "?"): string 
   const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || fallback;
+}
+
+/**
+ * Avatar seed for a directory row. `personId` is a prefixed composite
+ * ("u:<uuid>", "inv:<uuid>") and would hash to a different color than the raw
+ * ids presence and the header use, so it is only the last resort.
+ */
+export function getDirectoryPersonAvatarSeed(person: DirectoryPerson): string {
+  return resolveAvatarSeed({
+    userId: person.userId,
+    id: person.employeeId ?? person.personId,
+  });
 }
 
 export function getEmployeeDisplayName(emp: { firstName: string; lastName: string }): string {

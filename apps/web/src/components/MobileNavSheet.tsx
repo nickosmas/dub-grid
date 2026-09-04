@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { Button } from "@/components/Button";
+import type { AvatarTone } from "@dubgrid/design-tokens";
 
 interface MainNavItem {
   id: string;
@@ -21,6 +22,8 @@ interface MobileNavSheetProps {
   isGridmaster: boolean;
   displayName: string;
   initials: string;
+  /** Resolved by Header from the auth user id, so both avatars agree. */
+  avatarTone: AvatarTone;
   roleLabel: string;
   onSignOut: () => void;
   isUserViewActive?: boolean;
@@ -37,6 +40,7 @@ export default function MobileNavSheet({
   isGridmaster,
   displayName,
   initials,
+  avatarTone,
   roleLabel,
   onSignOut,
   isUserViewActive = false,
@@ -224,7 +228,16 @@ export default function MobileNavSheet({
             {/* Footer: Profile + Sign out */}
             <div className="dg-bottom-sheet-footer">
               <div className="dg-bottom-sheet-user">
-                <div className="dg-bottom-sheet-avatar">{initials}</div>
+                <div
+                  className="dg-bottom-sheet-avatar"
+                  style={{
+                    background: avatarTone.backgroundColor,
+                    border: `1px solid ${avatarTone.borderColor}`,
+                    color: avatarTone.textColor,
+                  }}
+                >
+                  {initials}
+                </div>
                 <div>
                   <div className="dg-bottom-sheet-user-name">{displayName}</div>
                   <div className="dg-bottom-sheet-user-role">{roleLabel}</div>

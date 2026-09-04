@@ -30,6 +30,7 @@ import { fetchOrganizationBilling } from "@/features/billing/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
@@ -291,7 +292,7 @@ export default function Header({ orgName }: HeaderProps) {
   });
 
   const { user: authUser } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -354,6 +355,10 @@ export default function Header({ orgName }: HeaderProps) {
 
   const displayName = userName || "Account";
   const initials = getAvatarInitials(userName, "?");
+  // Seeded by auth user id, the same seed presence uses, so you appear to
+  // yourself in the same color your team sees on the schedule grid.
+  const avatarSeed = authUser?.id ?? "";
+  const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const roleLabel = ROLE_LABELS[role] ?? "User";
   const canShowBillingNotice =
     Boolean(orgId) && !isUserViewActive && !isImpersonating && (isSuperAdmin || isGridmaster);
@@ -502,6 +507,7 @@ export default function Header({ orgName }: HeaderProps) {
           isGridmaster={isGridmaster}
           displayName={displayName}
           initials={initials}
+          avatarTone={avatarTone}
           roleLabel={roleLabel}
           onSignOut={handleSignOut}
           isUserViewActive={isUserViewActive}
@@ -695,14 +701,16 @@ export default function Header({ orgName }: HeaderProps) {
               style={{
                 width: 28,
                 height: 28,
+                boxSizing: "border-box",
                 borderRadius: "50%",
-                background: "var(--dg-color-brand)",
+                background: avatarTone.backgroundColor,
+                border: `1px solid ${avatarTone.borderColor}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--dg-color-text-inverse)",
+                color: avatarTone.textColor,
                 flexShrink: 0,
               }}
             >

@@ -15,7 +15,12 @@ import {
   formatHoursLabel,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
-import { getAvatarTone, getHeroGradientCss, heroGradientTokens } from "@dubgrid/design-tokens";
+import {
+  getAvatarTone,
+  getHeroGradientCss,
+  heroGradientTokens,
+  resolveAvatarSeed,
+} from "@dubgrid/design-tokens";
 import { isEmployeeEligibleForOpenShift } from "@/app/(app)/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
@@ -57,6 +62,9 @@ type DashboardScheduleSegment = {
 };
 
 type DashboardScheduleItem = {
+  /** Resolved where the employee record is in hand, so a shiftmate with an
+   *  account matches the color presence gives them. */
+  avatarSeed: string;
   date: Date;
   dateKey: string;
   employeeId: string;
@@ -592,12 +600,14 @@ function buildScheduleItemsFromShiftMap(input: {
 
     const employee = input.employeeById.get(parsedKey.employeeId);
     const employeeName = employee ? formatEmployeeName(employee) : "Staff";
+    const avatarSeed = employee ? resolveAvatarSeed(employee) : parsedKey.employeeId;
     const date = new Date(`${parsedKey.dateKey}T00:00:00`);
     const absenceTypeId = entry.absenceTypeId ?? null;
 
     if (absenceTypeId != null) {
       const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
       items.push({
+        avatarSeed,
         date,
         dateKey: parsedKey.dateKey,
         employeeId: parsedKey.employeeId,
@@ -630,6 +640,7 @@ function buildScheduleItemsFromShiftMap(input: {
       }
 
       items.push({
+        avatarSeed,
         date,
         dateKey: parsedKey.dateKey,
         employeeId: parsedKey.employeeId,
@@ -2084,7 +2095,7 @@ function ShiftmatesRow({
         }}
       >
         {visibleItems.map((item, index) => {
-          const avatarTone = getAvatarTone(item.employeeId, isDarkTheme);
+          const avatarTone = getAvatarTone(item.avatarSeed, isDarkTheme);
 
           return (
             <span

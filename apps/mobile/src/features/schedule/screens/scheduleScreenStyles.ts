@@ -468,7 +468,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       height: 38,
       borderRadius: 19,
       borderWidth: 1,
-      borderColor: "#2946C7",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -480,14 +479,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       height: 38,
       borderRadius: 19,
       borderWidth: 1,
-      borderColor: "#93C5FD",
-      backgroundColor: "#DBEAFE",
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
     meHeroCollaboratorOverflowText: {
       ...mobileText.bodyStrong,
-      color: "#1D4ED8",
+      color: mobileColors.textMuted,
     },
     meSectionBlock: {
       gap: 12,
@@ -975,20 +974,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meCollaboratorRowBorder: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
-    },
-    meCollaboratorAvatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: mobileColors.brandSoft,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    meCollaboratorAvatarText: {
-      ...mobileTextWeighted("meta", "semibold"),
-      color: mobileColors.brand,
     },
     meCollaboratorCopy: {
       flex: 1,

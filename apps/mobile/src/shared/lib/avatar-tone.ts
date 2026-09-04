@@ -1,1 +1,1 @@
-export { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
+export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "@dubgrid/design-tokens";

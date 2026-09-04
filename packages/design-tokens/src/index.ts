@@ -9,12 +9,7 @@ export {
   type AnimatedLogoTiming,
 } from "./animated-logo";
 
-export {
-  getAvatarTone,
-  getAvatarGradientTone,
-  type AvatarTone,
-  type AvatarGradientTone,
-} from "./avatar-tone";
+export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
 
 export {
   mobileIconToneTokens,

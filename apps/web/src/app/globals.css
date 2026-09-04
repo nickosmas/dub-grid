@@ -3342,6 +3342,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* ── Dashboard Card ─────────────────────────────────────── */
 .dg-card {
+  --dg-card-padding-x: 18px;
   background: var(--dg-color-surface);
   border: 1px solid var(--dg-color-border);
   border-radius: var(--dg-radius-md);
@@ -3350,7 +3351,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 .dg-card-header {
-  padding: 14px 18px;
+  padding: 14px var(--dg-card-padding-x);
   border-bottom: 1px solid var(--dg-color-border-light);
   display: flex;
   align-items: center;
@@ -3370,7 +3371,13 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 .dg-card-body {
-  padding: 16px 18px;
+  padding: 16px var(--dg-card-padding-x);
+}
+
+/* Side padding only, for an embedded editor that brings its own vertical rhythm. */
+.dg-card-body-sides {
+  padding-left: var(--dg-card-padding-x);
+  padding-right: var(--dg-card-padding-x);
 }
 
 /* ── Form Layout Helpers ───────────────────────────────── */
@@ -4696,17 +4703,17 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     border-bottom: 1px solid var(--dg-color-border-light);
   }
 
+  /* Colors come from the shared avatar palette, applied inline by the caller. */
   .dg-bottom-sheet-avatar {
     width: 32px;
     height: 32px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: var(--dg-color-brand);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: 700;
-    color: var(--dg-color-on-brand-text);
     flex-shrink: 0;
   }
 

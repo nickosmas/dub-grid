@@ -4,56 +4,89 @@ export type AvatarTone = {
   textColor: string;
 };
 
-export type AvatarGradientTone = {
-  gradientFrom: string;
-  gradientTo: string;
-  textColor: string;
-};
-
-type AvatarPaletteEntry = {
+type AvatarSurface = {
   background: string;
   border: string;
   text: string;
-  gradientTo: string;
 };
 
-// Curated, WCAG AA-verified (>=4.5:1) palette. Replaces continuous hue
-// rotation, which produced low-contrast badges for hues (yellow/green) that
-// read lighter than others at the same fixed HSL lightness. `gradientTo` is
-// a darkened shade of `text` used for presence-avatar gradients so a
-// person's gradient and flat avatar share the same hue family.
-const AVATAR_PALETTE: AvatarPaletteEntry[] = [
-  { background: "#DCE9FE", border: "#B6CEFB", text: "#1D4ED8", gradientTo: "#123086" },
-  { background: "#E3E1FD", border: "#C4C1FB", text: "#4F3CC9", gradientTo: "#31257D" },
-  { background: "#EFE1FE", border: "#DCC4FB", text: "#7E22CE", gradientTo: "#4E1580" },
-  { background: "#FBE1F1", border: "#F5C1E1", text: "#A8156F", gradientTo: "#680D45" },
-  { background: "#FDE1E4", border: "#FAC0C7", text: "#B91C4B", gradientTo: "#73112E" },
-  { background: "#FDECC8", border: "#F9D48A", text: "#92400E", gradientTo: "#5B2809" },
-  { background: "#DBF3E1", border: "#B4E5C2", text: "#0E6B34", gradientTo: "#094220" },
-  { background: "#D3F1EC", border: "#A5E4D8", text: "#0F766E", gradientTo: "#094944" },
-  { background: "#D6EFF7", border: "#AEE0EE", text: "#0E6B8C", gradientTo: "#094257" },
-  { background: "#E4E7EC", border: "#C9CFD9", text: "#374151", gradientTo: "#222832" },
-  { background: "#F0E2D6", border: "#E0C4AC", text: "#7A4A24", gradientTo: "#4C2E16" },
-];
+type AvatarHue = {
+  /** Documentation only, so the array stays readable. */
+  name: string;
+  light: AvatarSurface;
+  dark: AvatarSurface;
+};
 
-// Dark-mode counterpart, same hue order as `AVATAR_PALETTE`. Derived from
-// each light entry's already-saturated `text` hue (not the pale background)
-// so the dark chip reads as a rich, vivid jewel tone rather than a muted
-// gray — same "vibrant, not washed out" treatment as shift pills, with a
-// bright tint of the same hue for text. Each pairing is WCAG AA-verified
-// (>=4.5:1).
-const DARK_AVATAR_PALETTE: Omit<AvatarPaletteEntry, "gradientTo">[] = [
-  { background: "#0C2A80", border: "#24449F", text: "#AABDF2" },
-  { background: "#2E2280", border: "#483C9F", text: "#B3AAF2" },
-  { background: "#4C1080", border: "#68299F", text: "#D0AAF2" },
-  { background: "#800A52", border: "#9F226E", text: "#F2AAD6" },
-  { background: "#800E30", border: "#9F274A", text: "#F2AABF" },
-  { background: "#803406", border: "#9F4F1E", text: "#F2C5AA" },
-  { background: "#0B803B", border: "#239F56", text: "#D4FFE5" },
-  { background: "#0B8076", border: "#239F94", text: "#E6FFFD" },
-  { background: "#076080", border: "#1F7D9F", text: "#AADFF2" },
-  { background: "#365280", border: "#516E9F", text: "#ABC8F5" },
-  { background: "#804B21", border: "#9F673B", text: "#F2CAAA" },
+/**
+ * A person's whole color identity is one row here. Every avatar in both apps
+ * draws this same chip, presence included, so someone looks the same in the
+ * people table, on their own profile, and beside a cell they are editing.
+ *
+ * Generated in OKLCH: ten chromatic slots spaced 36 degrees apart at close to
+ * the highest chroma each hue can hold, plus one desaturated slate. Light
+ * backgrounds sit near L 0.82 so a chip reads as a color, not a tint. Hue alone
+ * cannot separate eleven chips, so adjacent slots also alternate lightness;
+ * that second axis is what stops neighbours like blue and indigo reading as the
+ * same color in a dense list. `avatar-tone.test.ts` gates both properties:
+ * every background/text pairing clears WCAG AA (>=4.5:1), and no two slots fall
+ * within an OKLab deltaE of 0.05.
+ */
+const AVATAR_HUES: AvatarHue[] = [
+  {
+    name: "blue",
+    light: { background: "#AFCDFA", border: "#78ABF7", text: "#174A92" },
+    dark: { background: "#1352A7", border: "#2E6FCD", text: "#B0CEFA" },
+  },
+  {
+    name: "indigo",
+    light: { background: "#C0B1F9", border: "#A385F6", text: "#51398A" },
+    dark: { background: "#522E96", border: "#6D4DB6", text: "#CDC1FA" },
+  },
+  {
+    name: "magenta",
+    light: { background: "#FAACF3", border: "#E47EDC", text: "#722C6E" },
+    dark: { background: "#84297F", border: "#A4499E", text: "#EDB6E7" },
+  },
+  {
+    name: "rose",
+    light: { background: "#F99FB2", border: "#F0688C", text: "#822341" },
+    dark: { background: "#85153D", border: "#AB3157", text: "#FAB4C2" },
+  },
+  {
+    name: "orange",
+    light: { background: "#FABAA1", border: "#F88658", text: "#7E3310" },
+    dark: { background: "#8C3913", border: "#B74D1C", text: "#FABBA3" },
+  },
+  {
+    name: "amber",
+    light: { background: "#F1AF36", border: "#C8912B", text: "#61440F" },
+    dark: { background: "#60440F", border: "#835E19", text: "#EBC487" },
+  },
+  {
+    name: "lime",
+    light: { background: "#CAD657", border: "#A9B430", text: "#4D5211" },
+    dark: { background: "#555B14", border: "#72791D", text: "#CDD590" },
+  },
+  {
+    name: "green",
+    light: { background: "#6ED888", border: "#34B860", text: "#13592B" },
+    dark: { background: "#13582A", border: "#1D793C", text: "#A0DCAC" },
+  },
+  {
+    name: "teal",
+    light: { background: "#43E7D8", border: "#37C1B5", text: "#145952" },
+    dark: { background: "#17635C", border: "#22827A", text: "#87E3D8" },
+  },
+  {
+    name: "cyan",
+    light: { background: "#42CFF9", border: "#31ACCF", text: "#125265" },
+    dark: { background: "#125264", border: "#1D7088", text: "#85D8F5" },
+  },
+  {
+    name: "slate",
+    light: { background: "#B2B8C2", border: "#8F97A6", text: "#3F4754" },
+    dark: { background: "#3F4551", border: "#586170", text: "#C7CBD2" },
+  },
 ];
 
 function hashSeed(value: string): number {
@@ -64,25 +97,28 @@ function hashSeed(value: string): number {
   return Math.abs(hash);
 }
 
-function paletteEntryFor(seed: string): AvatarPaletteEntry {
-  return AVATAR_PALETTE[hashSeed(seed) % AVATAR_PALETTE.length];
+function hueFor(seed: string): AvatarHue {
+  return AVATAR_HUES[hashSeed(seed) % AVATAR_HUES.length];
+}
+
+/**
+ * A person's color identity.
+ *
+ * Prefer the linked account id so presence, the signed-in avatar, and the
+ * people table agree for anyone who can log in: those surfaces only ever know
+ * one id or the other, and seeding them differently gave the same person two
+ * colors. Staff with no account fall back to their employee id.
+ */
+export function resolveAvatarSeed(person: { userId?: string | null; id: string }): string {
+  return person.userId ?? person.id;
 }
 
 export function getAvatarTone(seed: string, isDark = false): AvatarTone {
-  const index = hashSeed(seed) % AVATAR_PALETTE.length;
-  const entry = isDark ? DARK_AVATAR_PALETTE[index] : AVATAR_PALETTE[index];
+  const hue = hueFor(seed);
+  const surface = isDark ? hue.dark : hue.light;
   return {
-    backgroundColor: entry.background,
-    borderColor: entry.border,
-    textColor: entry.text,
-  };
-}
-
-export function getAvatarGradientTone(seed: string): AvatarGradientTone {
-  const entry = paletteEntryFor(seed);
-  return {
-    gradientFrom: entry.text,
-    gradientTo: entry.gradientTo,
-    textColor: "#FFFFFF",
+    backgroundColor: surface.background,
+    borderColor: surface.border,
+    textColor: surface.text,
   };
 }
