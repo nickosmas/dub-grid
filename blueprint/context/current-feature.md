@@ -36,13 +36,28 @@ gets the code and not the table.
 
 ## The fix
 
-Adopt `supabase db push` as the production path, and make migrations tolerant
-enough that the order they land in stops being load-bearing.
+Adopt Supabase branching, now that both Supabase and Vercel are on Pro.
+Branching runs migrations against production when a branch merges, which is the
+mechanism this project has never had, and its Vercel integration points each
+preview deployment at that branch's own database.
+
+Two gaps branching does not close, both of which still need handling:
+
+- **A preview branch starts empty.** `[db.seed].sql_paths` is `[]`, because
+  seeding here is a TypeScript script (`seed.ts`) run after `supabase db reset`,
+  not a SQL path the CLI knows about. Left alone, a preview branch comes up with
+  schema and no organization, no users, and nothing to sign in to.
+- **A preview branch replays onto an empty database.** That proves a clean
+  install, not the upgrade from production's real state, which is where the risk
+  lives given the unknown ledger and the `011` and `007` drift.
+
+Migrations still have to survive landing either side of the code deploy, because
+Supabase migrates on merge and Vercel builds on merge.
 
 | Concern                          | Owner                                                |
 | -------------------------------- | ---------------------------------------------------- |
 | What an environment has received | `supabase_migrations.schema_migrations`, via the CLI |
-| Applying only what is missing    | `supabase db push`                                   |
+| Applying only what is missing    | Branching on merge, or `supabase db push`            |
 | Surviving a code/schema race     | Expand and contract, enforced in review              |
 | Clean installs                   | Canonical `001`-`004`, unchanged                     |
 
@@ -67,7 +82,8 @@ migration. That is the trap the patches were papering over, and it belongs in
       everything except genuinely unapplied migrations.
 
 - [ ] **3. Apply the outstanding migrations.** With the ledger baselined,
-      `supabase db push` should apply only what production lacks, `013` included.
+      branching (or `supabase db push`) should apply only what production lacks,
+      `013` included.
       Note that `011_calendar_feed_tokens.sql` is the one migration that is not
       re-runnable (bare `CREATE TABLE`), so make it idempotent before any push that
       might retry.
@@ -81,12 +97,25 @@ migration. That is the trap the patches were papering over, and it belongs in
       Done when the release checklist names the order and `AGENTS.md` records the
       rule.
 
-- [ ] **5. Guard the invariants.** Add a CI check that applies canonical
-      `001`-`004` to one scratch database and every migration to another, then
-      asserts the two schemas match. Fence `db:reset:remote` to non-production by
-      project ref. Retire `supabase/patches/` once push works.
-      Done when the drift check fails on a deliberately unmirrored change, and
-      `db:reset:remote` refuses the production ref.
+- [ ] **5. Make preview branches usable.** Wire the seed SQL into
+      `[db.seed].sql_paths`, or run `seed.ts` against a freshly created branch, so
+      a preview has an organization to sign in to. Without it branching yields a
+      correct but unusable database.
+      Done when a preview branch accepts a seeded QA account.
+
+- [ ] **6. Rehearse the upgrade, not just the clean install.** Restore a
+      production backup into a persistent branch and take the migration against it
+      before production sees it. Pro now provides the daily backup this depends on,
+      and an untested restore is not a backup.
+      Done when a production-shaped database has taken the migration cleanly.
+
+- [x] **7. Guard the destructive path.** `reset-remote-db.ts` refuses production
+      refs ahead of the typed confirmation, beyond the reach of `CONFIRM_RESET=yes`;
+      overriding requires `ALLOW_PRODUCTION_RESET` to name the exact ref.
+      `db:reset:staging` gives the script a legitimate target. Still open: a CI
+      check that applies canonical `001`-`004` to one scratch database and every
+      migration to another and asserts the schemas match, and retiring
+      `supabase/patches/` once branching is live.
 
 ## Verify
 
