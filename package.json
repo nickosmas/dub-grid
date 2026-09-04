@@ -53,9 +53,6 @@
     "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core"
   },
   "overrides": {
-    "@expo/plist": {
-      "@xmldom/xmldom": "0.8.13"
-    },
     "@hono/node-server": "2.1.0",
     "@opentelemetry/otlp-transformer": {
       "protobufjs": "7.5.9"
@@ -72,7 +69,6 @@
     "@snaplet/seed": {
       "uuid": "^14.0.0"
     },
-    "@xmldom/xmldom": "0.8.13",
     "ajv": {
       "fast-uri": "^3.1.6"
     },
@@ -83,14 +79,12 @@
     "hono": "4.13.0",
     "ip-address": "^10.4.0",
     "next": "16.3.0",
-    "plist": {
-      "@xmldom/xmldom": "0.8.13"
-    },
     "postcss": "8.5.25",
     "posthog-js": {
       "dompurify": "3.4.13"
     },
     "protobufjs": "7.5.9",
+    "qs": "^6.16.0",
     "react-email": {
       "socket.io-parser": "^4.2.7",
       "fast-uri": "^3.1.6"
