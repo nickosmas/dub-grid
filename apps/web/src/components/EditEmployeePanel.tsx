@@ -83,6 +83,9 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
+  /** Drops the editor's own side padding so an embedding card owns the inner
+   *  padding and the fields line up with that card's heading. */
+  flushHorizontal?: boolean;
 }
 
 export interface EditEmployeePanelHandle {
@@ -142,6 +145,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onSaveWithReinvite,
       hideActions,
       persistent = false,
+      flushHorizontal = false,
     }: EditEmployeePanelProps,
     ref,
   ) {
@@ -405,6 +409,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     const canEdit = employee.status === "active" || employee.status === "inactive";
     const readOnly = !canEdit;
+    const sidePadding = flushHorizontal ? "0" : isMobile ? "16px" : "24px";
 
     return (
       <>
@@ -412,11 +417,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           style={{
             padding: isMobile
               ? hideActions
-                ? "16px 16px 0"
-                : "16px 16px 24px"
+                ? `16px ${sidePadding} 0`
+                : `16px ${sidePadding} 24px`
               : hideActions
-                ? "0 24px"
-                : "0 24px 28px",
+                ? `0 ${sidePadding}`
+                : `0 ${sidePadding} 28px`,
           }}
         >
           <div

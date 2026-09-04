@@ -40,6 +40,7 @@ import {
 } from "@/features/organization/client";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
+import { PersonProfileHeader } from "@/components/staff/PersonProfileHeader";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
@@ -142,6 +143,11 @@ export function ProfilePanel({
 }: ProfilePanelProps) {
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
+    user?.email ||
+    "";
 
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
@@ -609,6 +615,16 @@ export function ProfilePanel({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PersonProfileHeader
+        avatarSeed={user?.id ?? employee?.id ?? ""}
+        name={displayName}
+        status={employee && employee.status !== "active" ? employee.status : undefined}
+        email={user?.email ?? employee?.email}
+        phone={employee?.phone}
+        employmentType={employee?.employmentType}
+        employeeNumber={employee?.employeeNumber}
+      />
+
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="flex items-start justify-between gap-3">
@@ -627,7 +643,7 @@ export function ProfilePanel({
               e.preventDefault();
               requestSave();
             }}
-            className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3"
+            className="flex flex-col gap-5"
           >
             {canEditProfileDirectly && (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -712,6 +728,7 @@ export function ProfilePanel({
               </div>
             </div>
             <EditEmployeePanel
+              flushHorizontal
               ref={workEditorRef}
               employee={employee}
               focusAreas={focusAreas}

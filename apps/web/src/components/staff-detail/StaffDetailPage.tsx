@@ -581,7 +581,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             id: "profile",
             label: "Profile",
             Icon: ProfileIcon,
-            description: "Account and work details for this staff member.",
           },
           {
             id: "overview",
@@ -753,22 +752,25 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   </div>
 
                   {canEditDetails ? (
-                    <EditEmployeePanel
-                      employee={employee}
-                      orgId={orgId ?? undefined}
-                      focusAreas={focusAreas}
-                      certifications={certifications}
-                      roles={orgRoles}
-                      focusAreaLabel={org?.focusAreaLabel}
-                      certificationLabel={org?.certificationLabel}
-                      roleLabel={org?.roleLabel}
-                      isManagementUser={directoryPerson?.isManagementUser}
-                      persistent
-                      onSave={handleSaveEmployee}
-                      onCancel={() => {}}
-                      pendingInvitation={pendingInvite ?? undefined}
-                      onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-                    />
+                    <div className="dg-card-body-sides">
+                      <EditEmployeePanel
+                        flushHorizontal
+                        employee={employee}
+                        orgId={orgId ?? undefined}
+                        focusAreas={focusAreas}
+                        certifications={certifications}
+                        roles={orgRoles}
+                        focusAreaLabel={org?.focusAreaLabel}
+                        certificationLabel={org?.certificationLabel}
+                        roleLabel={org?.roleLabel}
+                        isManagementUser={directoryPerson?.isManagementUser}
+                        persistent
+                        onSave={handleSaveEmployee}
+                        onCancel={() => {}}
+                        pendingInvitation={pendingInvite ?? undefined}
+                        onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+                      />
+                    </div>
                   ) : (
                     <div className="dg-card-body grid gap-4 sm:grid-cols-2">
                       <ProfileField
