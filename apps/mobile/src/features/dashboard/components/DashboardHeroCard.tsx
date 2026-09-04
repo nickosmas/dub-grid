@@ -172,20 +172,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: 10,
     },
-    // White and lifted, like the card it sits in, rather than a grey inset
-    // panel. `cardBorder` rather than a fixed hairline so it follows the app's
-    // one rule for a raised surface: light mode separates by shadow alone, dark
-    // mode keeps the edge because a shadow on near-black is invisible.
-    //
-    // `overflow: hidden` is deliberately gone — it clips the very shadow that
-    // now draws this tile's shape.
+    // Kept boxed, unlike the empty-state panel. These three tiles are nothing
+    // but text, so a soft hairline is the only thing grouping each label with
+    // its number. Borderless, the columns ran together and the values stopped
+    // reading as a row. `control` radius nests inside the card's.
     tile: {
-      // Delineated by a hairline, not by a fill or a shadow. An inner section
-      // still needs an edge to read as its own group, but it sits on a card
-      // that is already lifted — a second shadow there muddies the first, and a
-      // tinted fill puts grey back on a white card. `control` radius rather
-      // than `card`: a nested corner needs a tighter curve than its container's
-      // to read as concentric.
       flexGrow: 1,
       flexBasis: "30%",
       minWidth: 0,
@@ -218,7 +209,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       // Nudge into the tile's top-right corner, matching the shared Card
       // component's icon treatment. Kept smaller than the tile's own padding
-      // (12) so it stays inside the tile's overflow:hidden bounds.
+      // (12) so it stays inside the tile's bounds.
       marginTop: -4,
       marginRight: -4,
     },

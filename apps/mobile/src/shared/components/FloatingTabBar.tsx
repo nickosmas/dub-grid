@@ -9,6 +9,7 @@ import { useMotionPreference } from "../motion/useMotionPreference";
 import { getScreenGutter } from "./screen-layout";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE_FIXED,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -155,7 +156,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
               />
             </TabIconPill>
             <Text
-              maxFontSizeMultiplier={1.3}
+              maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
               numberOfLines={1}
               style={[styles.label, focused ? styles.labelActive : styles.labelInactive]}
             >

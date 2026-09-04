@@ -17,6 +17,7 @@ import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileElevation,
   mobileRadii,
   mobileText,
@@ -148,7 +149,7 @@ export function ProfileHero({
               <View style={styles.avatarFrame}>
                 <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                   <Text
-                    maxFontSizeMultiplier={1.5}
+                    maxFontSizeMultiplier={MAX_FONT_SCALE}
                     style={[
                       styles.avatarText,
                       isCentered && styles.avatarTextLarge,

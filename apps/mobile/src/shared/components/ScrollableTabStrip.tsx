@@ -247,11 +247,18 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 14,
       paddingVertical: mobileSpace.sm,
       borderRadius: mobileRadii.pill,
-      borderWidth: 0,
+      // Same hairline the shared SegmentedControl carries: the neutral fill
+      // alone sits at 1.22:1 on a white page, so the border is what actually
+      // draws an idle tab's edge.
+      borderWidth: 1,
+      borderColor: mobileColors.controlNeutralBorder,
       backgroundColor: mobileColors.controlNeutralBg,
     },
     tabActive: {
       backgroundColor: mobileColors.brand,
+      // The active tab keeps the same 1pt geometry, with the edge folded into
+      // its own fill, since a grey hairline on a brand pill reads as an outline.
+      borderColor: mobileColors.brand,
     },
     label: {
       ...mobileText.bodyStrong,

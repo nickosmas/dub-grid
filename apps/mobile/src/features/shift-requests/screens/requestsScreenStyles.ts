@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native";
 import {
   mobileElevation,
   mobileRadii,
+  mobileRadius,
   mobileSpace,
   mobileSpacing,
   mobileText,
@@ -168,13 +169,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
     jobPillCompact: {
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       paddingHorizontal: 9,
       paddingVertical: 5,
     },
@@ -214,7 +215,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     mentoredPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,

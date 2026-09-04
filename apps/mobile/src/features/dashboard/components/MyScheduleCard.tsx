@@ -9,7 +9,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileRadii,
+  mobileRadius,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -25,11 +25,10 @@ import { ExpandButton } from "./ExpandButton";
 const PILL_WIDTH = 124;
 const PILL_GAP = 6;
 const DAY_CARD_GAP = 10;
-// The pill sits mobileRadii.control (12px) inset inside the day card, which
-// shares that same 12px radius — a nested corner needs a noticeably smaller
-// radius than its container's to read as a smooth, concentric curve rather
-// than a disconnected shape, so this stays well under the day card's.
-const PILL_RADIUS = 6;
+// The pill is now the only bounded shape in the day column, so this is the
+// radius the strip reads at rather than a nested corner inside a bigger one.
+// The chip step of the shared ramp (card 20 / panel 12 / chip 8).
+const PILL_RADIUS = mobileRadius.md;
 // Explicit min-height, shared by the worked-shift pill and the empty-day
 // placeholder, sized for 3 stacked lines (name/job/time) so every pill is
 // the same height regardless of whether a given shift has a job name or a
@@ -301,23 +300,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: DAY_CARD_GAP,
       paddingHorizontal: 18,
     },
-    // White and lifted rather than a grey inset panel, matching the card it sits
-    // in. `cardBorder` already follows the app's rule for a raised surface:
-    // transparent in light mode, where the shadow draws the shape, and a
-    // hairline in dark mode, where a shadow on near-black is invisible.
+    // No box. The shift pill below already carries its own fill and edge, so a
+    // hairline around the day only drew a second container inside the card:
+    // the day header and the gap between days do that job on their own.
     dayCard: {
-      // Delineated by a hairline, not by a fill or a shadow. An inner section
-      // still needs an edge to read as its own group, but it sits on a card
-      // that is already lifted — a second shadow there muddies the first, and a
-      // tinted fill puts grey back on a white card. `control` radius rather
-      // than `card`: a nested corner needs a tighter curve than its container's
-      // to read as concentric.
       minWidth: PILL_WIDTH,
       gap: 8,
-      padding: 12,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
     },
     dayHeader: {
       ...mobileText.label,

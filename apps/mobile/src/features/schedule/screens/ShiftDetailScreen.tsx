@@ -46,6 +46,7 @@ import {
 } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
   mobileBorderColorFromText,
   mobileDarkenTone,
   mobileRadii,
@@ -111,6 +112,18 @@ import {
   type RequestMode,
   type ShiftmateSegmentGroup,
 } from "../lib/shiftDetailHelpers";
+// The chip vocabulary is shared with the schedule home card rather than
+// re-derived here. The two had drifted: the local copies dropped the
+// supervisor/nurse/mentor tone heuristics, so the same job rendered coloured on
+// the home card and flat grey on this one.
+import {
+  buildAbsenceChip,
+  buildGeneralShiftChip,
+  buildJobChip,
+  hasMentoredSegments,
+  shouldShowMePrimaryTitle,
+  type JobChip,
+} from "../lib/scheduleScreenChips";
 import {
   ACTION_SEGMENT_OPTION_RADIUS,
   ACTION_SEGMENT_PANEL_PADDING,
@@ -131,160 +144,21 @@ const ACTIVE_SHIFT_REQUEST_STATUSES = new Set<MobileShiftRequest["status"]>([
   "open",
   "pending_approval",
 ]);
-type ChipTone = {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
-};
-type DetailChipKind = "job" | "general" | "absence";
-type DetailChip = ChipTone & {
-  kind: DetailChipKind;
-  label: string;
-  eyebrowLabel?: string | null;
-};
-type AbsenceColorSource = Pick<
-  MobileScheduleEntry["presentation"],
-  "shiftColor" | "shiftBorderColor" | "shiftTextColor"
->;
 type EyebrowDisplay = "inside" | "outside";
-
-function buildDetailJobChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: {
-    jobColor?: string | null;
-    jobBorderColor?: string | null;
-    jobTextColor?: string | null;
-  } | null,
-): DetailChip | null {
-  const trimmedLabel = label?.trim() ?? "";
-  const jobColor = readOptionalColor(colorSource?.jobColor);
-  const jobBorderColor = readOptionalColor(colorSource?.jobBorderColor);
-  const jobTextColor = readOptionalColor(colorSource?.jobTextColor);
-
-  if (!trimmedLabel) {
-    return null;
-  }
-
-  if (jobColor) {
-    return {
-      kind: "job",
-      label: trimmedLabel,
-      ...mobileDarkenTone(
-        {
-          backgroundColor: jobColor,
-          borderColor: mobileVisiblePillBorder(
-            jobBorderColor,
-            jobTextColor ?? mobileColors.textMuted,
-          ),
-          textColor: jobTextColor ?? mobileColors.textMuted,
-        },
-        isDark,
-      ),
-    };
-  }
-
-  return {
-    kind: "job",
-    label: trimmedLabel,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textMuted,
-  };
-}
-
-function buildDetailGeneralShiftChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: {
-    jobColor?: string | null;
-    jobBorderColor?: string | null;
-    jobTextColor?: string | null;
-  } | null,
-): DetailChip | null {
-  const chip = buildDetailJobChip(mobileColors, isDark, label, colorSource);
-
-  if (!chip) {
-    return null;
-  }
-
-  return {
-    ...chip,
-    kind: "general",
-    eyebrowLabel: "General shift",
-  };
-}
-
-function buildDetailAbsenceChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: AbsenceColorSource | null,
-): DetailChip | null {
-  const trimmedLabel = label?.trim() ?? "";
-  const absenceColor = readOptionalStyleColor(colorSource?.shiftColor);
-  const absenceBorderColor = readOptionalStyleColor(colorSource?.shiftBorderColor);
-  const absenceTextColor = readOptionalStyleColor(colorSource?.shiftTextColor);
-
-  if (!trimmedLabel) {
-    return null;
-  }
-
-  if (absenceColor) {
-    return {
-      kind: "absence",
-      label: trimmedLabel,
-      eyebrowLabel: "Absence",
-      ...mobileDarkenTone(
-        {
-          backgroundColor: absenceColor,
-          borderColor: mobileVisiblePillBorder(
-            absenceBorderColor,
-            absenceTextColor ?? mobileColors.textMuted,
-          ),
-          textColor: absenceTextColor ?? mobileColors.textMuted,
-        },
-        isDark,
-      ),
-    };
-  }
-
-  return {
-    kind: "absence",
-    label: trimmedLabel,
-    eyebrowLabel: "Absence",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textMuted,
-  };
-}
-
-function hasMentoredSegments(
-  segments: ReadonlyArray<{ isMentored?: boolean | null }> | null | undefined,
-): boolean {
-  return segments?.some((segment) => segment.isMentored === true) ?? false;
-}
 
 function getEntryJobChip(
   mobileColors: MobileColors,
   isDark: boolean,
   entry: MobileScheduleEntry,
-): DetailChip | null {
+): JobChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildDetailAbsenceChip(
-      mobileColors,
-      isDark,
-      getScheduleEntryTitle(entry),
-      entry.presentation,
-    );
+    return buildAbsenceChip(mobileColors, isDark, getScheduleEntryTitle(entry), entry.presentation);
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
 
   if (isGeneralDetailSegment(primarySegment)) {
-    return buildDetailGeneralShiftChip(
+    return buildGeneralShiftChip(
       mobileColors,
       isDark,
       getScheduleEntryTitle(entry),
@@ -299,16 +173,16 @@ function getEntryJobChip(
     return null;
   }
 
-  return buildDetailJobChip(mobileColors, isDark, label, segment);
+  return buildJobChip(mobileColors, isDark, label, segment);
 }
 
 function buildSegmentJobChip(
   mobileColors: MobileColors,
   isDark: boolean,
   segment: MobileScheduleEntrySegment,
-): DetailChip | null {
+): JobChip | null {
   if (isGeneralDetailSegment(segment)) {
-    return buildDetailGeneralShiftChip(
+    return buildGeneralShiftChip(
       mobileColors,
       isDark,
       segment.shiftName ?? segment.label ?? null,
@@ -322,7 +196,7 @@ function buildSegmentJobChip(
     return null;
   }
 
-  return buildDetailJobChip(mobileColors, isDark, label, segment);
+  return buildJobChip(mobileColors, isDark, label, segment);
 }
 
 function MentoredPill() {
@@ -885,6 +759,10 @@ export default function ShiftDetailScreen() {
   }
   const isViewingOtherEmployee = Boolean(shiftEntry && shiftEntry.employeeId !== linkedEmployeeId);
   const detailTitleChip = !hasMultipleSegments ? jobChip : null;
+  // Same rule the home card applies: when the chip already names the thing (an
+  // absence type, a general shift), the heading above it would only repeat the
+  // word, so the eyebrow and the pill carry it alone.
+  const shouldShowDetailTitle = shouldShowMePrimaryTitle(detailCardTitle, detailTitleChip);
   const shouldRenderTitlePills = Boolean(
     hasSplitShift || detailTitleChip || primarySegment?.isMentored,
   );
@@ -1132,7 +1010,11 @@ export default function ShiftDetailScreen() {
           <View style={styles.shiftDetailCard} testID="shift-detail-card">
             <View style={styles.detailHeroHeader}>
               <View style={styles.detailHeroCopy}>
-                <Text style={styles.detailHeroTitle}>{detailCardTitle}</Text>
+                {shouldShowDetailTitle ? (
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailHeroTitle}>
+                    {detailCardTitle}
+                  </Text>
+                ) : null}
                 {shouldRenderTitlePills ? (
                   <View style={styles.detailHeroPillRow}>
                     {hasSplitShift ? (
@@ -1167,23 +1049,13 @@ export default function ShiftDetailScreen() {
               ) : null}
               {!hasMultipleSegments && focusAreaName ? (
                 <DetailInfoRow
-                  iconBackgroundColor={mobileColors.successSoft}
-                  iconBorderColor={mobileColors.successBorder}
-                  iconColor={mobileColors.successText}
                   iconName="location-outline"
                   label="Focus area"
                   value={focusAreaName}
                 />
               ) : null}
               {!hasMultipleSegments && timeRange ? (
-                <DetailInfoRow
-                  iconBackgroundColor={mobileColors.brandSoft}
-                  iconBorderColor={mobileColors.brandBorder}
-                  iconColor={mobileColors.brand}
-                  iconName="time-outline"
-                  label="Shift time"
-                  value={timeRange}
-                />
+                <DetailInfoRow iconName="time-outline" label="Shift time" value={timeRange} />
               ) : null}
             </View>
 
@@ -1713,53 +1585,40 @@ function DetailHeaderJobPill({
   chip,
   isMentored = false,
 }: {
-  chip: DetailChip | null;
+  chip: JobChip | null;
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
 
-  const accessibilityLabel = chip.eyebrowLabel
-    ? `${chip.eyebrowLabel} ${chip.label}${isMentored ? " mentored assignment" : ""}`
-    : `Job ${chip.label}${isMentored ? " mentored assignment" : ""}`;
-  const label = chip.eyebrowLabel ?? chip.label;
+  // Same shape as the home card's MeTypePill: the kind ("Absence", "General
+  // shift") is an eyebrow above the pill, and the pill itself carries the
+  // name. This header used to render `eyebrowLabel ?? label`, so an absence
+  // showed a pill reading "Absence" and never named the absence type.
+  if (!chip.eyebrowLabel) {
+    return <DetailJobPill chip={chip} isMentored={isMentored} />;
+  }
 
   return (
-    <View
-      accessibilityLabel={accessibilityLabel}
-      style={[
-        styles.detailHeaderJobPill,
-        {
-          backgroundColor: chip.backgroundColor,
-          borderColor: chip.borderColor,
-        },
-      ]}
-    >
-      <Text style={[styles.detailHeaderJobPillText, { color: chip.textColor }]}>{label}</Text>
-      {isMentored ? (
-        <Text style={[styles.detailHeaderJobPillMentoredText, { color: chip.textColor }]}>
-          (Mentored)
-        </Text>
-      ) : null}
+    <View style={styles.detailHeaderJobPillStack}>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailHeaderJobPillEyebrow}>
+        {chip.eyebrowLabel}
+      </Text>
+      <DetailJobPill chip={chip} eyebrowDisplay="outside" isMentored={isMentored} />
     </View>
   );
 }
 
 function DetailInfoRow({
-  iconBackgroundColor,
-  iconBorderColor,
-  iconColor,
   iconName,
   label,
   value,
 }: {
-  iconBackgroundColor: string;
-  iconBorderColor: string;
-  iconColor: string;
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
@@ -1769,17 +1628,16 @@ function DetailInfoRow({
 
   return (
     <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
-      <View
-        style={[
-          styles.detailInfoIconBox,
-          { backgroundColor: iconBackgroundColor, borderColor: iconBorderColor },
-        ]}
-      >
-        <Ionicons color={iconColor} name={iconName} size={16} />
+      <View style={styles.detailInfoIcon}>
+        <Ionicons color={mobileColors.textMuted} name={iconName} size={16} />
       </View>
       <View style={styles.detailInfoCopy}>
-        <Text style={styles.detailInfoLabel}>{label}</Text>
-        <Text style={styles.detailInfoValue}>{value}</Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
+          {label}
+        </Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoValue}>
+          {value}
+        </Text>
       </View>
     </View>
   );
@@ -1863,7 +1721,7 @@ function DetailJobPill({
   eyebrowDisplay = "inside",
   isMentored = false,
 }: {
-  chip: DetailChip | null;
+  chip: JobChip | null;
   eyebrowDisplay?: EyebrowDisplay;
   isMentored?: boolean;
 }) {
@@ -2029,7 +1887,7 @@ function ShiftmateRow({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
         >
           {getInitials(entry.employeeName)}

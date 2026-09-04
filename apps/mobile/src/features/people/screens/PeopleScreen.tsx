@@ -49,6 +49,7 @@ import {
 } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -1167,7 +1168,7 @@ function PersonRow({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.personAvatarText, { color: avatarTone.textColor }]}
         >
           {initials}

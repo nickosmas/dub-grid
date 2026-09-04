@@ -14,6 +14,7 @@ import { useAsyncAction } from "../hooks/useAsyncAction";
 import { usePressAnimation, type PressHaptic } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileMotion,
   mobileRadius,
   mobileRadii,
@@ -197,7 +198,10 @@ export function Button({
         {isBusy ? <ActivityIndicator color={labelColor} size="small" /> : null}
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
-          <Text style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}>
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}
+          >
             {content}
           </Text>
         ) : null}

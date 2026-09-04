@@ -234,8 +234,19 @@ export const toastToneTokens = {
   warning: { background: "#D97706", border: "#92400E" },
 } as const;
 
+/**
+ * The three named surface roles, and the nesting ramp between them: a card is
+ * `card`, a panel or tile sitting directly on a card is `control`, and a chip
+ * or pill inside that is `mobileRadiusTokens.md`. Each step down is 8, which is
+ * what keeps a nested corner reading as concentric with the one around it.
+ *
+ * Anything that is visually a card uses `card`, not a local number. Mobile card
+ * surfaces had drifted to four different values (16, 22, 24 and 28) across the
+ * dashboard, the schedule hero, the Your Week card and team groups, which is
+ * the drift this vocabulary exists to prevent.
+ */
 export const radiusTokens = {
-  card: 16,
+  card: 20,
   control: 12,
   pill: 999,
 } as const;

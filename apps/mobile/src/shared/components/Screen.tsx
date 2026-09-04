@@ -23,6 +23,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileElevation,
   mobileRadii,
   mobileSpace,
@@ -385,12 +386,18 @@ export function Card({
           a section heading over its content rather than inside it. */}
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderCopy}>
-          <Text style={styles.cardTitle}>{title}</Text>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardTitle}>
+            {title}
+          </Text>
         </View>
         {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
       </View>
       <View style={styles.card}>
-        {body ? <Text style={styles.cardBody}>{body}</Text> : null}
+        {body ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardBody}>
+            {body}
+          </Text>
+        ) : null}
         {detail}
       </View>
     </View>
@@ -437,18 +444,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: mobileColors.borderSubtle,
-      // The level named for exactly this ("hairline lift: sticky headers once
-      // the content scrolls under them"). The fill and the hairline do the
-      // separating; the shadow only keeps the bar from looking pasted on.
-      ...mobileElevation("raised", isDark),
-      // ...but not its `elevation: 1`. On Android that number is also the draw
-      // order, and the cards scrolling underneath sit at the `card` level's 2 —
-      // at 1 the header would render *behind* them. This shell is an earlier
-      // sibling than the scroll view, so it loses ties too, and has to clear
-      // both outright.
-      elevation: 4,
+      // No divider. The bar separates from the content scrolling under it by
+      // shadow alone, which is what the `header` level exists for, and why it
+      // is heavier than the `raised` lift it replaced, which only ever had to
+      // stop a bordered bar looking pasted on. Its `elevation` also clears the
+      // `card`-level tiles beneath it on Android, where that number doubles as
+      // draw order and this shell is the earlier sibling, so it loses ties.
+      ...mobileElevation("header", isDark),
     },
     nonScrollStickyHeaderShell: {
       // Overrides `stickyHeaderShell`'s absolute positioning: nothing scrolls

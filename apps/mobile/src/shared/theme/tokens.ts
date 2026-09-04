@@ -138,6 +138,22 @@ const MOBILE_LIGHT = {
    * anything lighter needs a border or a shadow bought back first.
    */
   controlNeutralBg: "#E5E9EE",
+  /**
+   * Edge for the neutral control fills above: the segmented-control track and
+   * the tab strip's idle tabs.
+   *
+   * Its own token because neither existing border works here. `borderSubtle`
+   * (#E2E8F0) and `border` are tuned against `surface` and `background`, which
+   * are white; against a light-grey control fill of nearly the same value
+   * `borderSubtle` measures 1.01:1 and is drawn but invisible.
+   *
+   * Deliberately softer than `border` (#CBD5E1, 1.22:1 here), which read as a
+   * hard outline around what is meant to be a quiet control. This lands at
+   * 1.12:1 on the fill: present as a hairline, not as a stroke. That is close
+   * to the floor. Below about 1.06 it stops registering at all and the
+   * invisible-border bug comes back.
+   */
+  controlNeutralBorder: "#D6DDE5",
   /** Secondary control fill. On a white card: 1.09 -> 1.28. */
   controlSecondaryBg: "#D6E4FB",
   /**
@@ -190,6 +206,13 @@ const MOBILE_DARK = {
   /** Dark surfaces already separate well, so the page background is unchanged. */
   background: darkColorTokens.background,
   controlNeutralBg: "#26262B",
+  /**
+   * Dark counterpart, softened alongside the light one. A dark hairline needs
+   * more ratio than a light one to read at the same strength (the previous
+   * pair sat at 1.22:1 light against 1.34:1 dark), so this holds that
+   * relationship at the softer end: 1.20:1 against the fill.
+   */
+  controlNeutralBorder: "#333339",
   controlSecondaryBg: "#1B2E4E",
   /** Brighter than light mode's, to stay legible on a dark fill. */
   controlSecondaryFg: "#7FB0FF",
@@ -344,6 +367,31 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
     textColor: resolved.text,
   };
 }
+
+/**
+ * How far the OS text-size setting is allowed to scale mobile type.
+ *
+ * React Native honours that setting with no ceiling of its own, and the OS
+ * ceilings are high: iOS Larger Text reaches 310% and Android 200%. Uncapped, a
+ * 17px row title renders at 53px, which no card layout survives.
+ *
+ * 1.5 is the ceiling this app holds. It gives someone who has raised their text
+ * size most of what they asked for while leaving the fixed-size furniture (date
+ * tiles, shift pills, count badges) able to hold its content.
+ *
+ * A cap is the second line of defence, not the first. The first is a layout
+ * that grows: rows stack rather than sit in two columns, containers use
+ * `minHeight` rather than `height`, and nothing that must stay readable is
+ * pinned to a fixed width. The Your Week row is the worked example: it used to
+ * put the shift name and the time in two columns with the time refusing to
+ * shrink, so a raised text size squeezed the name into a column narrow enough
+ * to break "Visiting Nursing" mid-word.
+ *
+ * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for the few surfaces whose
+ * height genuinely cannot move, such as the floating tab bar.
+ */
+export const MAX_FONT_SCALE = 1.5;
+export const MAX_FONT_SCALE_FIXED = 1.3;
 
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 

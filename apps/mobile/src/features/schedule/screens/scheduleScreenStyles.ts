@@ -3,6 +3,7 @@ import {
   mobileElevation,
   mobileMotion,
   mobileRadii,
+  mobileRadius,
   mobileSpacing,
   mobileText,
   mobileTextWeighted,
@@ -34,22 +35,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     stickyControlsSection: {
       gap: 16,
-    },
-    scheduleCalendarStickyHeaderShell: {
-      // Everything this used to restate — the fill, the shadow, the Android
-      // elevation — now comes from `Screen`'s own `stickyHeaderShell`, which
-      // paints the bar `surface` and lifts it at the `raised` level. Overriding
-      // the fill here is what made this header the one that stayed page-colored
-      // when that shell went white, and the local `elevation: 2` quietly undid
-      // the shell's draw-order fix, letting `card`-level tiles paint over the
-      // bar on Android.
-      //
-      // What is left is the one thing the schedule genuinely needs differently:
-      // a thinner but darker divider. The grid scrolling under this bar is far
-      // denser than the dashboard's stack of cards, and `borderSubtle` gets
-      // lost against it.
-      borderBottomWidth: 0.5,
-      borderBottomColor: mobileColors.border,
     },
     mePage: {
       gap: 22,
@@ -144,7 +129,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroCard: {
       position: "relative",
       overflow: "hidden",
-      borderRadius: 24,
+      borderRadius: mobileRadii.card,
       paddingHorizontal: 18,
       paddingVertical: 18,
       shadowOffset: {
@@ -230,7 +215,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDateTile: {
       minWidth: 58,
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: "rgba(255, 255, 255, 0.22)",
       backgroundColor: "rgba(255, 255, 255, 0.14)",
@@ -425,7 +410,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "#42E878",
     },
     meHeroCollaborators: {
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: "rgba(255, 255, 255, 0.14)",
       flexDirection: "row",
@@ -508,7 +493,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     upcomingHoursBadge: {
-      borderRadius: 12,
+      borderRadius: mobileRadii.control,
       backgroundColor: mobileColors.brandSoft,
       paddingHorizontal: 14,
       paddingVertical: 9,
@@ -519,7 +504,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     upcomingShiftsCard: {
       backgroundColor: mobileColors.surface,
-      borderRadius: 28,
+      borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: 20,
@@ -533,7 +518,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: 20,
     },
     upcomingDateColumn: {
-      width: 60,
+      // minWidth, not width: at a raised OS text size the weekday and day
+      // labels grow, and a hard width clips them instead of letting the column
+      // take the room.
+      minWidth: 60,
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: 18,
@@ -568,17 +556,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.brandSoft,
     },
     upcomingShiftRowTodayFirst: {
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      borderTopLeftRadius: mobileRadii.card,
+      borderTopRightRadius: mobileRadii.card,
     },
     upcomingShiftRowTodayLast: {
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
+      borderBottomLeftRadius: mobileRadii.card,
+      borderBottomRightRadius: mobileRadii.card,
     },
     upcomingDateTile: {
-      width: 60,
+      minWidth: 60,
       minHeight: 68,
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceMuted,
@@ -610,14 +598,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
       gap: 9,
     },
-    upcomingShiftTitleRow: {
-      // flex-start (not center) so the time stays pinned to the title's first
-      // line instead of drifting to the vertical middle when a long shift name
-      // wraps to two lines.
-      alignItems: "flex-start",
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: 8,
+    // Title over time, not beside it. Tighter than `upcomingShiftCopy`'s gap so
+    // the two read as one heading block, with the focus area and type pill
+    // spaced further below.
+    upcomingShiftHeading: {
+      gap: 4,
     },
     upcomingShiftTitleMeta: {
       flex: 1,
@@ -639,14 +624,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSecondary,
     },
     upcomingShiftTime: {
-      flexShrink: 0,
+      alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      // upcomingShiftTitle's line-height (sectionTitle preset) adds leading
-      // space above its glyphs that this shorter icon+text row doesn't have —
-      // nudge down so it lines up with the title's actual text, not its box top.
-      paddingTop: 3,
     },
     // Smaller and lighter than upcomingShiftTitle (17px) — the time is
     // secondary to the shift name, not competing with it for attention.
@@ -885,13 +866,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
     jobPillCompact: {
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       paddingHorizontal: 9,
       paddingVertical: 5,
     },
@@ -928,7 +909,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     mentoredPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,
@@ -995,7 +976,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     timelineEntryCard: {
       backgroundColor: mobileColors.surface,
-      borderRadius: 22,
+      borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       padding: 16,
@@ -1257,7 +1238,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     teamGroupCard: {
       backgroundColor: mobileColors.surface,
-      borderRadius: 28,
+      borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: 20,
@@ -1330,7 +1311,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     teamMemberRoleChip: {
       borderWidth: 1,
-      borderRadius: 7,
+      borderRadius: mobileRadius.md,
       paddingHorizontal: 10,
       paddingVertical: 7,
     },

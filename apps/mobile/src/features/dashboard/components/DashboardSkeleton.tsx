@@ -12,6 +12,7 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import {
   mobileElevation,
   mobileRadii,
+  mobileRadius,
   mobileSpace,
   mobileSpacing,
   type MobileColors,
@@ -283,13 +284,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: 10,
     },
+    // Boxed, matching DashboardHeroCard's tiles.
     tile: {
-      // Delineated by a hairline, not by a fill or a shadow. An inner section
-      // still needs an edge to read as its own group, but it sits on a card
-      // that is already lifted — a second shadow there muddies the first, and a
-      // tinted fill puts grey back on a white card. `control` radius rather
-      // than `card`: a nested corner needs a tighter curve than its container's
-      // to read as concentric.
       flexBasis: "30%",
       flexGrow: 1,
       gap: 6,
@@ -368,23 +364,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 10,
       overflow: "hidden",
     },
+    // Borderless, matching MyScheduleCard's day cards.
     dayCard: {
-      // Delineated by a hairline, not by a fill or a shadow. An inner section
-      // still needs an edge to read as its own group, but it sits on a card
-      // that is already lifted — a second shadow there muddies the first, and a
-      // tinted fill puts grey back on a white card. `control` radius rather
-      // than `card`: a nested corner needs a tighter curve than its container's
-      // to read as concentric.
       gap: 8,
       minWidth: 124,
-      padding: 12,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
     },
     shiftPill: {
       backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 6,
+      borderRadius: mobileRadius.md,
       minHeight: 71,
       width: 124,
     },

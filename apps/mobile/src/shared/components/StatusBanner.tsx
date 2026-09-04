@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { MAX_FONT_SCALE, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
@@ -102,8 +102,20 @@ export function StatusBanner({
       <View style={styles.copyRow}>
         <Ionicons color={palette.iconColor} name={palette.iconName} size={24} style={styles.icon} />
         <View style={styles.copy}>
-          <Text style={[styles.title, { color: palette.titleColor }]}>{title}</Text>
-          {body ? <Text style={[styles.body, { color: palette.bodyColor }]}>{body}</Text> : null}
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={[styles.title, { color: palette.titleColor }]}
+          >
+            {title}
+          </Text>
+          {body ? (
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={[styles.body, { color: palette.bodyColor }]}
+            >
+              {body}
+            </Text>
+          ) : null}
         </View>
       </View>
       {actionLabel && onAction ? (
@@ -143,8 +155,14 @@ function CenteredStatus({
       {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
       <Ionicons color={iconColor} name={iconName} size={32} />
       <View style={centeredStyles.copy}>
-        <Text style={centeredStyles.title}>{title}</Text>
-        {body ? <Text style={centeredStyles.body}>{body}</Text> : null}
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.title}>
+          {title}
+        </Text>
+        {body ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.body}>
+            {body}
+          </Text>
+        ) : null}
       </View>
       {actionLabel && onAction ? (
         // Wrapped, not placed directly: `fullWidth={false}` gives the button

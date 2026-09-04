@@ -60,6 +60,8 @@ import { useMobileContentState } from "../../../shared/hooks/useMobileContentSta
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
+  MAX_FONT_SCALE_FIXED,
   mobileBorderColorFromText,
   mobileMotion,
   mobileRadii,
@@ -1663,7 +1665,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
-      stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
       <View>
         {/* The focus-area pills carry per-day counts, so they can't paint before
@@ -1907,7 +1908,7 @@ function MonthDayCell({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
           style={[
             styles.dateHighlightText,
             day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
@@ -2256,7 +2257,10 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text maxFontSizeMultiplier={1.5} style={styles.meHeroCollaboratorOverflowText}>
+              <Text
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.meHeroCollaboratorOverflowText}
+              >
                 +{overflowCount}
               </Text>
             </View>
@@ -2548,8 +2552,12 @@ function UpcomingShiftsSection({
             >
               <View style={styles.upcomingDateColumn}>
                 <View style={styles.upcomingDateTile}>
-                  <Text style={styles.upcomingDateWeekday}>{dateParts.weekdayLabel}</Text>
-                  <Text style={styles.upcomingDateDay}>{dateParts.dayLabel}</Text>
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateWeekday}>
+                    {dateParts.weekdayLabel}
+                  </Text>
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateDay}>
+                    {dateParts.dayLabel}
+                  </Text>
                   {isToday ? (
                     <View
                       pointerEvents="none"
@@ -2579,20 +2587,32 @@ function UpcomingShiftsSection({
                         style={styles.upcomingShiftRow}
                       >
                         <View style={styles.upcomingShiftCopy}>
-                          {shouldShowShiftName || splitSegments.length > 1 ? (
-                            <View style={styles.upcomingShiftTitleRow}>
-                              <View style={styles.upcomingShiftTitleMeta}>
-                                {shouldShowShiftName ? (
-                                  <Text style={styles.upcomingShiftTitle}>{shiftName}</Text>
-                                ) : null}
-                                {splitSegments.length > 1 ? (
-                                  <SplitShiftBadge
-                                    count={splitSegments.length}
-                                    compact
-                                    label={splitShiftLabel}
-                                  />
-                                ) : null}
-                              </View>
+                          {/* Title and time stack rather than sitting in two
+                              columns. Side by side, the time never gave width
+                              back, so at a raised OS text size the name was
+                              squeezed into a column narrow enough to break
+                              mid-word ("Visitin / g Nursin / g"). */}
+                          {shouldShowShiftName || splitSegments.length > 1 || timeRange ? (
+                            <View style={styles.upcomingShiftHeading}>
+                              {shouldShowShiftName || splitSegments.length > 1 ? (
+                                <View style={styles.upcomingShiftTitleMeta}>
+                                  {shouldShowShiftName ? (
+                                    <Text
+                                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                      style={styles.upcomingShiftTitle}
+                                    >
+                                      {shiftName}
+                                    </Text>
+                                  ) : null}
+                                  {splitSegments.length > 1 ? (
+                                    <SplitShiftBadge
+                                      count={splitSegments.length}
+                                      compact
+                                      label={splitShiftLabel}
+                                    />
+                                  ) : null}
+                                </View>
+                              ) : null}
                               {timeRange ? (
                                 <View style={styles.upcomingShiftTime}>
                                   <Ionicons
@@ -2600,29 +2620,29 @@ function UpcomingShiftsSection({
                                     name="time-outline"
                                     size={14}
                                   />
-                                  <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
+                                  <Text
+                                    maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                    style={styles.upcomingShiftTimeText}
+                                  >
+                                    {timeRange}
+                                  </Text>
                                 </View>
                               ) : null}
                             </View>
                           ) : null}
                           {focusAreaName ? (
-                            <Text style={styles.upcomingShiftArea}>{focusAreaName}</Text>
+                            <Text
+                              maxFontSizeMultiplier={MAX_FONT_SCALE}
+                              style={styles.upcomingShiftArea}
+                            >
+                              {focusAreaName}
+                            </Text>
                           ) : null}
                           <MeTypePill
                             chip={typeChip}
                             compact
                             isMentored={item.segment.isMentored === true}
                           />
-                          {timeRange && !shouldShowShiftName && splitSegments.length <= 1 ? (
-                            <View style={styles.upcomingShiftTime}>
-                              <Ionicons
-                                color={mobileColors.textMuted}
-                                name="time-outline"
-                                size={14}
-                              />
-                              <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
-                            </View>
-                          ) : null}
                         </View>
 
                         <View style={styles.upcomingShiftAction}>
@@ -3146,7 +3166,7 @@ function ShiftCoverRequestsSection({
                     ]}
                   >
                     <Text
-                      maxFontSizeMultiplier={1.5}
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
                       {getInitials(request.requesterName)}
@@ -3243,7 +3263,7 @@ function TeamShiftMemberRow({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
         >
           {getInitials(entry.employeeName)}

@@ -4,7 +4,13 @@ import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 
 export type ChipTone = "neutral" | "brand" | "success" | "warning" | "danger";
@@ -61,7 +67,10 @@ export function Chip({
           size={mobileText.label.fontSize}
         />
       ) : null}
-      <Text style={[mobileText.label, { color: mobileColors[palette.label] }]}>
+      <Text
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={[mobileText.label, { color: mobileColors[palette.label] }]}
+      >
         {children ?? label}
       </Text>
     </>
