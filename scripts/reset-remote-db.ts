@@ -3,6 +3,36 @@ import { createInterface } from "node:readline/promises";
 import { connectSqlClient } from "./lib/db-client";
 
 /**
+ * Project refs this script will not drop, whatever the operator types.
+ *
+ * A staging project makes this script routine, and routine is exactly when a
+ * stale `.env.remote` or a copied command reaches the wrong database. The ref
+ * is not a secret: it is the hostname of the public API URL.
+ *
+ * Overriding is deliberately awkward. `ALLOW_PRODUCTION_RESET` has to name the
+ * exact ref, so no blanket truthy value opens it, and `CONFIRM_RESET=yes` does
+ * not bypass it: automation can skip the prompt but never the denylist.
+ */
+const PRODUCTION_PROJECT_REFS = new Set(
+  (process.env.PRODUCTION_PROJECT_REFS ?? "xpoylacxkbphnudsupuu")
+    .split(",")
+    .map((ref) => ref.trim())
+    .filter(Boolean),
+);
+
+function refuseProductionReset(ref: string): void {
+  if (!PRODUCTION_PROJECT_REFS.has(ref)) return;
+  if (process.env.ALLOW_PRODUCTION_RESET === ref) {
+    console.warn(`\n⚠️  Production reset explicitly authorised for "${ref}".\n`);
+    return;
+  }
+  console.error(`\n✗ "${ref}" is a production project. This script drops the public schema.`);
+  console.error("  Point .env.remote at staging, or run migrations with `supabase db push`.");
+  console.error(`  To override deliberately: ALLOW_PRODUCTION_RESET=${ref}`);
+  process.exit(1);
+}
+
+/**
  * Require the operator to type the project ref back before we DROP its schema
  * (L-8). The only prior guard was `url.includes("supabase.co")`, which production
  * also passes. Skipped when CONFIRM_RESET=yes (for intentional automation).
@@ -50,6 +80,7 @@ async function main() {
   }
 
   const ref = new URL(supabaseUrl).hostname.split(".")[0];
+  refuseProductionReset(ref);
   await confirmDestructiveReset(ref);
   console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
 
