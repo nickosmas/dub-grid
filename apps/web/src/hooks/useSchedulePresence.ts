@@ -71,8 +71,12 @@ interface UseSchedulePresenceReturn {
   announceEditingCell: (cellKey: string | null) => void;
   /** Applies one `editing_cell` broadcast from a peer. */
   handleEditingCellBroadcast: (payload: unknown) => void;
-  /** Which other editor, if any, currently has this cell open. */
-  getCellEditor: (cellKey: string) => OnlineUser | null;
+  /**
+   * Which other editor has each cell open, keyed by cell. Built from positions
+   * rather than from the roster, so two tabs belonging to one person show a
+   * marker on both cells rather than only the representative one.
+   */
+  editingCells: Map<string, { userId: string; userName: string }>;
 }
 
 const PRESENCE_RETRY_BASE_MS = 400;
@@ -524,27 +528,14 @@ export function useSchedulePresence(
     return stable;
   }, [editorSessionId, remoteSessions, cellBySession, currentUser?.id]);
 
-  const getCellEditor = useCallback(
-    (cellKey: string): OnlineUser | null => {
-      for (const [sessionId, held] of cellBySession) {
-        if (held !== cellKey) continue;
-        const session = remoteSessions.get(sessionId);
-        if (!session) continue;
-        const currentUserId = currentUser?.id ?? null;
-        return {
-          editorSessionId: session.editorSessionId,
-          userId: session.userId,
-          userName: session.userName,
-          editingCell: cellKey,
-          canLockCells: session.canLockCells,
-          isSameUser: currentUserId != null && session.userId === currentUserId,
-          sessionCount: 1,
-        };
-      }
-      return null;
-    },
-    [cellBySession, remoteSessions, currentUser?.id],
-  );
+  const editingCells = useMemo(() => {
+    const map = new Map<string, { userId: string; userName: string }>();
+    for (const [sessionId, cellKey] of cellBySession) {
+      const session = remoteSessions.get(sessionId);
+      if (session) map.set(cellKey, { userId: session.userId, userName: session.userName });
+    }
+    return map;
+  }, [cellBySession, remoteSessions]);
 
   return {
     refreshPresence,
@@ -558,6 +549,6 @@ export function useSchedulePresence(
     isPresenceDegraded,
     announceEditingCell,
     handleEditingCellBroadcast,
-    getCellEditor,
+    editingCells,
   };
 }

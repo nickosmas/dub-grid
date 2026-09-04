@@ -203,7 +203,7 @@ describe("peer positions", () => {
       result.current.handleEditingCellBroadcast({ editorSessionId: THEIRS, cellKey: CELL }),
     );
 
-    expect(result.current.getCellEditor(CELL)).toMatchObject({ userName: "Riley RN" });
+    expect(result.current.editingCells.get(CELL)).toMatchObject({ userName: "Riley RN" });
     expect(result.current.onlineUsers[0].editingCell).toBe(CELL);
   });
 
@@ -220,7 +220,7 @@ describe("peer positions", () => {
       result.current.handleEditingCellBroadcast({ editorSessionId: THEIRS, cellKey: null }),
     );
 
-    expect(result.current.getCellEditor(CELL)).toBeNull();
+    expect(result.current.editingCells.get(CELL)).toBeUndefined();
   });
 
   // A crashed tab never says goodbye, so its marker has to fade on its own.
@@ -233,13 +233,13 @@ describe("peer positions", () => {
     act(() =>
       result.current.handleEditingCellBroadcast({ editorSessionId: THEIRS, cellKey: CELL }),
     );
-    expect(result.current.getCellEditor(CELL)).not.toBeNull();
+    expect(result.current.editingCells.get(CELL)).toBeDefined();
 
     act(() => {
       vi.advanceTimersByTime(EDITING_CELL_STALE_MS + EDITING_CELL_REANNOUNCE_MS);
     });
 
-    expect(result.current.getCellEditor(CELL)).toBeNull();
+    expect(result.current.editingCells.get(CELL)).toBeUndefined();
   });
 
   it("ignores an echo of our own position", () => {
@@ -248,7 +248,7 @@ describe("peer positions", () => {
 
     act(() => result.current.handleEditingCellBroadcast({ editorSessionId: MINE, cellKey: CELL }));
 
-    expect(result.current.getCellEditor(CELL)).toBeNull();
+    expect(result.current.editingCells.get(CELL)).toBeUndefined();
   });
 
   it("drops a removed session's marker with the session", () => {
@@ -262,7 +262,7 @@ describe("peer positions", () => {
 
     act(() => result.current.removeRemoteSession(THEIRS));
 
-    expect(result.current.getCellEditor(CELL)).toBeNull();
+    expect(result.current.editingCells.get(CELL)).toBeUndefined();
     expect(result.current.onlineUsers).toHaveLength(0);
   });
 });

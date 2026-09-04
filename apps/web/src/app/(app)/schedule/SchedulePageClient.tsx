@@ -30,7 +30,6 @@ import {
   ScheduleSessionWarning,
 } from "./_components/ScheduleSessionDialogs";
 import { resolveGridAuditLabel } from "./_lib/grid-audit-label";
-import { generateSeriesDates } from "@/lib/series-dates";
 import {
   buildGridCalloffOpenShiftsFromRequests,
   countPendingVolunteerRequestsForCoverageGap,
@@ -103,7 +102,6 @@ import {
   deleteShiftBatch,
   deleteShiftSeries,
   discardScheduleDrafts,
-  endScheduleEditorSession,
   endScheduleEditorSessions,
   fetchCalloffOpenShifts,
   fetchPublishedDateRanges,
@@ -192,7 +190,6 @@ import {
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
-import { describeEditingCell } from "./_lib/presence-labels";
 import {
   PublishChangeSummary,
   type PublishActiveEditor,
@@ -363,10 +360,6 @@ function SchedulerContent() {
   const employeeNameById = useMemo(
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
-  );
-  const describePresenceCell = useCallback(
-    (cellKey: string) => describeEditingCell(cellKey, employeeNameById),
-    [employeeNameById],
   );
   const [presenceProfiles, setPresenceProfiles] = useState<Map<string, PresenceProfile>>(
     () => new Map(),
@@ -1204,7 +1197,7 @@ function SchedulerContent() {
     syncPresence,
     announceEditingCell,
     handleEditingCellBroadcast,
-    getCellEditor,
+    editingCells,
   } = useSchedulePresence(
     realtimeChannelRef,
     currentUser,
@@ -1217,15 +1210,6 @@ function SchedulerContent() {
    * Who else has each cell open. Informational only: the grid draws a marker and
    * nothing consults it before allowing an edit.
    */
-  const peerEditingCells = useMemo(() => {
-    const map = new Map<string, { userId: string; userName: string }>();
-    for (const user of onlineUsers) {
-      if (user.editingCell)
-        map.set(user.editingCell, { userId: user.userId, userName: user.userName });
-    }
-    return map;
-  }, [onlineUsers]);
-
   const localSessionEndedRef = useRef(isSessionEnded);
   localSessionEndedRef.current = isSessionEnded;
 
@@ -4062,7 +4046,6 @@ function SchedulerContent() {
         const previousShifts = shiftsRef.current;
         const previousNotes = notesRef.current;
         await (pendingShiftWrites.current.get(session.cellKey) ?? Promise.resolve());
-        const seriesId = seriesScope === "all" ? (session.baseShift?.seriesId ?? null) : null;
         if (!guardActiveSession()) return;
 
         const currentShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
@@ -4450,13 +4433,6 @@ function SchedulerContent() {
       if (!seriesInput || (seriesInput.kind === "worked" && seriesInput.segments.length === 0)) {
         return;
       }
-      const occurrenceCellKeys = generateSeriesDates(
-        frequency,
-        daysOfWeek,
-        startDate,
-        endDate,
-        maxOccurrences,
-      ).map((dateKey) => `${editPanel.empId}_${dateKey}`);
       if (!guardActiveSession()) return;
       setIsCreatingRepeatSeries(true);
       startScheduleOperation({
@@ -4843,8 +4819,8 @@ function SchedulerContent() {
   const handlePasteShift = useCallback(
     (empId: string, date: Date) => {
       if (!clipboard) return;
-      const cellKey = `${empId}_${formatDateKey(date)}`;
       if (!guardActiveSession()) return;
+      const cellKey = `${empId}_${formatDateKey(date)}`;
 
       // Check if target employee qualifies for the pasted shift
       const clipboardAssignmentDefinitionIds = getInputAssignmentDefinitionIds(clipboard);
@@ -4888,7 +4864,6 @@ function SchedulerContent() {
 
   const handleClearShift = useCallback(
     (empId: string, date: Date) => {
-      const cellKey = `${empId}_${formatDateKey(date)}`;
       if (!guardActiveSession()) return;
       const emp = employees.find((e) => e.id === empId);
       const empName = emp ? getEmployeeDisplayName(emp) : "";
@@ -5604,7 +5579,7 @@ function SchedulerContent() {
         useCompactRoleCertificationLabels: org?.useCompactRoleCertificationLabels ?? false,
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
-        cellEditors: peerEditingCells,
+        cellEditors: editingCells,
         resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
         openShifts,
         activeFocusArea,
@@ -5654,7 +5629,7 @@ function SchedulerContent() {
       orgRoles,
       coverageRequirements,
       absenceTypeObjectMap,
-      peerEditingCells,
+      editingCells,
       auditNames,
       openShifts,
       activeFocusArea,
@@ -5734,7 +5709,7 @@ function SchedulerContent() {
   }, [
     canEditShifts,
     isMobile,
-    peerEditingCells,
+    editingCells,
     scheduleGridModel.columns,
     scheduleGridModel.departments,
     shiftForKey,
