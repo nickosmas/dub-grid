@@ -8,6 +8,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { InlineError } from "../../../shared/components/InlineError";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import {
@@ -54,6 +55,7 @@ export function ManagementUserAccessSheet({
   managementUser,
   managementDepartments,
   isPending,
+  error,
   onDismiss,
   onSubmit,
 }: {
@@ -61,6 +63,11 @@ export function ManagementUserAccessSheet({
   managementUser: MobileManagementUser;
   managementDepartments: MobileDepartment[];
   isPending: boolean;
+  /**
+   * Why the last submit failed. The sheet stays open on error, and a toast
+   * pushed from inside a `<Modal>` renders in the root window behind it.
+   */
+  error?: string | null;
   onDismiss: () => void;
   onSubmit: (draft: Draft) => Promise<unknown>;
 }) {
@@ -185,6 +192,8 @@ export function ManagementUserAccessSheet({
             ) : null}
           </View>
         </View>
+
+        {error ? <InlineError message={error} /> : null}
 
         <SheetActions>
           <Button

@@ -145,7 +145,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: mobileSpace.xl,
       gap: mobileSpace.lg,
       ...mobileElevation("card", isDark),
@@ -172,17 +172,28 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: 10,
     },
+    // White and lifted, like the card it sits in, rather than a grey inset
+    // panel. `cardBorder` rather than a fixed hairline so it follows the app's
+    // one rule for a raised surface: light mode separates by shadow alone, dark
+    // mode keeps the edge because a shadow on near-black is invisible.
+    //
+    // `overflow: hidden` is deliberately gone — it clips the very shadow that
+    // now draws this tile's shape.
     tile: {
+      // Delineated by a hairline, not by a fill or a shadow. An inner section
+      // still needs an edge to read as its own group, but it sits on a card
+      // that is already lifted — a second shadow there muddies the first, and a
+      // tinted fill puts grey back on a white card. `control` radius rather
+      // than `card`: a nested corner needs a tighter curve than its container's
+      // to read as concentric.
       flexGrow: 1,
       flexBasis: "30%",
       minWidth: 0,
-      overflow: "hidden",
-      backgroundColor: mobileColors.surfaceSecondary,
+      padding: 12,
+      gap: 6,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      padding: 12,
-      gap: 6,
     },
     tileHeader: {
       flexDirection: "row",

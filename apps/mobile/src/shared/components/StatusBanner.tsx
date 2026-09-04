@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
+import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
@@ -133,26 +134,29 @@ function CenteredStatus({
 }) {
   const mobileColors = useMobileColors();
   const centeredStyles = useMemo(() => createCenteredStyles(mobileColors), [mobileColors]);
-  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
-  // reliably fills the non-scrolling container's remaining space and centers
-  // within it, with none of the viewport-height guessing a ScrollView forces.
-  const fillStyle = fillScreen
-    ? {
-        flex: 1,
-        justifyContent: "center" as const,
-      }
-    : null;
-
+  // `Screen`'s `contentContainerStyle` carries `flexGrow: 1`, so `flex: 1` here
+  // claims the viewport's leftover space even inside a scroll view, and the two
+  // spacers place the message within it. See `fill-screen-anchor` for why not
+  // dead centre.
   return (
-    <View style={[centeredStyles.card, fillStyle]}>
+    <View style={[centeredStyles.card, fillScreen ? fillScreenAnchorStyles.fill : null]}>
+      {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
       <Ionicons color={iconColor} name={iconName} size={32} />
       <View style={centeredStyles.copy}>
         <Text style={centeredStyles.title}>{title}</Text>
         {body ? <Text style={centeredStyles.body}>{body}</Text> : null}
       </View>
       {actionLabel && onAction ? (
-        <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
+        // Wrapped, not placed directly: `fullWidth={false}` gives the button
+        // `alignSelf: "flex-start"`, and that beats the `alignItems: "center"`
+        // on the card around it — so the action sat hard left under centred
+        // copy. The wrapper is the flex child that stretches, and the button
+        // centres inside it. `EmptyStateCard` solves it the same way.
+        <View style={centeredStyles.actionRow}>
+          <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
+        </View>
       ) : null}
+      {fillScreen ? <View style={fillScreenAnchorStyles.spacerBelow} /> : null}
     </View>
   );
 }
@@ -199,6 +203,10 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
     },
     copy: {
       gap: 6,
+      alignItems: "center",
+    },
+    actionRow: {
+      alignSelf: "stretch",
       alignItems: "center",
     },
     title: {

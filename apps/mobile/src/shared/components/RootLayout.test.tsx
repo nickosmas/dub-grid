@@ -206,9 +206,11 @@ describe("RootLayout", () => {
     expect(screen.getByTestId("app-lock-provider")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
     expect(screen.getByTestId("stack")).toBeInTheDocument();
+    // The light page is plain white; the navigation theme has to follow it or
+    // the bar behind a screen transition flashes the old grey.
     expect(navigationThemeValues.at(-1)?.colors).toMatchObject({
-      background: "#EFF2F6",
-      card: "#EFF2F6",
+      background: "#FFFFFF",
+      card: "#FFFFFF",
     });
   });
 });

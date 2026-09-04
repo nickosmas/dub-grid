@@ -344,17 +344,17 @@ export default function ProfileScreen() {
     setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
   }
 
-  const isFillScreenState =
-    contentState.kind === "error" ||
-    (contentState.kind !== "loading" && (contentState.kind === "empty" || !profile));
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
       onScroll={handleProfileScroll}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState && contentState.kind !== "loading"}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
       scrollEventThrottle={16}
       // Passed only while a switch is in flight: `renderOverlay` costs the
       // screen its native scroll root, which is what drives the iOS large

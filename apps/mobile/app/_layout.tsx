@@ -12,6 +12,7 @@ import {
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getMobileNavigationTheme } from "@dubgrid/design-tokens";
 import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRealtimeProvider";
@@ -171,7 +172,22 @@ function RootLayoutSurface({
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: mobileColors.background }}>
-      <RootLayoutContent envValidation={envValidation} />
+      {/* The single owner of keyboard geometry for the whole app. Everything
+          that moves for the keyboard reads from here: `Screen`, `AuthShell` and
+          the bottom sheet. Before this there were three separate mechanisms and
+          none of them did anything on Android except rely on `adjustResize`.
+
+          No `statusBarTranslucent` / `navigationBarTranslucent` /
+          `preserveEdgeToEdge` here. They only apply when the library manages
+          edge-to-edge itself; this app is already edge-to-edge through
+          react-native-edge-to-edge (the SDK 54 default), which owns the system
+          bars, so the library ignores all three and warns on every launch if
+          they are passed. The sheet's own `<Modal>` still needs its pair of
+          translucency props — that is a different window and a different
+          mechanism (see `BottomSheetModal`). */}
+      <KeyboardProvider>
+        <RootLayoutContent envValidation={envValidation} />
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

@@ -81,6 +81,7 @@ export default function ForgotPasswordScreen() {
             hasError={Boolean(error)}
             inputAccessoryViewID={inputAccessoryViewID}
             keyboardType="email-address"
+            textContentType="emailAddress"
             onChangeText={(value) => {
               setEmail(value);
               if (error) setError(null);
@@ -98,7 +99,7 @@ export default function ForgotPasswordScreen() {
           <Button
             label="Send reset code"
             loading={submitting}
-            onPress={() => void requestReset()}
+            onPress={() => requestReset()}
             size="lg"
           />
           <Button

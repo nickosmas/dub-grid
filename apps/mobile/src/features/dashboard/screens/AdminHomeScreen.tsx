@@ -79,6 +79,8 @@ export function AdminHomeScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
+        // A skeleton stands in for content; it must not scroll.
+        scrollEnabled={false}
         stickyHeader={contentState.showSkeleton ? <DashboardHeaderSkeleton /> : undefined}
       >
         {contentState.showSkeleton ? (
@@ -100,7 +102,6 @@ export function AdminHomeScreen() {
         bottomPaddingMode="tabbed"
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
-        scrollEnabled={false}
       >
         <StatusBanner
           actionLabel="Try again"
@@ -125,7 +126,6 @@ export function AdminHomeScreen() {
         bottomPaddingMode="tabbed"
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
-        scrollEnabled={false}
       >
         <EmptyStateCard
           actionLabel="Refresh"

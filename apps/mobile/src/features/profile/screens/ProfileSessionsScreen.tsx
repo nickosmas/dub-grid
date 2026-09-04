@@ -10,6 +10,7 @@ import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { getProfileSessions, revokeProfileSession } from "../../../shared/lib/api";
 import {
@@ -19,9 +20,10 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { Collapsible } from "../../../shared/motion/Collapsible";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -56,9 +58,11 @@ type SessionConfirmation =
  */
 export default function ProfileSessionsScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
+  const handoff = useModalHandoff();
   const [openSession, setOpenSession] = useState<MobileProfileSession | null>(null);
   const [isScopeSheetVisible, setScopeSheetVisible] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<SessionConfirmation | null>(null);
@@ -144,13 +148,20 @@ export default function ProfileSessionsScreen() {
     if (!action) return;
 
     if (action.kind === "scope") {
-      // Close the sheet in the same tick: a global sign-out tears the session
+      // One modal at a time: the confirmation has already gone, the sheet
+      // follows once it has finished leaving. Tearing both down in one commit
+      // is the case iOS drops, which left the scope sheet up over a signed-out
+      // app. The sign-out still runs after the sheet is closed, which is what
+      // the same-tick version was for — a global sign-out tears the session
       // down underneath whatever is still mounted over it.
-      setScopeSheetVisible(false);
-      return handleSessionAction(action.scope);
+      handoff(() => {
+        setScopeSheetVisible(false);
+        void handleSessionAction(action.scope);
+      });
+      return;
     }
 
-    setOpenSession(null);
+    handoff(() => setOpenSession(null));
     return revokeMutation.mutateAsync(action.session.refreshTokenHash).then(
       () => undefined,
       () => undefined,
@@ -175,7 +186,7 @@ export default function ProfileSessionsScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "error"}
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
@@ -183,7 +194,7 @@ export default function ProfileSessionsScreen() {
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
           fillScreen
           title="Could not load sessions"
@@ -297,7 +308,8 @@ function SessionRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const label = formatSessionDeviceLabel(session);
 
   return (
@@ -331,7 +343,7 @@ function SessionRow({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     sessionList: {
       backgroundColor: mobileColors.surface,
@@ -339,6 +351,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",
+      ...mobileElevation("card", isDark),
     },
     sessionRow: {
       alignItems: "center",

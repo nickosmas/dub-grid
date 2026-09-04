@@ -30,7 +30,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderRadius: mobileRadii.card,
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       marginTop: 12,
       marginBottom: 8,
       padding: mobileSpace.xl,
@@ -138,8 +138,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 2,
     },
     detailInfoLabel: {
+      // Sentence case, not all caps: a shouted label competes with the card
+      // title above it, and reads as chrome rather than as a heading.
       ...mobileText.label,
-      textTransform: "uppercase",
       color: mobileColors.textSubtle,
     },
     detailInfoValue: {
@@ -427,9 +428,10 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderColor: mobileColors.cardBorder,
     },
     swapSummaryLabel: {
+      // Sentence case, not all caps: a shouted label competes with the card
+      // title above it, and reads as chrome rather than as a heading.
       ...mobileText.label,
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
     },
     swapSummaryTitle: {
       ...mobileText.rowTitle,

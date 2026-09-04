@@ -117,6 +117,28 @@ describe("AddPersonScreen", () => {
     render(<AddPersonScreen />);
   }
 
+  it("says the form could not load rather than rendering it with empty pickers", () => {
+    // Gating on `isLoading` alone let a failed bootstrap fall straight through
+    // to the form, which then showed an empty Assignments picker next to a live
+    // "Select at least one" error, and no way to retry. That is the exact state
+    // the loading branch exists to avoid.
+    const refetch = vi.fn();
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error("boom"),
+      refetch,
+    });
+
+    renderWithMutation();
+
+    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+    expect(screen.getByText("Could not load this form")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("disables submit until first name, last name, and a focus area are set", () => {
     renderWithMutation();
 

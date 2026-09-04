@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenBottomPadding } from "./screen-layout";
 
 function getIssueTitle(key: string): string {
@@ -45,7 +45,8 @@ export function ConfigurationScreen({
   validation: Extract<MobileEnvValidation, { status: "invalid" }>;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
 
   return (
@@ -85,7 +86,7 @@ export function ConfigurationScreen({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -105,6 +106,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 12,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
+      ...mobileElevation("card", isDark),
     },
     eyebrow: {
       ...mobileText.label,

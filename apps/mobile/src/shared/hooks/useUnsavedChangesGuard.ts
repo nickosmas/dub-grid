@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useModalHandoff } from "./useModalHandoff";
 
 /** Exactly the props `ConfirmationModal` needs. Spread it, don't destructure. */
 export type DiscardConfirmationProps = {
@@ -103,6 +104,7 @@ export function useUnsavedChangesGuard({
   // The exit the user is being asked about, boxed so `useState` doesn't mistake
   // the function for an updater. `null` means no confirmation is showing.
   const [pendingExit, setPendingExit] = useState<{ run: () => void } | null>(null);
+  const handoff = useModalHandoff();
 
   const requestExit = useCallback(
     (exit: () => void) => {
@@ -130,10 +132,15 @@ export function useUnsavedChangesGuard({
 
   const confirm = useCallback(() => {
     const exit = pendingExit;
+    // The confirmation goes first and on its own: it is a `<Modal>` presented
+    // over the sheet's `<Modal>`, and tearing both down in one commit leaves the
+    // sheet stuck on screen. By this point the sheet is back in place anyway —
+    // raising this confirmation is what settled a dragged one — so there is no
+    // off-screen sheet waiting on a synchronous close.
     setPendingExit(null);
     onDiscard?.();
-    exit?.run();
-  }, [onDiscard, pendingExit]);
+    handoff(() => exit?.run());
+  }, [handoff, onDiscard, pendingExit]);
 
   return {
     isDirty,

@@ -12,11 +12,9 @@ import {
   AppState,
   Animated,
   LayoutAnimation,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   useWindowDimensions,
   type AppStateStatus,
@@ -222,12 +220,12 @@ const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
 const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
-if (
-  Platform.OS === "android" &&
-  typeof UIManager.setLayoutAnimationEnabledExperimental === "function"
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// `setLayoutAnimationEnabledExperimental` used to be the Android opt-in for
+// `LayoutAnimation`. Under the New Architecture it does nothing but warn on
+// every launch ("is currently a no-op in the New Architecture"), so calling it
+// bought a permanent LogBox entry and no animation. The `configureNext` calls
+// below stay: they still animate where the platform supports them, and they
+// degrade to an un-animated layout change where it doesn't.
 
 type ScheduleScope = "mine" | "team";
 type RequestActionBody =
@@ -1653,24 +1651,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // Mirrors the `fillScreen` branches below: every one of them is meant to be
-  // the whole page, not a card sharing a scroll with something else. The
-  // loading skeleton always wins first in that same ternary chain, so it has
-  // to win here too, or a still-loading blocked/unlinked screen would lose
-  // its scroll before the skeleton it's showing needs it.
-  const isFillScreenState =
-    contentState.kind !== "loading" &&
-    (contentState.kind === "error" ||
-      isBlockedTeamView ||
-      (!isTeamScope && !linkedEmployee) ||
-      (isTeamScope && shiftGroups.length === 0));
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState && contentState.kind !== "loading"}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}

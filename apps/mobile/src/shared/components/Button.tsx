@@ -47,6 +47,9 @@ export type ButtonShape = "pill" | "squircle";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** The platform minimum for anything tappable. */
+const MIN_TOUCH_TARGET = 44;
+
 const SIZE = {
   sm: { minHeight: 36, paddingHorizontal: 14, gap: 6, icon: 16, iconOnly: 36 },
   md: { minHeight: 48, paddingHorizontal: 20, gap: 8, icon: 18, iconOnly: 44 },
@@ -160,6 +163,10 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: isBusy, selected, expanded }}
       android_ripple={androidRipple}
       disabled={isDisabled}
+      // The `sm` icon-only square is 36pt, under the 44pt minimum touch target.
+      // Pad the difference out rather than growing the button, which is drawn
+      // small deliberately. Every other size already clears it.
+      hitSlop={iconOnly ? Math.max(0, (MIN_TOUCH_TARGET - metrics.iconOnly) / 2) : undefined}
       onPress={action.run}
       {...pressHandlers}
       style={[
@@ -301,8 +308,12 @@ const createStyles = (mobileColors: MobileColors) =>
     toneWarning: {
       backgroundColor: mobileColors.buttonWarningBg,
     },
+    // Grey, not white. This took `surface`, which since the page went white is
+    // the same colour as the ground behind it — an invisible button. Buttons
+    // carry no border and no shadow, so the fill is the only thing that can
+    // draw one.
     tonePlain: {
-      backgroundColor: mobileColors.surface,
+      backgroundColor: mobileColors.controlNeutralBg,
     },
     toneGhost: {
       backgroundColor: "transparent",

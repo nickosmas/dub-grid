@@ -13,9 +13,11 @@ import {
 } from "react-native";
 import { Chip } from "../../../shared/components/Chip";
 import { PressableRow } from "../../../shared/components/PressableRow";
+import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileElevation,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -104,7 +106,8 @@ export function ProfileHero({
   children?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const isCentered = align === "center";
 
   // A screen whose native header already names it may want none of the
@@ -210,7 +213,8 @@ export function ProfileHero({
 
 export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const isCentered = useContext(ProfileHeroAlignContext) === "center";
 
   return (
@@ -233,7 +237,8 @@ export function ProfileSection({
   style?: StyleProp<ViewStyle>;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={[styles.section, style]}>
@@ -252,9 +257,13 @@ export function ProfilePanel({
   style?: StyleProp<ViewStyle>;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const insideSheet = useIsInsideSheet();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
-  return <View style={[styles.panel, style]}>{children}</View>;
+  return (
+    <View style={[styles.panel, insideSheet ? styles.flatInSheet : null, style]}>{children}</View>
+  );
 }
 
 export function ProfileList({
@@ -265,9 +274,20 @@ export function ProfileList({
   variant?: "framed" | "plain";
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const insideSheet = useIsInsideSheet();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
-  return <View style={variant === "plain" ? styles.listPlain : styles.list}>{children}</View>;
+  return (
+    <View
+      style={[
+        variant === "plain" ? styles.listPlain : styles.list,
+        insideSheet ? styles.flatInSheet : null,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function ProfileInfoRow({
@@ -284,7 +304,8 @@ export function ProfileInfoRow({
   isLast?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
@@ -318,7 +339,8 @@ export function ProfileNavRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <PressableRow
@@ -356,7 +378,8 @@ export function ProfileTextInput({
   inputStyle?: StyleProp<TextStyle>;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
 
@@ -426,7 +449,8 @@ export function ProfileChoiceGroup<TId extends string | number>({
   onToggle: (id: TId) => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.chipGroup}>
@@ -462,7 +486,8 @@ export function ProfileIcon({
   tone?: "neutral" | "brand" | "danger" | "success";
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   const semanticColor =
     tone === "brand"
@@ -587,10 +612,11 @@ const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
 
 export function useProfilePrimitiveStyles() {
   const mobileColors = useMobileColors();
-  return useMemo(() => createProfilePrimitiveStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  return useMemo(() => createProfilePrimitiveStyles(mobileColors), [mobileColors, isDark]);
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     hero: {
       gap: 14,
@@ -777,6 +803,12 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textMuted,
       marginTop: -4,
     },
+    // Cancels the card shadow when this is rendered inside a sheet.
+    flatInSheet: {
+      boxShadow: undefined,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
     panel: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
@@ -784,6 +816,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       gap: 14,
       padding: 16,
+      ...mobileElevation("card", isDark),
     },
     list: {
       backgroundColor: mobileColors.surface,
@@ -791,6 +824,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",
+      ...mobileElevation("card", isDark),
     },
     listPlain: {
       gap: 0,

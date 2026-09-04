@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 import {
+  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileSpacing,
@@ -11,7 +12,7 @@ import {
 /**
  * The requests screen's stylesheet, split out of `RequestsScreen.tsx` for size.
  */
-export const createStyles = (mobileColors: MobileColors) =>
+export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
       gap: 10,
@@ -33,6 +34,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.cardBorder,
       padding: 16,
       gap: 10,
+      ...mobileElevation("card", isDark),
     },
     openShiftCard: {
       gap: 12,

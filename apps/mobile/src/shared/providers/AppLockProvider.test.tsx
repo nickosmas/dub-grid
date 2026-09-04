@@ -111,6 +111,57 @@ describe("AppLockProvider", () => {
     expect(authenticateAsync).not.toHaveBeenCalled();
   });
 
+  it("does not re-prompt when the user cancels the device check", async () => {
+    // The loop this guards against: a declined check leaves `locked` true and
+    // `authenticating` back to false, which used to re-enter `attemptUnlock`
+    // immediately and raise the system prompt again the moment it closed —
+    // with the sheet's own Unlock button unreachable underneath it.
+    appLockEnabled = true;
+    authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    // Settle anything the rejection queued, then confirm it stayed at one.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+  });
+
+  it("stays locked rather than crashing when the device check throws", async () => {
+    // Android rejects `authenticateAsync` when the activity isn't ready, which
+    // is exactly when this runs. It used to surface as an unhandled rejection.
+    appLockEnabled = true;
+    authenticateAsync.mockRejectedValue(new Error("activity not available"));
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+  });
+
   it("locks again when the app returns from the background", async () => {
     appLockEnabled = true;
 

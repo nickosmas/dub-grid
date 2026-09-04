@@ -8,8 +8,9 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileSpacing,
@@ -32,7 +33,8 @@ type DashboardRowVariant =
 
 function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (variant === "meter") {
     return (
@@ -97,7 +99,8 @@ function DashboardCardSkeleton({
   titleWidth?: `${number}%`;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.cardGroup}>
@@ -120,7 +123,8 @@ function DashboardCardSkeleton({
 /** The hero card: period toggle, headline, and the three metric tiles. */
 function DashboardHeroSkeleton() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.heroCard}>
@@ -147,7 +151,8 @@ function DashboardHeroSkeleton() {
 /** The horizontally scrolling day strip inside "Your schedule". */
 function MyScheduleSkeleton() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.cardGroup}>
@@ -187,7 +192,8 @@ export function DashboardSkeleton({
   showMySchedule?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={styles.page}>
@@ -207,7 +213,8 @@ export function DashboardSkeleton({
 /** The greeting block that sits in the screen's sticky header slot. */
 export function DashboardHeaderSkeleton() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.header}>
@@ -231,7 +238,8 @@ export function DashboardListSkeleton({
   variant?: DashboardRowVariant;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={styles.expandedPage}>
@@ -250,7 +258,7 @@ export function DashboardListSkeleton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     page: {
       gap: mobileSpacing.sectionGap,
@@ -259,12 +267,13 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 4,
     },
     heroCard: {
-      backgroundColor: mobileColors.surface,
+      backgroundColor: isDark ? mobileColors.surfaceSecondary : mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: mobileSpace.lg,
       padding: mobileSpace.xl,
+      ...mobileElevation("card", isDark),
     },
     heroCopy: {
       gap: 6,
@@ -275,16 +284,21 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 10,
     },
     tile: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
+      // Delineated by a hairline, not by a fill or a shadow. An inner section
+      // still needs an edge to read as its own group, but it sits on a card
+      // that is already lifted — a second shadow there muddies the first, and a
+      // tinted fill puts grey back on a white card. `control` radius rather
+      // than `card`: a nested corner needs a tighter curve than its container's
+      // to read as concentric.
       flexBasis: "30%",
       flexGrow: 1,
       gap: 6,
       minWidth: 0,
       overflow: "hidden",
       padding: 12,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
     },
     tileHeader: {
       alignItems: "flex-start",
@@ -355,13 +369,18 @@ const createStyles = (mobileColors: MobileColors) =>
       overflow: "hidden",
     },
     dayCard: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
+      // Delineated by a hairline, not by a fill or a shadow. An inner section
+      // still needs an edge to read as its own group, but it sits on a card
+      // that is already lifted — a second shadow there muddies the first, and a
+      // tinted fill puts grey back on a white card. `control` radius rather
+      // than `card`: a nested corner needs a tighter curve than its container's
+      // to read as concentric.
       gap: 8,
       minWidth: 124,
       padding: 12,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
     },
     shiftPill: {
       backgroundColor: mobileColors.skeletonBase,

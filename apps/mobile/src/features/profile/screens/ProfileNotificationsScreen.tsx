@@ -183,7 +183,7 @@ export default function ProfileNotificationsScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "error"}
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

@@ -61,6 +61,12 @@ export function TermsGate({ children }: PropsWithChildren) {
         getInlineErrorMessageOrToast(pushToast, {
           error: acceptError,
           fallbackMessage: "We couldn't record your acceptance. Try again in a moment.",
+          // Without this a network failure returned null and pushed a toast
+          // instead — into the root window, behind this full-screen modal, and
+          // then dropped outright because `pushToast` discards everything while
+          // offline. Accepting the terms with no connection produced no
+          // feedback whatsoever, on a sheet covering the entire app.
+          preferInlineNetworkError: true,
         }),
       );
     } finally {
@@ -91,7 +97,7 @@ export function TermsGate({ children }: PropsWithChildren) {
           <Button
             label="Accept and continue"
             loading={saving}
-            onPress={() => void accept()}
+            onPress={() => accept()}
             tone="primary"
           />
           {/* Declining has to be possible. The sheet covers the whole app, so
@@ -100,7 +106,7 @@ export function TermsGate({ children }: PropsWithChildren) {
           <Button
             disabled={saving}
             label="Sign out"
-            onPress={() => void handleExpiredMobileSession()}
+            onPress={() => handleExpiredMobileSession()}
             tone="ghost"
           />
         </SheetActions>

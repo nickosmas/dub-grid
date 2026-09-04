@@ -11,6 +11,9 @@ export type ChipTone = "neutral" | "brand" | "success" | "warning" | "danger";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Brings a 24pt pill up to the 44pt minimum touch target. */
+const CHIP_HIT_SLOP = { top: 10, bottom: 10, left: 0, right: 0 } as const;
+
 /**
  * A small solid pill for status, metadata and filter selection.
  *
@@ -90,6 +93,11 @@ export function Chip({
       accessibilityState={{ selected, disabled }}
       android_ripple={androidRipple}
       disabled={disabled}
+      // A chip is 24pt tall (16 line height plus its padding), well under the
+      // 44pt minimum touch target. Pad the deficit out rather than growing the
+      // pill, which is drawn small on purpose. Vertical only: chips sit in rows
+      // 8pt apart, so a horizontal slop would overlap the neighbour's target.
+      hitSlop={CHIP_HIT_SLOP}
       onPress={action.run}
       {...pressHandlers}
       style={[...chipStyle, animatedStyle]}

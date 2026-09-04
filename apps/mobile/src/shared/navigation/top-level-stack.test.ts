@@ -40,6 +40,14 @@ describe("top-level stack options", () => {
     expect(options.headerStyle).toMatchObject({
       backgroundColor: mobileColors.background,
     });
-    expect(mobileColors.background).not.toBe(mobileColors.surface);
+    // The header and the page it sits over are one continuous surface, so the
+    // bar has to take the page's colour rather than `surface`. That used to be
+    // visible as a colour difference; now that the light page is white it is
+    // only visible if the two tokens are read from the same place, which is
+    // exactly what this pins. The content style has to agree, or the header
+    // and the page under it split into two shades on any future theme change.
+    expect(options.contentStyle).toMatchObject({
+      backgroundColor: mobileColors.background,
+    });
   });
 });

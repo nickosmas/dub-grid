@@ -461,7 +461,7 @@ describe("PeopleScreen", () => {
     expect(screen.getAllByText("Clinical Leadership").length).toBeGreaterThan(1);
   });
 
-  it("asks before replacing a management-only pending invitation's access", () => {
+  it("asks before replacing a management-only pending invitation's access", async () => {
     const mutateCalls: ReturnType<typeof vi.fn>[] = [];
     useMutation.mockImplementation(() => {
       const mutate = vi.fn();
@@ -520,7 +520,9 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
     fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-    fireEvent.click(screen.getByText("Super Admin"));
+    // The access sheet is presented only once the actions sheet has finished
+    // leaving: iOS refuses a present that overlaps a dismiss.
+    fireEvent.click(await screen.findByText("Super Admin"));
     fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
 
     expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();

@@ -72,7 +72,15 @@ export function useTabsGate(): TabsGateResult {
     };
   }
 
-  if (bootstrapQuery.isError) {
+  // Only when there is nothing to show. A refetch that fails while the tab tree
+  // is already populated must not replace the navigator: returning an element
+  // here unmounts `<NativeTabs>` entirely, and remounting it throws the user
+  // back to the first tab having lost every screen's scroll position, search
+  // text, filter selections and open sheets. A backgrounded app returning on a
+  // flaky connection hit that every time. With cached data the screens keep
+  // rendering it and each surfaces its own error, the same reasoning the
+  // comment below applies to the first load.
+  if (bootstrapQuery.isError && !bootstrapQuery.data) {
     return {
       kind: "blocked",
       element: (

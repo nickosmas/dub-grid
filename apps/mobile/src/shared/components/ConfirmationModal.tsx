@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { BottomSheetModal, SheetActions, SheetCopy, SheetHeader } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
+import { InlineError } from "./InlineError";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 
@@ -23,6 +24,7 @@ export function ConfirmationModal({
   confirmLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
+  error,
   loading,
   onCancel,
   onConfirm,
@@ -34,6 +36,15 @@ export function ConfirmationModal({
   confirmLabel: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
+  /**
+   * Why the last confirm failed, shown above the actions.
+   *
+   * A confirmation that stays open on failure has to say why *here*: this is a
+   * `<Modal>`, its own native window, so a toast pushed from the caller's error
+   * handler renders in the root window behind it and is never seen. Without
+   * this the button simply stopped spinning and nothing else happened.
+   */
+  error?: string | null;
   /**
    * Overrides the busy state `Button` works out for itself. Only needed when
    * the pending flag lives outside this sheet; an async `onConfirm` already
@@ -73,6 +84,7 @@ export function ConfirmationModal({
     >
       {body ? <SheetCopy body={body} /> : null}
       {children}
+      {error ? <InlineError message={error} /> : null}
       <SheetActions>
         <Button label={confirmLabel} loading={isBusy} onPress={confirm.run} tone={confirmTone} />
         <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="neutral" />

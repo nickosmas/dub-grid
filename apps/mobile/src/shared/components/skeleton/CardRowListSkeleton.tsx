@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { useIsDarkMode, useMobileColors } from "../../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace, type MobileColors } from "../../theme/tokens";
+import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../../theme/tokens";
 import {
   SkeletonCircle,
   SkeletonGroup,
@@ -77,6 +77,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       gap: mobileSpace.sm,
       padding: mobileSpace.lg,
+      ...mobileElevation("card", isDark),
     },
     header: {
       alignItems: "flex-start",

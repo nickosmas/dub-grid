@@ -42,9 +42,14 @@ import {
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileElevation,
   mobileMotion,
   mobileRadii,
   mobileText,
@@ -167,7 +172,8 @@ function getManagementRoleRank(role: MobileOrgRole): number {
 
 export default function PeopleScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
@@ -511,20 +517,10 @@ export default function PeopleScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      // Loading is a non-scrolling state, not a scrolling one: the skeleton is a
-      // placeholder standing in for content, so letting it scroll (and letting a
-      // pull-to-refresh fire on something already loading) is wrong on both
-      // counts. This used to read `contentState.kind === "loading" ||`.
-      scrollEnabled={
-        contentState.kind !== "loading" &&
-        !(isManagementTab
-          ? contentState.kind === "error" ||
-            managementUsers.length === 0 ||
-            filteredManagementUsers.length === 0
-          : contentState.kind === "error" ||
-            visiblePeople.length === 0 ||
-            filteredPeople.length === 0)
-      }
+      // A skeleton is a placeholder, not content: it must not scroll. Empty and
+      // error states stay scrollable so the large title can still collapse and
+      // pull-to-refresh keeps working.
+      scrollEnabled={contentState.kind !== "loading"}
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
@@ -1082,7 +1078,8 @@ function AddPersonButton({
   // pointed at something that files a request rather than opening a screen.
   const action = useAsyncAction(onPress);
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
     rippleBorderless: true,
     rippleColor: mobileColors.ripplePrimary,
@@ -1133,7 +1130,8 @@ function PersonRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
   const secondaryDetail = [
     employmentType === null ? null : employmentType === "part_time" ? "PT" : "FT",
@@ -1202,7 +1200,7 @@ function PersonRow({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
       gap: 10,
@@ -1239,6 +1237,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       overflow: "hidden",
+      ...mobileElevation("card", isDark),
     },
     personRow: {
       alignItems: "center",

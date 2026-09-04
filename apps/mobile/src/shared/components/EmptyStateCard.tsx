@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
+import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
@@ -61,18 +62,14 @@ export function EmptyStateCard({
     [mobileColors, isDark],
   );
   const variant = compact ? compactStyles : styles;
-  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
-  // reliably fills the non-scrolling container's remaining space and centers
-  // within it, with none of the viewport-height guessing a ScrollView forces.
-  const fillStyle =
-    !compact && fillScreen
-      ? {
-          flex: 1,
-          justifyContent: "center" as const,
-        }
-      : null;
+  // `Screen`'s `contentContainerStyle` carries `flexGrow: 1`, so `flex: 1` here
+  // claims the viewport's leftover space even inside a scroll view, and the two
+  // spacers place the message within it. See `fill-screen-anchor` for why not
+  // dead centre.
+  const isFilling = !compact && fillScreen;
   return (
-    <View style={[variant.card, fillStyle]}>
+    <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
+      {isFilling ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
       <View style={variant.iconFrame}>
         <Ionicons
           color={compact ? mobileColors.textMuted : mobileColors.brand}
@@ -100,14 +97,18 @@ export function EmptyStateCard({
           )}
         </View>
       ) : null}
+      {isFilling ? <View style={fillScreenAnchorStyles.spacerBelow} /> : null}
     </View>
   );
 }
 
-// Owns the page: centred on the ground itself, with no panel behind it.
+// Owns the page: sits on the ground itself, with no panel behind it.
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     card: {
+      // No panel. This sits inside a card, and information belongs directly on
+      // that card's surface rather than in a box drawn on top of it. The
+      // centring below is what keeps it deliberate now that nothing bounds it.
       paddingHorizontal: 4,
       paddingVertical: 32,
       gap: 16,
@@ -151,10 +152,13 @@ const createStyles = (mobileColors: MobileColors) =>
 const createCompactStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     card: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      // One step tighter than the card's own radius, so the panel nests inside
-      // it rather than tracing it.
+      // A hairline, no fill and no shadow. The bound shape is what stops centred
+      // copy reading as misaligned under a left-aligned card header, but this
+      // sits on an already-lifted card, so it gets an edge rather than a second
+      // elevation or a grey inset. `control` radius nests inside the card's.
       borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
       paddingHorizontal: 20,
       paddingVertical: 24,
       gap: 12,

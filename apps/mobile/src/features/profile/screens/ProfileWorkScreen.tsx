@@ -349,15 +349,16 @@ export default function ProfileWorkScreen() {
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
 
-  const isFillScreenState =
-    contentState.kind === "error" || (contentState.kind !== "loading" && !profile);
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
@@ -610,6 +611,9 @@ function EditPanel({
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
+            autoComplete="email"
+            autoCorrect={false}
+            textContentType="emailAddress"
             label="Email"
             placeholder="Email"
             value={draft.email}
@@ -624,6 +628,8 @@ function EditPanel({
               error={fieldErrors.phone}
               focused={focusedField === "phone"}
               keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
               label="Phone"
               placeholder="Phone"
               value={draft.phone}

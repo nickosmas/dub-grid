@@ -8,8 +8,13 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileSpacing, type MobileColors } from "../../../shared/theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import {
+  mobileElevation,
+  mobileRadii,
+  mobileSpacing,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import type { ProfileHeroAlign } from "./ProfilePrimitives";
 
 /** `avatar` in ProfilePrimitives. */
@@ -30,7 +35,8 @@ type ProfileRowVariant =
 
 function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (variant === "toggle") {
     return (
@@ -81,7 +87,8 @@ function ProfileHeroSkeleton({
   subtitle: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const isCentered = align === "center";
 
   return (
@@ -167,7 +174,8 @@ export function ProfileSkeleton({
   rowVariant?: ProfileRowVariant;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={styles.page}>
@@ -205,7 +213,7 @@ export function ProfileSkeleton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     page: {
       gap: mobileSpacing.sectionGap,
@@ -275,6 +283,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",
+      ...mobileElevation("card", isDark),
     },
     row: {
       alignItems: "center",

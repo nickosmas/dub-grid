@@ -16,13 +16,17 @@ import {
   markNotificationRead,
 } from "../../../shared/lib/api";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { NotificationDetailSkeleton } from "../components/NotificationDetailSkeleton";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileElevation,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -64,7 +68,8 @@ function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
 
 function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const entries = formatNotificationMetadata(metadata);
   if (!entries.length) return null;
   return (
@@ -82,7 +87,8 @@ function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
 
 export default function NotificationDetailScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const params = useLocalSearchParams<{ id: string }>();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
@@ -197,7 +203,7 @@ export default function NotificationDetailScreen() {
 
   if (!id) {
     return (
-      <Screen scrollEnabled={false}>
+      <Screen>
         <StatusBanner
           body="The alert id is missing."
           fillScreen
@@ -213,12 +219,38 @@ export default function NotificationDetailScreen() {
   // below declared the alert missing until the token arrived. "Still resolving"
   // has to cover the not-yet-started case too.
   if (!notification && isResolvingNotification) {
-    return <Screen>{showSkeleton ? <NotificationDetailSkeleton /> : null}</Screen>;
+    return (
+      <Screen scrollEnabled={false}>{showSkeleton ? <NotificationDetailSkeleton /> : null}</Screen>
+    );
+  }
+
+  // A failed fetch first: without this the branch below told the user the alert
+  // was gone for good when the request had simply failed, and offered no way to
+  // try again. "No longer accessible" has to mean the server answered and the
+  // alert genuinely was not there.
+  if (!notification && detailQuery.error) {
+    return (
+      <Screen>
+        <StatusBanner
+          actionLabel="Try again"
+          body={getClientFriendlyErrorMessage(
+            detailQuery.error,
+            "We couldn't load that alert right now.",
+          )}
+          fillScreen
+          title="Could not load this alert"
+          variant="centered"
+          onAction={() => {
+            void detailQuery.refetch();
+          }}
+        />
+      </Screen>
+    );
   }
 
   if (!notification) {
     return (
-      <Screen scrollEnabled={false}>
+      <Screen>
         <EmptyStateCard
           fillScreen
           body="That alert is no longer accessible."
@@ -304,7 +336,7 @@ export default function NotificationDetailScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     container: {
       gap: 14,
@@ -372,6 +404,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       gap: 8,
+      ...mobileElevation("card", isDark),
     },
     metadataTitle: {
       ...mobileTextWeighted("label", "bold"),

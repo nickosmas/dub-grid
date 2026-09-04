@@ -54,6 +54,12 @@ type ClientFriendlyToastInput = {
   error: unknown;
   fallbackMessage: string;
   title: string;
+  /**
+   * Collapses repeats of the same failure into one toast. Pass it where two
+   * surfaces report the same underlying query error — without it the user gets
+   * a stack of differently-titled toasts for a single failed request.
+   */
+  dedupeKey?: string;
 };
 
 /**
@@ -87,6 +93,7 @@ export function pushClientFriendlyErrorToast(
     tone: "error",
     title: input.title,
     message: getClientFriendlyErrorMessage(input.error, input.fallbackMessage),
+    dedupeKey: input.dedupeKey,
   });
 }
 

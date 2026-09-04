@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import {
   navigatedActions,
   pressBack,
@@ -39,7 +39,21 @@ function renderGuardedScreen(options: { isDirty?: boolean; disabled?: boolean } 
   return { back, onClose, onDiscard, view };
 }
 
-beforeEach(() => resetNavigationShim());
+beforeEach(() => {
+  resetNavigationShim();
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** The confirmed exit waits for the confirmation modal to leave first. */
+function completeModalHandoff() {
+  act(() => {
+    vi.runAllTimers();
+  });
+}
 
 describe("useNavigationDiscardGuard", () => {
   it("lets a clean screen go back", () => {
@@ -71,6 +85,7 @@ describe("useNavigationDiscardGuard", () => {
 
     back();
     act(() => view.result.current.confirmationProps.onConfirm());
+    completeModalHandoff();
 
     expect(onDiscard).toHaveBeenCalledTimes(1);
     expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);

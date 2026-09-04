@@ -243,14 +243,14 @@ export default function ProfileTwoFactorScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "error"}>
+    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "loading"}>
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={1} sections={1} showHero={false} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
           fillScreen
           title="Could not load two-factor status"
@@ -275,6 +275,7 @@ export default function ProfileTwoFactorScreen() {
               autoComplete="one-time-code"
               inputMode="numeric"
               keyboardType="number-pad"
+              textContentType="oneTimeCode"
               label="Verification code"
               maxLength={6}
               placeholder="000000"
@@ -287,7 +288,7 @@ export default function ProfileTwoFactorScreen() {
               disabled={mfaLoading || mfaVerifyCode.length !== 6}
               label="Verify & enable"
               loading={mfaLoading}
-              onPress={() => void verifyMfaEnrollment()}
+              onPress={() => verifyMfaEnrollment()}
             />
             <Button
               disabled={mfaLoading}
@@ -315,11 +316,7 @@ export default function ProfileTwoFactorScreen() {
               tone="danger"
             />
           ) : (
-            <Button
-              label="Enable 2FA"
-              loading={mfaLoading}
-              onPress={() => void startMfaEnrollment()}
-            />
+            <Button label="Enable 2FA" loading={mfaLoading} onPress={() => startMfaEnrollment()} />
           )}
         </ProfileSection>
       )}

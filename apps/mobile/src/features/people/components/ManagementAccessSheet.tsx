@@ -10,6 +10,7 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { InlineError } from "../../../shared/components/InlineError";
 import {
   SegmentedControl,
   type SegmentedOption,
@@ -71,6 +72,7 @@ export function ManagementAccessSheet({
   person,
   managementDepartments,
   isPending,
+  error,
   onDismiss,
   onSubmit,
   onRemove,
@@ -79,6 +81,12 @@ export function ManagementAccessSheet({
   person: MobilePerson;
   managementDepartments: MobileDepartment[];
   isPending: boolean;
+  /**
+   * Why the last submit failed. This sheet stays open on error, and it is a
+   * `<Modal>` — its own native window — so the caller's toast rendered behind
+   * it and the failure looked like the button doing nothing.
+   */
+  error?: string | null;
   onDismiss: () => void;
   onSubmit: (draft: ManagementAccessDraft) => Promise<unknown>;
   onRemove: () => Promise<unknown>;
@@ -217,6 +225,8 @@ export function ManagementAccessSheet({
             ) : null}
           </View>
         )}
+
+        {error ? <InlineError message={error} /> : null}
 
         <SheetActions>
           {/* One label for both branches, as on web. "Send Invitation" would

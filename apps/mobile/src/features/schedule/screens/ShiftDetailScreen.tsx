@@ -23,6 +23,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -1089,16 +1090,16 @@ export default function ShiftDetailScreen() {
     setSelectedTargetShift(null);
   }
 
-  const isFillScreenState =
-    contentState.kind === "error" ||
-    (contentState.kind !== "loading" && (!employeeId || !shiftDate || !shiftEntry));
-
   return (
     <Screen
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
@@ -1435,17 +1436,23 @@ export default function ShiftDetailScreen() {
                   </View>
                   <View style={styles.modalInlinePanel}>
                     <Text style={styles.subsectionLabel}>Eligible teammates</Text>
+                    {/* The app's only text-based loading state and only
+                        icon-less, retry-less error lived here. Both now read
+                        like every other surface. */}
                     {swapOptionsQuery.isLoading ? (
-                      <Text style={styles.subsectionBody}>
-                        Loading teammate shifts for this range.
-                      </Text>
+                      <CardRowListSkeleton rows={2} />
                     ) : swapOptionsQuery.error ? (
-                      <Text style={styles.subsectionBody}>
-                        {getQueryErrorMessage(
+                      <StatusBanner
+                        actionLabel="Try again"
+                        body={getQueryErrorMessage(
                           swapOptionsQuery.error,
                           "We couldn't load teammate shifts.",
                         )}
-                      </Text>
+                        title="Could not load teammate shifts"
+                        onAction={() => {
+                          void swapOptionsQuery.refetch();
+                        }}
+                      />
                     ) : swapTargetOptions.length === 0 ? (
                       <EmptyStateCard
                         compact
@@ -1472,7 +1479,7 @@ export default function ShiftDetailScreen() {
                             android_ripple={
                               previousEligibleSwapWeekStart == null
                                 ? undefined
-                                : { color: "rgba(15, 23, 42, 0.08)" }
+                                : { color: mobileColors.rippleNeutral }
                             }
                             disabled={previousEligibleSwapWeekStart == null}
                             onPress={() => handleSwapWeek(-1)}
@@ -1503,7 +1510,7 @@ export default function ShiftDetailScreen() {
                             android_ripple={
                               nextEligibleSwapWeekStart == null
                                 ? undefined
-                                : { color: "rgba(15, 23, 42, 0.08)" }
+                                : { color: mobileColors.rippleNeutral }
                             }
                             disabled={nextEligibleSwapWeekStart == null}
                             onPress={() => handleSwapWeek(1)}
@@ -2070,7 +2077,7 @@ function SelectorChip({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
+      android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -2125,7 +2132,7 @@ function CoverageOptionCard({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
+      android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -2235,7 +2242,7 @@ function SwapDateChip({
       accessibilityLabel={`Show eligible teammates for ${formatShiftDate(date)}`}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
+      android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
       style={[

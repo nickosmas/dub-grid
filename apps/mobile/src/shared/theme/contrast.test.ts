@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { darkMobileColors, mobileColors } from "./tokens";
+import { darkMobileColors, mobileColors, mobileElevation } from "./tokens";
 
 /** WCAG 2.1 relative luminance. */
 function relativeLuminance(hex: string): number {
@@ -31,10 +31,30 @@ const AA_TEXT = 4.5;
 const PERCEIVABLE_FILL = 1.1;
 
 describe("light mode control contrast", () => {
-  it("separates cards from the page background", () => {
-    expect(contrastRatio(mobileColors.surface, mobileColors.background)).toBeGreaterThanOrEqual(
-      1.12,
+  /**
+   * The light page is white and so is a card, by design — separation moved from
+   * fill to shadow. So the thing to hold is no longer a contrast ratio (it is
+   * 1:1 on purpose) but that the shadow which replaced it actually exists and
+   * is strong enough to draw an edge. Drop the elevation and every card in light
+   * mode becomes invisible, which is exactly the regression worth catching.
+   */
+  it("gives light-mode cards a shadow, since their fill no longer separates them", () => {
+    expect(contrastRatio(mobileColors.surface, mobileColors.background)).toBe(1);
+    expect(mobileColors.cardBorder).toBe("transparent");
+
+    const shadow = mobileElevation("card", false);
+    expect(shadow.boxShadow, "a card with no shadow is invisible on a white page").toBeDefined();
+
+    const layers = shadow.boxShadow ?? [];
+    expect(
+      layers.length,
+      "one soft blur reads as a smudge; the edge needs a tight layer too",
+    ).toBeGreaterThanOrEqual(2);
+
+    const alphas = layers.map((layer) =>
+      Number(/rgba\([^)]*,\s*([\d.]+)\)/.exec(String(layer.color))?.[1] ?? 0),
     );
+    expect(Math.max(...alphas)).toBeGreaterThanOrEqual(0.08);
   });
 
   /**
@@ -48,9 +68,11 @@ describe("light mode control contrast", () => {
    * this ground are held to the same window, so a later "let's warm the grays"
    * pass can't split the family.
    */
-  it("keeps the page and its neutral fills a subtle slate gray", () => {
+  it("keeps the neutral fills a subtle slate gray", () => {
+    // `background` is no longer in this list: the page is plain white, so it has
+    // no tint to hold. These fills are now the only tinted shapes on that white
+    // ground, which makes keeping them in one family matter more, not less.
     for (const [name, hex] of [
-      ["background", mobileColors.background],
       ["controlNeutralBg", mobileColors.controlNeutralBg],
       ["skeletonBase", mobileColors.skeletonBase],
     ] as const) {
@@ -67,8 +89,13 @@ describe("light mode control contrast", () => {
   });
 
   it("keeps soft control fills perceivable on a card and on the page", () => {
+    // 1.20, down from 1.25, to admit a lighter neutral fill by direction. This
+    // is the floor for a control whose fill is its *only* edge — buttons carry
+    // no border and no shadow — so it is close to the point where a control
+    // stops reading as one at all. Do not lower it again without giving those
+    // controls a border or a shadow back.
     for (const fill of [mobileColors.controlNeutralBg, mobileColors.controlSecondaryBg]) {
-      expect(contrastRatio(fill, mobileColors.surface)).toBeGreaterThanOrEqual(1.25);
+      expect(contrastRatio(fill, mobileColors.surface)).toBeGreaterThanOrEqual(1.2);
       expect(contrastRatio(fill, mobileColors.background)).toBeGreaterThanOrEqual(PERCEIVABLE_FILL);
     }
   });

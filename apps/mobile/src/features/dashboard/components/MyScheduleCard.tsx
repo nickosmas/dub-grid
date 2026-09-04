@@ -5,6 +5,8 @@ import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -78,7 +80,12 @@ function buildDaySegmentPills(
   mobileColors: MobileColors,
   isDarkTheme: boolean,
 ): DaySegmentPill[] {
-  if (!entry || entry.state.kind !== "worked") {
+  // Absences are genuine pills, not blanks. An absence carries the absence
+  // type's own label and colours on `presentation`, and the schema forbids it
+  // any `segments`, so the `[{}]` fallback below resolves the whole pill from
+  // the top level — exactly what a single-segment worked day does. Only a
+  // `deleted` cell, or no cell at all, is truly unscheduled.
+  if (!entry || (entry.state.kind !== "worked" && entry.state.kind !== "absence")) {
     return [];
   }
 
@@ -143,8 +150,11 @@ export function MyScheduleCard({
   onExpand?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDarkTheme = useIsDarkMode();
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDarkTheme),
+    [mobileColors, isDarkTheme],
+  );
   // The screens that render this card fold the same query into their content
   // state, so by the time the card mounts the data is there. No local loading
   // branch: returning null here made the card appear after the page skeleton
@@ -178,7 +188,6 @@ export function MyScheduleCard({
             {dates.map((dateIso) => {
               const entry = entryByDate.get(dateIso);
               const { weekday, dayNumber } = formatDayHeader(dateIso);
-              const isAbsence = entry?.state.kind === "absence";
               const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
 
               return (
@@ -235,14 +244,33 @@ export function MyScheduleCard({
                       ))}
                     </View>
                   ) : (
+                    // Nothing scheduled at all. Absences no longer land here —
+                    // they render as their own coloured pill above.
                     <View style={styles.emptyPill}>
-                      <Text style={styles.emptyText}>{isAbsence ? "Off" : "—"}</Text>
+                      <Text style={styles.emptyText}>—</Text>
                     </View>
                   )}
                 </View>
               );
             })}
           </ScrollView>
+        ) : query.error ? (
+          // A failed fetch is not an empty week. This card owns its own query,
+          // and the dashboard's content state deliberately excludes its error,
+          // so without this branch a dropped request told the user they had no
+          // shifts — a wrong answer rather than a missing one, in a scheduling
+          // app where that is the whole question.
+          <StatusBanner
+            actionLabel="Try again"
+            body={getClientFriendlyErrorMessage(
+              query.error,
+              "We couldn't load your schedule right now.",
+            )}
+            title="Could not load your schedule"
+            onAction={() => {
+              void query.refetch();
+            }}
+          />
         ) : (
           <EmptyStateCard
             actionLabel={onExpand ? "View full schedule" : undefined}
@@ -258,7 +286,7 @@ export function MyScheduleCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
     // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
@@ -273,14 +301,23 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: DAY_CARD_GAP,
       paddingHorizontal: 18,
     },
+    // White and lifted rather than a grey inset panel, matching the card it sits
+    // in. `cardBorder` already follows the app's rule for a raised surface:
+    // transparent in light mode, where the shadow draws the shape, and a
+    // hairline in dark mode, where a shadow on near-black is invisible.
     dayCard: {
+      // Delineated by a hairline, not by a fill or a shadow. An inner section
+      // still needs an edge to read as its own group, but it sits on a card
+      // that is already lifted — a second shadow there muddies the first, and a
+      // tinted fill puts grey back on a white card. `control` radius rather
+      // than `card`: a nested corner needs a tighter curve than its container's
+      // to read as concentric.
       minWidth: PILL_WIDTH,
       gap: 8,
-      backgroundColor: mobileColors.surfaceSecondary,
+      padding: 12,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      padding: 12,
+      borderColor: mobileColors.borderSubtle,
     },
     dayHeader: {
       ...mobileText.label,

@@ -11,12 +11,13 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
-import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -35,8 +36,14 @@ export default function AddPersonScreen() {
   const bootstrapQuery = useBootstrap(accessToken);
   // Bootstrap is usually warm here — the tab that got you to this form already
   // read it — so the placeholder only paints if the wait is long enough to be
-  // worth acknowledging.
-  const showSkeleton = useSkeletonGate(bootstrapQuery.isLoading);
+  // worth acknowledging. Routed through the shared content state, like every
+  // other screen, so a failed bootstrap is a state of its own rather than
+  // falling through to the form.
+  const contentState = useMobileContentState({
+    hasData: Boolean(bootstrapQuery.data),
+    isLoading: bootstrapQuery.isLoading,
+    error: bootstrapQuery.error,
+  });
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -163,9 +170,32 @@ export default function AddPersonScreen() {
   // before it resolves shows an empty Assignments picker next to a live
   // "Select at least one <focus area>" error, which reads as broken rather
   // than loading.
-  if (bootstrapQuery.isLoading) {
+  if (contentState.kind === "loading") {
     return (
-      <Screen bottomPaddingMode="tabbed">{showSkeleton ? <PersonFormSkeleton /> : null}</Screen>
+      <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
+        {contentState.showSkeleton ? <PersonFormSkeleton /> : null}
+      </Screen>
+    );
+  }
+
+  // The same reasoning applies to a bootstrap that *failed*: gating on
+  // `isLoading` alone let an error fall straight through to the form, with the
+  // pickers empty and no way to retry. That is the state the comment above
+  // describes as reading broken, so it needs saying out loud.
+  if (contentState.kind === "error") {
+    return (
+      <Screen bottomPaddingMode="tabbed">
+        <StatusBanner
+          actionLabel="Try again"
+          body={contentState.message}
+          fillScreen
+          title="Could not load this form"
+          variant="centered"
+          onAction={() => {
+            void bootstrapQuery.refetch();
+          }}
+        />
+      </Screen>
     );
   }
 
@@ -208,6 +238,9 @@ export default function AddPersonScreen() {
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
+            autoComplete="email"
+            autoCorrect={false}
+            textContentType="emailAddress"
             label="Email (optional)"
             placeholder="name@example.com"
             value={email}

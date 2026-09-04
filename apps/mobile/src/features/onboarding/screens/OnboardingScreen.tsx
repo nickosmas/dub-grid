@@ -95,62 +95,68 @@ export default function OnboardingScreen() {
   const isLast = activeIndex >= SLIDES.length - 1;
 
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
-      {/* A brand halo behind the header, fading out before the copy starts. */}
+    <View style={styles.root}>
+      {/* A brand halo behind the header, fading out before the copy starts.
+          Outside the safe area on purpose: it is `position: absolute; top: 0`,
+          and Yoga positions an absolute child from its parent's *padding* edge,
+          so inside the SafeAreaView it started below the notch and left a flat
+          band of background across the status bar. */}
       <GradientBackdrop height="100%" kind="aurora" />
-      <View style={styles.headerRow}>
-        <View style={styles.brand}>
-          <Image
-            accessibilityIgnoresInvertColors
-            accessibilityLabel="DubGrid logo"
-            source={require("../../../../assets/images/logo-blue.png")}
-            style={styles.brandMark}
-          />
-          <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
-        </View>
-        <View style={styles.skipButton}>
-          <Button label="Skip" onPress={handleSkip} tone="link" />
-        </View>
-      </View>
-
-      <View
-        style={styles.scroller}
-        onLayout={(event) => {
-          const width = event.nativeEvent.layout.width;
-          if (width > 0 && width !== pageWidth) {
-            setPageWidth(width);
-          }
-        }}
-      >
-        <AnimatedScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          scrollEventThrottle={16}
-          showsHorizontalScrollIndicator={false}
-          onScroll={scrollHandler}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          decelerationRate="fast"
-        >
-          {SLIDES.map((slide, index) => (
-            <OnboardingCard
-              key={slide.title}
-              visual={slide.visual}
-              title={slide.title}
-              body={slide.body}
-              width={pageWidth}
-              index={index}
-              scrollX={scrollX}
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+        <View style={styles.headerRow}>
+          <View style={styles.brand}>
+            <Image
+              accessibilityIgnoresInvertColors
+              accessibilityLabel="DubGrid logo"
+              source={require("../../../../assets/images/logo-blue.png")}
+              style={styles.brandMark}
             />
-          ))}
-        </AnimatedScrollView>
-      </View>
+            <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
+          </View>
+          <View style={styles.skipButton}>
+            <Button label="Skip" onPress={handleSkip} tone="link" />
+          </View>
+        </View>
 
-      <View style={styles.footer}>
-        <OnboardingPagination count={SLIDES.length} pageWidth={pageWidth} scrollX={scrollX} />
-        <Button label={isLast ? "Get Started" : "Continue"} onPress={handlePrimary} />
-      </View>
-    </SafeAreaView>
+        <View
+          style={styles.scroller}
+          onLayout={(event) => {
+            const width = event.nativeEvent.layout.width;
+            if (width > 0 && width !== pageWidth) {
+              setPageWidth(width);
+            }
+          }}
+        >
+          <AnimatedScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            scrollEventThrottle={16}
+            showsHorizontalScrollIndicator={false}
+            onScroll={scrollHandler}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            decelerationRate="fast"
+          >
+            {SLIDES.map((slide, index) => (
+              <OnboardingCard
+                key={slide.title}
+                visual={slide.visual}
+                title={slide.title}
+                body={slide.body}
+                width={pageWidth}
+                index={index}
+                scrollX={scrollX}
+              />
+            ))}
+          </AnimatedScrollView>
+        </View>
+
+        <View style={styles.footer}>
+          <OnboardingPagination count={SLIDES.length} pageWidth={pageWidth} scrollX={scrollX} />
+          <Button label={isLast ? "Get Started" : "Continue"} onPress={handlePrimary} />
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -159,6 +165,9 @@ const createStyles = (mobileColors: MobileColors) =>
     root: {
       flex: 1,
       backgroundColor: mobileColors.background,
+    },
+    safeArea: {
+      flex: 1,
     },
     headerRow: {
       flexDirection: "row",
