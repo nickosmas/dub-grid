@@ -14,7 +14,7 @@ import {
   type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "../_lib/operations";
-import { getImportTargetCellKeys } from "../_lib/cell-lock-preflight";
+import { getImportTargetCellKeys } from "../_lib/import-cell-keys";
 
 export type ImportPreviewState = {
   sourceRange: string;

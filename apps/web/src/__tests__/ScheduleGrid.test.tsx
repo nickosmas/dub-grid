@@ -275,7 +275,7 @@ interface RenderGridOptions {
     publishedAt: string;
     publishedBy: string;
   } | null;
-  cellLocks?: Map<string, { userName: string; owner?: "same_account" | "other_account" }>;
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   coverageRequirements?: CoverageRequirement[];
@@ -323,7 +323,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     orgRoles: options.orgRoles ?? [],
     coverageRequirements: options.coverageRequirements,
     absenceTypeMap: options.absenceTypeMap,
-    cellLocks: options.cellLocks,
+    cellEditors: options.cellEditors,
     resolvePublisherName: options.resolvePublisherName,
     openShifts: options.openShifts as any,
     activeFocusArea: options.activeFocusArea ?? null,
@@ -1852,7 +1852,7 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
-      cellLocks: new Map([[`emp-1_2024-01-07`, { userName: "Mina Ray" }]]),
+      cellEditors: new Map([[`emp-1_2024-01-07`, { userId: "user-mina", userName: "Mina Ray" }]]),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
@@ -2769,11 +2769,13 @@ describe("ScheduleGrid", () => {
     expect(activeCells).toHaveLength(1);
   });
 
-  it("activates same-account locked cells so the caller can offer session takeover", () => {
+  // Another editor's marker is informational. Blocking on it is exactly the
+  // behaviour that was removed, so this pins that it cannot come back.
+  it("still opens a cell another editor has open, and marks it", () => {
     const onActivateCell = vi.fn();
     renderGrid({
-      cellLocks: new Map([
-        ["emp-1_2024-01-07", { userName: "Current user", owner: "same_account" }],
+      cellEditors: new Map([
+        ["emp-1_2024-01-07", { userId: "user-other", userName: "Another user" }],
       ]),
       onActivateCell,
     });
@@ -2781,27 +2783,13 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     fireEvent.click(firstCell);
 
-    expect(firstCell.dataset.locked).toBe("true");
+    expect(firstCell.dataset.peerEditing).toBe("true");
     expect(onActivateCell).toHaveBeenCalledWith(
       expect.objectContaining({
         cellId: { empId: "emp-1", dateKey: "2024-01-07", sectionId: 1 },
         trigger: "click",
       }),
     );
-  });
-
-  it("keeps other-account locked cells non-activatable", () => {
-    const onActivateCell = vi.fn();
-    renderGrid({
-      cellLocks: new Map([
-        ["emp-1_2024-01-07", { userName: "Another user", owner: "other_account" }],
-      ]),
-      onActivateCell,
-    });
-
-    fireEvent.click(screen.getAllByRole("gridcell")[0]!);
-
-    expect(onActivateCell).not.toHaveBeenCalled();
   });
 
   it("toggles selectable cells in bulk delete mode instead of opening the editor", () => {
@@ -2861,21 +2849,20 @@ describe("ScheduleGrid", () => {
     expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
   });
 
-  it("does not select locked cells in bulk delete mode", () => {
+  it("still selects a cell another editor has open in bulk delete mode", () => {
     const onToggleBulkDeleteCell = vi.fn();
     renderGrid({
       bulkDeleteMode: true,
       bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
-      cellLocks: new Map([["emp-1_2024-01-07", { userName: "Sam" }]]),
+      cellEditors: new Map([["emp-1_2024-01-07", { userId: "user-sam", userName: "Sam" }]]),
       onToggleBulkDeleteCell,
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     fireEvent.click(firstCell);
 
-    expect(firstCell.dataset.locked).toBe("true");
-    expect(firstCell.dataset.bulkSelectable).toBeUndefined();
-    expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
+    expect(firstCell.dataset.peerEditing).toBe("true");
+    expect(onToggleBulkDeleteCell).toHaveBeenCalled();
   });
 
   it("suppresses context menus and keyboard activation in bulk delete mode", () => {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import PresenceAvatars from "@/components/PresenceAvatars";
-import type { OnlineUser } from "@/hooks/useCellLocks";
+import type { OnlineUser } from "@/hooks/useSchedulePresence";
 
 const onlineUser = (overrides: Partial<OnlineUser> = {}): OnlineUser => ({
   editorSessionId: "session-other",
