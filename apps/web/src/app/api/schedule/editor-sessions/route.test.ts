@@ -14,7 +14,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: () => null }));
-vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
+vi.mock("@/lib/logger", () => ({ default: { error: vi.fn(), warn: vi.fn() } }));
 
 import { GET, POST } from "./route";
 
@@ -144,5 +144,68 @@ describe("/api/schedule/editor-sessions", () => {
     expect(eqOrg).toHaveBeenCalledWith("org_id", ORG_ID);
     expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
     expect(eqEditorSession).toHaveBeenCalledWith("editor_session_id", TARGET_ID);
+  });
+
+  // The terminations table arrives with migration 013, and the only remote-apply
+  // path this project has is a full reset, so an environment can legitimately
+  // run this code before the table exists. That must not 500 on every schedule
+  // load and tab refocus.
+  describe("when the terminations table is missing", () => {
+    const missingTable = { code: "42P01", message: 'relation "..." does not exist' };
+    const schemaCacheMiss = { code: "PGRST205", message: "Could not find the table" };
+
+    it("reports no ended session rather than failing", async () => {
+      maybeSingle.mockResolvedValue({ data: null, error: missingTable });
+
+      const response = await GET(
+        new NextRequest(
+          `http://localhost/api/schedule/editor-sessions?orgId=${ORG_ID}&editorSessionId=${TARGET_ID}`,
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ended: false, endedAt: null });
+    });
+
+    it("treats a PostgREST schema-cache miss the same way", async () => {
+      maybeSingle.mockResolvedValue({ data: null, error: schemaCacheMiss });
+
+      const response = await GET(
+        new NextRequest(
+          `http://localhost/api/schedule/editor-sessions?orgId=${ORG_ID}&editorSessionId=${TARGET_ID}`,
+        ),
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    // Ending a session genuinely cannot work without the table, so say so
+    // instead of inviting a retry that can never succeed.
+    it("tells the caller the action is unavailable instead of asking them to retry", async () => {
+      upsert.mockResolvedValue({ error: missingTable });
+
+      const response = await post({
+        orgId: ORG_ID,
+        targetEditorSessionIds: [TARGET_ID],
+        endingEditorSessionId: ENDING_ID,
+      });
+
+      expect(response.status).toBe(503);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toMatch(/isn't available/i);
+      expect(body.error).not.toMatch(/try again/i);
+    });
+
+    it("still surfaces a genuine database failure as an error", async () => {
+      maybeSingle.mockResolvedValue({ data: null, error: { code: "57014", message: "timeout" } });
+
+      const response = await GET(
+        new NextRequest(
+          `http://localhost/api/schedule/editor-sessions?orgId=${ORG_ID}&editorSessionId=${TARGET_ID}`,
+        ),
+      );
+
+      expect(response.status).toBe(500);
+    });
   });
 });

@@ -45,6 +45,20 @@ const canUseScheduleEditor = (permissions: {
   permissions.canEditShifts ||
   permissions.canEditNotes;
 
+/**
+ * True when the terminations table is not in the database yet.
+ *
+ * The table arrives with migration 013, and the only remote-apply path this
+ * project has is a full reset, so an environment can legitimately run this code
+ * before the table exists. Postgres reports that as `42P01`; PostgREST reports
+ * its own schema-cache miss as `PGRST205`.
+ */
+function isMissingTerminationsTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "42P01" || code === "PGRST205";
+}
+
 export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse({
     orgId: req.nextUrl.searchParams.get("orgId"),
@@ -69,7 +83,15 @@ export async function GET(req: NextRequest) {
       .eq("editor_session_id", parsed.data.editorSessionId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      // Degrade rather than 500 on every schedule load and tab refocus: with no
+      // table there are no terminations, so no session has been ended.
+      if (isMissingTerminationsTable(error)) {
+        logger.warn({ error }, "schedule editor session terminations table missing");
+        return NextResponse.json({ ended: false, endedAt: null });
+      }
+      throw error;
+    }
     return NextResponse.json({ ended: data != null, endedAt: data?.ended_at ?? null });
   } catch (error) {
     logger.error({ error }, "schedule editor session status failed");
@@ -115,7 +137,16 @@ export async function POST(req: NextRequest) {
       .from("schedule_editor_session_terminations")
       .upsert(terminations, { onConflict: "org_id,user_id,editor_session_id" });
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingTerminationsTable(error)) {
+        logger.warn({ error }, "schedule editor session terminations table missing");
+        return NextResponse.json(
+          { error: "Ending another schedule session isn't available in this environment yet." },
+          { status: 503 },
+        );
+      }
+      throw error;
+    }
     return NextResponse.json({
       ended: true,
       endedAt,
