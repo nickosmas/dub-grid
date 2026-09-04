@@ -37,6 +37,7 @@
     "db:reset:mobile": "npm run db:reset && node scripts/reset-mobile-android-storage.mjs",
     "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
     "db:reset:staging": "npx tsx --env-file=.env.staging scripts/reset-remote-db.ts && npx tsx --env-file=.env.staging seed.ts",
+    "db:seed:branch": "npx tsx seed.ts",
     "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
     "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",

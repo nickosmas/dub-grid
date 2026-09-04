@@ -50,6 +50,26 @@ This holds because migrations are applied by ledger now, through Supabase
 branching or `supabase db push`, rather than by dropping and replaying the
 whole schema.
 
+## Preview branches
+
+Supabase branching replays every migration onto a new, empty database. That
+covers the schema; it does not cover the data, and a preview with no
+organization is a preview nobody can sign in to.
+
+`[db.seed].sql_paths` is deliberately empty and cannot fix this. The seed files
+are order-dependent (`seed_arden_wood.sql` clones Calm Haven, so Calm Haven has
+to exist first) and none of them create `auth.users`. `seed.ts` is what
+orchestrates them, so seeding is a step after the branch exists:
+
+```
+DATABASE_URL='<branch connection string>' npm run db:seed:branch
+```
+
+A preview branch proves a clean install. It does not prove the upgrade from
+production's real state, which is where the risk lives. Rehearse that by
+restoring a production backup into a persistent branch and taking the migration
+against it.
+
 ## config.toml: JWT Hook (CRITICAL)
 
 The `custom_access_token_hook` must be enabled for local dev:
