@@ -39,7 +39,6 @@ export default function ImpersonationBanner() {
   useEffect(() => {
     const expiresAt = imp?.expiresAt;
     if (!expiresAt) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountdown(null);
       return;
     }

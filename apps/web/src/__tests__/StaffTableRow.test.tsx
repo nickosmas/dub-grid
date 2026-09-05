@@ -279,14 +279,26 @@ describe("StaffTableRow column gating", () => {
       </table>,
     );
 
-    for (const label of ["Active", "Skilled Nursing", "Memory Care", "+1 more"]) {
-      const pill = Array.from(container.querySelectorAll("span")).find(
-        (node) => node.textContent === label,
-      );
+    const findPill = (label: string) =>
+      Array.from(container.querySelectorAll("span")).find((node) => node.textContent === label);
+
+    // Focus areas stay square category pills with no leading mark.
+    for (const label of ["Skilled Nursing", "Memory Care", "+1 more"]) {
+      const pill = findPill(label);
       expect(pill?.className).toContain("rounded-[4px]");
       expect(pill?.className).toContain("font-semibold");
       expect(pill?.querySelector('[aria-hidden="true"]')).toBeNull();
     }
+
+    // Status matches the Account pill instead: rounded, borderless, and led by
+    // a tone dot rather than an icon.
+    const statusPill = findPill("Active");
+    expect(statusPill?.className).toContain("rounded-full");
+    expect(statusPill?.className).toContain("font-semibold");
+    expect(statusPill?.getAttribute("style")).not.toContain("border");
+    const statusDot = statusPill?.querySelector('[aria-hidden="true"]');
+    expect(statusDot).not.toBeNull();
+    expect(statusDot?.className).toContain("rounded-full");
 
     const accountPill = container.querySelector('[aria-label="Account: Not invited"]');
     expect(accountPill?.className).toContain("rounded-full");

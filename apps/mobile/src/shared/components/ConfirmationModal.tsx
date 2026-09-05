@@ -71,6 +71,9 @@ export function ConfirmationModal({
   return (
     <BottomSheetModal
       accessibilityRole="alert"
+      // Every confirmation names itself for free, which matters because a
+      // confirmation is nearly always the sheet involved in a stacking report.
+      debugName={title}
       // A pending confirmation can't be dragged or tapped away; the grabber
       // stays, as it does on every sheet, and the drag settles back instead.
       dismissDisabled={isBusy}

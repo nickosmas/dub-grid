@@ -100,14 +100,14 @@ export function useScheduleImport({
       });
 
       if (outcomes.length === 0) {
-        toast.info("Nothing to import — the previous period has no shifts.");
+        toast.info("Nothing to import: the previous period has no shifts.");
         return;
       }
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
       if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
         toast.info(
-          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, employeeNameById)}.`,
+          `Nothing new to import: ${formatImportPreviousSkipDescription(outcomes, breakdown, employeeNameById)}.`,
         );
         return;
       }
@@ -186,7 +186,7 @@ export function useScheduleImport({
 
       if (breakdown.imported === 0) {
         toast.info(
-          skipDescription ? `Nothing imported — ${skipDescription}.` : "Nothing imported.",
+          skipDescription ? `Nothing imported: ${skipDescription}.` : "Nothing imported.",
           breakdown.totalSkipped > 0
             ? { action: { label: "View details", onClick: () => setShowImportResults(true) } }
             : undefined,

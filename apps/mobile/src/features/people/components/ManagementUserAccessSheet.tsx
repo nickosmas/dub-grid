@@ -19,7 +19,7 @@ import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesG
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
-import type { ManagementAccessRole } from "./ManagementAccessSheet";
+import type { ManagementAccessRole } from "../lib/managementAccess";
 
 type Draft = {
   orgRole: ManagementAccessRole;

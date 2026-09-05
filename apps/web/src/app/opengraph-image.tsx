@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { LogoGrid, loadDmSansFonts } from "./logo-grid";
 
-export const alt = "DubGrid — Smart staff scheduling for care facilities";
+export const alt = "DubGrid: Smart staff scheduling for care facilities";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

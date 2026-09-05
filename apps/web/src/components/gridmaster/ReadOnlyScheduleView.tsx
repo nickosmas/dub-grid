@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { Button } from "@/components/Button";
+import { MaybeHint } from "@/components/ui/hint";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
@@ -205,9 +206,9 @@ export default function ReadOnlyScheduleView({
                         {r.assignmentDetails.length > 0 ? (
                           <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
                             {r.assignmentDetails.map((assignment) => (
-                              <span
+                              <MaybeHint
                                 key={assignment.id}
-                                title={[
+                                content={[
                                   assignment.name,
                                   assignment.coverageStatus
                                     ? `Coverage ${assignment.coverageStatus.actual}/${assignment.coverageStatus.required}`
@@ -215,18 +216,21 @@ export default function ReadOnlyScheduleView({
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")}
-                                style={{
-                                  display: "inline-block",
-                                  padding: "1px 6px",
-                                  borderRadius: 4,
-                                  fontSize: "var(--dg-fs-caption)",
-                                  fontWeight: 700,
-                                  border: "1px solid",
-                                  ...getAssignmentStyle(assignment, isDarkTheme),
-                                }}
                               >
-                                {assignment.label}
-                              </span>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "1px 6px",
+                                    borderRadius: 4,
+                                    fontSize: "var(--dg-fs-caption)",
+                                    fontWeight: 700,
+                                    border: "1px solid",
+                                    ...getAssignmentStyle(assignment, isDarkTheme),
+                                  }}
+                                >
+                                  {assignment.label}
+                                </span>
+                              </MaybeHint>
                             ))}
                           </span>
                         ) : r.absenceLabel ? (
@@ -289,20 +293,20 @@ export default function ReadOnlyScheduleView({
                             </span>
                           )}
                           {r.requestIndicators.map((request) => (
-                            <span
-                              key={request.id}
-                              title={formatRequestIndicator(request)}
-                              style={{
-                                fontSize: "var(--dg-fs-footnote)",
-                                fontWeight: 600,
-                                color: "var(--dg-color-today-text)",
-                                background: "var(--dg-color-today-bg)",
-                                padding: "1px 6px",
-                                borderRadius: 4,
-                              }}
-                            >
-                              {formatShiftRequestTypeLabel(request.type)}
-                            </span>
+                            <MaybeHint key={request.id} content={formatRequestIndicator(request)}>
+                              <span
+                                style={{
+                                  fontSize: "var(--dg-fs-footnote)",
+                                  fontWeight: 600,
+                                  color: "var(--dg-color-today-text)",
+                                  background: "var(--dg-color-today-bg)",
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                }}
+                              >
+                                {formatShiftRequestTypeLabel(request.type)}
+                              </span>
+                            </MaybeHint>
                           ))}
                           {r.assignmentDetails.some(
                             (assignment) =>

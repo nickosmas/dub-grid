@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
 
   const isStart = type === "start";
   const subject = isStart
-    ? `Account access notice — ${targetOrgName || "DubGrid"}`
-    : `Account access ended — ${targetOrgName || "DubGrid"}`;
+    ? `Account access notice: ${targetOrgName || "DubGrid"}`
+    : `Account access ended: ${targetOrgName || "DubGrid"}`;
 
   const html = await render(
     createElement(ImpersonationNoticeEmail, {

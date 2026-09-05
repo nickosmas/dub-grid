@@ -1,19 +1,19 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { getInitials } from "@/lib/utils";
 import { useAvatarTone } from "@/hooks/useAvatarTone";
-import type { EmployeeEmploymentType, EmployeeStatus } from "@/types";
+import { AccessInsignia } from "./AccessInsignia";
+import type { EmployeeEmploymentType, OrganizationRole } from "@/types";
 
 interface PersonProfileHeaderProps {
   /** Seed the avatar tone with `resolveAvatarSeed` so one human keeps one color. */
   avatarSeed: string;
   name: string;
-  /** Omitted for people without an employee record, who have no staff status. */
-  status?: EmployeeStatus;
+  /** Drives the avatar insignia. Plain users and staff with no login get none. */
+  orgRole?: OrganizationRole | null;
   email?: string | null;
   phone?: string | null;
   employmentType?: EmployeeEmploymentType;
@@ -21,38 +21,11 @@ interface PersonProfileHeaderProps {
   actions?: ReactNode;
 }
 
-const STATUS_CONFIG: Record<EmployeeStatus, { label: string; style: CSSProperties }> = {
-  active: {
-    label: "Active",
-    style: {
-      background: "var(--dg-color-success-bg)",
-      color: "var(--dg-color-success-text)",
-      borderColor: "var(--dg-color-success-border)",
-    },
-  },
-  inactive: {
-    label: "Inactive",
-    style: {
-      background: "var(--dg-color-warning-bg)",
-      color: "var(--dg-color-warning-text)",
-      borderColor: "var(--dg-color-warning-border)",
-    },
-  },
-  removed: {
-    label: "Removed",
-    style: {
-      background: "var(--dg-color-danger-bg)",
-      color: "var(--dg-color-danger-text)",
-      borderColor: "var(--dg-color-danger-border)",
-    },
-  },
-};
-
 /** Identity header shared by a staff member's profile and your own profile. */
 export function PersonProfileHeader({
   avatarSeed,
   name,
-  status,
+  orgRole,
   email,
   phone,
   employmentType,
@@ -60,7 +33,6 @@ export function PersonProfileHeader({
   actions,
 }: PersonProfileHeaderProps) {
   const avatarTone = useAvatarTone(avatarSeed);
-  const statusConfig = status ? STATUS_CONFIG[status] : null;
   const employmentLabel = employmentType
     ? employmentType === "part_time"
       ? "Part-time"
@@ -89,11 +61,7 @@ export function PersonProfileHeader({
               <h1 className="min-w-0 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                 {name}
               </h1>
-              {statusConfig && (
-                <Badge variant="outline" className="px-2 font-semibold" style={statusConfig.style}>
-                  {statusConfig.label}
-                </Badge>
-              )}
+              <AccessInsignia orgRole={orgRole} size="lg" />
             </div>
           </div>
 

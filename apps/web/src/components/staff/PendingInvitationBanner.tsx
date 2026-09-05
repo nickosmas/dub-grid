@@ -128,7 +128,7 @@ export function PendingInvitationBanner({
               ? `Revoke the existing invitation for ${pendingInvitation.email} and create a new one?`
               : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
           }
-          confirmLabel={pendingAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"}
+          confirmLabel={pendingAction === "reinvite" ? "Reissue" : "Revoke"}
           variant={pendingAction === "reinvite" ? "warning" : "danger"}
           isLoading={busy}
           onConfirm={handleConfirm}

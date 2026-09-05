@@ -666,7 +666,6 @@ export default function MonthView({
       </div>
 
       {/* Day popover */}
-      {/* eslint-disable react-hooks/refs -- accessing a stable DOM ref in render is safe here */}
       {popoverData && popoverAnchorRef.current && (
         <DayPopover
           anchorEl={popoverAnchorRef.current}
@@ -676,7 +675,6 @@ export default function MonthView({
           hasHighlightedSearch={hasHighlightedSearch}
         />
       )}
-      {/* eslint-enable react-hooks/refs */}
     </div>
   );
 }

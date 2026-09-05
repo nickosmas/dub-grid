@@ -136,7 +136,7 @@ export function EmployeeStatusActions({
             />
           </div>
         }
-        confirmLabel={isRemove ? "Remove" : "Mark Inactive"}
+        confirmLabel={isRemove ? "Remove" : "Mark inactive"}
         variant={isRemove ? "danger" : "warning"}
         onConfirm={() => {
           const trimmedNote = note.trim() || undefined;
@@ -177,18 +177,12 @@ export function EmployeeStatusActions({
           <Button
             onClick={() => setShowActivateConfirm(true)}
             className={
-              variant === "page"
-                ? "dg-btn dg-btn-secondary dg-btn-sm"
-                : "dg-btn dg-btn-ghost dg-btn-xs"
+              variant === "page" ? "dg-btn dg-btn-success" : "dg-btn dg-btn-ghost dg-btn-xs"
             }
             style={{
-              ...(variant === "page"
-                ? {
-                    color: "var(--dg-color-success)",
-                    borderColor: "var(--dg-color-success-border)",
-                    background: "var(--dg-color-success-bg)",
-                  }
-                : { color: "var(--dg-color-success)" }),
+              // Inline success colors here would outrank the variant's :hover,
+              // so the page button wears the class and only ghost tints inline.
+              ...(variant === "page" ? null : { color: "var(--dg-color-success-text)" }),
               ...(fillWidth ? { flex: 1, width: "100%" } : null),
             }}
           >

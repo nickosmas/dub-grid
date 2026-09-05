@@ -1,5 +1,6 @@
 "use client";
 
+import { ORG_ROLE_LABELS, ORG_ROLE_PRIVILEGE_ORDER } from "@dubgrid/domain";
 import type { Department, FocusArea, NamedItem } from "@/types";
 import { FilterChip, FilterGroup, FilterPanelShell, FilterSection } from "./FilterPanelShell";
 import type {
@@ -7,6 +8,7 @@ import type {
   CertificationFilter,
   ContactPresenceFilter,
   EmploymentTypeFilter,
+  OrgRoleFilter,
 } from "./useStaffFilters";
 
 interface StaffFilterPopoverProps {
@@ -31,6 +33,14 @@ interface StaffFilterPopoverProps {
   onFilterEmailPresenceChange: (value: ContactPresenceFilter) => void;
   filterPhonePresence: ContactPresenceFilter;
   onFilterPhonePresenceChange: (value: ContactPresenceFilter) => void;
+  filterOrgRole: OrgRoleFilter;
+  onFilterOrgRoleChange: (value: OrgRoleFilter) => void;
+  /**
+   * Access is admin-only information, and the tier map behind it is only
+   * loaded for viewers who can read the directory. Off, the filter would be
+   * answering about a column this viewer cannot see.
+   */
+  showAccessControls: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
@@ -67,6 +77,9 @@ export function StaffFilterPopover({
   onFilterEmailPresenceChange,
   filterPhonePresence,
   onFilterPhonePresenceChange,
+  filterOrgRole,
+  onFilterOrgRoleChange,
+  showAccessControls,
   focusAreas,
   certifications,
   roles,
@@ -236,6 +249,23 @@ export function StaffFilterPopover({
           >
             Unlinked account{unlinkedCount > 0 ? ` (${unlinkedCount})` : ""}
           </FilterChip>
+        </FilterSection>
+      )}
+
+      {showAccessControls && (
+        <FilterSection title="Access">
+          <FilterChip active={filterOrgRole === "all"} onClick={() => onFilterOrgRoleChange("all")}>
+            All
+          </FilterChip>
+          {ORG_ROLE_PRIVILEGE_ORDER.map((role) => (
+            <FilterChip
+              key={role}
+              active={filterOrgRole === role}
+              onClick={() => onFilterOrgRoleChange(role)}
+            >
+              {ORG_ROLE_LABELS[role]}
+            </FilterChip>
+          ))}
         </FilterSection>
       )}
 

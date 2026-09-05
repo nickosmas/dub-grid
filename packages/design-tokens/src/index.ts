@@ -89,6 +89,10 @@ export const lightColorTokens = {
   warningText: "#92400E",
   warningSoft: "#FFFBEB",
   warningBorder: "#FDE68A",
+  // The Super Admin avatar insignia. A step deeper than `warning`, which is too
+  // light to carry the white crown. Theme-stable: the insignia is a solid chip
+  // ringed in the surface behind it, so only the ring tracks the theme.
+  insigniaCrown: "#D97706",
   danger: "#EF4444",
   dangerText: "#B91C1C",
   dangerSoft: "#FEF2F2",
@@ -156,6 +160,7 @@ export const darkColorTokens: ColorTokens = {
   warningText: "#FBBF24",
   warningSoft: "#241C0B",
   warningBorder: "#3F2F10",
+  insigniaCrown: "#D97706",
   danger: "#EF4444",
   dangerText: "#FF5C5C",
   dangerSoft: "#2A1414",

@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
-import { Button } from "@/components/Button";
+import { Pagination } from "@/components/ui/pagination";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -637,42 +637,12 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           onOpen={setSelectedSession}
         />
 
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "12px 16px",
-            borderTop: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            disabled={page === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-          >
-            Previous
-          </Button>
-          <span
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--dg-color-text-muted)",
-              fontFamily: "var(--font-dm-mono), monospace",
-            }}
-          >
-            Page {page + 1}
-          </span>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            disabled={sessions.length < SESSIONS_PAGE_SIZE}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
-        </div>
+        <Pagination
+          page={page + 1}
+          hasNext={sessions.length >= SESSIONS_PAGE_SIZE}
+          onPageChange={(next) => setPage(next - 1)}
+          className="border-t border-[var(--dg-color-border-light)]"
+        />
       </div>
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div

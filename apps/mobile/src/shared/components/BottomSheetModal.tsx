@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
@@ -6,6 +6,7 @@ import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-ha
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { trackSheetPresentation } from "../lib/modal-presentation";
 import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
@@ -72,6 +73,7 @@ export function BottomSheetModal({
   scrollable = false,
   accessibilityLabel = "Dismiss",
   accessibilityRole,
+  debugName,
   header,
   footer,
   children,
@@ -96,6 +98,12 @@ export function BottomSheetModal({
   accessibilityLabel?: string;
   /** Set "alert" for a blocking sheet the user must answer before continuing. */
   accessibilityRole?: "alert";
+  /**
+   * Names this sheet in a stacking violation. Diagnostics only, never rendered.
+   * Worth setting on any sheet that shares a screen with others: without it the
+   * report can only say "Dismiss", which is every sheet's backdrop label.
+   */
+  debugName?: string;
   /**
    * Rendered in the sheet's non-scrolling top region, which is also the drag
    * region. Put a sheet's title here rather than in `children` so the whole
@@ -134,6 +142,22 @@ export function BottomSheetModal({
   const keyboardStyle = useAnimatedStyle(() => ({
     marginBottom: -keyboardHeight.value - SHEET_OVERDRAG_LIMIT,
   }));
+  // Reports what this sheet is doing to the presentation tracker, which is the
+  // only place that can see two sheets transitioning against each other. Keyed
+  // on `visible` alone so it fires once per real transition, not per re-render.
+  // The name is read through a ref so it stays out of the dependency list: a
+  // sheet whose title changes while it is open (a confirmation reusing one slot
+  // for two questions) would otherwise tear this down and re-run it, and report
+  // itself as two sheets trading places.
+  const presentationName = useRef(debugName ?? accessibilityLabel);
+  presentationName.current = debugName ?? accessibilityLabel;
+  useEffect(() => {
+    if (!visible) return;
+    const name = presentationName.current;
+    trackSheetPresentation("show", name);
+    return () => trackSheetPresentation("hide", name);
+  }, [visible]);
+
   const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();

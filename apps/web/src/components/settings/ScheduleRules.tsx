@@ -285,8 +285,8 @@ export default function ScheduleRules({
           <ConfirmDialog
             title="Save Schedule Rule"
             message="This change updates an organization-wide scheduling rule. Review carefully before saving."
-            confirmLabel="Save Rule"
-            variant="warning"
+            confirmLabel="Save"
+            variant="info"
             isLoading={saving}
             onConfirm={() => handleSave()}
             onCancel={() => setConfirmOpen(false)}

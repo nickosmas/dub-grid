@@ -299,6 +299,9 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
+    // The pill's glyph can't be asserted here: every icon subpath aliases to one
+    // shim, so this file's `vi.mock` of Ionicons nulls them all. See
+    // orgRoleBadges.test.ts for which glyph a tier gets.
     expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.queryByText("Details")).not.toBeInTheDocument();
@@ -1056,6 +1059,77 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
+  it("filters admins out of the staff directory by access level", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz", orgRole: "admin" }),
+          buildPerson({
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            orgRole: "user",
+            seniority: 2,
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("User"));
+
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+  });
+
+  it("can sort the staff directory by access level", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          // Seniority runs opposite to privilege, so the default sort passing
+          // could never be mistaken for the access sort passing.
+          buildPerson({
+            id: "emp-1",
+            firstName: "June",
+            lastName: "Patel",
+            orgRole: "user",
+            seniority: 1,
+          }),
+          buildPerson({
+            id: "emp-2",
+            firstName: "Mina",
+            lastName: "Diaz",
+            orgRole: "super_admin",
+            seniority: 2,
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    // Twice on this tab too: the section of access-level filters, then the
+    // sort by it.
+    fireEvent.click(screen.getAllByText("Access level")[1]);
+
+    const minaRow = screen.getByText("Mina Diaz");
+    const juneRow = screen.getByText("June Patel");
+    expect(
+      minaRow.compareDocumentPosition(juneRow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   // The staff sheet's sections would all be dead controls against the roster,
   // so the management tab swaps in the ones its own rows can answer.
   it("swaps the filter sheet for management filters on the management tab", () => {
@@ -1065,7 +1139,10 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText("Open people filters and sort"));
     expect(screen.getByText("Focus area")).toBeInTheDocument();
-    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+    // Access level is the one control both halves share, so the roster-only
+    // sections are what prove the staff sheet is showing.
+    expect(screen.queryByText("Management department")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invitation")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Management"));
 

@@ -128,7 +128,7 @@ function RootLayoutContent({
                                 options={createDetailStackOptions(mobileColors, "Shift Detail")}
                               />
                               <Stack.Screen
-                                name="person/[id]"
+                                name="person/[id]/index"
                                 options={{
                                   ...createDetailStackOptions(mobileColors, "Staff Profile", {
                                     scrollEdge: true,
@@ -141,6 +141,18 @@ function RootLayoutContent({
                                     fontFamily: mobileTypography.fontFamily.bold,
                                   },
                                 }}
+                              />
+                              {/* Add to Schedule is a pushed screen rather than a
+                                  sheet: it is a three-picker form, and stacking
+                                  it over the person page put a third modal on a
+                                  stack iOS is unreliable about tearing down.
+                                  Management access stays a sheet, which is where
+                                  management settings always open. */}
+                              <Stack.Screen
+                                name="person/[id]/schedule"
+                                options={createDetailStackOptions(mobileColors, "Add to Schedule", {
+                                  largeTitle: true,
+                                })}
                               />
                             </Stack>
                           </StartupSplashGate>

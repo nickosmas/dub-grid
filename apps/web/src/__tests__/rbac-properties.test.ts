@@ -105,7 +105,6 @@ function createMockRoleChangeSystem() {
    */
   function updateAuditLogEntry(
     idempotencyKey: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _newValues?: Partial<RoleChangeLogEntry>,
   ): void {
     // Check if entry exists

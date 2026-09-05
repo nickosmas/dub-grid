@@ -215,7 +215,7 @@ export default function GridmasterDashboard({
         >
           Dashboard
         </h2>
-        <Button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
+        <Button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>
           + New Organization
         </Button>
       </div>

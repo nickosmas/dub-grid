@@ -395,7 +395,7 @@ export function useShiftRequests(
       if (!orgId) return false;
       try {
         await respondToShiftRequest(requestId, empId, accept, orgId);
-        toast.success(accept ? "Swap accepted — awaiting admin approval" : "Swap declined");
+        toast.success(accept ? "Swap accepted, awaiting admin approval" : "Swap declined");
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {

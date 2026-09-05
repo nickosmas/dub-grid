@@ -196,7 +196,7 @@ export function InvitationsTab({
         <ConfirmDialog
           title="Revoke Invitation"
           message={`Revoke the invitation for "${revokeConfirm.email}"? They will not be able to use the current invite link after this change.`}
-          confirmLabel="Revoke Invitation"
+          confirmLabel="Revoke"
           variant="danger"
           isLoading={revoking === revokeConfirm.id}
           onConfirm={() => handleRevoke(revokeConfirm)}

@@ -312,6 +312,7 @@ function SchedulerContent() {
     canPublishSchedule,
     canApproveShiftRequests,
     canManageEmployees,
+    canViewDashboardAnalytics,
     isSuperAdmin,
     isGridmaster,
     isLoading: permsLoading,
@@ -322,6 +323,11 @@ function SchedulerContent() {
   // tool, regardless of the org's openShiftVisibility setting or their own
   // personal eligibility for a given shift (see openShifts memo below).
   const canSeeAllOpenShifts = canEditShifts || canManageEmployees || isSuperAdmin || isGridmaster;
+  // Org-wide staffing shortfalls are a management view, not staff-facing. The
+  // same flag gates /api/dashboard/analytics, and authz already derives it from
+  // any scheduling capability, so regular staff (and benched accounts) lose the
+  // Coverage button while keeping the open shifts they can volunteer for.
+  const canViewCoveragePanel = canViewDashboardAnalytics;
   const {
     org,
     focusAreas,
@@ -1143,7 +1149,7 @@ function SchedulerContent() {
           if (delCount > 0) parts.push(`${delCount} removed`);
           if (parts.length > 0) {
             toast.info(
-              `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit — ${parts.join(", ")}`,
+              `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit: ${parts.join(", ")}`,
               { duration: 6000 },
             );
           }
@@ -4760,7 +4766,7 @@ function SchedulerContent() {
         })
         .catch(async (err) => {
           if (err instanceof OptimisticLockError) {
-            toast.error("Entry was modified by another editor or another tab — refreshing");
+            toast.error("Entry was modified by another editor or another tab. Refreshing.");
           } else {
             toast.error(
               mode === "copy"
@@ -5926,7 +5932,7 @@ function SchedulerContent() {
         setShowBulkDeleteReview(false);
         if (deleted > 0) {
           toast.info(
-            `Removed ${deleted} of ${updates.length}. The rest are still selected — try again.`,
+            `Removed ${deleted} of ${updates.length}. The rest are still selected. Try again.`,
           );
         }
         return;
@@ -6371,12 +6377,10 @@ function SchedulerContent() {
                         showPublishDiff ? (
                           <Button
                             onClick={() => setShowPublishDiff(false)}
-                            className="dg-btn dg-btn-secondary"
+                            className="dg-btn dg-btn-info"
                             style={{
                               fontSize: "var(--dg-fs-caption)",
                               padding: "5px 12px",
-                              background: "var(--dg-color-info-bg)",
-                              color: "var(--dg-color-accent-text)",
                             }}
                           >
                             Hide Changes
@@ -6399,12 +6403,10 @@ function SchedulerContent() {
                           >
                             <Button
                               onClick={() => setShowPublishDiff((v) => !v)}
-                              className="dg-btn dg-btn-secondary"
+                              className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
                               style={{
                                 fontSize: "var(--dg-fs-caption)",
                                 padding: "5px 12px",
-                                background: showPublishDiff ? "var(--dg-color-info-bg)" : undefined,
-                                color: showPublishDiff ? "var(--dg-color-accent-text)" : undefined,
                               }}
                             >
                               {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
@@ -6492,12 +6494,15 @@ function SchedulerContent() {
                 isImportingPrevious={isImportingPrevious}
                 onPrintOpen={featureFlags.printing ? () => setShowPrintOptions(true) : undefined}
                 onExportCSV={
-                  dates.length > 0 && filteredEmployees.length > 0
+                  // /api/export already requires canEditShifts for a schedule
+                  // export; this client-side one was handing the same roster to
+                  // anyone with the page open.
+                  canEditShifts && dates.length > 0 && filteredEmployees.length > 0
                     ? () => exportScheduleCSV(filteredEmployees, dates, shiftNameForKey)
                     : undefined
                 }
                 presenceSlot={
-                  canEditShifts ? (
+                  isScheduleEditor ? (
                     <PresenceAvatars
                       onlineUsers={onlineUsers}
                       profiles={presenceProfiles}
@@ -6512,9 +6517,11 @@ function SchedulerContent() {
                 requestsBadgeCount={shiftRequests.badgeCount}
                 onRequestsToggle={() => setShowRequestBoard((prev) => !prev)}
                 coverageGapCount={visibleCoverageGaps.length}
-                onCoverageToggle={() => setShowCoveragePanel((prev) => !prev)}
+                onCoverageToggle={
+                  canViewCoveragePanel ? () => setShowCoveragePanel((prev) => !prev) : undefined
+                }
                 hideTwoWeek={shouldAutoUseOneWeek}
-                onPublishHistory={() => setShowPublishHistory(true)}
+                onPublishHistory={canEditShifts ? () => setShowPublishHistory(true) : undefined}
                 onBulkDeleteToggle={
                   canEditShifts && !isMobile && spanWeeks !== "month"
                     ? handleToggleBulkDeleteMode
@@ -6691,7 +6698,7 @@ function SchedulerContent() {
               <ConfirmDialog
                 title="Review Bulk Removal"
                 message={<BulkDeleteReviewContent targets={bulkDeleteSelectedTargets} />}
-                confirmLabel="Remove selected entries"
+                confirmLabel="Remove"
                 cancelLabel="Back"
                 variant="danger"
                 maxWidth={620}
@@ -7228,7 +7235,7 @@ function SchedulerContent() {
           )}
 
           {/* ── Coverage Panel (slide-out) ── */}
-          {showCoveragePanel && (
+          {showCoveragePanel && canViewCoveragePanel && (
             <CoveragePanel
               gaps={visibleCoverageGaps}
               focusAreas={focusAreas}
@@ -7379,7 +7386,7 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Auto Fill Shifts?"
               message={`This will fill ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring templates. Existing visible shifts will not be overwritten.`}
-              confirmLabel="Fill Shifts"
+              confirmLabel="Fill"
               variant="info"
               isLoading={isApplyingRecurring}
               onConfirm={handleApplyRecurring}
@@ -7394,7 +7401,7 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Delete Shift Series?"
               message={`This will mark ${pendingSeriesDelete.shiftCount} shift${pendingSeriesDelete.shiftCount === 1 ? "" : "s"} for deletion. They will be permanently removed when you publish.`}
-              confirmLabel="Delete Series"
+              confirmLabel="Delete"
               variant="danger"
               onConfirm={handleConfirmSeriesDelete}
               onCancel={() => {
@@ -7420,7 +7427,7 @@ function SchedulerContent() {
                 );
                 return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
               })()}
-              confirmLabel="Import Shifts"
+              confirmLabel="Import"
               variant="info"
               isLoading={isImportingPrevious}
               onConfirm={handleImportPrevious}
@@ -7437,7 +7444,7 @@ function SchedulerContent() {
               onClose={closeImportResults}
             />
           )}
-          {showPublishHistory && org && (
+          {showPublishHistory && canEditShifts && org && (
             <PublishHistoryPanel
               orgId={org.id}
               open={showPublishHistory}

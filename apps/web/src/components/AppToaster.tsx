@@ -7,7 +7,6 @@ type ToastMethod = "success" | "error" | "info" | "warning" | "message" | "loadi
 const TONES: ToastMethod[] = ["success", "error", "info", "warning", "message", "loading"];
 
 declare global {
-  // eslint-disable-next-line no-var
   var __dubgridToastPatched: boolean | undefined;
 }
 

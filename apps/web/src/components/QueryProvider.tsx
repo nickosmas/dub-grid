@@ -40,7 +40,6 @@ function attachPerfLogger(client: QueryClient): () => void {
     } else if (query.state.fetchStatus === "idle" && starts.has(key)) {
       const dur = performance.now() - (starts.get(key) ?? 0);
       starts.delete(key);
-      // eslint-disable-next-line no-console
       console.debug(`%c[rq] ${query.queryKey[0]}`, "color:#0a84ff", `${dur.toFixed(0)}ms`, {
         key: query.queryKey,
         status: query.state.status,
@@ -59,7 +58,6 @@ function attachPerfLogger(client: QueryClient): () => void {
     ) {
       const dur = performance.now() - (starts.get(`mut:${m.mutationId}`) ?? 0);
       starts.delete(`mut:${m.mutationId}`);
-      // eslint-disable-next-line no-console
       console.debug(`%c[rq:mutation]`, "color:#ff9f0a", `${dur.toFixed(0)}ms`, {
         key: m.options.mutationKey,
         status: m.state.status,

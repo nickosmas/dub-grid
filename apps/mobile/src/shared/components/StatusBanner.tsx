@@ -9,11 +9,16 @@ import { MAX_FONT_SCALE, mobileRadii, mobileText, type MobileColors } from "../t
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
 
+// `borderlessBackgroundColor` is the tone's border colour used as a fill. The
+// soft tints are a step off white, which is enough behind an outline and not
+// enough without one: drop the outline and the fill is the only thing left to
+// separate the banner from the page, so it steps up the same hue's ramp.
 const createStatusBannerTone = (mobileColors: MobileColors) =>
   ({
     error: {
       backgroundColor: mobileColors.dangerSoft,
       borderColor: mobileColors.dangerBorder,
+      borderlessBackgroundColor: mobileColors.dangerBorder,
       iconColor: mobileColors.dangerText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -24,6 +29,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     warning: {
       backgroundColor: mobileColors.warningSoft,
       borderColor: mobileColors.warningBorder,
+      borderlessBackgroundColor: mobileColors.warningBorder,
       iconColor: mobileColors.warningText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -34,6 +40,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     info: {
       backgroundColor: mobileColors.brandSoft,
       borderColor: mobileColors.brandBorder,
+      borderlessBackgroundColor: mobileColors.brandBorder,
       iconColor: mobileColors.brand,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -44,6 +51,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     success: {
       backgroundColor: mobileColors.successSoft,
       borderColor: mobileColors.successBorder,
+      borderlessBackgroundColor: mobileColors.successBorder,
       iconColor: mobileColors.successText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -61,6 +69,7 @@ export function StatusBanner({
   actionLabel,
   onAction,
   fillScreen = false,
+  bordered = true,
 }: {
   title: string;
   body?: string;
@@ -69,6 +78,11 @@ export function StatusBanner({
   actionLabel?: string;
   onAction?: () => void;
   fillScreen?: boolean;
+  /**
+   * Drop the outline where the banner is a quiet aside rather than an
+   * interruption, and the tinted fill alone is enough to set it off.
+   */
+  bordered?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -93,10 +107,12 @@ export function StatusBanner({
     <View
       style={[
         styles.banner,
-        {
-          backgroundColor: palette.backgroundColor,
-          borderColor: palette.borderColor,
-        },
+        bordered
+          ? { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor }
+          : {
+              backgroundColor: palette.borderlessBackgroundColor,
+              borderWidth: 0,
+            },
       ]}
     >
       <View style={styles.copyRow}>

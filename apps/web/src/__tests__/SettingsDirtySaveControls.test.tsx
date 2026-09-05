@@ -184,7 +184,10 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: /confirm save/i }));
+    const reviewDialog = await screen.findByRole("dialog", {
+      name: /review organization changes/i,
+    });
+    await user.click(within(reviewDialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
       expect(updateOrganizationSettings).toHaveBeenCalledWith(
@@ -402,7 +405,10 @@ describe("settings dirty save controls", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /^save$/i }));
-    await user.click(screen.getByRole("button", { name: /save rule/i }));
+    // The page's Save and the dialog's confirm are both "Save" now, so scope
+    // the confirm to the dialog rather than matching whichever comes first.
+    const ruleDialog = await screen.findByRole("dialog", { name: /save schedule rule/i });
+    await user.click(within(ruleDialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
       expect(updateOrganizationSettings).toHaveBeenCalledWith(

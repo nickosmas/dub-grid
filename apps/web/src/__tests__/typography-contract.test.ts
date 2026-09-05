@@ -176,6 +176,7 @@ function collectThinInteractiveOverrides(): string[] {
 
 const documentedMicroTextCounts = {
   "app/globals.css": 2,
+  "components/ScheduleGrid.tsx": 1,
   "components/dashboard/DonutChart.tsx": 1,
   "components/schedule-grid/badges.tsx": 1,
 };

@@ -554,7 +554,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || !name.trim()}
             onClick={handleDetailsNext}
           >
@@ -747,7 +747,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={
               saving ||
               !superAdminFirstName.trim() ||
@@ -871,7 +871,7 @@ export default function OrganizationSetupWizard({
               </div>
               <Button
                 type="button"
-                className="dg-btn dg-btn-brand"
+                className="dg-btn dg-btn-primary"
                 disabled={sendingEmail}
                 onClick={handleSendPendingEmail}
                 style={{ whiteSpace: "nowrap" }}
@@ -905,7 +905,7 @@ export default function OrganizationSetupWizard({
             </Button>
             <Button
               type="button"
-              className="dg-btn dg-btn-brand"
+              className="dg-btn dg-btn-primary"
               style={{ padding: "12px 24px" }}
               onClick={() => setCurrentStep("config")}
             >
@@ -1679,7 +1679,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving}
             onClick={() => setSetupConfirmAction("save-configuration")}
           >
@@ -1864,7 +1864,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || readyEmployeeCount === 0}
             onClick={() => setSetupConfirmAction("create-employees")}
           >
@@ -2058,7 +2058,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || selectedCount === 0}
             onClick={() => setSetupConfirmAction("send-invitations")}
           >

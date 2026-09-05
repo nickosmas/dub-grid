@@ -80,7 +80,7 @@ const ANON_WELCOMES: ReadonlyArray<string> = [
 const NAMED_WELCOMES_SETUP: ReadonlyArray<(name: string) => string> = [
   (n) => `Welcome, ${n}! Let's get you set up.`,
   (n) => `Welcome aboard, ${n}! Let's get set up.`,
-  (n) => `Glad you're here, ${n} — let's get set up.`,
+  (n) => `Glad you're here, ${n}. Let's get set up.`,
 ];
 
 const ANON_WELCOMES_SETUP: ReadonlyArray<string> = [

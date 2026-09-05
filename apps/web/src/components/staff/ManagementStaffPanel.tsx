@@ -24,6 +24,7 @@ import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
+import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -388,8 +389,12 @@ export function ManagementStaffPanel({
   const initials = getInitials(displayName);
   const avatarTone = getAvatarTone(getDirectoryPersonAvatarSeed(person), resolvedTheme === "dark");
 
-  const statusConfig = isPending
-    ? isExpired
+  // Only the invitation states earn a pill. Active/Inactive read as noise on a
+  // page about one person, but an invitation nobody has accepted (or one that
+  // has expired) is not something the rest of the panel says anywhere.
+  const statusConfig = !isPending
+    ? null
+    : isExpired
       ? {
           bg: "var(--dg-color-danger-bg)",
           text: "var(--dg-color-danger-text)",
@@ -401,27 +406,7 @@ export function ManagementStaffPanel({
           text: "var(--dg-color-warning-text)",
           dot: "var(--dg-color-warning)",
           label: "Pending",
-        }
-    : person.employeeStatus === "removed"
-      ? {
-          bg: "var(--dg-color-danger-bg)",
-          text: "var(--dg-color-danger-text)",
-          dot: "var(--dg-color-danger)",
-          label: "Removed",
-        }
-      : person.employeeStatus === "inactive"
-        ? {
-            bg: "var(--dg-color-warning-bg)",
-            text: "var(--dg-color-warning-text)",
-            dot: "var(--dg-color-warning)",
-            label: "Inactive",
-          }
-        : {
-            bg: "var(--dg-color-success-bg)",
-            text: "var(--dg-color-success-text)",
-            dot: "var(--dg-color-success)",
-            label: "Active",
-          };
+        };
 
   const labelStyle: React.CSSProperties = {
     display: "block",
@@ -522,6 +507,7 @@ export function ManagementStaffPanel({
                 >
                   {displayName}
                 </span>
+                <AccessInsignia orgRole={person.orgRole} size="md" />
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   {isOnSchedule && (
                     <span
@@ -540,30 +526,32 @@ export function ManagementStaffPanel({
                       On Schedule
                     </span>
                   )}
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 600,
-                      background: statusConfig.bg,
-                      color: statusConfig.text,
-                    }}
-                  >
+                  {statusConfig && (
                     <span
                       style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: "50%",
-                        background: statusConfig.dot,
-                        flexShrink: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        background: statusConfig.bg,
+                        color: statusConfig.text,
                       }}
-                    />
-                    {statusConfig.label}
-                  </span>
+                    >
+                      <span
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          background: statusConfig.dot,
+                          flexShrink: 0,
+                        }}
+                      />
+                      {statusConfig.label}
+                    </span>
+                  )}
                 </div>
               </div>
               <div
@@ -1167,12 +1155,7 @@ export function ManagementStaffPanel({
                       <Button
                         onClick={handleRevoke}
                         disabled={revoking}
-                        className="dg-btn dg-btn-primary"
-                        style={{
-                          background: "var(--dg-color-danger)",
-                          border: "none",
-                          color: "var(--dg-color-text-inverse)",
-                        }}
+                        className="dg-btn dg-btn-danger-filled"
                       >
                         <ButtonLoading loading={revoking} spinnerSize={14}>
                           Confirm

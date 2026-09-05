@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 import {
   navigatedActions,
@@ -16,6 +16,9 @@ const routerPush = vi.fn();
 const routerBack = vi.fn();
 const createMobilePerson = vi.fn();
 const createMobilePersonInvitation = vi.fn();
+const checkMobilePersonContact = vi.fn();
+const parseMobileContactConflict = vi.fn();
+const parseMobileStaffFieldErrors = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -43,6 +46,9 @@ vi.mock("../../../shared/components/Screen", async () => createScreenModule(awai
 vi.mock("../../../shared/lib/api", () => ({
   createMobilePerson: (...args: unknown[]) => createMobilePerson(...args),
   createMobilePersonInvitation: (...args: unknown[]) => createMobilePersonInvitation(...args),
+  checkMobilePersonContact: (...args: unknown[]) => checkMobilePersonContact(...args),
+  parseMobileContactConflict: (...args: unknown[]) => parseMobileContactConflict(...args),
+  parseMobileStaffFieldErrors: (...args: unknown[]) => parseMobileStaffFieldErrors(...args),
 }));
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
@@ -76,7 +82,13 @@ describe("AddPersonScreen", () => {
     routerBack.mockReset();
     createMobilePerson.mockReset();
     createMobilePersonInvitation.mockReset();
+    checkMobilePersonContact.mockReset();
+    parseMobileContactConflict.mockReset();
+    parseMobileStaffFieldErrors.mockReset();
 
+    checkMobilePersonContact.mockResolvedValue({ email: null, phone: null });
+    parseMobileContactConflict.mockReturnValue(null);
+    parseMobileStaffFieldErrors.mockReturnValue(null);
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
       data: {
@@ -313,6 +325,107 @@ describe("AddPersonScreen", () => {
 
     expect(navigatedActions).toHaveLength(0);
     expect(screen.getByLabelText("First name")).toHaveValue("Nia");
+  });
+
+  describe("duplicate contact details", () => {
+    // The focus-area picker toggles, so filling the required fields is its own
+    // step: calling it twice in one test would deselect what the first call set
+    // and disable the button for a reason the test isn't about.
+    function fillRequiredFields() {
+      fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+      fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+      fireEvent.click(screen.getByText("Skilled Nursing"));
+    }
+
+    async function typeEmail(value: string) {
+      fireEvent.change(screen.getByLabelText("Email"), { target: { value } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+    }
+
+    async function fillFormWithEmail(value: string) {
+      fillRequiredFields();
+      await typeEmail(value);
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("blocks the save and names the duplicate under the field", async () => {
+      checkMobilePersonContact.mockResolvedValue({
+        email: { conflict: true, reason: "employee_duplicate" },
+        phone: null,
+      });
+      renderWithMutation();
+
+      await fillFormWithEmail("taken@dubgrid.com");
+
+      expect(
+        screen.getByText("That email is already used by another person on your team."),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add person" })).toBeDisabled();
+    });
+
+    it("retires the verdict once the address changes", async () => {
+      checkMobilePersonContact.mockResolvedValue({
+        email: { conflict: true, reason: "employee_duplicate" },
+        phone: null,
+      });
+      renderWithMutation();
+      await fillFormWithEmail("taken@dubgrid.com");
+
+      checkMobilePersonContact.mockResolvedValue({ email: { conflict: false }, phone: null });
+      await typeEmail("free@dubgrid.com");
+
+      expect(
+        screen.queryByText("That email is already used by another person on your team."),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add person" })).not.toBeDisabled();
+    });
+
+    // The 409 on submit is the real gate, so a check that couldn't run must not
+    // be what stops a legitimate save.
+    it("lets the save through when the check itself fails", async () => {
+      checkMobilePersonContact.mockRejectedValue(new Error("offline"));
+      renderWithMutation();
+
+      await fillFormWithEmail("someone@dubgrid.com");
+
+      expect(screen.getByRole("button", { name: "Add person" })).not.toBeDisabled();
+    });
+
+    it("never asks about an address that isn't valid yet", async () => {
+      renderWithMutation();
+
+      await fillFormWithEmail("nia@");
+
+      expect(checkMobilePersonContact).not.toHaveBeenCalled();
+    });
+
+    it("marks the field when the create is rejected as a duplicate", async () => {
+      parseMobileContactConflict.mockReturnValue({
+        field: "email",
+        message: "That email is already used by another person.",
+      });
+      createMobilePerson.mockRejectedValue(new Error("409"));
+      renderWithMutation();
+
+      await fillFormWithEmail("taken@dubgrid.com");
+      fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("That email is already used by another person."),
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByRole("button", { name: "Add person" })).toBeDisabled();
+    });
   });
 
   it("does not ask on the way out after the person was saved", () => {

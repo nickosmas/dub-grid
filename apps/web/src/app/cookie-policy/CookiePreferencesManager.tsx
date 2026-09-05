@@ -66,7 +66,7 @@ export default function CookiePreferencesManager() {
             ? analyticsEnabled
               ? "All cookies accepted (essential + analytics)"
               : "Essential cookies only"
-            : "No preference set — the consent banner will appear on your next visit"}
+            : "No preference set. The consent banner will appear on your next visit"}
         </p>
       </div>
       {consent !== "none" && (

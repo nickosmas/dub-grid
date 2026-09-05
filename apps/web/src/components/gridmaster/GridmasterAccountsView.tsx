@@ -513,9 +513,9 @@ export default function GridmasterAccountsView({
 
       {forceLogoutConfirm && (
         <ConfirmDialog
-          title="Force Logout"
+          title="Force logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
-          confirmLabel="Force Logout"
+          confirmLabel="Force logout"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
           onConfirm={() => handleForceLogout(forceLogoutConfirm)}
@@ -527,7 +527,7 @@ export default function GridmasterAccountsView({
         <ConfirmDialog
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
-          confirmLabel="Send Reset Email"
+          confirmLabel="Send reset email"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
           onConfirm={() => handlePasswordReset(resetConfirm)}

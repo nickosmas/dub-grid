@@ -318,7 +318,7 @@ export default function DashboardMockup() {
               needs your attention.
             </p>
           </div>
-          {/* Action button — matches dg-btn-brand (filled brand, white text) */}
+          {/* Action button — matches dg-btn-primary (filled brand, white text) */}
           <div
             style={{
               display: "inline-flex",

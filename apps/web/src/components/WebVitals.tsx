@@ -15,7 +15,6 @@ const PERF_TIMING =
 export default function WebVitals() {
   useReportWebVitals((metric) => {
     if (!PERF_TIMING) return;
-    // eslint-disable-next-line no-console
     console.debug(
       `%c[web-vitals] ${metric.name}`,
       "color:#30d158",

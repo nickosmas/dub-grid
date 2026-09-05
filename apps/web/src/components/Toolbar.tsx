@@ -124,7 +124,7 @@ function SortMenuButton({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="dg-btn dg-btn-secondary"
+          className={`dg-btn dg-btn-secondary${open ? " dg-btn-toggled" : ""}`}
           style={{
             height: "var(--dg-toolbar-h)",
             padding: "0 12px",
@@ -133,11 +133,6 @@ function SortMenuButton({
             gap: 6,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
-            border: open
-              ? "1px solid var(--dg-color-brand-border)"
-              : "1px solid var(--dg-color-border)",
-            background: open ? "var(--dg-color-brand-bg)" : undefined,
-            color: open ? "var(--dg-color-brand)" : undefined,
           }}
         >
           <ArrowUpDown size={13} />
@@ -685,17 +680,12 @@ export default function Toolbar({
               onClick={toggleTools}
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
-              className="dg-btn dg-btn-ghost"
+              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
               data-tour="toolbar-tools-btn"
               style={{
-                border: toolsOpen
-                  ? "1px solid var(--dg-color-brand-border)"
-                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 flexShrink: 0,
                 position: "relative",
               }}
@@ -1039,17 +1029,12 @@ export default function Toolbar({
               onClick={toggleTools}
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
-              className="dg-btn dg-btn-ghost"
+              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
               data-tour="toolbar-tools-btn"
               style={{
-                border: toolsOpen
-                  ? "1px solid var(--dg-color-brand-border)"
-                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 position: "relative",
               }}
             >

@@ -443,6 +443,7 @@ export default function ProfileScreen() {
             badge={orgRoleBadge.label}
             badgeTone={orgRoleBadge.tone}
             initials={getProfileInitials(displayName)}
+            orgRole={profile.effectiveRole}
             title={displayName}
             subtitle={profile.user.email || "No email on file"}
             style={{ paddingBottom: 16 }}

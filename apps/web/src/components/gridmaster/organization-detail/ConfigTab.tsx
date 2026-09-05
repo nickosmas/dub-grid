@@ -460,7 +460,7 @@ export function ConfigTab({
                     color: "var(--dg-color-text-secondary)",
                   }}
                 >
-                  {c.abbr ? `${c.abbr} — ${c.name}` : c.name}
+                  {c.abbr ? `${c.abbr}: ${c.name}` : c.name}
                 </span>
               ))}
             </div>
@@ -493,7 +493,7 @@ export function ConfigTab({
                     color: "var(--dg-color-text-secondary)",
                   }}
                 >
-                  {r.abbr ? `${r.abbr} — ${r.name}` : r.name}
+                  {r.abbr ? `${r.abbr}: ${r.name}` : r.name}
                 </span>
               ))}
             </div>

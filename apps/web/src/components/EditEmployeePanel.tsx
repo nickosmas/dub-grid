@@ -72,7 +72,7 @@ export interface EditEmployeePanelProps {
    *  while a pending invitation exists — saves the identity change (which
    *  auto-revokes the old invitation) and sends a fresh one to the new
    *  address, reusing the old invitation's role/departments. Required to
-   *  offer the "Save & Send" choice; without it, a changed email with a
+   *  offer the "Save & send" choice; without it, a changed email with a
    *  pending invitation present falls back to a plain save. */
   onSaveWithReinvite?: (
     updatedEmployee: Employee,
@@ -424,11 +424,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 : `0 ${sidePadding} 28px`,
           }}
         >
+          {/* A removed employee's record is read-only, not disabled: every field
+              below already carries its own `readOnly`/`disabled`, so dimming the
+              whole card only made the record look broken and blocked selecting
+              text out of it. */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              ...(readOnly ? { opacity: 0.5, pointerEvents: "none" } : {}),
             }}
           >
             {/* ── Access status ── */}
@@ -437,7 +440,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 label={focusAreaLabel}
                 statusText={
                   form.focusAreaIds.length > 0
-                    ? `Scheduled — ${form.focusAreaIds.length} ${focusAreaLabel.toLowerCase()}`
+                    ? `Scheduled: ${form.focusAreaIds.length} ${focusAreaLabel.toLowerCase()}`
                     : "Not scheduled"
                 }
                 tone={form.focusAreaIds.length > 0 ? "active" : "neutral"}
@@ -900,7 +903,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 <strong>{pendingReinviteSave.email}</strong>?
               </>
             }
-            confirmLabel="Save & Send"
+            confirmLabel="Save & send"
             cancelLabel="Cancel"
             variant="warning"
             onCancel={() => setPendingReinviteSave(null)}

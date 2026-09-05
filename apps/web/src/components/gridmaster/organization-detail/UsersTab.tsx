@@ -509,7 +509,7 @@ export function UsersTab({
         <ConfirmDialog
           title="Change Organization Role"
           message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
-          confirmLabel="Change Role"
+          confirmLabel="Change role"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
           onConfirm={handleConfirmRoleChange}
@@ -521,7 +521,7 @@ export function UsersTab({
         <ConfirmDialog
           title="Add Organization User"
           message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
-          confirmLabel="Add User"
+          confirmLabel="Add"
           variant="warning"
           isLoading={adding}
           onConfirm={handleConfirmAddUser}

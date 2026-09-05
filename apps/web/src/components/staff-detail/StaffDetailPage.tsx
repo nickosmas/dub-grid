@@ -728,7 +728,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         >
           {activeSection === "profile" && (
             <div className="space-y-6">
-              <StaffDetailHeader employee={employee} />
+              <StaffDetailHeader employee={employee} orgRole={effectiveOrgRole} />
 
               {perms.canManageEmployees && pendingInvite && (
                 <PendingInvitationBanner

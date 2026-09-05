@@ -111,14 +111,24 @@ describe("shared chrome theming", () => {
     expect(secondary).toContain("bg-[var(--dg-color-surface)]");
     expect(secondary).toContain("border-[var(--dg-color-control-active-border)]");
     expect(secondary).toContain("hover:bg-[var(--dg-color-surface-hover)]");
-    expect(secondary).toContain("hover:border-[var(--dg-color-border-strong)]");
     expect(secondary).toContain("active:bg-[var(--dg-color-control-active-border)]");
     expect(globalsCss).toMatch(
       /\.dg-btn-secondary\s*\{[\s\S]*background: var\(--dg-color-surface\);[\s\S]*border: 1px solid var\(--dg-color-control-active-border\);[\s\S]*\}/,
     );
     expect(globalsCss).toMatch(
-      /\.dg-btn-secondary:hover\s*\{[\s\S]*background: var\(--dg-color-surface-hover\);[\s\S]*border-color: var\(--dg-color-border-strong\);[\s\S]*\}/,
+      /\.dg-btn-secondary:hover\s*\{[\s\S]*background: var\(--dg-color-surface-hover\);[\s\S]*\}/,
     );
+  });
+
+  it("moves only the fill on hover, never the border, for bordered buttons", () => {
+    // A border that darkens under the cursor reads as the button resizing.
+    // Hover changes the fill; the border is structure, so it holds still.
+    expect(buttonVariants({ variant: "secondary" })).not.toContain("hover:border-");
+    expect(buttonVariants({ variant: "outline" })).not.toContain("hover:border-");
+    for (const rule of ["dg-btn-secondary", "dg-btn-dashed"]) {
+      const hoverBlock = globalsCss.match(new RegExp(`\\.${rule}:hover\\s*\\{[^}]*\\}`))?.[0] ?? "";
+      expect(hoverBlock).not.toContain("border-color");
+    }
   });
 
   it("uses the shared toolbar height and radius for tabs and toolbar controls", () => {
@@ -199,8 +209,13 @@ describe("shared chrome theming", () => {
   it("keeps audited primary buttons and selectors on theme blue", () => {
     expect(jobsSettings).toContain('className="dg-btn dg-btn-primary dg-btn-sm"');
     expect(jobsSettings).toContain('className="dg-btn dg-btn-secondary dg-btn-sm"');
-    expect(toolbar).toContain('background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined');
-    expect(toolbar).toContain('color: toolsOpen ? "var(--dg-color-brand)" : undefined');
+    // The open-state tint moved out of inline styles into .dg-btn-toggled, so
+    // that an inline background stops outranking the button's own :hover.
+    expect(toolbar).toContain('toolsOpen ? " dg-btn-toggled" : ""');
+    expect(globalsCss).toMatch(
+      /\.dg-btn-toggled\s*\{[\s\S]*background: var\(--dg-color-brand-bg\);[\s\S]*color: var\(--dg-color-brand\);[\s\S]*\}/,
+    );
+    expect(globalsCss).toMatch(/\.dg-btn-toggled:hover\s*\{[\s\S]*background:/);
     expect(globalsCss).toMatch(
       /\.dg-checkbox:checked\s*\{[\s\S]*background: var\(--dg-color-brand\);[\s\S]*border-color: var\(--dg-color-brand\);[\s\S]*\}/,
     );

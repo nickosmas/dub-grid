@@ -618,7 +618,7 @@ export function ProfilePanel({
       <PersonProfileHeader
         avatarSeed={user?.id ?? employee?.id ?? ""}
         name={displayName}
-        status={employee && employee.status !== "active" ? employee.status : undefined}
+        orgRole={selfOrgRole}
         email={user?.email ?? employee?.email}
         phone={employee?.phone}
         employmentType={employee?.employmentType}

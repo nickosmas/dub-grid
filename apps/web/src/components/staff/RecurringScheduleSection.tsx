@@ -50,6 +50,7 @@ import type {
   ShiftJobSegment,
 } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type ShiftCellPopoverProps = {
@@ -982,7 +983,7 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-primary"
               style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
             >
-              <ButtonLoading loading={saving}>Save Changes</ButtonLoading>
+              <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
             </Button>
           </div>
         </div>
@@ -1227,7 +1228,7 @@ export function RecurringScheduleSection({
                     <div
                       style={{
                         fontWeight: 600,
-                        fontSize: "var(--dg-fs-label)",
+                        fontSize: "var(--dg-fs-body-sm)",
                         color: "var(--dg-color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -1403,8 +1404,8 @@ export function RecurringScheduleSection({
               ? `Save ${dirtyCount} recurring schedule change${dirtyCount === 1 ? "" : "s"}? These templates affect future schedule generation.`
               : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
           }
-          confirmLabel={pendingRecurringAction === "save" ? "Save Changes" : "Discard"}
-          variant={pendingRecurringAction === "save" ? "warning" : "danger"}
+          confirmLabel={pendingRecurringAction === "save" ? "Save" : "Discard"}
+          variant={pendingRecurringAction === "save" ? "info" : "danger"}
           isLoading={saving}
           onConfirm={() => {
             const action = pendingRecurringAction;

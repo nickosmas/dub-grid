@@ -13,6 +13,7 @@ const useLocalSearchParams = vi.fn();
 const stackScreenOptions: { title?: string }[] = [];
 const pushToast = vi.fn();
 const routerReplace = vi.fn();
+const routerPush = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -36,6 +37,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("expo-router", () => ({
   router: {
     replace: routerReplace,
+    push: routerPush,
   },
   Stack: {
     Screen: (props: { options?: { title?: string } }) => {
@@ -113,6 +115,7 @@ describe("PersonDetailScreen", () => {
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
     routerReplace.mockReset();
+    routerPush.mockReset();
     emptyStateTitles.length = 0;
     stackScreenOptions.length = 0;
 
@@ -136,6 +139,10 @@ describe("PersonDetailScreen", () => {
         departments: [{ id: 4, name: "North Wing" }],
         permissions: {
           canManageEmployees: true,
+          // `packages/authz` normalizes view from manage, so a real manager
+          // always arrives with both. Mocking manage alone would describe a
+          // viewer the server cannot produce.
+          canViewEmployeeDetails: true,
         },
       },
       error: null,
@@ -223,10 +230,10 @@ describe("PersonDetailScreen", () => {
     expect(emptyStateTitles).not.toContain("Person not found");
   });
 
-  // The tier used to hang off the status chip behind a "·", which read as a
-  // caption on that chip and left the account chip alone on the next line. It
-  // is the hero's badge now, and the chips share the one row under it.
-  it("badges the access tier and groups the hero chips on one line", () => {
+  // The hero states the access tier and nothing else. Status and account chips
+  // used to sit under the avatar as well, which made three competing labels out
+  // of a heading; both facts are stated further down the page instead.
+  it("badges the access tier and leaves the rest of the hero clear", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson() },
       error: null,
@@ -237,17 +244,29 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    // A chip nests its label in its own wrapper, so the row is one level up.
-    const chipRow = screen.getByText("Active").parentElement?.parentElement;
-    const accountRow = screen.getByText("App access").parentElement?.parentElement;
-
-    expect(chipRow).toBe(accountRow);
-    // The tier reads as the same pill the profile tab and the People rows
-    // print, so it sits above those chips rather than among them.
-    const badge = screen.getByText("Super Admin");
-    expect(badge.parentElement?.parentElement).not.toBe(chipRow);
+    expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Super Admin Access")).not.toBeInTheDocument();
     expect(screen.queryByText("·")).not.toBeInTheDocument();
+  });
+
+  // The avatar's corner used to carry a status dot. The tier's insignia sits
+  // beside the name now, and an inactive person reads as inactive from the
+  // Activate button rather than from a chip.
+  it("crowns a super admin beside their name", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ status: "inactive" }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
+    expect(screen.getByText("Activate")).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -278,6 +297,49 @@ describe("PersonDetailScreen", () => {
     );
     expect(screen.getByText("Employee ID")).toBeInTheDocument();
     expect(screen.getByText("#12")).toBeInTheDocument();
+  });
+
+  // An employee number is a payroll identifier for the person, not a directory
+  // fact about them, so it rides on the employee-details permission the way
+  // web's ID column and staff detail page both do.
+  it("hides a colleague's employee number from a regular user", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        user: { id: "user-9" },
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [],
+        roles: [],
+        certifications: [],
+        departments: [],
+        permissions: { canManageEmployees: false, canViewEmployeeDetails: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({}) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.queryByText("Employee ID")).not.toBeInTheDocument();
+    expect(screen.queryByText("#12")).not.toBeInTheDocument();
+    // The rest of the Staffing section still renders, so this is the one row
+    // being withheld rather than the section collapsing.
+    expect(screen.getByText("Employment")).toBeInTheDocument();
   });
 
   // The management label is fixed, never composed from the org's own noun for
@@ -508,9 +570,10 @@ describe("PersonDetailScreen", () => {
       "emp-1",
     ]);
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
-    // The account chip never repeats the status chip's word, so "Active"
-    // stays the answer to one question on this header.
-    expect(screen.getAllByText("App access")).toHaveLength(1);
+    // Someone who already has an account gets no invitation banner: the two
+    // states worth announcing are the ones a manager can still act on.
+    expect(screen.queryByText("App access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invitation pending")).not.toBeInTheDocument();
     expect(screen.queryByText("Active app account")).not.toBeInTheDocument();
     // Each staffing fact is printed exactly once: the hero grid used to preview
     // the sections below it, so the role, the focus areas and the employment
@@ -559,7 +622,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     // The identity block is the page's heading at rest: initials, the name
-    // once, and the status and tier beside it. The email is not part of it —
+    // once, and the tier beside it. The email is not part of it —
     // it keeps its own row in Contact, and printing it here too is what made
     // the old block redundant. The native header carries the same name, but
     // stays invisible until the hero scrolls under it.
@@ -583,7 +646,8 @@ describe("PersonDetailScreen", () => {
     // tiers worth picking out of a list of names; a page about one person
     // states the tier whatever it is.
     expect(screen.getByText("User")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    // Status is not part of the heading any more, only the tier.
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("omits the account access section even when the person still needs app access", () => {
@@ -629,6 +693,25 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(screen.queryByText("Pending for mina@dubgrid.com")).not.toBeInTheDocument();
     expect(screen.getByText("Status updated")).toBeInTheDocument();
+    // Where the account stands is a banner under the actions now, not a chip
+    // competing with the name.
+    expect(screen.getByText("Invitation pending")).toBeInTheDocument();
+    expect(screen.getByText("Sent to mina@dubgrid.com.")).toBeInTheDocument();
+  });
+
+  it("banners a person with no account, and tells a manager what to do about it", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ pendingInvitation: null, userId: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByText("No app access")).toBeInTheDocument();
+    expect(screen.getByText("Send an invitation to give app access.")).toBeInTheDocument();
   });
 
   it("shows a grouped edit flow with dedicated save and discard actions", () => {
@@ -1083,6 +1166,18 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
     });
 
+    // Management settings always open in a popup over whatever raised them,
+    // never as a page of their own. The form's own behaviour is covered in
+    // ManagementAccessSheet's tests.
+    it("opens management access in a sheet, not a pushed screen", () => {
+      renderWithManagementAccess({});
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+
+      expect(screen.getByText("Add to management")).toBeInTheDocument();
+      expect(routerPush).not.toHaveBeenCalled();
+    });
+
     it("offers only the org's management departments, never its scheduled ones", () => {
       renderWithManagementAccess({});
 
@@ -1092,39 +1187,11 @@ describe("PersonDetailScreen", () => {
       expect(screen.queryByText("NW")).not.toBeInTheDocument();
     });
 
-    it("sends the picked departments, defaulting a fresh grant to User", () => {
-      const mutationCalls = renderWithManagementAccess({ person: { orgRole: null } });
-
-      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
-      fireEvent.click(screen.getByText("OPS"));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
-
-      expect(allMutatePayloads(mutationCalls)).toContainEqual({
-        draft: { orgRole: "user", managementDepartmentIds: [9] },
-      });
-    });
-
-    it("opens on the role they already hold rather than resetting it", () => {
-      const mutationCalls = renderWithManagementAccess({
-        person: { orgRole: "admin", managementDepartmentIds: [9] },
-      });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-      // Something has to change before Save will fire at all, so the role the
-      // sheet seeded with rides along on a department edit.
-      fireEvent.click(screen.getByText("FAC"));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
-
-      expect(allMutatePayloads(mutationCalls)).toContainEqual({
-        draft: { orgRole: "admin", managementDepartmentIds: [9, 10] },
-      });
-    });
-
-    it("asks before replacing a pending invitation's access level", () => {
-      const mutationCalls = renderWithManagementAccess({
+    // A plain app invitation carries no management departments, so it must not
+    // read as management access the person was never granted.
+    it("offers Add to Management to someone holding only a staff invitation", () => {
+      renderWithManagementAccess({
         person: {
-          orgRole: null,
-          managementDepartmentIds: [9],
           pendingInvitation: {
             id: "invite-1",
             email: "mina@dubgrid.com",
@@ -1135,59 +1202,226 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-      fireEvent.click(screen.getByText("Admin"));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit Management Access" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("app access badge", () => {
+    function renderWithAccessBadge(options: {
+      canManageManagementAccess?: boolean;
+      person?: Record<string, unknown>;
+    }) {
+      const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
+      useMutation.mockImplementation(() => {
+        const mutate = vi.fn();
+        mutationCalls.push({ mutate });
+        return { error: null, isPending: false, mutate };
+      });
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [{ id: 9, name: "Operations", abbr: "OPS", type: "management" }],
+          permissions: {
+            canManageEmployees: true,
+            canManageManagementAccess: options.canManageManagementAccess ?? true,
+          },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      useQuery.mockReturnValue({
+        data: { person: makePerson(options.person) },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      render(<PersonDetailScreen />);
+      return mutationCalls;
+    }
+
+    const badge = () => screen.getByLabelText(/^App access: /);
+
+    it("makes the badge a control for a linked member", () => {
+      renderWithAccessBadge({
+        person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
+      });
+
+      expect(badge()).toHaveAttribute("aria-label", "App access: User");
+      fireEvent.click(badge());
+      expect(screen.getByText("Access level")).toBeInTheDocument();
+    });
+
+    // Nothing carries a role for someone with neither an account nor an invite,
+    // so there is nothing for the picker to write. Web prints a dash here.
+    it("leaves the badge static, and says why, with no account and no invitation", () => {
+      renderWithAccessBadge({ person: { orgRole: null, userId: null } });
+
+      // A static badge is a plain label, not a button, so it carries no
+      // accessible name of its own.
+      expect(screen.queryByLabelText(/^App access: /)).not.toBeInTheDocument();
+      expect(screen.getByText("User")).toBeInTheDocument();
+      expect(screen.getByText("Send an invitation to give app access.")).toBeInTheDocument();
+    });
+
+    it("keeps the badge static without the permission", () => {
+      renderWithAccessBadge({
+        canManageManagementAccess: false,
+        person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
+      });
+
+      expect(screen.queryByLabelText(/^App access: /)).not.toBeInTheDocument();
+      expect(screen.getByText("User")).toBeInTheDocument();
+    });
+
+    // The invitation's `roleToAssign` is the role until it is accepted; reading
+    // `orgRole` alone showed a pending Admin as "User".
+    it("badges a pending invitation with the role it will grant", () => {
+      renderWithAccessBadge({
+        person: {
+          orgRole: null,
+          userId: null,
+          pendingInvitation: {
+            id: "inv-1",
+            email: "mina@dubgrid.com",
+            expiresAt: "2026-02-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            roleToAssign: "admin",
+          },
+        },
+      });
+
+      expect(badge()).toHaveAttribute("aria-label", "App access: Admin");
+    });
+
+    it("sends the picked role once the change is confirmed", () => {
+      const mutationCalls = renderWithAccessBadge({
+        person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
+      });
+
+      fireEvent.click(badge());
+      fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
+      confirmDialog("Change role");
+
+      expect(allMutatePayloads(mutationCalls)).toContain("admin");
+    });
+
+    it("asks about revoking and resending when the role lives on an invitation", () => {
+      renderWithAccessBadge({
+        person: {
+          orgRole: null,
+          userId: null,
+          pendingInvitation: {
+            id: "inv-1",
+            email: "mina@dubgrid.com",
+            expiresAt: "2026-02-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            roleToAssign: "user",
+          },
+        },
+      });
+
+      fireEvent.click(badge());
+      fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
 
       expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
-      expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
-      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+    });
+  });
 
-      confirmDialog("Revoke and resend");
-      expect(allMutatePayloads(mutationCalls)).toContainEqual({
-        draft: { orgRole: "admin", managementDepartmentIds: [9] },
+  describe("schedule membership", () => {
+    function renderForSchedule(person: Record<string, unknown>) {
+      const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
+      useMutation.mockImplementation(() => {
+        const mutate = vi.fn();
+        mutationCalls.push({ mutate });
+        return { error: null, isPending: false, mutate };
       });
+      useQuery.mockReturnValue({
+        data: { person: makePerson(person) },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      render(<PersonDetailScreen />);
+      return mutationCalls;
+    }
+
+    it("offers Remove from Schedule to someone with management access", () => {
+      renderForSchedule({ managementDepartmentIds: [9] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+      expect(screen.getByRole("button", { name: "Remove from Schedule" })).toBeInTheDocument();
     });
 
-    // Save used to be live the moment the sheet opened, so the everyday
-    // "opened it to check, closed it again" ended in a no-op write.
-    it("holds Save until something actually changes", () => {
-      const mutationCalls = renderWithManagementAccess({
-        person: { orgRole: "admin", managementDepartmentIds: [9] },
-      });
+    // Without management access the focus areas are the whole staff record, and
+    // clearing them is what Deactivate is for.
+    it("withholds Remove from Schedule from plain staff", () => {
+      renderForSchedule({ managementDepartmentIds: [] });
 
-      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
-      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
-      fireEvent.click(screen.getByText("FAC"));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
-      expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
+      expect(
+        screen.queryByRole("button", { name: "Remove from Schedule" }),
+      ).not.toBeInTheDocument();
     });
 
-    it("submits one removal when the destructive confirmation is pressed twice", () => {
-      const mutationCalls = renderWithManagementAccess({
-        person: { orgRole: "admin", managementDepartmentIds: [9] },
-      });
+    // The server allows the empty focus-area set only because they keep
+    // managing, so Save has to stay live once the row is cleared.
+    it("clears the focus areas and keeps Save available", () => {
+      renderForSchedule({ managementDepartmentIds: [9] });
 
-      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-      fireEvent.click(screen.getByRole("button", { name: "Remove from Management" }));
-      const confirm = within(screen.getByRole("alert")).getByRole("button", {
-        name: "Remove Access",
-      });
-      fireEvent.click(confirm);
-      fireEvent.click(confirm);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Remove from Schedule" }));
 
-      expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
+      expect(screen.getByText("Not scheduled")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Saving now removes them from the schedule. They'll keep management access.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
     });
 
-    it("refuses to submit with no department selected", () => {
-      const mutationCalls = renderWithManagementAccess({});
+    it("offers Add to Schedule to someone who isn't on it", () => {
+      renderForSchedule({ focusAreaIds: [], managementDepartmentIds: [9] });
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
-      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+      expect(screen.getByRole("button", { name: "Add to Schedule" })).toBeInTheDocument();
+    });
 
-      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+    it("withholds Add to Schedule from someone already on it", () => {
+      renderForSchedule({ focusAreaIds: [2] });
+
+      expect(screen.queryByRole("button", { name: "Add to Schedule" })).not.toBeInTheDocument();
+    });
+
+    it("opens the add-to-schedule screen rather than stacking a sheet", () => {
+      renderForSchedule({ focusAreaIds: [], managementDepartmentIds: [9] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Schedule" }));
+
+      expect(routerPush).toHaveBeenCalledWith({
+        pathname: "/person/[id]/schedule",
+        params: { id: "emp-1" },
+      });
     });
   });
 });

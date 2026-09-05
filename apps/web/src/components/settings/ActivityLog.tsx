@@ -8,6 +8,7 @@ import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { Pagination as SharedPagination } from "@/components/ui/pagination";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
   ACTIVITY_CATEGORIES,
@@ -368,44 +369,13 @@ function Pagination({
   entryCount: number;
   pageSize: number;
 }) {
-  const start = page * pageSize + 1;
-  const end = page * pageSize + entryCount;
-  const hasPrev = page > 0;
-  const hasNext = entryCount >= pageSize;
-
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "12px 0 4px",
-        fontSize: "var(--dg-fs-footnote)",
-        color: "var(--dg-color-text-muted)",
-      }}
-    >
-      <span>
-        Showing {start}–{end}
-      </span>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Button
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-          onClick={() => onPageChange(page - 1)}
-          disabled={!hasPrev}
-          style={{ opacity: hasPrev ? 1 : 0.4 }}
-        >
-          Previous
-        </Button>
-        <Button
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-          onClick={() => onPageChange(page + 1)}
-          disabled={!hasNext}
-          style={{ opacity: hasNext ? 1 : 0.4 }}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
+    <SharedPagination
+      page={page + 1}
+      hasNext={entryCount >= pageSize}
+      onPageChange={(next) => onPageChange(next - 1)}
+      summary={`Showing ${page * pageSize + 1}–${page * pageSize + entryCount}`}
+    />
   );
 }
 

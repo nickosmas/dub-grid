@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/Button";
+import { Pagination } from "@/components/ui/pagination";
 
 interface StaffPaginationProps {
   page: number;
@@ -17,42 +17,12 @@ export function StaffPagination({
   pageSize,
   onPageChange,
 }: StaffPaginationProps) {
-  if (totalPages <= 1) return null;
-
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 8,
-        padding: "12px 16px",
-        fontSize: "var(--dg-fs-label)",
-        color: "var(--dg-color-text-muted)",
-      }}
-    >
-      <span style={{ fontSize: "var(--dg-fs-caption)" }}>
-        Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount}
-      </span>
-      <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-        <Button
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={page === 1}
-          className="dg-btn dg-btn-secondary"
-          style={{ padding: "5px 12px", fontSize: "var(--dg-fs-caption)" }}
-        >
-          Previous
-        </Button>
-        <Button
-          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          disabled={page === totalPages}
-          className="dg-btn dg-btn-secondary"
-          style={{ padding: "5px 12px", fontSize: "var(--dg-fs-caption)" }}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      onPageChange={onPageChange}
+      summary={`Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalCount)} of ${totalCount}`}
+    />
   );
 }

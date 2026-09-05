@@ -119,9 +119,8 @@ describe("mobile people contact-check route", () => {
   });
 
   it("answers 500 when a lookup fails rather than leaking the query error", async () => {
-    const { EmployeeContactLookupError } = await import(
-      "@/features/employees/server/contact-conflicts"
-    );
+    const { EmployeeContactLookupError } =
+      await import("@/features/employees/server/contact-conflicts");
     checkEmployeeEmailConflict.mockRejectedValue(
       new EmployeeContactLookupError("lookup failed", new Error("boom")),
     );

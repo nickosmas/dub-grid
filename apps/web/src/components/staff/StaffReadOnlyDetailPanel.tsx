@@ -15,14 +15,17 @@ import {
   Tag,
   UserCircle,
 } from "lucide-react";
-import type { Employee, FocusArea, NamedItem } from "@/types";
+import type { Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
+import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 interface StaffReadOnlyDetailPanelProps {
   employee: Employee;
+  /** Drives the avatar insignia. This panel shows no Access row of its own. */
+  orgRole?: OrganizationRole | null;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
@@ -54,6 +57,7 @@ function deriveScheduledDepartmentIds(focusAreaIds: number[], focusAreas: FocusA
 
 export function StaffReadOnlyDetailPanel({
   employee,
+  orgRole,
   focusAreas,
   certifications,
   roles,
@@ -172,6 +176,7 @@ export function StaffReadOnlyDetailPanel({
                 >
                   {displayName}
                 </span>
+                <AccessInsignia orgRole={orgRole} size="md" />
                 <span
                   style={{
                     display: "inline-flex",

@@ -827,7 +827,6 @@ export default function ShiftEditPanel({
   // When shift is cleared externally, return to picker
   useEffect(() => {
     if (typeof currentShift !== "string" || !currentShift || currentShift === "OFF") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowPicker(true);
     }
   }, [currentShift]);
@@ -1918,8 +1917,6 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-caption)",
                 color: "var(--dg-color-text-subtle)",
                 fontFamily: "inherit",
-                border: "none",
-                background: "transparent",
                 cursor: "pointer",
               }}
             >
@@ -3590,7 +3587,7 @@ export default function ShiftEditPanel({
                       color: "var(--dg-color-warning-text)",
                     }}
                   >
-                    {isAbsence ? "Repeating — edit scope" : "Repeating shift — edit scope"}
+                    {isAbsence ? "Repeating: edit scope" : "Repeating shift: edit scope"}
                   </div>
                   <div className="dg-segment" style={{ display: "flex" }}>
                     <Button

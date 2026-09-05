@@ -18,17 +18,11 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+import { AccessInsignia } from "./AccessInsignia";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
-import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
-
-function statusTone(status: Employee["status"]): StatusPillTone {
-  if (status === "inactive") return "warning";
-  if (status === "removed") return "danger";
-  return "success";
-}
 
 interface StaffDetailPanelProps {
   employee: Employee;
@@ -166,8 +160,6 @@ export function StaffDetailPanel({
     setOpen(true);
   }, [employee.id]);
 
-  const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
-
   const handleFooterDismiss = useCallback(() => {
     if (!canEditEmployee) {
       handleRequestClose();
@@ -242,13 +234,7 @@ export function StaffDetailPanel({
                 >
                   {getEmployeeDisplayName(employee)}
                 </span>
-                <StatusPill
-                  tone={statusTone(employee.status)}
-                  className="shrink-0"
-                  aria-label={`Status: ${statusLabel}`}
-                >
-                  {statusLabel}
-                </StatusPill>
+                <AccessInsignia orgRole={orgRole} size="md" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                 {employee.email && (

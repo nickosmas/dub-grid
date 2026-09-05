@@ -73,13 +73,14 @@ import { SortIcon } from "./SortIcon";
 import { StaffContextBar } from "./StaffContextBar";
 import { StaffDetailPanel } from "./StaffDetailPanel";
 import { StaffReadOnlyDetailPanel } from "./StaffReadOnlyDetailPanel";
+import { AccessInsignia } from "./AccessInsignia";
 import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
 import { ManagementFilterPopover } from "./ManagementFilterPopover";
 import { isPendingManagementInvite, useManagementFilters } from "./useManagementFilters";
 import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
-import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
+import { STAFF_SORT_OPTIONS, useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -198,9 +199,104 @@ export function MembersSection({
   // granting any of the edit affordances that stay on canViewManagementUsers.
   const canSeeManagementUsers = canViewManagementUsers || !!isManagementUser;
   const directoryOrgId = canSeeManagementUsers ? (orgId ?? null) : null;
+  // Access is admin-only information, and the tier map behind it only loads for
+  // viewers who can read the directory. Without both, the access filter and the
+  // access sort would be acting on a column this viewer never sees.
+  const showAccessControls = !regularUserMode && canViewEmployeeDetails && canSeeManagementUsers;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
+  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!orgId || regularUserMode) return;
+    let cancelled = false;
+
+    fetchOrganizationInvitations(orgId)
+      .then((invites) => {
+        if (cancelled) return;
+        loadedInvitationsForOrgIdRef.current = orgId;
+        setPendingInvitations(
+          invites.filter(
+            (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
+          ),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        Sentry.captureException(err);
+        loadedInvitationsForOrgIdRef.current = orgId;
+        setPendingInvitations([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, regularUserMode]);
+
+  const invitationStateReady =
+    regularUserMode || !orgId || loadedInvitationsForOrgIdRef.current === orgId;
+
+  // Re-derive against "now" on a slow tick so invitations that cross their
+  // 72h expiry while the page is open stop rendering as "Pending". Without
+  // this, refreshInvitations() only runs after revoke/resend/create and the
+  // UI happily shows expired invites with stale CTAs (audit H4).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const pendingInviteByEmployeeId = useMemo(() => {
+    const map = new Map<string, Invitation>();
+    for (const inv of regularUserMode ? [] : pendingInvitations) {
+      if (new Date(inv.expiresAt).getTime() <= nowMs) continue;
+      if (inv.employeeId) {
+        map.set(inv.employeeId, inv);
+      }
+    }
+    return map;
+  }, [pendingInvitations, nowMs, regularUserMode]);
+
+  const {
+    directory,
+    hasMore: directoryHasMore,
+    loadingMore: directoryLoadingMore,
+    loadMore: loadMoreDirectory,
+  } = useDirectory(directoryOrgId);
+  // Access role (org_role) per linked employee, sourced from the directory.
+  // Only populated when the viewer can load directory data; staff with no
+  // linked login simply resolve to null and render an em dash.
+  const orgRoleByEmployeeId = useMemo(() => {
+    const map = new Map<string, NonNullable<DirectoryPerson["orgRole"]>>();
+    for (const person of directory) {
+      if (person.employeeId && person.orgRole) {
+        map.set(person.employeeId, person.orgRole);
+      }
+    }
+    return map;
+  }, [directory]);
+  // Full directory person per linked employee, for inline role editing.
+  const directoryByEmployeeId = useMemo(() => {
+    const map = new Map<string, DirectoryPerson>();
+    for (const person of directory) {
+      if (person.employeeId) map.set(person.employeeId, person);
+    }
+    return map;
+  }, [directory]);
+  // What the Access column actually prints: a live membership, else the tier a
+  // pending invitation would grant. The filter and the sort read this same map,
+  // so a control can never disagree with the column it acts on.
+  const effectiveOrgRoleByEmployeeId = useMemo(() => {
+    const map = new Map<string, OrganizationRole>(orgRoleByEmployeeId);
+    for (const [employeeId, invitation] of pendingInviteByEmployeeId) {
+      if (!map.has(employeeId) && invitation.roleToAssign) {
+        map.set(employeeId, invitation.roleToAssign);
+      }
+    }
+    return map;
+  }, [orgRoleByEmployeeId, pendingInviteByEmployeeId]);
 
   const filters = useStaffFilters({
     employees,
@@ -210,6 +306,7 @@ export function MembersSection({
     certifications,
     roles,
     regularUserMode,
+    orgRoleByEmployeeId: effectiveOrgRoleByEmployeeId,
   });
   const {
     activeTab,
@@ -218,6 +315,7 @@ export function MembersSection({
     setSearchQuery,
     sortConfig,
     handleSort,
+    setSortKey,
     filterEmploymentType,
     setFilterEmploymentType,
     filterDepartment,
@@ -232,6 +330,8 @@ export function MembersSection({
     setFilterRole,
     filterAccountLink,
     setFilterAccountLink,
+    filterOrgRole,
+    setFilterOrgRole,
     filterEmailPresence,
     setFilterEmailPresence,
     filterPhonePresence,
@@ -514,6 +614,7 @@ export function MembersSection({
     filterEmailPresence,
     filterEmploymentType,
     filterFocusArea,
+    filterOrgRole,
     filterPhonePresence,
     filterRole,
     searchQuery,
@@ -522,8 +623,6 @@ export function MembersSection({
 
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
-  const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
-  const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
   const [, setRevokingId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<{
     action: BulkStaffAction;
@@ -533,82 +632,6 @@ export function MembersSection({
   const [isBulkActionRunning, setIsBulkActionRunning] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(false);
 
-  useEffect(() => {
-    if (!orgId || regularUserMode) return;
-    let cancelled = false;
-
-    fetchOrganizationInvitations(orgId)
-      .then((invites) => {
-        if (cancelled) return;
-        loadedInvitationsForOrgIdRef.current = orgId;
-        setPendingInvitations(
-          invites.filter(
-            (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
-          ),
-        );
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        Sentry.captureException(err);
-        loadedInvitationsForOrgIdRef.current = orgId;
-        setPendingInvitations([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, regularUserMode]);
-
-  const invitationStateReady =
-    regularUserMode || !orgId || loadedInvitationsForOrgIdRef.current === orgId;
-
-  // Re-derive against "now" on a slow tick so invitations that cross their
-  // 72h expiry while the page is open stop rendering as "Pending". Without
-  // this, refreshInvitations() only runs after revoke/resend/create and the
-  // UI happily shows expired invites with stale CTAs (audit H4).
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const pendingInviteByEmployeeId = useMemo(() => {
-    const map = new Map<string, Invitation>();
-    for (const inv of regularUserMode ? [] : pendingInvitations) {
-      if (new Date(inv.expiresAt).getTime() <= nowMs) continue;
-      if (inv.employeeId) {
-        map.set(inv.employeeId, inv);
-      }
-    }
-    return map;
-  }, [pendingInvitations, nowMs, regularUserMode]);
-
-  const {
-    directory,
-    hasMore: directoryHasMore,
-    loadingMore: directoryLoadingMore,
-    loadMore: loadMoreDirectory,
-  } = useDirectory(directoryOrgId);
-  // Access role (org_role) per linked employee, sourced from the directory.
-  // Only populated when the viewer can load directory data; staff with no
-  // linked login simply resolve to null and render an em dash.
-  const orgRoleByEmployeeId = useMemo(() => {
-    const map = new Map<string, NonNullable<DirectoryPerson["orgRole"]>>();
-    for (const person of directory) {
-      if (person.employeeId && person.orgRole) {
-        map.set(person.employeeId, person.orgRole);
-      }
-    }
-    return map;
-  }, [directory]);
-  // Full directory person per linked employee, for inline role editing.
-  const directoryByEmployeeId = useMemo(() => {
-    const map = new Map<string, DirectoryPerson>();
-    for (const person of directory) {
-      if (person.employeeId) map.set(person.employeeId, person);
-    }
-    return map;
-  }, [directory]);
   const replacePendingInvitationRole = (
     pendingInvitation: Invitation | null | undefined,
   ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
@@ -899,6 +922,9 @@ export function MembersSection({
     !filterCertification &&
     !filterRole &&
     filterAccountLink === "all" &&
+    // Reordering writes seniority across the whole roster, so it must never run
+    // against a list with rows filtered out of view.
+    filterOrgRole === "all" &&
     filterEmailPresence === "all" &&
     filterPhonePresence === "all" &&
     canManageEmployees &&
@@ -1190,7 +1216,9 @@ export function MembersSection({
                     setShowManagement(value === "management");
                     setFilterOpen(false);
                     if (value === "schedule") {
-                      setActiveTab("all");
+                      // "All" is a tab only managers get. Landing anyone else on
+                      // it would strand them there, since their strip is hidden.
+                      setActiveTab(canManageEmployees ? "all" : "active");
                     }
                   }}
                   style={{ minWidth: 180 }}
@@ -1202,6 +1230,28 @@ export function MembersSection({
               )}
 
               {!showManagement && (
+                <CustomSelect
+                  ariaLabel="Sort staff by"
+                  value={sortConfig.key}
+                  options={
+                    showAccessControls
+                      ? STAFF_SORT_OPTIONS
+                      : STAFF_SORT_OPTIONS.filter((option) => option.value !== "access")
+                  }
+                  onChange={setSortKey}
+                  style={{ minWidth: 180 }}
+                  fontSize="var(--dg-fs-navigation-item)"
+                  fontWeight="var(--dg-type-control-weight)"
+                  activeFontWeight="var(--dg-type-control-weight)"
+                  letterSpacing="normal"
+                />
+              )}
+
+              {/* A strip with one tab is a label wearing a control's clothes:
+                  it invites a choice the viewer does not have. Viewers who
+                  can't manage employees only ever get "Active", and its count
+                  is already on the summary card above. */}
+              {!showManagement && tabs.length > 1 && (
                 <ScrollableTabs
                   className="dg-span-tabs dg-span-tabs--light"
                   style={{
@@ -1664,6 +1714,9 @@ export function MembersSection({
               unlinkedCount={unlinkedCount}
               filterAccountLink={filterAccountLink}
               onFilterAccountLinkChange={setFilterAccountLink}
+              filterOrgRole={filterOrgRole}
+              onFilterOrgRoleChange={setFilterOrgRole}
+              showAccessControls={showAccessControls}
               filterEmailPresence={filterEmailPresence}
               onFilterEmailPresenceChange={setFilterEmailPresence}
               filterPhonePresence={filterPhonePresence}
@@ -1754,11 +1807,7 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={
-                                orgRoleByEmployeeId.get(employee.id) ??
-                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
-                                null
-                              }
+                              orgRole={effectiveOrgRoleByEmployeeId.get(employee.id) ?? null}
                               invitationStateReady={invitationStateReady}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
@@ -1796,7 +1845,7 @@ export function MembersSection({
                                     }
                                     onChange={() => toggleSelectAll(paginatedList)}
                                     onClick={(event) => event.stopPropagation()}
-                                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--dg-color-today-text)]"
+                                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--dg-color-brand)]"
                                   />
                                 )}
                                 <span
@@ -1878,11 +1927,7 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
-                              orgRole={
-                                orgRoleByEmployeeId.get(employee.id) ??
-                                pendingInviteByEmployeeId.get(employee.id)?.roleToAssign ??
-                                null
-                              }
+                              orgRole={effectiveOrgRoleByEmployeeId.get(employee.id) ?? null}
                               onRoleChange={roleChangeHandlerFor(
                                 employee.id,
                                 directoryByEmployeeId.get(employee.id)?.userId,
@@ -1927,9 +1972,11 @@ export function MembersSection({
                 <Table className="min-w-[900px]" showScrollCues scrollLabel="People roster">
                   <TableHeader>
                     <UITableRow className="bg-[var(--dg-color-bg)] hover:bg-transparent">
-                      <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
-                        ID
-                      </TableHead>
+                      {canViewEmployeeDetails && (
+                        <TableHead className="w-[100px] border-r border-[var(--dg-color-border-light)] pl-6">
+                          ID
+                        </TableHead>
+                      )}
                       <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Name
                       </TableHead>
@@ -1996,7 +2043,10 @@ export function MembersSection({
                       const displayName =
                         person.firstName || person.lastName
                           ? `${person.firstName} ${person.lastName}`.trim()
-                          : person.email;
+                          : // A pending invite carries no name, so the address is the only
+                            // identity it has. Viewers without contact access get neither,
+                            // and an unlabelled row is clearer than an empty one.
+                            person.email || "Invited member";
                       const initials = getAvatarInitials(displayName);
                       const avatarTone = getAvatarTone(
                         getDirectoryPersonAvatarSeed(person),
@@ -2019,16 +2069,18 @@ export function MembersSection({
                           }
                           style={{ opacity: isPending ? 0.7 : 1 }}
                         >
-                          <TableCell className="w-[100px] border-r border-[var(--dg-color-border-light)] py-4 pl-6">
-                            <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--dg-color-text-faint)]">
-                              {person.employeeNumber !== null
-                                ? `#${person.employeeNumber}`
-                                : "\u2014"}
-                            </span>
-                          </TableCell>
+                          {canViewEmployeeDetails && (
+                            <TableCell className="w-[100px] border-r border-[var(--dg-color-border-light)] py-4 pl-6">
+                              <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--dg-color-text-faint)]">
+                                {person.employeeNumber !== null
+                                  ? `#${person.employeeNumber}`
+                                  : "\u2014"}
+                              </span>
+                            </TableCell>
+                          )}
 
                           <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
-                            <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex min-w-0 items-center gap-1.5">
                               <div
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--dg-type-badge-size)] font-semibold"
                                 style={{
@@ -2064,15 +2116,19 @@ export function MembersSection({
                                         currentUserId,
                                       )}
                                       onClick={(event) => event.stopPropagation()}
-                                      className="truncate text-[14px] font-medium text-[var(--dg-color-text-primary)] hover:underline"
+                                      className="truncate text-[length:var(--dg-fs-body)] font-medium text-[var(--dg-color-text-primary)] hover:underline"
                                     >
                                       {displayName}
                                     </Link>
                                   ) : (
-                                    <span className="truncate text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+                                    <span className="truncate text-[length:var(--dg-fs-body)] font-medium text-[var(--dg-color-text-primary)]">
                                       {displayName}
                                     </span>
                                   )}
+                                  {/* A pending invite is badged too: the row
+                                      says the account isn't live yet, the crown
+                                      says which tier it will land on. */}
+                                  <AccessInsignia orgRole={person.orgRole} />
                                   {isYou && (
                                     <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                                       You
@@ -2097,9 +2153,11 @@ export function MembersSection({
                                     </span>
                                   )}
                                 </div>
-                                <div className="mt-0.5 truncate text-[12px] text-[var(--dg-color-text-muted)]">
-                                  {person.email}
-                                </div>
+                                {person.email && (
+                                  <div className="mt-0.5 truncate text-[12px] text-[var(--dg-color-text-muted)]">
+                                    {person.email}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -2271,6 +2329,7 @@ export function MembersSection({
       {selectedEmployee && !canManageEmployees && selectedEmployee.status === "active" && (
         <StaffReadOnlyDetailPanel
           employee={selectedEmployee}
+          orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           focusAreas={focusAreas}
           certifications={certifications}
           roles={roles}
@@ -2306,11 +2365,7 @@ export function MembersSection({
           onInvite={
             canManageManagementAccess ? (employee) => setInviteEmployee(employee) : undefined
           }
-          orgRole={
-            orgRoleByEmployeeId.get(selectedEmployee.id) ??
-            pendingInviteByEmployeeId.get(selectedEmployee.id)?.roleToAssign ??
-            null
-          }
+          orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           onRoleChange={selectedEmployeeRoleChange}
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
@@ -2653,7 +2708,7 @@ export function MembersSection({
           title="Export Staff Data?"
           message="Export the current staff directory data as a downloadable file?"
           confirmLabel="Export"
-          variant="warning"
+          variant="info"
           onConfirm={() => {
             setExportConfirm(false);
             return handleExport();

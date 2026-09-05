@@ -180,7 +180,7 @@ export default function DashboardHero({
         </div>
         <Link
           href={actionHref}
-          className="dg-btn dg-btn-brand"
+          className="dg-btn dg-btn-primary"
           style={{ whiteSpace: "nowrap", alignSelf: "center" }}
         >
           {actionLabel}

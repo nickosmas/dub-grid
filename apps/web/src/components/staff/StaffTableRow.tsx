@@ -16,7 +16,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { MaybeHint } from "@/components/ui/hint";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
@@ -214,7 +216,7 @@ function StaffRowCells({
                 checked={isSelected}
                 onChange={() => onToggleSelect(emp.id)}
                 onClick={(e) => e.stopPropagation()}
-                className="accent-[var(--dg-color-today-text)] cursor-pointer w-3.5 h-3.5"
+                className="accent-[var(--dg-color-brand)] cursor-pointer w-3.5 h-3.5"
               />
             )}
             <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
@@ -230,7 +232,7 @@ function StaffRowCells({
         tableClassName="py-4 border-r border-[var(--dg-color-border-light)]"
         gridClassName="dg-staff-directory-cell dg-staff-directory-cell--name flex py-4"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <Avatar>
             <AvatarFallback
               className="text-[length:var(--dg-type-badge-size)] font-semibold"
@@ -244,7 +246,7 @@ function StaffRowCells({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--dg-color-text-primary)] truncate">
+            <div className="flex items-center gap-1.5 text-[length:var(--dg-fs-body)] font-medium text-[var(--dg-color-text-primary)] truncate">
               {canNavigateToDetailsPage ? (
                 <Link
                   href={profileHref}
@@ -263,13 +265,14 @@ function StaffRowCells({
                   {displayName}
                 </span>
               )}
+              <AccessInsignia orgRole={orgRole} />
               {isYou && (
                 <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
                   You
                 </span>
               )}
             </div>
-            {(emp.email || emp.phone) && (
+            {canViewEmployeeDetails && (emp.email || emp.phone) && (
               <div className="mt-0.5 truncate text-[12px] text-[var(--dg-color-text-primary)]">
                 {emp.email || emp.phone}
               </div>
@@ -304,6 +307,9 @@ function StaffRowCells({
           <StatusPill
             tone={statusTone(emp.status)}
             variant="category"
+            bordered={false}
+            dot
+            className="gap-1.5 rounded-full px-2"
             aria-label={`Status: ${statusLabel}`}
           >
             {statusLabel}
@@ -332,13 +338,11 @@ function StaffRowCells({
                   </StatusPill>
                 ))}
                 {overflow.length > 0 && (
-                  <StatusPill
-                    tone="neutral"
-                    variant="category"
-                    title={overflow.map((fa) => fa.name).join(", ")}
-                  >
-                    +{overflow.length} more
-                  </StatusPill>
+                  <MaybeHint content={overflow.map((fa) => fa.name).join(", ")}>
+                    <StatusPill tone="neutral" variant="category">
+                      +{overflow.length} more
+                    </StatusPill>
+                  </MaybeHint>
                 )}
               </>
             );
@@ -360,12 +364,11 @@ function StaffRowCells({
           );
           const certName = getCertName(emp.certificationId, certifications);
           return (
-            <span
-              className="text-[12px] whitespace-nowrap text-[var(--dg-color-text-primary)]"
-              title={certName || undefined}
-            >
-              {certAbbr || "None"}
-            </span>
+            <MaybeHint content={certName}>
+              <span className="text-[12px] whitespace-nowrap text-[var(--dg-color-text-primary)]">
+                {certAbbr || "None"}
+              </span>
+            </MaybeHint>
           );
         })()}
       </StaffCell>
@@ -445,12 +448,11 @@ function StaffRowCells({
           tableClassName="table-cell py-4 w-[140px]"
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined flex py-4"
         >
-          <span
-            className="text-[12px] tabular-nums whitespace-nowrap text-[var(--dg-color-text-primary)]"
-            title={emp.createdAt ?? undefined}
-          >
-            {joinedLabel}
-          </span>
+          <MaybeHint content={emp.createdAt}>
+            <span className="text-[12px] tabular-nums whitespace-nowrap text-[var(--dg-color-text-primary)]">
+              {joinedLabel}
+            </span>
+          </MaybeHint>
         </StaffCell>
       )}
 

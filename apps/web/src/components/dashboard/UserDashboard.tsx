@@ -4,6 +4,7 @@ import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "l
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
+import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
@@ -2098,41 +2099,41 @@ function ShiftmatesRow({
           const avatarTone = getAvatarTone(item.avatarSeed, isDarkTheme);
 
           return (
-            <span
-              key={item.employeeId}
-              data-testid="user-dashboard-shiftmate-avatar-frame"
-              title={item.employeeName}
-              style={{
-                background: collaboratorBackground,
-                borderRadius: 999,
-                display: "inline-flex",
-                flexShrink: 0,
-                height: 42,
-                marginLeft: index === 0 ? 0 : DASHBOARD_HERO_AVATAR_OVERLAP,
-                padding: 2,
-                width: 42,
-              }}
-            >
+            <MaybeHint key={item.employeeId} content={item.employeeName}>
               <span
-                data-testid="user-dashboard-shiftmate-avatar"
+                data-testid="user-dashboard-shiftmate-avatar-frame"
                 style={{
-                  alignItems: "center",
-                  background: avatarTone.backgroundColor,
-                  border: `1px solid ${avatarTone.borderColor}`,
-                  borderRadius: 19,
-                  color: avatarTone.textColor,
+                  background: collaboratorBackground,
+                  borderRadius: 999,
                   display: "inline-flex",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  height: 38,
-                  justifyContent: "center",
-                  lineHeight: "18px",
-                  width: 38,
+                  flexShrink: 0,
+                  height: 42,
+                  marginLeft: index === 0 ? 0 : DASHBOARD_HERO_AVATAR_OVERLAP,
+                  padding: 2,
+                  width: 42,
                 }}
               >
-                {getAvatarInitials(item.employeeName)}
+                <span
+                  data-testid="user-dashboard-shiftmate-avatar"
+                  style={{
+                    alignItems: "center",
+                    background: avatarTone.backgroundColor,
+                    border: `1px solid ${avatarTone.borderColor}`,
+                    borderRadius: 19,
+                    color: avatarTone.textColor,
+                    display: "inline-flex",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    height: 38,
+                    justifyContent: "center",
+                    lineHeight: "18px",
+                    width: 38,
+                  }}
+                >
+                  {getAvatarInitials(item.employeeName)}
+                </span>
               </span>
-            </span>
+            </MaybeHint>
           );
         })}
         {overflowCount > 0 ? (
@@ -2886,7 +2887,7 @@ function AsyncActionButton({
 
   return (
     <Button
-      className={variant === "primary" ? "dg-btn dg-btn-brand" : "dg-btn dg-btn-secondary"}
+      className={variant === "primary" ? "dg-btn dg-btn-primary" : "dg-btn dg-btn-secondary"}
       disabled={isDisabled}
       onClick={() => {
         if (isDisabled) {

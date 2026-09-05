@@ -48,7 +48,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: "Deactivate" }));
 
     // Modal opens with "Mark inactive" selected by default → primary button
-    // reads "Mark Inactive" (not "Remove").
+    // reads "Mark inactive" (not "Remove").
     const dialog = screen.getByRole("dialog", { name: /Deactivate Alice Smith/i });
     expect(within(dialog).getByRole("radio", { name: /Mark inactive/i })).toBeChecked();
     expect(within(dialog).getByRole("radio", { name: /Remove from staff/i })).not.toBeChecked();
@@ -57,7 +57,7 @@ describe("EmployeeStatusActions", () => {
       within(dialog).getByPlaceholderText(/Reason \(optional\)/),
       "  On leave until June  ",
     );
-    await user.click(within(dialog).getByRole("button", { name: "Mark Inactive" }));
+    await user.click(within(dialog).getByRole("button", { name: "Mark inactive" }));
 
     expect(onDeactivate).toHaveBeenCalledWith("emp-1", "On leave until June");
   });
@@ -108,7 +108,11 @@ describe("EmployeeStatusActions", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Activate" })).toHaveClass("dg-btn-sm");
+    // Page variant shares its row with Send Invitation / Add to Management,
+    // so it wears the default button size, not a smaller one.
+    const activate = screen.getByRole("button", { name: "Activate" });
+    expect(activate).toHaveClass("dg-btn-success");
+    expect(activate).not.toHaveClass("dg-btn-sm");
 
     await user.click(screen.getByRole("button", { name: "Activate" }));
     const dialog = screen.getByRole("dialog", { name: "Activate Staff Member?" });

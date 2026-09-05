@@ -1,5 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { createContext, useContext, useMemo, type ComponentProps, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  useContext,
+  useMemo,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,6 +18,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { Chip } from "../../../shared/components/Chip";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
@@ -67,9 +75,6 @@ export type ProfileHeroAlign = "row" | "center";
 
 const ProfileHeroAlignContext = createContext<ProfileHeroAlign>("row");
 
-/** The dot on the avatar's corner. Omit it where there is no status to show. */
-export type ProfileHeroStatusTone = "success" | "muted";
-
 export function ProfileHero({
   align = "row",
   initials,
@@ -77,7 +82,9 @@ export function ProfileHero({
   subtitle,
   badge,
   badgeTone = "brand",
-  statusTone,
+  onBadgePress,
+  badgeAccessibilityLabel,
+  orgRole,
   avatarStyle,
   avatarTextStyle,
   style,
@@ -97,10 +104,18 @@ export function ProfileHero({
   badge?: string;
   badgeTone?: "brand" | "contrast" | "warning";
   /**
-   * Paints a dot on the avatar's corner, ringed in the page background so it
-   * reads as cut out of the avatar rather than sitting on it.
+   * Turns the badge into a control. Given one, the pill grows a chevron and
+   * takes presses; without one it stays the static label every other hero
+   * shows, so no existing caller changes shape.
    */
-  statusTone?: ProfileHeroStatusTone;
+  onBadgePress?: () => void;
+  badgeAccessibilityLabel?: string;
+  /**
+   * Paints the access insignia on the avatar's corner, ringed in the page
+   * background so it reads as cut out of the avatar rather than sitting on it.
+   * Plain users and members with no account get none.
+   */
+  orgRole?: string | null;
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
   style?: StyleProp<ViewStyle>;
@@ -116,28 +131,45 @@ export function ProfileHero({
   // the row anyway would leave its gap above the grid.
   const hasIdentity = Boolean(initials || title || badge || subtitle);
 
+  const badgeTextStyle = [
+    styles.heroBadgeText,
+    badgeTone === "contrast" && styles.heroBadgeTextContrast,
+    badgeTone === "warning" && styles.heroBadgeTextWarning,
+  ];
+  const badgeStyle = [
+    styles.heroBadge,
+    // `heroBadge` pins itself with `alignSelf: "flex-start"`, which beats a
+    // centered parent's `alignItems` and would hang the pill off the left
+    // edge of an otherwise centered block.
+    isCentered && styles.heroBadgeCentered,
+    badgeTone === "contrast" && styles.heroBadgeContrast,
+    badgeTone === "warning" && styles.heroBadgeWarning,
+  ];
+  const badgeChevronColor =
+    badgeTone === "contrast"
+      ? mobileColors.textInverse
+      : badgeTone === "warning"
+        ? mobileColors.warningText
+        : mobileColors.brand;
+
   const badgeNode = badge ? (
-    <View
-      style={[
-        styles.heroBadge,
-        // `heroBadge` pins itself with `alignSelf: "flex-start"`, which beats a
-        // centered parent's `alignItems` and would hang the pill off the left
-        // edge of an otherwise centered block.
-        isCentered && styles.heroBadgeCentered,
-        badgeTone === "contrast" && styles.heroBadgeContrast,
-        badgeTone === "warning" && styles.heroBadgeWarning,
-      ]}
-    >
-      <Text
-        style={[
-          styles.heroBadgeText,
-          badgeTone === "contrast" && styles.heroBadgeTextContrast,
-          badgeTone === "warning" && styles.heroBadgeTextWarning,
-        ]}
+    onBadgePress ? (
+      <Pressable
+        accessibilityHint="Opens the access level picker"
+        accessibilityLabel={badgeAccessibilityLabel ?? badge}
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onBadgePress}
+        style={({ pressed }) => [...badgeStyle, pressed && styles.heroBadgePressed]}
       >
-        {badge}
-      </Text>
-    </View>
+        <Text style={badgeTextStyle}>{badge}</Text>
+        <Ionicons color={badgeChevronColor} name="chevron-down" size={13} />
+      </Pressable>
+    ) : (
+      <View style={badgeStyle}>
+        <Text style={badgeTextStyle}>{badge}</Text>
+      </View>
+    )
   ) : null;
 
   return (
@@ -146,30 +178,13 @@ export function ProfileHero({
         {hasIdentity ? (
           <View style={[styles.heroTop, isCentered && styles.heroTopCentered]}>
             {initials ? (
-              <View style={styles.avatarFrame}>
-                <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
-                  <Text
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    style={[
-                      styles.avatarText,
-                      isCentered && styles.avatarTextLarge,
-                      avatarTextStyle,
-                    ]}
-                  >
-                    {initials}
-                  </Text>
-                </View>
-                {statusTone ? (
-                  <View
-                    style={[
-                      styles.avatarStatusDot,
-                      isCentered && styles.avatarStatusDotLarge,
-                      statusTone === "success"
-                        ? styles.avatarStatusDotSuccess
-                        : styles.avatarStatusDotMuted,
-                    ]}
-                  />
-                ) : null}
+              <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
+                <Text
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
+                >
+                  {initials}
+                </Text>
               </View>
             ) : null}
             <View style={[styles.heroCopy, isCentered && styles.heroCopyCentered]}>
@@ -183,6 +198,7 @@ export function ProfileHero({
                       {title}
                     </Text>
                   ) : null}
+                  <AccessInsignia orgRole={orgRole} size={isCentered ? "lg" : "sm"} />
                   {/* Centered, the badge goes under the name instead of beside
                       it: a pill tucked against a 26pt title pulls the whole
                       block off center, and the eye reads the pair as one
@@ -558,8 +574,10 @@ const personLayoutStyles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
+  },
+  actionRowItem: {
+    flex: 1,
   },
 });
 
@@ -591,9 +609,19 @@ export function ProfileActionStack({ children }: { children: ReactNode }) {
   return <View style={personLayoutStyles.actionStack}>{children}</View>;
 }
 
-/** Two actions sharing a line inside a `ProfileActionStack`. */
+/**
+ * Two actions sharing a line inside a `ProfileActionStack`, each taking an
+ * equal share of the width. Sized by their share rather than by their labels,
+ * so a short verb beside a long one doesn't read as the lesser action.
+ */
 export function ProfileActionRow({ children }: { children: ReactNode }) {
-  return <View style={personLayoutStyles.actionRow}>{children}</View>;
+  return (
+    <View style={personLayoutStyles.actionRow}>
+      {Children.map(children, (child) =>
+        child == null ? null : <View style={personLayoutStyles.actionRowItem}>{child}</View>,
+      )}
+    </View>
+  );
 }
 
 const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
@@ -633,10 +661,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 14,
       paddingTop: 8,
     },
-    /** Relative only so the status dot can hang off the avatar's corner. */
-    avatarFrame: {
-      position: "relative",
-    },
     avatar: {
       alignItems: "center",
       backgroundColor: mobileColors.brand,
@@ -660,29 +684,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     avatarTextLarge: {
       fontSize: 32,
       lineHeight: 40,
-    },
-    avatarStatusDot: {
-      borderColor: mobileColors.background,
-      borderRadius: 9,
-      borderWidth: 3,
-      bottom: 0,
-      height: 18,
-      position: "absolute",
-      right: 0,
-      width: 18,
-    },
-    avatarStatusDotLarge: {
-      borderRadius: 11,
-      bottom: 4,
-      height: 22,
-      right: 4,
-      width: 22,
-    },
-    avatarStatusDotSuccess: {
-      backgroundColor: mobileColors.success,
-    },
-    avatarStatusDotMuted: {
-      backgroundColor: mobileColors.textSubtle,
     },
     heroCopy: {
       flex: 1,
@@ -739,6 +740,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroBadgeCentered: {
       alignSelf: "center",
+    },
+    heroBadgePressed: {
+      opacity: 0.6,
     },
     heroBadgeText: {
       ...mobileTextWeighted("caption", "semibold"),

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
+import { MaybeHint } from "@/components/ui/hint";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { toast } from "sonner";
@@ -187,9 +188,9 @@ function classificationTitle(classification: EnrichedClassification): string | u
       : `existing employee ${name}`;
   if (classification.status === "blocked") {
     const reasonLabel = reason === "name" ? "name" : reason === "email" ? "email" : "phone";
-    return `Duplicate of ${who} (matched by ${reasonLabel}) — will not be imported`;
+    return `Duplicate of ${who} (matched by ${reasonLabel}), will not be imported`;
   }
-  return `Similar to ${who} — different contact info, double-check before importing`;
+  return `Similar to ${who}: different contact info, double-check before importing`;
 }
 
 function classificationRowBackground(
@@ -777,44 +778,46 @@ export function BulkImportModal({
                             >
                               {i + 1}
                             </td>
-                            <td
-                              style={{ padding: "8px 12px", borderBottom }}
-                              title={statusTitle(classification, referenceErrors)}
-                            >
-                              {isBlocked && (
-                                <XCircle
-                                  size={16}
-                                  style={{ color: "var(--dg-color-danger-text)" }}
-                                />
-                              )}
-                              {classification.status === "warning" && (
-                                <AlertTriangle
-                                  size={16}
-                                  style={{ color: "var(--dg-color-warning-text)" }}
-                                />
-                              )}
-                            </td>
-                            {PREVIEW_COLUMNS.map((col) => (
-                              <td
-                                key={col.key}
-                                title={col.maxWidth ? previewCellValue(row, col.key) : undefined}
-                                style={{
-                                  padding: "8px 12px",
-                                  borderBottom,
-                                  color:
-                                    col.key === "name" ? undefined : "var(--dg-color-text-muted)",
-                                  ...(col.maxWidth
-                                    ? {
-                                        maxWidth: col.maxWidth,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                      }
-                                    : { whiteSpace: "nowrap" }),
-                                }}
-                              >
-                                {previewCellValue(row, col.key) || "—"}
+                            <MaybeHint content={statusTitle(classification, referenceErrors)}>
+                              <td style={{ padding: "8px 12px", borderBottom }}>
+                                {isBlocked && (
+                                  <XCircle
+                                    size={16}
+                                    style={{ color: "var(--dg-color-danger-text)" }}
+                                  />
+                                )}
+                                {classification.status === "warning" && (
+                                  <AlertTriangle
+                                    size={16}
+                                    style={{ color: "var(--dg-color-warning-text)" }}
+                                  />
+                                )}
                               </td>
+                            </MaybeHint>
+                            {PREVIEW_COLUMNS.map((col) => (
+                              <MaybeHint
+                                key={col.key}
+                                content={col.maxWidth ? previewCellValue(row, col.key) : null}
+                              >
+                                <td
+                                  style={{
+                                    padding: "8px 12px",
+                                    borderBottom,
+                                    color:
+                                      col.key === "name" ? undefined : "var(--dg-color-text-muted)",
+                                    ...(col.maxWidth
+                                      ? {
+                                          maxWidth: col.maxWidth,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }
+                                      : { whiteSpace: "nowrap" }),
+                                  }}
+                                >
+                                  {previewCellValue(row, col.key) || "—"}
+                                </td>
+                              </MaybeHint>
                             ))}
                           </tr>
                         );

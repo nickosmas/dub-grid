@@ -369,7 +369,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
             label="Management access"
             statusText={
               managementDepartmentIds.length > 0
-                ? `Active — ${managementDepartmentIds.length} department${
+                ? `Active: ${managementDepartmentIds.length} department${
                     managementDepartmentIds.length === 1 ? "" : "s"
                   }`
                 : "No management access"

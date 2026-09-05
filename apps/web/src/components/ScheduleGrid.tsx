@@ -1426,8 +1426,8 @@ const SectionBlock = memo(function SectionBlock({
                         const openShiftHint = os.calledOffBy
                           ? `Called off by ${os.calledOffBy}`
                           : os.viewerEligible === false
-                            ? `${needed} needed — click for details`
-                            : `${needed} needed — click to volunteer`;
+                            ? `${needed} needed, click for details`
+                            : `${needed} needed, click to volunteer`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -1598,7 +1598,7 @@ const SectionBlock = memo(function SectionBlock({
                       <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
                         <span
                           style={{
-                            fontSize: "var(--dg-fs-label)",
+                            fontSize: "var(--dg-fs-body-sm)",
                             fontWeight: 600,
                             color:
                               hasHighlightedSearch && isHighlighted

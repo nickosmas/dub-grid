@@ -10,7 +10,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { Hint } from "@/components/ui/hint";
+import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -763,14 +763,15 @@ export default function StringListSettings({
                   </div>
                 ) : item.name && showScheduleRoleToggle ? (
                   <div style={{ minWidth: 0 }}>
-                    <StatusPill
-                      tone="neutral"
-                      variant="category"
-                      className="dg-role-name-view-pill max-w-full whitespace-normal"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </StatusPill>
+                    <MaybeHint content={item.name}>
+                      <StatusPill
+                        tone="neutral"
+                        variant="category"
+                        className="dg-role-name-view-pill max-w-full whitespace-normal"
+                      >
+                        {item.name}
+                      </StatusPill>
+                    </MaybeHint>
                   </div>
                 ) : (
                   <div
@@ -1248,15 +1249,11 @@ function RoleRequirementPills({ requirements }: { requirements: string[] }) {
     <div className="dg-role-requirement-cell">
       <div ref={containerRef} className="dg-role-requirement-pills dg-role-requirement-pills--view">
         {visibleRequirements.map((requirement, index) => (
-          <StatusPill
-            key={`${index}-${requirement}`}
-            tone="neutral"
-            variant="category"
-            className="dg-role-requirement-view-pill"
-            title={requirement}
-          >
-            <span className="dg-role-requirement-pill-label">{requirement}</span>
-          </StatusPill>
+          <MaybeHint key={`${index}-${requirement}`} content={requirement}>
+            <StatusPill tone="neutral" variant="category" className="dg-role-requirement-view-pill">
+              <span className="dg-role-requirement-pill-label">{requirement}</span>
+            </StatusPill>
+          </MaybeHint>
         ))}
         {hiddenRequirements.length > 0 ? (
           <Hint content={hint(hiddenRequirements.join(", "))} side="top">

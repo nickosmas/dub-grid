@@ -150,7 +150,7 @@ export function OverviewTab({
   useEffect(() => {
     setEditing(false);
     resetEditState();
-  }, [organization.id, organization.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- reset when persisted org state changes
+  }, [organization.id, organization.updatedAt]);
 
   async function handleSave() {
     if (!nextOrganization.name) return;

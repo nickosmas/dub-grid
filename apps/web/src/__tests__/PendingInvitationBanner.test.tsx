@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
@@ -49,7 +49,7 @@ describe("PendingInvitationBanner", () => {
     expect(onReinvite).not.toHaveBeenCalled();
 
     expect(screen.getByText("Reissue Invitation?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reissue Invitation" }));
+    await user.click(screen.getByRole("button", { name: "Reissue" }));
     expect(onReinvite).toHaveBeenCalledOnce();
   });
 
@@ -62,8 +62,10 @@ describe("PendingInvitationBanner", () => {
     await user.click(screen.getByRole("button", { name: "Revoke" }));
     expect(onRevoke).not.toHaveBeenCalled();
 
-    expect(screen.getByText("Revoke Invitation?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+    // The banner's trigger and the dialog's confirm are both "Revoke" now, so
+    // scope to the dialog rather than matching whichever comes first.
+    const confirmDialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+    await user.click(within(confirmDialog).getByRole("button", { name: "Revoke" }));
     expect(onRevoke).toHaveBeenCalledWith("inv-1");
   });
 
