@@ -36,15 +36,26 @@ import { GET } from "./route";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 
-function hangingQuery() {
+// Builder calls are recorded so a test can assert the shape of a query the
+// fan-out issues, which happens synchronously before the deadline rejects.
+const queryCalls: Array<{ table: string; method: string; args: unknown[] }> = [];
+
+function hangingQuery(table: string) {
   const pending = new Promise<never>(() => {});
+  const record =
+    (method: string) =>
+    (...args: unknown[]) => {
+      queryCalls.push({ table, method, args });
+      return query;
+    };
   const query = {
-    select: () => query,
-    eq: () => query,
-    order: () => query,
-    is: () => query,
-    single: () => query,
-    maybeSingle: () => query,
+    select: record("select"),
+    eq: record("eq"),
+    order: record("order"),
+    is: record("is"),
+    not: record("not"),
+    single: record("single"),
+    maybeSingle: record("maybeSingle"),
     then: pending.then.bind(pending),
   };
   return query;
@@ -62,7 +73,8 @@ describe("GET /api/organization/bootstrap", () => {
       serviceClient: { from: (table: string) => serviceFrom(table) },
       userClient: {},
     });
-    serviceFrom.mockImplementation(() => hangingQuery());
+    queryCalls.length = 0;
+    serviceFrom.mockImplementation((table: string) => hangingQuery(table));
     cacheThrough.mockImplementation((_key: string, _ttl: number, fetcher: () => Promise<unknown>) =>
       fetcher(),
     );
@@ -72,6 +84,34 @@ describe("GET /api/organization/bootstrap", () => {
           ? Promise.reject(new Error("fanout timed out"))
           : work,
     );
+  });
+
+  // The entry gate this feeds decides whether a member waits or is let in, so
+  // the filters are the whole behaviour: an archived membership, a non-super
+  // admin, or an unfinished onboarding must not count as an open organization.
+  it("asks whether any active super admin has finished their own onboarding", async () => {
+    await GET(
+      new NextRequest("http://acme.localhost/api/organization/bootstrap", {
+        headers: { host: "acme.localhost" },
+      }),
+    );
+
+    const membershipCalls = queryCalls.filter((call) => call.table === "organization_memberships");
+    expect(membershipCalls).toContainEqual({
+      table: "organization_memberships",
+      method: "eq",
+      args: ["org_role", "super_admin"],
+    });
+    expect(membershipCalls).toContainEqual({
+      table: "organization_memberships",
+      method: "is",
+      args: ["archived_at", null],
+    });
+    expect(membershipCalls).toContainEqual({
+      table: "organization_memberships",
+      method: "not",
+      args: ["onboarding_completed_at", "is", null],
+    });
   });
 
   it("returns a controlled error when the database fan-out exceeds its deadline", async () => {

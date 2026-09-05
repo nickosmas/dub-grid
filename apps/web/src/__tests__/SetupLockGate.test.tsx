@@ -28,7 +28,11 @@ const mockPermissions = {
 
 const mockOrganizationData = {
   org: { id: "org-1", name: "Acme" },
-  entryGate: { onboardingCompleted: false, billingLocked: null as boolean | null },
+  entryGate: {
+    onboardingCompleted: false,
+    adminOnboardingCompleted: true,
+    billingLocked: null as boolean | null,
+  },
   setupStatus: {
     isComplete: false,
     missing: {
@@ -148,7 +152,11 @@ beforeEach(() => {
     },
   };
   mockOrganizationData.loading = false;
-  mockOrganizationData.entryGate = { onboardingCompleted: false, billingLocked: null };
+  mockOrganizationData.entryGate = {
+    onboardingCompleted: false,
+    adminOnboardingCompleted: true,
+    billingLocked: null,
+  };
   mockEmployeesData.employees = [];
   mockEmployeesData.loading = false;
   vi.mocked(fetchOrganizationBilling).mockResolvedValue({
@@ -229,7 +237,11 @@ describe("OnboardingGate setup lock", () => {
     const { rerenderGate } = renderGate();
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
 
-    mockOrganizationData.entryGate = { onboardingCompleted: false, billingLocked: null };
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: false,
+      adminOnboardingCompleted: true,
+      billingLocked: null,
+    };
     mockOrganizationData.setupStatus = {
       isComplete: false,
       missing: {
@@ -388,6 +400,84 @@ describe("OnboardingGate setup lock", () => {
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
     expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  // An organization can read as fully configured while its first super admin is
+  // still sitting on their own welcome step. Members were being let in there.
+  it("holds a member while the first admin is still in their own onboarding", async () => {
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    mockOrganizationData.entryGate.adminOnboardingCompleted = false;
+
+    renderGate();
+
+    expect(await screen.findByText("Setup pending")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+  });
+
+  it("lets that member in once the admin has finished", async () => {
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+
+    renderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
+  // The proxy holds members on /billing-required before an organization is
+  // open at all. Anything the onboarding gate renders there covers the screen
+  // explaining the wait, and a wizard finished on top of it just puts the user
+  // back on the same page.
+  it("never intercepts the organization gate for a member who cannot set up the org", async () => {
+    mockPathname = "/billing-required";
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+
+    renderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+  });
+
+  it("never intercepts the organization gate once org config is complete either", async () => {
+    mockPathname = "/billing-required";
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+
+    renderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
   });
 });
 

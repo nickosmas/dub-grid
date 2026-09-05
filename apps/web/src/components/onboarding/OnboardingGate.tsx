@@ -28,6 +28,13 @@ const PUBLIC_ROUTES = [
   "/privacy",
   "/cookie-policy",
   "/onboarding",
+  // The organization gate in the proxy is terminal: a member held there has no
+  // organization to be onboarded into yet. Without this the wizard painted
+  // straight over the screen explaining the wait, and finishing it dropped the
+  // user back on that same screen. Bootstrap is the other reason: it answers a
+  // locked organization with a 403, which reads here as a failed bootstrap and
+  // covers the gate with the recovery screen instead.
+  "/billing-required",
   "/forgot-password",
   "/reset-password",
   "/verify-email",

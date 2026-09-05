@@ -7,7 +7,7 @@ function input(overrides: Partial<OnboardingDecisionInput> = {}): OnboardingDeci
     completedThisSession: false,
     appAlreadyShown: false,
     orgLoading: false,
-    entryGate: { onboardingCompleted: false, billingLocked: null },
+    entryGate: { onboardingCompleted: false, adminOnboardingCompleted: true, billingLocked: null },
     onBillingRecoveryRoute: false,
     setupComplete: true,
     canCompleteSetup: false,
@@ -39,7 +39,11 @@ describe("resolveOnboardingDecision", () => {
   });
 
   it("keeps an onboarded member in the app when org setup goes incomplete", () => {
-    const entryGate = { onboardingCompleted: true, billingLocked: null };
+    const entryGate = {
+      onboardingCompleted: true,
+      adminOnboardingCompleted: true,
+      billingLocked: null,
+    };
     expect(resolveOnboardingDecision(input({ entryGate, setupComplete: false }))).toEqual({
       kind: "app",
       settled: true,
@@ -73,7 +77,11 @@ describe("resolveOnboardingDecision", () => {
       resolveOnboardingDecision(
         input({
           appAlreadyShown: true,
-          entryGate: { onboardingCompleted: true, billingLocked: true },
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: true,
+            billingLocked: true,
+          },
         }),
       ),
     ).toEqual({ kind: "billing-redirect" });
@@ -84,7 +92,11 @@ describe("resolveOnboardingDecision", () => {
       resolveOnboardingDecision(
         input({
           onBillingRecoveryRoute: true,
-          entryGate: { onboardingCompleted: false, billingLocked: true },
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: true,
+            billingLocked: true,
+          },
         }),
       ),
     ).toEqual({ kind: "app", settled: true });
@@ -107,6 +119,53 @@ describe("resolveOnboardingDecision", () => {
       isOrgSetup: true,
       freezePhase: "orientation",
     });
+  });
+
+  it("holds a first-time member until an admin has finished their own onboarding", () => {
+    // The organization reads as configured, which is what used to let members
+    // in while the first super admin was still on their welcome step.
+    expect(
+      resolveOnboardingDecision(
+        input({
+          setupComplete: true,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: false,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "setup-pending" });
+  });
+
+  it("never holds the admin who has to finish that onboarding", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          canCompleteSetup: true,
+          setupComplete: true,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: false,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "wizard", isOrgSetup: true, freezePhase: "orientation" });
+  });
+
+  it("leaves a member who is already through the door where they are", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: false,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
   });
 
   it("recovers from an unusable bootstrap before anything else", () => {

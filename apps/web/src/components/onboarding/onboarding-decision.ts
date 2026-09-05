@@ -2,6 +2,9 @@ import type { OnboardingPhase } from "@/features/onboarding/client";
 
 export interface OnboardingEntryGate {
   onboardingCompleted: boolean;
+  /** A super admin has been through their own onboarding, so the organization
+   *  is open to members who cannot configure it themselves. */
+  adminOnboardingCompleted: boolean;
   billingLocked: boolean | null;
 }
 
@@ -60,6 +63,17 @@ export function resolveOnboardingDecision(input: OnboardingDecisionInput): Onboa
   // app is never sent back into a wizard (or made to wait behind the pending
   // screen) because the organization's configuration is mid-edit.
   if (input.entryGate.onboardingCompleted) return { kind: "app", settled: true };
+
+  // Nobody who cannot configure the organization gets in, or even gets their
+  // own orientation, until an admin has been all the way through theirs.
+  // Org-wide configuration completeness is not the same question: an org can
+  // read as configured while its first super admin is still on their welcome
+  // step, and that is exactly when members were being let in ahead of them.
+  // Members already through the door are answered above and keep their access,
+  // so this can only ever hold a first-time arrival.
+  if (!input.canCompleteSetup && !input.entryGate.adminOnboardingCompleted) {
+    return { kind: "setup-pending" };
+  }
 
   const phase: OnboardingPhase =
     input.frozenPhase ?? (input.setupComplete ? "orientation" : "config");

@@ -25,6 +25,9 @@ export interface OrganizationBootstrap {
   isGridmaster: boolean;
   entryGate: {
     onboardingCompleted: boolean;
+    /** Org-wide: a super admin has finished their own onboarding, so the
+     *  organization is open to members who cannot configure it themselves. */
+    adminOnboardingCompleted: boolean;
     /** Only present for a super-admin's own organization. */
     billingLocked: boolean | null;
   };
