@@ -106,7 +106,9 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   if (await skipSetupButton.isVisible()) {
     await clearBlockingOverlays(page);
     await skipSetupButton.click();
-    await page.getByRole("button", { name: "Yes, skip" }).click();
+    // Exact: the confirm button reads "Skip", and the wizard's own "Skip setup"
+    // button stays mounted behind the dialog, so a substring match hits both.
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
     // handleSkip() does a full window.location.reload() on completion.
     await page.waitForLoadState("load");
   }
