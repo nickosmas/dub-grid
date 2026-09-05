@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -11,6 +12,11 @@ import type {
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
+import {
+  ORG_ROLE_PRIVILEGE_ORDER,
+  getEffectiveOrgRole,
+  getOrgRolePrivilegeRank,
+} from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -35,13 +41,22 @@ import {
   inviteMobileManagementUser,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import { getDepartmentNames } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
+  mobileElevation,
   mobileMotion,
   mobileRadii,
   mobileText,
@@ -60,7 +75,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 type StatusFilter = "active" | "inactive";
 /** Which half of the directory the list is showing, mirroring web's toggle. */
 type RosterTab = "schedule" | "management";
-type SortMode = "seniority" | "alphabetical";
+type SortMode = "seniority" | "alphabetical" | "access";
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 /** The three access states a staff row's hint prints, as a filter value. */
 type PersonAppAccess = "has_access" | "invited" | "none";
@@ -80,6 +95,7 @@ type StaffFilters = {
   roleId: number | "all";
   employmentType: "all" | MobilePerson["employmentType"];
   appAccess: "all" | PersonAppAccess;
+  orgRole: "all" | NonNullable<MobileOrgRole>;
   status: StatusFilter;
   sort: SortMode;
 };
@@ -97,6 +113,7 @@ const STAFF_FILTER_DEFAULTS: StaffFilters = {
   roleId: "all",
   employmentType: "all",
   appAccess: "all",
+  orgRole: "all",
   status: "active",
   sort: "seniority",
 };
@@ -107,16 +124,6 @@ const MANAGEMENT_FILTER_DEFAULTS: ManagementFilters = {
   invitation: "all",
   sort: "alphabetical",
 };
-
-/** Super admins first, then admins, then everyone else. */
-const MANAGEMENT_ROLE_RANK: Record<NonNullable<MobileOrgRole>, number> = {
-  super_admin: 0,
-  admin: 1,
-  user: 2,
-};
-
-/** Offered in the same order the sort ranks them. */
-const MANAGEMENT_ROLE_FILTERS: NonNullable<MobileOrgRole>[] = ["super_admin", "admin", "user"];
 
 /** How many of a tab's filters sit away from their default, for the badge. */
 function countActiveFilters<Filters extends object>(filters: Filters, defaults: Filters): number {
@@ -131,10 +138,6 @@ type ProfileRequestConfirmation = {
 
 function getFullName(person: MobilePerson): string {
   return `${person.firstName} ${person.lastName}`.trim() || person.email || "Unnamed person";
-}
-
-function formatStatusLabel(status: MobilePerson["status"]): string {
-  return status === "active" ? "Active" : "Inactive";
 }
 
 function getManagementUserName(managementUser: MobileManagementUser): string {
@@ -155,16 +158,19 @@ function countManagementUsersWithRole(
   managementUsers: MobileManagementUser[],
   role: NonNullable<MobileOrgRole>,
 ): number {
-  return managementUsers.filter((managementUser) => managementUser.orgRole === role).length;
+  return managementUsers.filter(
+    (managementUser) => getEffectiveOrgRole(managementUser.orgRole) === role,
+  ).length;
 }
 
-function getManagementRoleRank(role: MobileOrgRole): number {
-  return role ? MANAGEMENT_ROLE_RANK[role] : MANAGEMENT_ROLE_RANK.user + 1;
+function countPeopleWithRole(people: MobilePerson[], role: NonNullable<MobileOrgRole>): number {
+  return people.filter((person) => getEffectiveOrgRole(person.orgRole) === role).length;
 }
 
 export default function PeopleScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
@@ -176,6 +182,7 @@ export default function PeopleScreen() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
   const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   /** The roster row whose actions sheet is open, for rows with no staff profile. */
   const [managementUserActions, setManagementUserActions] = useState<MobileManagementUser | null>(
     null,
@@ -235,12 +242,16 @@ export default function PeopleScreen() {
         message: "They'll join management once they accept.",
       });
     },
+    // Inline: the invite sheet stays open on failure, and it is a `<Modal>` —
+    // its own native window — so a toast renders behind it and is never seen.
+    onMutate: () => setInviteError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not send invitation",
-        fallbackMessage: "We couldn't send that management invitation right now.",
-      });
+      setInviteError(
+        getClientFriendlyErrorMessage(
+          error,
+          "We couldn't send that management invitation right now.",
+        ),
+      );
     },
   });
   const manualRefresh = useManualRefresh(() =>
@@ -394,6 +405,14 @@ export default function PeopleScreen() {
           !canManageEmployees || staffFilters.appAccess === "all"
             ? true
             : getPersonAppAccess(person) === staffFilters.appAccess;
+        // Access level is admin-only for the same reason as app access above:
+        // the tier it narrows on is never printed on a regular user's rows.
+        // Staff with no account count as Users, so picking that tier returns
+        // everyone but the admins.
+        const matchesOrgRole =
+          !canManageEmployees || staffFilters.orgRole === "all"
+            ? true
+            : getEffectiveOrgRole(person.orgRole) === staffFilters.orgRole;
 
         return (
           matchesSearch &&
@@ -402,11 +421,22 @@ export default function PeopleScreen() {
           matchesCertification &&
           matchesRole &&
           matchesEmploymentType &&
-          matchesAppAccess
+          matchesAppAccess &&
+          matchesOrgRole
         );
       })
       .sort((left, right) => {
         if (staffFilters.sort === "alphabetical") {
+          return getFullName(left).localeCompare(getFullName(right));
+        }
+
+        if (staffFilters.sort === "access") {
+          const rankComparison =
+            getOrgRolePrivilegeRank(left.orgRole) - getOrgRolePrivilegeRank(right.orgRole);
+          if (rankComparison !== 0) {
+            return rankComparison;
+          }
+
           return getFullName(left).localeCompare(getFullName(right));
         }
 
@@ -447,7 +477,7 @@ export default function PeopleScreen() {
         const matchesOrgRole =
           managementFilters.orgRole === "all"
             ? true
-            : managementUser.orgRole === managementFilters.orgRole;
+            : getEffectiveOrgRole(managementUser.orgRole) === managementFilters.orgRole;
         const matchesInvitation =
           managementFilters.invitation === "all"
             ? true
@@ -457,7 +487,7 @@ export default function PeopleScreen() {
       .sort((left, right) => {
         if (managementFilters.sort === "access") {
           const rankComparison =
-            getManagementRoleRank(left.orgRole) - getManagementRoleRank(right.orgRole);
+            getOrgRolePrivilegeRank(left.orgRole) - getOrgRolePrivilegeRank(right.orgRole);
           if (rankComparison !== 0) {
             return rankComparison;
           }
@@ -503,16 +533,10 @@ export default function PeopleScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={
-        contentState.kind === "loading" ||
-        !(isManagementTab
-          ? contentState.kind === "error" ||
-            managementUsers.length === 0 ||
-            filteredManagementUsers.length === 0
-          : contentState.kind === "error" ||
-            visiblePeople.length === 0 ||
-            filteredPeople.length === 0)
-      }
+      // A skeleton is a placeholder, not content: it must not scroll. Empty and
+      // error states stay scrollable so the large title can still collapse and
+      // pull-to-refresh keeps working.
+      scrollEnabled={contentState.kind !== "loading"}
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
@@ -560,7 +584,7 @@ export default function PeopleScreen() {
                 onPress={() => setManagementFilter("orgRole", "all")}
                 selected={managementFilters.orgRole === "all"}
               />
-              {MANAGEMENT_ROLE_FILTERS.map((role) => (
+              {ORG_ROLE_PRIVILEGE_ORDER.map((role) => (
                 <SelectionRow
                   key={role}
                   detail={`${countManagementUsersWithRole(managementUsers, role)} people`}
@@ -706,6 +730,25 @@ export default function PeopleScreen() {
             ) : null}
 
             {canManageEmployees ? (
+              <SelectionSection label="Access level">
+                <SelectionRow
+                  label="All access levels"
+                  onPress={() => setStaffFilter("orgRole", "all")}
+                  selected={staffFilters.orgRole === "all"}
+                />
+                {ORG_ROLE_PRIVILEGE_ORDER.map((role) => (
+                  <SelectionRow
+                    key={role}
+                    detail={`${countPeopleWithRole(visiblePeople, role)} people`}
+                    label={ORG_ROLE_LABELS[role]}
+                    onPress={() => setStaffFilter("orgRole", role)}
+                    selected={staffFilters.orgRole === role}
+                  />
+                ))}
+              </SelectionSection>
+            ) : null}
+
+            {canManageEmployees ? (
               <SelectionSection label="Status">
                 <SelectionRow
                   detail={`${activeCount} people`}
@@ -733,6 +776,13 @@ export default function PeopleScreen() {
                 onPress={() => setStaffFilter("sort", "alphabetical")}
                 selected={staffFilters.sort === "alphabetical"}
               />
+              {canManageEmployees ? (
+                <SelectionRow
+                  label="Access level"
+                  onPress={() => setStaffFilter("sort", "access")}
+                  selected={staffFilters.sort === "access"}
+                />
+              ) : null}
             </SelectionSection>
           </>
         )}
@@ -867,13 +917,11 @@ export default function PeopleScreen() {
                 return (
                   <AnimatedListItem index={index} key={managementUser.id}>
                     <PersonRow
-                      accessHint={
-                        managementUser.source === "pending_invite"
-                          ? "Invitation pending"
-                          : "App access"
-                      }
                       id={managementUser.id}
-                      employmentType={null}
+                      avatarSeed={resolveAvatarSeed({
+                        userId: managementUser.userId,
+                        id: managementUser.id,
+                      })}
                       isLast={index === filteredManagementUsers.length - 1}
                       name={getManagementUserName(managementUser)}
                       navigable
@@ -900,8 +948,6 @@ export default function PeopleScreen() {
                         // accepted. Its handful of actions come up here.
                         setManagementUserActions(managementUser);
                       }}
-                      showStatus={false}
-                      status="active"
                       subtitle={
                         departmentNames.join(", ") || managementUser.email || "No departments"
                       }
@@ -945,11 +991,6 @@ export default function PeopleScreen() {
                   : canManageEmployees
                     ? person.email || person.phone || "No contact on file"
                     : "No focus area";
-              const accessHint = person.pendingInvitation
-                ? "Invitation pending"
-                : person.userId
-                  ? "App access"
-                  : "No app access";
               const isSelf =
                 (currentEmployeeId !== null && person.id === currentEmployeeId) ||
                 (currentUserId !== null &&
@@ -963,9 +1004,8 @@ export default function PeopleScreen() {
               return (
                 <AnimatedListItem index={index} key={person.id}>
                   <PersonRow
-                    accessHint={canManageEmployees ? accessHint : null}
                     id={person.id}
-                    employmentType={canManageEmployees ? person.employmentType : null}
+                    avatarSeed={resolveAvatarSeed(person)}
                     isLast={index === filteredPeople.length - 1}
                     name={getFullName(person)}
                     navigable={navigable}
@@ -980,8 +1020,6 @@ export default function PeopleScreen() {
                         params: { id: person.id },
                       });
                     }}
-                    showStatus={canManageEmployees}
-                    status={person.status}
                     subtitle={subtitle}
                   />
                 </AnimatedListItem>
@@ -997,9 +1035,13 @@ export default function PeopleScreen() {
       />
 
       <ManagementUserInviteSheet
+        error={inviteError}
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
-        onDismiss={() => setShowInviteManagementUser(false)}
+        onDismiss={() => {
+          setInviteError(null);
+          setShowInviteManagementUser(false);
+        }}
         onSubmit={(body) =>
           new Promise<void>((resolve) => {
             inviteManagementUserMutation.mutate(body, { onSettled: () => resolve() });
@@ -1061,7 +1103,8 @@ function AddPersonButton({
   // pointed at something that files a request rather than opening a screen.
   const action = useAsyncAction(onPress);
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
     rippleBorderless: true,
     rippleColor: mobileColors.ripplePrimary,
@@ -1084,41 +1127,29 @@ function AddPersonButton({
 
 function PersonRow({
   id,
-  employmentType,
+  avatarSeed,
   name,
   navigable,
   orgRole,
   subtitle,
-  status,
-  accessHint,
-  showStatus,
   isLast,
   onPress,
 }: {
   id: string;
-  /** Null for a management-only user, who was never on the schedule. */
-  employmentType: MobilePerson["employmentType"] | null;
+  /** Prefers the linked account id, so a person keeps one color across apps. */
+  avatarSeed: string;
   name: string;
   navigable: boolean;
   orgRole: MobileOrgRole;
   subtitle: string;
-  status: MobilePerson["status"];
-  accessHint: string | null;
-  showStatus: boolean;
   isLast: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
-  const secondaryDetail = [
-    employmentType === null ? null : employmentType === "part_time" ? "PT" : "FT",
-    accessHint,
-    showStatus ? formatStatusLabel(status) : null,
-  ]
-    .filter(Boolean)
-    .join(" - ");
-  const avatarTone = getAvatarTone(id, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const initials =
     name
@@ -1145,7 +1176,7 @@ function PersonRow({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.personAvatarText, { color: avatarTone.textColor }]}
         >
           {initials}
@@ -1158,6 +1189,11 @@ function PersonRow({
           </Text>
           {orgRoleBadge ? (
             <View style={orgRoleBadge.containerStyle}>
+              <MaterialCommunityIcons
+                color={orgRoleBadge.textStyle.color}
+                name={orgRoleBadge.icon === "crown" ? "crown" : "star"}
+                size={13}
+              />
               <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
             </View>
           ) : null}
@@ -1165,11 +1201,6 @@ function PersonRow({
         <Text numberOfLines={1} style={styles.personSubtitle}>
           {subtitle}
         </Text>
-        {secondaryDetail ? (
-          <Text numberOfLines={1} style={styles.personAccess}>
-            {secondaryDetail}
-          </Text>
-        ) : null}
       </View>
       {navigable ? (
         <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
@@ -1178,7 +1209,7 @@ function PersonRow({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
       gap: 10,
@@ -1215,11 +1246,12 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       overflow: "hidden",
+      ...mobileElevation("card", isDark),
     },
     personRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 12,
+      gap: 8,
       minHeight: 76,
       paddingVertical: 12,
     },
@@ -1273,10 +1305,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     personSubtitle: {
       ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    personAccess: {
-      ...mobileText.caption,
       color: mobileColors.textMuted,
     },
   });

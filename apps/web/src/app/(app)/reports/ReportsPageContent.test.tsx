@@ -540,8 +540,8 @@ describe("ReportsPageContent", () => {
 
     expect(focusTarget).toHaveClass("dg-input");
     expect(peopleTarget).toHaveClass("dg-input");
-    expect(focusTarget).toHaveStyle({ minHeight: "40px" });
-    expect(peopleTarget).toHaveStyle({ minHeight: "40px" });
+    expect(focusTarget).toHaveStyle({ minHeight: "var(--dg-toolbar-h)" });
+    expect(peopleTarget).toHaveStyle({ minHeight: "var(--dg-toolbar-h)" });
 
     fireEvent.click(focusTarget);
     await waitFor(() => {

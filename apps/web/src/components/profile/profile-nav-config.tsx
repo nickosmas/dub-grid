@@ -45,7 +45,6 @@ export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<Pro
       id: "profile",
       label: "Profile",
       Icon: ProfileIcon,
-      description: "Your name, email, and phone — the basics about how you appear in DubGrid.",
     },
     {
       id: "security",

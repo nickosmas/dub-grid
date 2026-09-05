@@ -90,7 +90,7 @@ function NotificationPreferencesSkeleton({ rowCount }: { rowCount: number }) {
     >
       <div className="dg-skeleton dg-skeleton--text" style={{ width: "46%" }} />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div className="dg-skeleton" style={{ height: 40, borderRadius: 4 }} />
+        <div className="dg-skeleton" style={{ height: 40, borderRadius: "var(--dg-radius-xs)" }} />
         {Array.from({ length: rowCount }, (_, index) => (
           <div
             key={index}
@@ -111,7 +111,10 @@ function NotificationPreferencesSkeleton({ rowCount }: { rowCount: number }) {
           </div>
         ))}
       </div>
-      <div className="dg-skeleton" style={{ width: 132, height: 36, borderRadius: 4 }} />
+      <div
+        className="dg-skeleton"
+        style={{ width: 132, height: 36, borderRadius: "var(--dg-radius-xs)" }}
+      />
     </div>
   );
 }

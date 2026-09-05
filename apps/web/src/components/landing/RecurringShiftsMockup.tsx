@@ -1,3 +1,4 @@
+import { ChevronDown, Search } from "lucide-react";
 /* ── Recurring shifts mockup ──────────────────────────────────────────────
    Mirrors RecurringScheduleSection. Real component:
    apps/web/src/components/staff/RecurringScheduleSection.tsx — page-title
@@ -82,7 +83,7 @@ export default function RecurringShiftsMockup() {
         style={{
           background: "var(--dg-color-info-bg)",
           border: "1px solid var(--dg-color-info-border)",
-          borderRadius: 10,
+          borderRadius: "var(--dg-radius-lg)",
           padding: "10px 20px",
           display: "flex",
           alignItems: "center",
@@ -120,7 +121,7 @@ export default function RecurringShiftsMockup() {
               color: "var(--dg-color-text-secondary)",
               padding: "6px 14px",
               border: "1px solid var(--dg-color-border)",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               background: "var(--dg-color-surface)",
             }}
           >
@@ -132,7 +133,7 @@ export default function RecurringShiftsMockup() {
               fontWeight: 600,
               color: "var(--dg-color-danger)",
               padding: "6px 14px",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               background: "transparent",
             }}
           >
@@ -144,7 +145,7 @@ export default function RecurringShiftsMockup() {
               fontWeight: 600,
               color: "var(--dg-color-text-inverse)",
               padding: "6px 18px",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               background: "var(--dg-color-brand)",
             }}
           >
@@ -197,7 +198,7 @@ export default function RecurringShiftsMockup() {
             height: 32,
             padding: "0 10px",
             border: "1px solid var(--dg-color-border)",
-            borderRadius: 6,
+            borderRadius: "var(--dg-radius-sm)",
             background: "var(--dg-color-surface)",
             fontSize: 12,
             color: "var(--dg-color-text-secondary)",
@@ -206,17 +207,7 @@ export default function RecurringShiftsMockup() {
           }}
         >
           <span>All Focus Areas</span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            style={{ color: "var(--dg-color-text-faint)" }}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <ChevronDown size={12} style={{ color: "var(--dg-color-text-faint)" }} />
         </div>
         <div style={{ flex: 1 }} />
         <div
@@ -225,25 +216,16 @@ export default function RecurringShiftsMockup() {
             width: 180,
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-text-faint)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <Search
+            size={14}
+            color="var(--dg-color-text-faint)"
             style={{
               position: "absolute",
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
             }}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          />
           <div
             style={{
               height: 32,
@@ -251,7 +233,7 @@ export default function RecurringShiftsMockup() {
               alignItems: "center",
               padding: "0 10px 0 32px",
               border: "1px solid var(--dg-color-border)",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               background: "var(--dg-color-surface)",
               fontSize: 12,
               color: "var(--dg-color-text-faint)",
@@ -266,7 +248,7 @@ export default function RecurringShiftsMockup() {
       <div
         style={{
           background: "var(--dg-color-surface)",
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
@@ -370,7 +352,7 @@ export default function RecurringShiftsMockup() {
                         fontSize: 10,
                         fontWeight: 700,
                         padding: "1px 5px",
-                        borderRadius: 10,
+                        borderRadius: "var(--dg-radius-lg)",
                         background: "var(--dg-color-brand-bg)",
                         color: "var(--dg-color-brand)",
                         whiteSpace: "nowrap" as const,
@@ -425,7 +407,7 @@ export default function RecurringShiftsMockup() {
                           border: isDirty
                             ? `2px dashed ${shift.text}`
                             : `1px solid ${borderColor(shift.text)}`,
-                          borderRadius: 8,
+                          borderRadius: "var(--dg-radius-md)",
                           color: shift.text,
                           display: "flex",
                           alignItems: "center",
@@ -447,7 +429,7 @@ export default function RecurringShiftsMockup() {
                           left: 4,
                           background: "transparent",
                           border: "1px dashed var(--dg-color-border-light)",
-                          borderRadius: 8,
+                          borderRadius: "var(--dg-radius-md)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",

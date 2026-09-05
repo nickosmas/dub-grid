@@ -2,7 +2,7 @@ import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
+import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
  * Server-side auth confirmation route.
@@ -21,22 +21,16 @@ export async function GET(request: NextRequest) {
 
   if (tokenHash && type) {
     const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      requireSupabasePublishableKey(),
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          },
+    const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         },
       },
-    );
+    });
 
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
 

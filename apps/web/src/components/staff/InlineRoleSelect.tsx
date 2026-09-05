@@ -6,6 +6,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationRole } from "@/types";
 import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
+import { MaybeHint } from "@/components/ui/hint";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
 
@@ -36,16 +37,19 @@ export function InlineRoleSelect({
   const [saving, setSaving] = useState(false);
 
   // Self can't change own role: show the dropdown in its disabled state so
-  // the Access column reads consistently across rows. Title explains why.
+  // the Access column reads consistently across rows. The hint explains why.
   if (orgRole && isSelf) {
     return (
-      <div
-        onClick={(event) => event.stopPropagation()}
-        style={{ minWidth: 132, maxWidth: 168 }}
-        title={SELF_ACTION_FORBIDDEN_MESSAGE}
-      >
-        <CustomSelect value={orgRole} disabled onChange={() => undefined} options={ROLE_OPTIONS} />
-      </div>
+      <MaybeHint content={SELF_ACTION_FORBIDDEN_MESSAGE}>
+        <div onClick={(event) => event.stopPropagation()} style={{ minWidth: 132, maxWidth: 168 }}>
+          <CustomSelect
+            value={orgRole}
+            disabled
+            onChange={() => undefined}
+            options={ROLE_OPTIONS}
+          />
+        </div>
+      </MaybeHint>
     );
   }
 

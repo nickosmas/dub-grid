@@ -73,6 +73,22 @@ export const scheduleCellStateSchema = z
     }
   });
 
+/**
+ * A saved recurring-schedule draft: employee id -> day of week -> cell state,
+ * where null clears that day.
+ *
+ * Declared here rather than at the route because `z.record(key, value)` decides
+ * which overload it was handed with `value instanceof ZodType`. A schema that
+ * crosses a package boundary can carry a second copy of zod with it, that check
+ * then reads false, and the record silently degrades to `Record<string, string>`
+ * and rejects every real draft as invalid input. Building the whole record with
+ * one zod keeps the check honest.
+ */
+export const recurringScheduleDraftSchema = z.record(
+  z.string(),
+  z.record(z.string(), scheduleCellStateSchema.nullable()),
+);
+
 export const resolvedSchedulePresentationSegmentSchema = z.object({
   shiftId: z.number().int().nullable().optional(),
   jobId: z.number().int().nullable().optional(),
@@ -112,6 +128,7 @@ export const resolvedSchedulePresentationSchema = z.object({
 export type ScheduleCellKind = z.infer<typeof scheduleCellKindSchema>;
 export type ScheduleCellSegment = z.infer<typeof scheduleCellSegmentSchema>;
 export type ScheduleCellState = z.infer<typeof scheduleCellStateSchema>;
+export type RecurringScheduleDraftPayload = z.infer<typeof recurringScheduleDraftSchema>;
 export type ResolvedSchedulePresentationSegment = z.infer<
   typeof resolvedSchedulePresentationSegmentSchema
 >;

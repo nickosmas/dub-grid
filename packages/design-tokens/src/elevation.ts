@@ -53,8 +53,14 @@ export type MobileElevation = {
 export type MobileElevationLevel =
   /** No shadow. Use to explicitly cancel an inherited level. */
   | "flat"
-  /** Hairline lift: sticky headers once the content scrolls under them. */
+  /** Small surfaces nested inside a card: metric tiles, day cells. */
   | "raised"
+  /**
+   * Sticky page headers. Carries the whole separation on its own: a page header
+   * draws no bottom border, so nothing but this shadow tells the reader that
+   * content is passing underneath it.
+   */
+  | "header"
   /** The default surface treatment for cards and list tiles. */
   | "card"
   /** Detached surfaces: FAB-like controls, popovers anchored under a trigger. */
@@ -79,19 +85,76 @@ export const mobileElevationTokens: Record<MobileElevationLevel, MobileElevation
     shadowRadius: 0,
     elevation: 0,
   },
+  /**
+   * The quiet lift: small surfaces nested inside a card (the dashboard's metric
+   * tiles, day cells).
+   *
+   * Same reasoning as `card` — on a white ground a 4% shadow was invisible, so
+   * a nested white tile had no shape at all — but deliberately lighter than it.
+   * These sit *inside* an already-elevated card, and matching its depth would
+   * flatten the hierarchy between the two.
+   */
   raised: {
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
-    elevation: 1,
+    elevation: 0,
+    boxShadow: [
+      { offsetX: 0, offsetY: 1, blurRadius: 6, color: "rgba(15, 23, 42, 0.04)" },
+      { offsetX: 0, offsetY: 4, blurRadius: 22, color: "rgba(15, 23, 42, 0.06)" },
+    ],
   },
+  /**
+   * Sticky page headers, once content scrolls under them.
+   *
+   * Stronger than `raised`, which this replaced. A header used to pair that
+   * quiet lift with a 1pt `borderSubtle` divider, and the line did the real
+   * separating; the shadow only kept the bar from looking pasted on. With the
+   * border gone the shadow is the whole treatment, so it has to read on its
+   * own.
+   *
+   * A single shadow rather than the ambient + directional pair `card` uses.
+   * A header spans the full width and has no side or top edges in view, so an
+   * all-round ambient layer draws blur nothing can see, and its `elevation`
+   * stays a real number instead of 0: Android needs one anyway to keep the bar
+   * above the `card`-level tiles scrolling beneath it, and pairing that with
+   * `boxShadow` would draw the cast twice.
+   */
+  header: {
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  /**
+   * Cards. Load-bearing in light mode, not decorative: the mobile page is white
+   * and `cardBorder` is transparent there, so a card shares its fill with the
+   * ground it sits on and this shadow is the *only* thing drawing its edge.
+   *
+   * Two layers rather than one, for the same reason `floatBar` has two: a tight
+   * layer draws the edge, a much wider ambient one gives it height.
+   *
+   * Tuned soft and wide — a large blur at low alpha, so a card reads as gently
+   * lifted rather than outlined. The ambient layer is held just above the 0.08
+   * alpha `contrast.test.ts` requires, and that floor is not decorative: with a
+   * white page and no card border, this shadow is the only thing drawing a
+   * card, so lowering the alpha further makes cards disappear rather than
+   * merely softer.
+   */
   card: {
     shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 2,
+    // Zero because `boxShadow` below owns the Android cast too — the same
+    // pairing `floatBar` uses. Leaving both on double-draws the shadow.
+    elevation: 0,
+    boxShadow: [
+      { offsetX: 0, offsetY: 1, blurRadius: 8, color: "rgba(15, 23, 42, 0.05)" },
+      { offsetX: 0, offsetY: 8, blurRadius: 44, color: "rgba(15, 23, 42, 0.09)" },
+    ],
   },
   float: {
     shadowColor: "#0F172A",
@@ -147,6 +210,19 @@ export const darkMobileElevationTokens: Record<MobileElevationLevel, MobileEleva
     shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 1,
+  },
+  /**
+   * Pushed harder than its light counterpart, and harder than the levels around
+   * it. Dark surfaces normally lean on the `borderSubtle` hairline they keep,
+   * and a page header now has none, so black at high alpha is the only thing
+   * left to darken the content passing under the bar.
+   */
+  header: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    elevation: 4,
   },
   card: {
     shadowColor: "#000000",

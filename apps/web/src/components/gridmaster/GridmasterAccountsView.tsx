@@ -33,7 +33,7 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: "var(--dg-color-danger-bg)",
         color: "var(--dg-color-danger)",
         textTransform: "uppercase",
@@ -52,7 +52,7 @@ function GridmasterBadge() {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 700,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: "var(--dg-color-brand-bg)",
         color: "var(--dg-color-brand)",
         border: "1px solid var(--dg-color-brand-border)",
@@ -513,9 +513,9 @@ export default function GridmasterAccountsView({
 
       {forceLogoutConfirm && (
         <ConfirmDialog
-          title="Force Logout"
+          title="Force logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
-          confirmLabel="Force Logout"
+          confirmLabel="Force logout"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
           onConfirm={() => handleForceLogout(forceLogoutConfirm)}
@@ -527,7 +527,7 @@ export default function GridmasterAccountsView({
         <ConfirmDialog
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
-          confirmLabel="Send Reset Email"
+          confirmLabel="Send reset email"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
           onConfirm={() => handlePasswordReset(resetConfirm)}

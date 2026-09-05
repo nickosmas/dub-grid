@@ -10,6 +10,7 @@ import { sendResendEmail } from "@/lib/resend";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +84,8 @@ export async function GET(req: NextRequest) {
   // NULL in a single UPDATE and only the request that wins the row (returns it)
   // sends. On failure we roll the claim back so a later load retries.
   if (!org.trial_welcome_email_sent_at) {
-    const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+    const apiKey = serverEnv?.RESEND_API_KEY;
+    const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
     if (apiKey && user.email) {
       const claimedAt = new Date().toISOString();
       const { data: claimed, error: claimError } = await service

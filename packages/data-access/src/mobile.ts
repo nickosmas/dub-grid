@@ -1490,9 +1490,83 @@ export async function updateMobileInvitationAssignmentsRow(
 }
 
 /**
- * Set a member's org role and management departments in one guarded write.
+ * What `change_user_role` did, or why it refused.
+ *
+ * The RPC signals failure by raising, and the messages are the only thing that
+ * distinguishes "someone edited this while you were looking at it" from "this
+ * would leave the org with no super admin". Reading them belongs here, next to
+ * the SQL it is coupled to, rather than in each route.
+ */
+export type MobileRoleChangeOutcome =
+  | { status: "changed" }
+  | { status: "already_applied" }
+  | { status: "conflict" }
+  | { status: "blocked"; message: string };
+
+/**
+ * Change a member's org role through the one path the database allows.
+ *
+ * A direct `UPDATE ... SET org_role` is rejected by the `guard_org_role_change`
+ * trigger ("Direct org_role changes are not allowed"), which is why this cannot
+ * go through `updateMobileMembershipAccessRow`. The RPC sets the session flag
+ * that lifts the trigger, takes an advisory lock so two callers cannot race, and
+ * keeps the last-super-admin guard.
+ *
+ * Note the RPC gates its own callers on `auth.uid()`, which is NULL under the
+ * service role, so those checks quietly pass here: callers must do their own
+ * permission check first. The guards that do not read `auth.uid()` — the
+ * expected-updated-at check, the self-action check, and the last-super-admin
+ * check — still apply.
+ */
+export async function changeMobileMembershipOrgRole(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    targetUserId: string;
+    actorUserId: string;
+    orgRole: "user" | "admin" | "super_admin";
+    expectedUpdatedAt: string | null;
+  },
+): Promise<MobileRoleChangeOutcome> {
+  const { data, error } = await serviceClient.rpc("change_user_role", {
+    p_target_user_id: input.targetUserId,
+    p_new_role: input.orgRole,
+    p_changed_by_id: input.actorUserId,
+    p_idempotency_key: `${input.targetUserId}-${input.orgRole}-${Date.now()}`,
+    p_org_id: input.orgId,
+    p_expected_updated_at: input.expectedUpdatedAt,
+  });
+
+  if (error) {
+    const message = error.message ?? "";
+    if (message.includes("changed elsewhere")) {
+      return { status: "conflict" };
+    }
+    if (message.includes("last super_admin")) {
+      return {
+        status: "blocked",
+        message: "Cannot demote the only super admin. Transfer ownership first.",
+      };
+    }
+    if (message.includes("SELF_ACTION_FORBIDDEN")) {
+      return { status: "blocked", message: "You can't change your own role." };
+    }
+    throw error;
+  }
+
+  return (data as { status?: string } | null)?.status === "already_applied"
+    ? { status: "already_applied" }
+    : { status: "changed" };
+}
+
+/**
+ * Set a member's management departments in one guarded write.
  * A null return means the `expectedUpdatedAt` check lost — the caller should
  * 409 rather than retry, since the values it was editing are stale.
+ *
+ * `orgRole` is accepted only so an unchanged role can ride along; an actual
+ * role change must go through `changeMobileMembershipOrgRole`, because the
+ * database rejects a direct write to that column.
  */
 export async function updateMobileMembershipAccessRow(
   serviceClient: SupabaseClient,

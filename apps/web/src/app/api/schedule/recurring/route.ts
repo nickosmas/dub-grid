@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { DbRecurringShift } from "@dubgrid/db-types";
-import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { recurringScheduleDraftSchema, scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -70,7 +70,7 @@ const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("saveRecurringDraft"),
     orgId: z.string().uuid(),
-    draftData: z.record(z.string(), z.record(z.string(), scheduleCellStateSchema.nullable())),
+    draftData: recurringScheduleDraftSchema,
   }),
   z.object({
     action: z.literal("deleteRecurringDraft"),

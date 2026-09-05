@@ -24,7 +24,26 @@ vi.mock("@/features/employees/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/employees/client")>()),
   updateEmployee: vi.fn(),
 }));
-vi.mock("@/features/organization/client", () => ({ updateAppOnlyUser: vi.fn() }));
+vi.mock("@/features/organization/client", () => ({
+  updateAppOnlyUser: vi.fn(),
+  fetchOrganizationUsers: vi.fn().mockResolvedValue([]),
+  updateOrganizationMembershipGuarded: vi.fn(),
+}));
+
+let lastManagementAccessEditorProps: {
+  employee: Employee;
+  onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
+} | null = null;
+
+vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
+  EmployeeManagementAccessEditor: (props: {
+    employee: Employee;
+    onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
+  }) => {
+    lastManagementAccessEditorProps = props;
+    return <div data-testid="employee-management-access-editor" />;
+  },
+}));
 
 vi.mock("@/components/EditEmployeePanel", async () => {
   const React = await import("react");
@@ -116,7 +135,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
     roles: [],
     setProfile: vi.fn(),
     setEmployee: vi.fn(),
-    setManagementDepartmentIds: vi.fn(),
+    refetchProfile: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
   return { ...render(<ProfilePanel {...props} />), props };
@@ -189,5 +208,96 @@ describe("ProfilePanel", () => {
     expect(toast.error).toHaveBeenCalledWith(
       "Your staff profile changed elsewhere. Review the latest values and try again.",
     );
+  });
+
+  // The Access card used to render only when managementDepartmentIds was
+  // already non-empty, so a super_admin/gridmaster starting from zero
+  // departments had no way to add themselves to management from their own
+  // profile - the entry point simply didn't exist.
+  describe("Access card", () => {
+    it("always shows the viewer's own role, even with no management involvement", () => {
+      renderPanel({ role: "user", canManageManagementAccess: false, managementDepartmentIds: [] });
+
+      expect(screen.getByText("Access")).toBeInTheDocument();
+      expect(screen.getByText("Role")).toBeInTheDocument();
+      expect(screen.getByText("User")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /add to management|edit management access/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers Add to Management for a super_admin/gridmaster with zero departments", () => {
+      renderPanel({
+        role: "super_admin",
+        canManageManagementAccess: true,
+        managementDepartmentIds: [],
+      });
+
+      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit management access" }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Management access edits open in the same popup the People directory
+    // panels use (EmployeeManagementAccessEditor in a Modal), not an inline
+    // department-toggle form of its own - mirrored here for a zero-department
+    // self-viewer with permission, same as a brand-new hire's "Add to
+    // Management" would.
+    it("opens the shared management-access editor in a popup, not an inline form", async () => {
+      const refetchProfile = vi.fn().mockResolvedValue(undefined);
+
+      renderPanel({
+        role: "super_admin",
+        canManageManagementAccess: true,
+        managementDepartmentIds: [],
+        departments: [
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Leadership",
+            abbr: "LEAD",
+            type: "management",
+            sortOrder: 0,
+          },
+        ],
+        refetchProfile,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+
+      const dialog = screen.getByRole("dialog", { name: "Add to management" });
+      expect(within(dialog).getByTestId("employee-management-access-editor")).toBeInTheDocument();
+      expect(lastManagementAccessEditorProps?.employee.id).toBe("employee-1");
+
+      await lastManagementAccessEditorProps?.onCompleted(null);
+      expect(refetchProfile).toHaveBeenCalled();
+    });
+
+    it("says Edit management access, not Add to Management, once departments already exist", () => {
+      renderPanel({
+        role: "admin",
+        canManageManagementAccess: true,
+        managementDepartmentIds: [10],
+        departments: [
+          {
+            id: 10,
+            orgId: "org-1",
+            name: "Leadership",
+            abbr: "LEAD",
+            type: "management",
+            sortOrder: 0,
+          },
+        ],
+      });
+
+      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+    });
+
+    it("hides the department field entirely for a viewer with neither departments nor permission", () => {
+      renderPanel({ role: "admin", canManageManagementAccess: false, managementDepartmentIds: [] });
+
+      expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+    });
   });
 });

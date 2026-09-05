@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
-import { ArrowUpDown, Check, Import as ImportIcon, Trash2, Upload } from "lucide-react";
+import {
+  ArrowUpDown,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Import as ImportIcon,
+  Search,
+  Trash2,
+  Upload,
+  User,
+} from "lucide-react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
@@ -124,7 +135,7 @@ function SortMenuButton({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="dg-btn dg-btn-secondary"
+          className={`dg-btn dg-btn-secondary${open ? " dg-btn-toggled" : ""}`}
           style={{
             height: "var(--dg-toolbar-h)",
             padding: "0 12px",
@@ -133,11 +144,6 @@ function SortMenuButton({
             gap: 6,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
-            border: open
-              ? "1px solid var(--dg-color-brand-border)"
-              : "1px solid var(--dg-color-border)",
-            background: open ? "var(--dg-color-brand-bg)" : undefined,
-            color: open ? "var(--dg-color-brand)" : undefined,
           }}
         >
           <ArrowUpDown size={13} />
@@ -259,19 +265,7 @@ function ToolsMenu({
               disabled={scheduleEntryActionsDisabled}
               onClick={onAuditToggle}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <User size={14} strokeWidth={2.5} />
               <span style={{ flex: 1 }}>Authors</span>
               <Switch checked={!!showAudit} presentationOnly />
             </MenuItem>
@@ -358,19 +352,7 @@ function ToolsMenu({
                 onPublishHistory();
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
+              <Clock size={14} strokeWidth={2.5} />
               Publish History
             </MenuItem>
           </Hint>
@@ -561,18 +543,7 @@ export default function Toolbar({
               }}
               aria-label="Go to previous period"
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={16} strokeWidth={2.5} />
             </Button>
           </Hint>
           <span
@@ -604,18 +575,7 @@ export default function Toolbar({
               }}
               aria-label="Go to next period"
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              <ChevronRight size={16} strokeWidth={2.5} />
             </Button>
           </Hint>
         </div>
@@ -647,15 +607,9 @@ export default function Toolbar({
           {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
             <div style={{ position: "relative", flex: "1 1 160px", minWidth: 0 }}>
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <Search
+                size={13}
+                strokeWidth={2.5}
                 style={{
                   position: "absolute",
                   left: 10,
@@ -664,10 +618,7 @@ export default function Toolbar({
                   color: "var(--dg-color-text-faint)",
                   pointerEvents: "none",
                 }}
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              />
               <input
                 type="text"
                 placeholder="Search staff…"
@@ -685,17 +636,12 @@ export default function Toolbar({
               onClick={toggleTools}
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
-              className="dg-btn dg-btn-ghost"
+              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
               data-tour="toolbar-tools-btn"
               style={{
-                border: toolsOpen
-                  ? "1px solid var(--dg-color-brand-border)"
-                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 flexShrink: 0,
                 position: "relative",
               }}
@@ -798,18 +744,7 @@ export default function Toolbar({
               }}
               aria-label="Go to previous period"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={14} strokeWidth={2.5} />
             </Button>
           </Hint>
           <span
@@ -843,18 +778,7 @@ export default function Toolbar({
               }}
               aria-label="Go to next period"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              <ChevronRight size={14} strokeWidth={2.5} />
             </Button>
           </Hint>
         </div>
@@ -891,6 +815,7 @@ export default function Toolbar({
             display: "flex",
             alignItems: "center",
             gap: 8,
+            flex: isTablet ? undefined : "1 1 auto",
             minWidth: 0,
             maxWidth: "100%",
             ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%", flexWrap: "wrap" } : {}),
@@ -900,11 +825,11 @@ export default function Toolbar({
           {focusAreaOptions.length > 1 && (
             <div
               data-tour="schedule-focus-filter"
-              style={{ flex: isTablet ? "1 1 240px" : 1, minWidth: 0 }}
+              style={{ flex: isTablet ? "1 1 240px" : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
             >
               <ScrollableTabs
                 className="dg-span-tabs dg-span-tabs--light"
-                style={{ flex: 1, minWidth: 0 }}
+                style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
               >
                 {focusAreaOptions.map((w, i) => {
                   const isActive = activeFocusArea === w.id;
@@ -943,19 +868,14 @@ export default function Toolbar({
           <div
             style={{
               position: "relative",
-              minWidth: 0,
-              flex: isTablet ? "1 1 160px" : undefined,
+              minWidth: isTablet ? 0 : 200,
+              maxWidth: isTablet ? undefined : 320,
+              flex: isTablet ? "1 1 160px" : "1 1 220px",
             }}
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Search
+              size={13}
+              strokeWidth={2.5}
               style={{
                 position: "absolute",
                 left: 10,
@@ -964,10 +884,7 @@ export default function Toolbar({
                 color: "var(--dg-color-text-faint)",
                 pointerEvents: "none",
               }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            />
             <input
               type="text"
               placeholder="Search staff…"
@@ -976,7 +893,7 @@ export default function Toolbar({
               className="dg-input"
               style={{
                 paddingLeft: 30,
-                width: isTablet ? "100%" : 160,
+                width: "100%",
                 borderRadius: "var(--dg-btn-radius)",
               }}
             />
@@ -1037,17 +954,12 @@ export default function Toolbar({
               onClick={toggleTools}
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
-              className="dg-btn dg-btn-ghost"
+              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
               data-tour="toolbar-tools-btn"
               style={{
-                border: toolsOpen
-                  ? "1px solid var(--dg-color-brand-border)"
-                  : "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                background: toolsOpen ? "var(--dg-color-brand-bg)" : undefined,
-                color: toolsOpen ? "var(--dg-color-brand)" : undefined,
                 position: "relative",
               }}
             >

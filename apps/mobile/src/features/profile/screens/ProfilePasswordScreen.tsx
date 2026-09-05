@@ -14,6 +14,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getProfile } from "../../../shared/lib/api";
@@ -104,17 +105,6 @@ function PasswordVisibilityToggle({
         size={22}
       />
     </Pressable>
-  );
-}
-
-function InlineError({ message }: { message: string }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  return (
-    <View style={styles.errorRow}>
-      <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
-      <Text style={styles.errorText}>{message}</Text>
-    </View>
   );
 }
 
@@ -302,14 +292,14 @@ export default function ProfilePasswordScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "error"}>
+    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "loading"}>
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={3} sections={1} showHero={false} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
           fillScreen
           title="Could not load your account"
@@ -323,6 +313,10 @@ export default function ProfilePasswordScreen() {
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Current password"
+              autoCapitalize="none"
+              autoComplete="current-password"
+              autoCorrect={false}
+              textContentType="password"
               focused={focusedPasswordField === "currentPassword"}
               label="Current password"
               placeholder="Current password"
@@ -341,6 +335,10 @@ export default function ProfilePasswordScreen() {
             />
             <ProfileTextInput
               accessibilityLabel="New password"
+              autoCapitalize="none"
+              autoComplete="new-password"
+              autoCorrect={false}
+              textContentType="newPassword"
               focused={focusedPasswordField === "newPassword"}
               label="New password"
               placeholder="New password"
@@ -360,6 +358,10 @@ export default function ProfilePasswordScreen() {
             <PasswordStrengthHints password={newPassword} />
             <ProfileTextInput
               accessibilityLabel="Confirm new password"
+              autoCapitalize="none"
+              autoComplete="new-password"
+              autoCorrect={false}
+              textContentType="newPassword"
               error={confirmPasswordError}
               focused={focusedPasswordField === "confirmPassword"}
               label="Confirm new password"
@@ -400,7 +402,7 @@ export default function ProfilePasswordScreen() {
           setIsConfirming(false);
           setConfirmError(null);
         }}
-        onConfirm={() => void saveNewPassword()}
+        onConfirm={() => saveNewPassword()}
         title="Update password?"
         visible={isConfirming}
       >

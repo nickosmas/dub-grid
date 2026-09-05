@@ -1,7 +1,7 @@
 import { useMemo, type PropsWithChildren } from "react";
 import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../theme/tokens";
+import { MAX_FONT_SCALE, mobileText, type MobileColors } from "../theme/tokens";
 
 export type TextVariant = keyof typeof mobileText;
 
@@ -66,6 +66,9 @@ export function AppText({
 
   return (
     <Text
+      // The app-wide ceiling on OS text scaling. Overridable per call site by
+      // passing `maxFontSizeMultiplier` through, since it spreads after this.
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       style={[
         mobileText[variant],
         { color: tones[tone] },

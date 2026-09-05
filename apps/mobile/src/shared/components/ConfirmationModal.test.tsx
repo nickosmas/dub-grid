@@ -38,4 +38,42 @@ describe("ConfirmationModal", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();
   });
+
+  it("shows why the confirm failed, inside the sheet that failed", () => {
+    // A `<Modal>` is its own native window, so a toast pushed from the caller's
+    // error handler renders behind it. Without this the button just stopped
+    // spinning and the user got no explanation at all.
+    render(
+      <ConfirmationModal
+        body="The staff profile will be updated."
+        confirmLabel="Save"
+        error="We couldn't save those staff details right now."
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title="Save these changes?"
+        visible
+      />,
+    );
+
+    expect(
+      within(screen.getByRole("alert")).getByText(
+        "We couldn't save those staff details right now.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no error row when there is nothing to report", () => {
+    render(
+      <ConfirmationModal
+        body="The staff profile will be updated."
+        confirmLabel="Save"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title="Save these changes?"
+        visible
+      />,
+    );
+
+    expect(screen.queryByText(/couldn't/i)).toBeNull();
+  });
 });

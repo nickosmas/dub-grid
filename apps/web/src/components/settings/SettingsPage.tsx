@@ -48,10 +48,22 @@ function SettingsSectionSkeleton() {
         gap: 16,
       }}
     >
-      <div className="dg-skeleton" style={{ width: 150, height: 14, borderRadius: 4 }} />
-      <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
-      <div className="dg-skeleton" style={{ width: "72%", height: 14, borderRadius: 4 }} />
-      <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+      <div
+        className="dg-skeleton"
+        style={{ width: 150, height: 14, borderRadius: "var(--dg-radius-xs)" }}
+      />
+      <div
+        className="dg-skeleton"
+        style={{ width: "100%", height: 36, borderRadius: "var(--dg-radius-sm)" }}
+      />
+      <div
+        className="dg-skeleton"
+        style={{ width: "72%", height: 14, borderRadius: "var(--dg-radius-xs)" }}
+      />
+      <div
+        className="dg-skeleton"
+        style={{ width: "100%", height: 36, borderRadius: "var(--dg-radius-sm)" }}
+      />
     </div>
   );
 }

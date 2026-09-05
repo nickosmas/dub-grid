@@ -181,7 +181,6 @@ interface PrintSectionProps {
   splitAtIndex?: number;
   fontSize: number;
   shiftDisplayMode?: ShiftDisplayMode;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 function PrintSection({
@@ -204,7 +203,6 @@ function PrintSection({
   splitAtIndex,
   fontSize,
   shiftDisplayMode = "code",
-  useCompactRoleCertificationLabels = false,
 }: PrintSectionProps) {
   const isNameMode = shiftDisplayMode === "name";
   // Bind focus-area context so label lookups resolve the section-specific definition first.
@@ -393,11 +391,9 @@ function PrintSection({
         {/* Employee rows */}
         <tbody>
           {employees.map((emp, ri) => {
-            const certAbbr = getCertAbbr(
-              emp.certificationId,
-              certifications,
-              useCompactRoleCertificationLabels,
-            );
+            // Always compact: a printed name cell has no room for a full
+            // certification name, and DESIGNATION_COLORS is keyed by abbreviation.
+            const certAbbr = getCertAbbr(emp.certificationId, certifications, true);
             const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
             return (
@@ -459,11 +455,7 @@ function PrintSection({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {getRoleAbbrs(
-                            emp.roleIds,
-                            orgRoles,
-                            useCompactRoleCertificationLabels,
-                          ).join(", ")}
+                          {getRoleAbbrs(emp.roleIds, orgRoles, true).join(", ")}
                         </div>
                       )}
                     </div>
@@ -589,7 +581,7 @@ function PrintSection({
                                     left: "0.5em",
                                     background: isCross ? "#ffffff" : style.color,
                                     border: `1px solid ${borderColor(singleForegroundColor)}`,
-                                    borderRadius: 4,
+                                    borderRadius: "var(--dg-radius-xs)",
                                     color: singleForegroundColor,
                                     display: "flex",
                                     flexDirection: "column",
@@ -768,7 +760,7 @@ function PrintSection({
                                         flex: 1,
                                         background: isCross ? "#ffffff" : style.color,
                                         border: `1px solid ${borderColor(multiForegroundColor)}`,
-                                        borderRadius: 4,
+                                        borderRadius: "var(--dg-radius-xs)",
                                         color: multiForegroundColor,
                                         display: "flex",
                                         flexDirection: "column",
@@ -1023,7 +1015,6 @@ interface PrintScheduleViewProps {
   onClose: () => void;
   focusAreaLabel?: string;
   shiftDisplayMode?: ShiftDisplayMode;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 export default function PrintScheduleView({
@@ -1047,7 +1038,6 @@ export default function PrintScheduleView({
   onClose,
   focusAreaLabel = "Focus Areas",
   shiftDisplayMode = "code",
-  useCompactRoleCertificationLabels = false,
 }: PrintScheduleViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { fontSize, selectedFocusAreas: selectedWings, spanWeeks } = config;
@@ -1242,7 +1232,7 @@ export default function PrintScheduleView({
             padding: "0.5in",
             maxWidth: "none",
             boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
           }}
         >
           {/* Print header */}
@@ -1329,7 +1319,6 @@ export default function PrintScheduleView({
                 splitAtIndex={splitAtIndex}
                 fontSize={fontSize}
                 shiftDisplayMode={shiftDisplayMode}
-                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               />
             );
           })}
@@ -1367,7 +1356,7 @@ export default function PrintScheduleView({
                         background: s.color,
                         border: `1px solid ${borderColor(s.text)}`,
                         color: s.text,
-                        borderRadius: 4,
+                        borderRadius: "var(--dg-radius-xs)",
                         padding: "0.15em 0.5em",
                         fontSize: "0.9em",
                         fontWeight: 700,

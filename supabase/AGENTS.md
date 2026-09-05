@@ -2,8 +2,8 @@
 
 Scope: `supabase/`.
 
-Local Supabase configuration, exactly four migration files, seed SQL, and
-compiled auth email templates.
+Local Supabase configuration, canonical migrations plus numbered forward
+migrations, seed SQL, and compiled auth email templates.
 
 ## Verified Structure
 
@@ -15,6 +15,7 @@ supabase/
     002_functions_triggers.sql    # Functions, triggers, RPCs, JWT hook implementation
     003_rls_policies.sql          # RLS ENABLE + all row-level security policies
     004_grants.sql                # Grants + default privileges + supabase_auth_admin grants
+    005_*.sql ...                 # Ordered, idempotent forward migrations
   seed_arden_wood.sql             # Local seed: Arden Wood org
   seed_calm_haven.sql             # Local seed: Calm Haven org
   seed_gridmaster.sql             # Local seed: gridmaster user
@@ -26,13 +27,48 @@ supabase/
 
 ## Migration Rules (CRITICAL)
 
-- **Never create a 5th migration file.** All schema changes go into the existing
-  4 files according to their purpose:
-  - `001_schema.sql` — enums, tables, foreign keys, indexes, realtime publication
-  - `002_functions_triggers.sql` — functions, triggers, RPCs, JWT hook logic
-  - `003_rls_policies.sql` — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + all policies
-  - `004_grants.sql` — grants to `anon`, `authenticated`, `service_role`,
-    `supabase_auth_admin`, and default privileges
+**Every schema change is a new numbered migration. Nothing else.**
+
+- Add `NNN_name.sql` at the next number. Make it idempotent, so a retried
+  apply converges instead of failing halfway.
+- **Do not edit `001`-`004`.** They are a frozen historical baseline. Once a
+  migration is in a database's ledger it never runs again, so editing one is a
+  no-op for every environment that already has it, and the edit reaches only
+  future clean installs. That divergence is the bug, not the fix.
+- **Do not mirror a change back into the canonical files.** The old rule asked
+  for both a forward migration and a canonical edit, and every such pair was a
+  chance to do one and forget the other. Five migrations drifted that way
+  (`007`, `008`, `009`, `011`, `012`) before the gap was closed. The rule is
+  retired; the drift it caused cannot recur.
+
+`001`-`004` are still the clean-install definition and still describe the
+schema as it stood when they were written. They are simply no longer maintained
+by hand: a clean install applies every migration in order, so correctness comes
+from the sequence rather than from any one file being complete.
+
+This holds because migrations are applied by ledger now, through Supabase
+branching or `supabase db push`, rather than by dropping and replaying the
+whole schema.
+
+## Preview branches
+
+Supabase branching replays every migration onto a new, empty database. That
+covers the schema; it does not cover the data, and a preview with no
+organization is a preview nobody can sign in to.
+
+`[db.seed].sql_paths` is deliberately empty and cannot fix this. The seed files
+are order-dependent (`seed_arden_wood.sql` clones Calm Haven, so Calm Haven has
+to exist first) and none of them create `auth.users`. `seed.ts` is what
+orchestrates them, so seeding is a step after the branch exists:
+
+```
+DATABASE_URL='<branch connection string>' npm run db:seed:branch
+```
+
+A preview branch proves a clean install. It does not prove the upgrade from
+production's real state, which is where the risk lives. Rehearse that by
+restoring a production backup into a persistent branch and taking the migration
+against it.
 
 ## config.toml: JWT Hook (CRITICAL)
 
@@ -124,11 +160,11 @@ The Next.js request proxy (`apps/web/src/proxy.ts`) reads these via `jwtVerify`
 
 - `seed_arden_wood.sql`, `seed_calm_haven.sql`, `seed_gridmaster.sql` are local-only.
 - They are NOT run on production. The remote reset script (`scripts/reset-remote-db.ts`)
-  runs all 4 migration files then a separate seed path.
+  runs every numbered migration in lexical order, then a separate seed path.
 
 ## Verification
 
-- Inspect all four migration files before editing.
+- Inspect the canonical files and relevant forward migrations before editing.
 - For schema/RLS changes, run `npm run db:reset` locally when possible (resets local DB).
 - Run `npm run gen:types` when schema changes affect generated types (`apps/web/src/lib/database.types.ts`).
 - Do not run `npm run db:reset:remote` unless the user explicitly requests it and

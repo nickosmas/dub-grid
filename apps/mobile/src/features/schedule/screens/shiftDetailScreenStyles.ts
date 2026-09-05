@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native";
 import {
   mobileElevation,
   mobileRadii,
+  mobileRadius,
   mobileSpace,
   mobileText,
   mobileTextWeighted,
@@ -30,7 +31,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderRadius: mobileRadii.card,
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       marginTop: 12,
       marginBottom: 8,
       padding: mobileSpace.xl,
@@ -62,24 +63,17 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.rowTitle,
       color: mobileColors.textSubtle,
     },
-    detailHeaderJobPill: {
-      minHeight: 28,
-      borderRadius: 10,
-      borderWidth: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      flexShrink: 0,
+    // Mirrors the home card's meTypePillStack/meTypePillLabel: the chip kind
+    // reads as an eyebrow above the pill, not as the pill's own text.
+    detailHeaderJobPillStack: {
+      alignSelf: "flex-start",
       gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
     },
-    detailHeaderJobPillText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    detailHeaderJobPillMentoredText: {
-      ...mobileText.badge,
-      textTransform: "none",
+    detailHeaderJobPillEyebrow: {
+      ...mobileText.rowTitle,
+      fontSize: 17,
+      lineHeight: 22,
+      color: mobileColors.textMuted,
     },
     detailInfoStack: {
       gap: 14,
@@ -121,16 +115,13 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: 10,
     },
-    // 32/10/bordered: matches the app's shared icon-tile pattern (Screen.tsx's
-    // cardIconFrame, ProfilePrimitives' iconBadge) rather than the borderless
-    // circle reserved for large standalone icons.
-    detailInfoIconBox: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
-      borderWidth: 1,
+    // A bare muted glyph, matching how the home card sets a time or a focus
+    // area beside its copy. The tinted, bordered 32pt tile this replaced had no
+    // counterpart left anywhere else: the shared Card dropped its icon frame,
+    // so the detail screen was the only surface still drawing one.
+    detailInfoIcon: {
+      width: 18,
       alignItems: "center",
-      justifyContent: "center",
     },
     detailInfoCopy: {
       flex: 1,
@@ -138,8 +129,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 2,
     },
     detailInfoLabel: {
+      // Sentence case, not all caps: a shouted label competes with the card
+      // title above it, and reads as chrome rather than as a heading.
       ...mobileText.label,
-      textTransform: "uppercase",
       color: mobileColors.textSubtle,
     },
     detailInfoValue: {
@@ -153,7 +145,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailDateTile: {
       width: 60,
       minHeight: 68,
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceMuted,
@@ -196,7 +188,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailJobChip: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 5,
@@ -230,7 +222,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     mentoredPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,
@@ -427,9 +419,10 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       borderColor: mobileColors.cardBorder,
     },
     swapSummaryLabel: {
+      // Sentence case, not all caps: a shouted label competes with the card
+      // title above it, and reads as chrome rather than as a heading.
       ...mobileText.label,
       color: mobileColors.textSubtle,
-      textTransform: "uppercase",
     },
     swapSummaryTitle: {
       ...mobileText.rowTitle,
@@ -620,7 +613,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flex: 1,
       minWidth: 0,
       minHeight: 68,
-      borderRadius: 14,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
@@ -655,7 +648,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     swapDateChipCount: {
       minWidth: 0,
       minHeight: 18,
-      borderRadius: 10,
+      borderRadius: mobileRadius.md,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",

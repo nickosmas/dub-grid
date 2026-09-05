@@ -1,4 +1,9 @@
 import { useMemo, useState } from "react";
+import {
+  ORG_ROLE_PRIVILEGE_ORDER,
+  getEffectiveOrgRole,
+  getOrgRolePrivilegeRank,
+} from "@dubgrid/domain";
 import type { DirectoryPerson, OrganizationRole } from "@/types";
 
 /** Everyone, or one access tier. */
@@ -7,15 +12,8 @@ export type ManagementRoleFilter = "all" | OrganizationRole;
 export type ManagementInvitationFilter = "all" | "has_access" | "pending";
 export type ManagementSortKey = "name" | "access";
 
-/** Super admins first, then admins, then everyone else. */
-const ROLE_RANK: Record<OrganizationRole, number> = {
-  super_admin: 0,
-  admin: 1,
-  user: 2,
-};
-
 /** Offered in the same order the access sort ranks them. */
-export const MANAGEMENT_ROLE_FILTERS: OrganizationRole[] = ["super_admin", "admin", "user"];
+export const MANAGEMENT_ROLE_FILTERS: readonly OrganizationRole[] = ORG_ROLE_PRIVILEGE_ORDER;
 
 /**
  * A roster row whose invitation is still outstanding: invited, but with no
@@ -23,10 +21,6 @@ export const MANAGEMENT_ROLE_FILTERS: OrganizationRole[] = ["super_admin", "admi
  */
 export function isPendingManagementInvite(person: DirectoryPerson): boolean {
   return person.invitationStatus !== null && !person.hasAppAccess;
-}
-
-function getRoleRank(role: OrganizationRole | null): number {
-  return role ? ROLE_RANK[role] : ROLE_RANK.user + 1;
 }
 
 function getFullName(person: DirectoryPerson): string {
@@ -82,7 +76,10 @@ export function useManagementFilters({
           if (!person.managementDepartmentIds.includes(deptFilterId)) return false;
         }
 
-        if (filterRole !== "all" && person.orgRole !== filterRole) return false;
+        // A roster row with no role set counts as a User, the same rule the
+        // staff half applies, so the two halves cannot disagree on a tier.
+        if (filterRole !== "all" && getEffectiveOrgRole(person.orgRole) !== filterRole)
+          return false;
 
         if (filterInvitation !== "all") {
           const pending = isPendingManagementInvite(person);
@@ -98,7 +95,8 @@ export function useManagementFilters({
       })
       .sort((left, right) => {
         if (sortKey === "access") {
-          const rankComparison = getRoleRank(left.orgRole) - getRoleRank(right.orgRole);
+          const rankComparison =
+            getOrgRolePrivilegeRank(left.orgRole) - getOrgRolePrivilegeRank(right.orgRole);
           if (rankComparison !== 0) return rankComparison;
         }
 

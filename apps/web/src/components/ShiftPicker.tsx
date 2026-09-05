@@ -216,7 +216,7 @@ export default function ShiftPicker({
       border: isActive
         ? `1.5px solid ${effectiveBorder === "transparent" ? text : effectiveBorder}`
         : `1px solid ${borderColor(text)}`,
-      borderRadius: 8,
+      borderRadius: "var(--dg-radius-md)",
       padding: "8px 10px 6px",
       cursor: "pointer",
       textAlign: "left",
@@ -399,7 +399,7 @@ export default function ShiftPicker({
     color: "var(--dg-color-text-faint)",
     background: "var(--dg-color-bg-secondary)",
     padding: "1px 6px",
-    borderRadius: 10,
+    borderRadius: "var(--dg-radius-lg)",
   };
 
   const headingLine: React.CSSProperties = {

@@ -126,4 +126,84 @@ describe("useReliableRealtimeBroadcasts", () => {
       payload: {},
     });
   });
+
+  describe("retry hardening", () => {
+    it("backs off between attempts instead of retrying at a flat interval", async () => {
+      vi.useFakeTimers();
+      try {
+        const channel = createChannel();
+        channel.send.mockResolvedValue("error");
+        const { result } = renderHook(() =>
+          useReliableRealtimeBroadcasts(createChannelRef(channel)),
+        );
+
+        act(() => result.current.sendBroadcast("cell_locked", { cellKey: "c1" }, { key: "k" }));
+        await act(async () => {});
+        const afterFirst = channel.send.mock.calls.length;
+
+        // A flat 400ms retry would fire many times in this window; backoff
+        // should have spread the attempts out well beyond that.
+        await act(async () => {
+          vi.advanceTimersByTime(400);
+        });
+        const afterShortWait = channel.send.mock.calls.length;
+
+        expect(afterFirst).toBeGreaterThan(0);
+        expect(afterShortWait - afterFirst).toBeLessThanOrEqual(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("stops retrying and reports degraded delivery", async () => {
+      vi.useFakeTimers();
+      try {
+        const channel = createChannel();
+        channel.send.mockResolvedValue("error");
+        const { result } = renderHook(() =>
+          useReliableRealtimeBroadcasts(createChannelRef(channel)),
+        );
+
+        act(() => result.current.sendBroadcast("cell_locked", { cellKey: "c1" }, { key: "k" }));
+        for (let i = 0; i < 14; i += 1) {
+          await act(async () => {
+            vi.advanceTimersByTime(20_000);
+          });
+        }
+
+        expect(result.current.isBroadcastDegraded).toBe(true);
+        expect(channel.send.mock.calls.length).toBeLessThanOrEqual(14);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clears the degraded flag once the queue drains", async () => {
+      vi.useFakeTimers();
+      try {
+        const channel = createChannel();
+        channel.send.mockResolvedValue("error");
+        const { result } = renderHook(() =>
+          useReliableRealtimeBroadcasts(createChannelRef(channel)),
+        );
+
+        act(() => result.current.sendBroadcast("cell_locked", { cellKey: "c1" }, { key: "k" }));
+        for (let i = 0; i < 14; i += 1) {
+          await act(async () => {
+            vi.advanceTimersByTime(20_000);
+          });
+        }
+        expect(result.current.isBroadcastDegraded).toBe(true);
+
+        channel.send.mockResolvedValue("ok");
+        await act(async () => {
+          await result.current.flushPendingBroadcasts();
+        });
+
+        expect(result.current.isBroadcastDegraded).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

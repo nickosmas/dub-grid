@@ -53,6 +53,13 @@ export default defineConfig(async () => {
           find: /^react-native-gesture-handler$/,
           replacement: path.resolve(__dirname, "./src/test/gesture-handler-stub.tsx"),
         },
+        // react-native-keyboard-controller resolves its native module at import
+        // time, so the root layout and every screen reading keyboard geometry
+        // failed to collect. The stub reports a closed keyboard.
+        {
+          find: /^react-native-keyboard-controller$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/keyboard-controller.tsx"),
+        },
         // Expo native modules eagerly import expo-modules-core + native bindings
         // that vitest can't resolve/run in jsdom. Shim them to test stubs (same
         // approach as the react-native shim above). expo-notifications is

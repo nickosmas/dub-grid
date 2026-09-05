@@ -62,6 +62,55 @@ export function fetchScheduleActorNames(input: {
   });
 }
 
+export interface SchedulePresenceProfile {
+  userId: string;
+  orgRole: string;
+  email: string | null;
+}
+
+export function fetchSchedulePresenceProfiles(input: {
+  orgId: string;
+  userIds: string[];
+}): Promise<{ profiles: SchedulePresenceProfile[] }> {
+  const params = new URLSearchParams({
+    orgId: input.orgId,
+    userIds: input.userIds.join(","),
+  });
+  return requestScheduleJson(`/api/schedule/presence-profiles?${params}`);
+}
+
+export function fetchScheduleEditorSessionStatus(input: {
+  orgId: string;
+  editorSessionId: string;
+}): Promise<{ ended: boolean; endedAt: string | null }> {
+  const params = new URLSearchParams(input);
+  return requestScheduleJson(`/api/schedule/editor-sessions?${params}`);
+}
+
+export function endScheduleEditorSession(input: {
+  orgId: string;
+  targetEditorSessionId: string;
+  endingEditorSessionId: string;
+}): Promise<{ ended: true; endedAt: string; endedEditorSessionIds: string[] }> {
+  return endScheduleEditorSessions({
+    orgId: input.orgId,
+    targetEditorSessionIds: [input.targetEditorSessionId],
+    endingEditorSessionId: input.endingEditorSessionId,
+  });
+}
+
+export function endScheduleEditorSessions(input: {
+  orgId: string;
+  targetEditorSessionIds: string[];
+  endingEditorSessionId: string;
+}): Promise<{ ended: true; endedAt: string; endedEditorSessionIds: string[] }> {
+  return requestScheduleJson("/api/schedule/editor-sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchRepeatOverwriteCount(input: {
   empId: string;
   dates: string[];

@@ -193,6 +193,13 @@ function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employ
     statusNote: "",
     deptAdminIds: [],
     userId: isSelf ? employee.userId : null,
+    // A coworker's email and phone are personal contact details, not roster
+    // facts: care staff are invited on personal addresses and personal mobiles.
+    // Withholding them from view-only callers matches what the mobile people
+    // endpoint has always done (packages/mobile-api-core/src/read.ts). Your own
+    // row keeps them, for the same reason userId survives above.
+    email: isSelf ? employee.email : "",
+    phone: isSelf ? employee.phone : "",
   };
 }
 

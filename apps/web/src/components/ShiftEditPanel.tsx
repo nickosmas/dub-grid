@@ -40,7 +40,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
-import { Check, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -827,7 +827,6 @@ export default function ShiftEditPanel({
   // When shift is cleared externally, return to picker
   useEffect(() => {
     if (typeof currentShift !== "string" || !currentShift || currentShift === "OFF") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowPicker(true);
     }
   }, [currentShift]);
@@ -1518,7 +1517,7 @@ export default function ShiftEditPanel({
   function renderCoverageChooser({ standalone = false }: { standalone?: boolean }) {
     const choiceButtonBaseStyle: React.CSSProperties = {
       width: "100%",
-      borderRadius: 12,
+      borderRadius: "var(--dg-radius-xl)",
       padding: "15px 16px",
       display: "flex",
       flexDirection: "column",
@@ -1688,7 +1687,7 @@ export default function ShiftEditPanel({
           <div
             style={{
               padding: "12px 14px",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-xl)",
               border: "1px solid var(--dg-color-warning-border)",
               background: "var(--dg-color-warning-bg)",
               fontSize: "var(--dg-fs-body-sm)",
@@ -1754,7 +1753,7 @@ export default function ShiftEditPanel({
                   display: "flex",
                   flexDirection: "column",
                   border: "1px solid var(--dg-color-border)",
-                  borderRadius: 12,
+                  borderRadius: "var(--dg-radius-xl)",
                   overflow: "hidden",
                   flex: 1,
                   minHeight: 0,
@@ -1850,7 +1849,7 @@ export default function ShiftEditPanel({
               flexDirection: "column",
               gap: 10,
               padding: "14px 16px",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-xl)",
               border: "1px solid var(--dg-color-danger-border)",
               background: "var(--dg-color-surface)",
             }}
@@ -1880,7 +1879,7 @@ export default function ShiftEditPanel({
                     width: "100%",
                     fontSize: "var(--dg-fs-body-sm)",
                     padding: "12px 14px",
-                    borderRadius: 12,
+                    borderRadius: "var(--dg-radius-xl)",
                     border: "1px solid var(--dg-color-border)",
                     background: "var(--dg-color-surface)",
                     color: "var(--dg-color-text-primary)",
@@ -1918,8 +1917,6 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-caption)",
                 color: "var(--dg-color-text-subtle)",
                 fontFamily: "inherit",
-                border: "none",
-                background: "transparent",
                 cursor: "pointer",
               }}
             >
@@ -1975,7 +1972,7 @@ export default function ShiftEditPanel({
         <div
           style={{
             padding: "12px 14px",
-            borderRadius: 12,
+            borderRadius: "var(--dg-radius-xl)",
             border: "1px solid var(--dg-color-border)",
             background: "var(--dg-color-bg-secondary)",
             display: "flex",
@@ -2036,7 +2033,7 @@ export default function ShiftEditPanel({
               flexDirection: "column",
               gap: 12,
               padding: "14px 16px",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-xl)",
               border: "1px solid var(--dg-color-border)",
               background: "var(--dg-color-surface)",
             }}
@@ -2272,7 +2269,7 @@ export default function ShiftEditPanel({
                     aria-label={`Show eligible teammates for ${formatDisplayDate(date)}`}
                     style={{
                       minHeight: 68,
-                      borderRadius: 10,
+                      borderRadius: "var(--dg-radius-lg)",
                       border: `1px solid ${active ? "var(--dg-color-brand)" : "var(--dg-color-border)"}`,
                       background: active
                         ? "var(--dg-color-bg-secondary)"
@@ -2331,7 +2328,7 @@ export default function ShiftEditPanel({
                 display: "flex",
                 flexDirection: "column",
                 border: "1px solid var(--dg-color-border)",
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-xl)",
                 overflow: "hidden",
                 background: "var(--dg-color-surface)",
                 flex: 1,
@@ -2477,7 +2474,7 @@ export default function ShiftEditPanel({
     ): React.CSSProperties => ({
       flex: 1,
       padding: "10px 12px",
-      borderRadius: 10,
+      borderRadius: "var(--dg-radius-lg)",
       border: `1px solid ${
         tone === "danger" && isActive ? "var(--dg-color-danger-border)" : "var(--dg-color-border)"
       }`,
@@ -2542,7 +2539,7 @@ export default function ShiftEditPanel({
               flexDirection: "column",
               gap: 8,
               padding: "12px 14px",
-              borderRadius: 12,
+              borderRadius: "var(--dg-radius-xl)",
               border: "1px solid var(--dg-color-brand)",
               background: "var(--dg-color-bg-secondary)",
             }}
@@ -2570,7 +2567,7 @@ export default function ShiftEditPanel({
                     style={{
                       width: "100%",
                       padding: "10px 12px",
-                      borderRadius: 10,
+                      borderRadius: "var(--dg-radius-lg)",
                       border: `1px solid ${
                         selectedRequesterSegmentIndex === option.segmentIndex
                           ? "var(--dg-color-brand)"
@@ -3008,20 +3005,7 @@ export default function ShiftEditPanel({
                       color: "var(--dg-color-text-subtle)",
                     }}
                   >
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+                    <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                     <span style={{ fontWeight: 500 }}>
                       {[
                         defaultStart ? fmt12h(defaultStart) : null,
@@ -3186,7 +3170,7 @@ export default function ShiftEditPanel({
                   gap: 10,
                   padding: "10px 12px",
                   border: `1.5px solid ${isActive ? color : "var(--dg-color-border)"}`,
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   background: isActive ? `${color}18` : "var(--dg-color-surface)",
                   cursor: "pointer",
                   textAlign: "left",
@@ -3387,24 +3371,13 @@ export default function ShiftEditPanel({
                 height: 36,
                 background: "transparent",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -3495,7 +3468,7 @@ export default function ShiftEditPanel({
                       gap: 12,
                       padding: "10px 12px",
                       border: "1px solid var(--dg-color-border)",
-                      borderRadius: 8,
+                      borderRadius: "var(--dg-radius-md)",
                       background: "var(--dg-color-surface)",
                     }}
                   >
@@ -3580,7 +3553,7 @@ export default function ShiftEditPanel({
                     padding: "10px 12px",
                     background: "var(--dg-color-warning-bg)",
                     border: "1px solid var(--dg-color-warning-border)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                   }}
                 >
                   <div
@@ -3590,7 +3563,7 @@ export default function ShiftEditPanel({
                       color: "var(--dg-color-warning-text)",
                     }}
                   >
-                    {isAbsence ? "Repeating — edit scope" : "Repeating shift — edit scope"}
+                    {isAbsence ? "Repeating: edit scope" : "Repeating shift: edit scope"}
                   </div>
                   <div className="dg-segment" style={{ display: "flex" }}>
                     <Button
@@ -3809,7 +3782,7 @@ export default function ShiftEditPanel({
                     marginTop: 16,
                     padding: "10px 12px",
                     background: "var(--dg-color-warning-bg)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--dg-color-warning-text)",
                     textAlign: "center",
@@ -3825,7 +3798,7 @@ export default function ShiftEditPanel({
                     padding: "10px 12px",
                     background: "var(--dg-color-danger-bg)",
                     border: "1px solid var(--dg-color-danger-border)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--dg-color-danger-dark)",
                   }}
@@ -3843,7 +3816,7 @@ export default function ShiftEditPanel({
                       ? "var(--dg-color-danger-bg)"
                       : "var(--dg-color-warning-bg)",
                     border: `1px solid ${enforceConflicts ? "var(--dg-color-danger-border)" : "var(--dg-color-warning-border)"}`,
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                   }}
                 >
                   <div
@@ -3907,18 +3880,7 @@ export default function ShiftEditPanel({
                     border: "1px solid var(--dg-color-border)",
                   }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
+                  <ChevronLeft size={12} strokeWidth={2.5} />
                   Back
                 </Button>
               )}

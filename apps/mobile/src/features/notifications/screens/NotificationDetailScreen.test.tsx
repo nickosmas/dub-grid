@@ -113,6 +113,28 @@ describe("NotificationDetailScreen", () => {
     expect(screen.getByText("Alert not found")).toBeInTheDocument();
   });
 
+  it("says the fetch failed rather than declaring the alert gone", () => {
+    // "That alert is no longer accessible" is a definitive answer, and a
+    // transient 500 does not earn one. It also offered no way to try again.
+    const refetch = vi.fn();
+    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
+    useQueryClient.mockReturnValue(mockQueryClient());
+    useQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error("boom"),
+      refetch,
+    });
+
+    render(<NotificationDetailScreen />);
+
+    expect(screen.queryByText("Alert not available")).not.toBeInTheDocument();
+    expect(screen.getByText("Could not load this alert")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("shows an empty state when the notification isn't cached or fetched", () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
     useQueryClient.mockReturnValue(mockQueryClient());

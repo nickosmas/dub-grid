@@ -1,3 +1,4 @@
+import { Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
@@ -179,19 +180,7 @@ export function PillTimeEditor({
             marginTop: 8,
           }}
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+          <Clock size={10} strokeWidth={2.5} />
           Custom time
           {(defaultStart || defaultEnd) && (
             <span style={{ color: "var(--dg-color-text-muted)" }}>
@@ -274,7 +263,7 @@ export function PillTimeEditor({
                 color: "var(--dg-color-brand)",
                 background: "var(--dg-color-brand-bg)",
                 border: "1px solid var(--dg-color-brand-border)",
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 cursor: "pointer",
                 padding: "4px 10px",
                 fontFamily: "inherit",
@@ -292,7 +281,7 @@ export function PillTimeEditor({
                 color: "var(--dg-color-danger)",
                 background: "var(--dg-color-surface)",
                 border: "1px solid var(--dg-color-border)",
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 cursor: "pointer",
                 padding: "4px 10px",
                 fontFamily: "inherit",
@@ -345,7 +334,7 @@ export function PillTimeEditor({
               color: "var(--dg-color-text-secondary)",
               background: "var(--dg-color-surface)",
               border: "1px solid var(--dg-color-border)",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               cursor: "pointer",
               padding: "4px 10px",
               fontFamily: "inherit",
@@ -365,7 +354,7 @@ export function PillTimeEditor({
                 color: "var(--dg-color-danger)",
                 background: "var(--dg-color-surface)",
                 border: "1px solid var(--dg-color-border)",
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 cursor: "pointer",
                 padding: "4px 10px",
                 fontFamily: "inherit",

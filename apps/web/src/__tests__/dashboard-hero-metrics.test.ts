@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { buildDashboardHeroMetrics } from "@/components/dashboard/DashboardView";
 
 describe("Dashboard Hero Metrics", () => {
   it("should display coverage percentage from periodStats", () => {
@@ -186,57 +187,63 @@ describe("Dashboard Hero Metrics", () => {
     expect(heroStatus).toBe("Healthy");
   });
 
+  const heroMetricsInput = {
+    coveragePct: 92,
+    hasCoverageRequirements: true,
+    isCoveragePartial: false,
+    isCoverageUnpublished: false,
+    openShiftSlotCount: 2,
+    draftTotal: 2,
+    pendingApprovalCount: 1,
+    canEditShifts: true,
+    canApproveShiftRequests: true,
+  };
+
   it("should include pending approvals metric only for admins", () => {
-    const permissions = { canApproveShiftRequests: true };
-    const coveragePct = 92;
-    const openShifts = [{ needed: 2 }];
-    const draftTotal = 2;
-    const shiftRequests = { pendingApproval: { length: 1 } };
+    const metrics = buildDashboardHeroMetrics(heroMetricsInput);
 
-    const metrics = [
-      { label: "Coverage", value: `${coveragePct}%` },
-      {
-        label: "Open gaps",
-        value: `${openShifts.reduce((total, shift) => total + shift.needed, 0)}`,
-      },
-      { label: "Draft shifts", value: `${draftTotal}` },
-    ];
-
-    if (permissions.canApproveShiftRequests) {
-      metrics.splice(2, 0, {
-        label: "Pending approvals",
-        value: `${shiftRequests.pendingApproval.length}`,
-      });
-    }
-
-    expect(metrics.length).toBe(4);
-    expect(metrics[2]?.label).toBe("Pending approvals");
+    expect(metrics.map((metric) => metric.label)).toEqual([
+      "Coverage",
+      "Open gaps",
+      "Pending approvals",
+      "Draft shifts",
+    ]);
   });
 
   it("should not include pending approvals metric for regular users", () => {
-    const permissions = { canApproveShiftRequests: false };
-    const coveragePct = 92;
-    const openShifts = [{ needed: 2 }];
-    const draftTotal = 2;
+    const metrics = buildDashboardHeroMetrics({
+      ...heroMetricsInput,
+      canApproveShiftRequests: false,
+    });
 
-    const metrics = [
-      { label: "Coverage", value: `${coveragePct}%` },
-      {
-        label: "Open gaps",
-        value: `${openShifts.reduce((total, shift) => total + shift.needed, 0)}`,
-      },
-      { label: "Draft shifts", value: `${draftTotal}` },
-    ];
+    expect(metrics.some((metric) => metric.label === "Pending approvals")).toBe(false);
+  });
 
-    if (permissions.canApproveShiftRequests) {
-      metrics.splice(2, 0, {
-        label: "Pending approvals",
-        value: "0",
-      });
-    }
+  it("omits the draft tile entirely for a viewer who cannot edit shifts", () => {
+    const metrics = buildDashboardHeroMetrics({
+      ...heroMetricsInput,
+      canEditShifts: false,
+    });
 
-    expect(metrics.length).toBe(3);
-    expect(metrics.some((m) => m.label === "Pending approvals")).toBe(false);
+    // Reporting 0 would be worse than silence: the schedule API withholds drafts
+    // from this viewer, so the number is an artefact of the redaction, not a fact
+    // about the schedule.
+    expect(metrics.some((metric) => metric.label === "Draft shifts")).toBe(false);
+    expect(metrics.map((metric) => metric.label)).toEqual([
+      "Coverage",
+      "Open gaps",
+      "Pending approvals",
+    ]);
+  });
+
+  it("keeps the draft tile for an editor even when there are no drafts", () => {
+    const metrics = buildDashboardHeroMetrics({
+      ...heroMetricsInput,
+      draftTotal: 0,
+    });
+
+    const draftTile = metrics.find((metric) => metric.label === "Draft shifts");
+    expect(draftTile?.value).toBe("0");
   });
 
   it("should calculate progress in onboarding checklist", () => {

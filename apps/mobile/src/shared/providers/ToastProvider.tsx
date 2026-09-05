@@ -35,6 +35,7 @@ type ToastDescriptor = ToastInput & {
 const DEFAULT_TOAST_DURATION_MS = 4500;
 const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
 const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
+const TOAST_HOST_GUTTER = 20;
 
 const createToastTone = (mobileColors: MobileColors) =>
   ({
@@ -94,9 +95,12 @@ function getTouchEventY(event: GestureResponderEvent): number | null {
 
 export function ToastProvider({ children }: PropsWithChildren) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
+  const styles = useMemo(
+    () => createStyles(mobileColors, insets.left, insets.right),
+    [mobileColors, insets.left, insets.right],
+  );
+  const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const { isOffline } = useNetworkStatus();
   const { isNetworkRecoveryActive } = useNetworkRecovery();
   const idRef = useRef(0);
@@ -104,6 +108,23 @@ export function ToastProvider({ children }: PropsWithChildren) {
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
   const [activeToast, setActiveToast] = useState<ToastDescriptor | null>(null);
   const [isOfflineBannerDismissed, setIsOfflineBannerDismissed] = useState(false);
+  // `pushToast` reads both of these, and it must never change identity: nearly
+  // every consumer calls it from an effect that lists it as a dependency, next
+  // to an error condition that stays true until the query recovers. With
+  // `activeToast` in the dependency array below, pushing a toast changed
+  // `pushToast`, which re-ran those effects, which pushed the same toast again —
+  // a permanent stream of the same error. Only network errors escaped it, by
+  // carrying a `dedupeKey`.
+  const activeToastRef = useRef<ToastDescriptor | null>(null);
+  const isOfflineRef = useRef(isOffline);
+
+  useEffect(() => {
+    activeToastRef.current = activeToast;
+  }, [activeToast]);
+
+  useEffect(() => {
+    isOfflineRef.current = isOffline;
+  }, [isOffline]);
 
   const dismissToast = useCallback((targetToastId?: number) => {
     setActiveToast((current) => {
@@ -119,33 +140,30 @@ export function ToastProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const pushToast = useCallback(
-    (toast: ToastInput) => {
-      if (isOffline) {
-        // Anything failing right now is failing for one reason, and the banner
-        // already names it, so queueing these would only flood the user with
-        // stale errors on reconnect. Re-assert the banner instead: it
-        // auto-dismisses after a few seconds, and without this a mutation
-        // attempted later in an offline session produced no feedback at all.
-        setIsOfflineBannerDismissed(false);
-        return;
+  const pushToast = useCallback((toast: ToastInput) => {
+    if (isOfflineRef.current) {
+      // Anything failing right now is failing for one reason, and the banner
+      // already names it, so queueing these would only flood the user with
+      // stale errors on reconnect. Re-assert the banner instead: it
+      // auto-dismisses after a few seconds, and without this a mutation
+      // attempted later in an offline session produced no feedback at all.
+      setIsOfflineBannerDismissed(false);
+      return;
+    }
+
+    setQueue((current) => {
+      if (
+        toast.dedupeKey &&
+        (activeToastRef.current?.dedupeKey === toast.dedupeKey ||
+          current.some((queuedToast) => queuedToast.dedupeKey === toast.dedupeKey))
+      ) {
+        return current;
       }
 
-      setQueue((current) => {
-        if (
-          toast.dedupeKey &&
-          (activeToast?.dedupeKey === toast.dedupeKey ||
-            current.some((queuedToast) => queuedToast.dedupeKey === toast.dedupeKey))
-        ) {
-          return current;
-        }
-
-        idRef.current += 1;
-        return [...current, { ...toast, id: idRef.current }];
-      });
-    },
-    [activeToast, isOffline],
-  );
+      idRef.current += 1;
+      return [...current, { ...toast, id: idRef.current }];
+    });
+  }, []);
 
   useEffect(() => {
     if (activeToast || queue.length === 0) {
@@ -327,7 +345,7 @@ export function useToast() {
   return context;
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight: number) =>
   StyleSheet.create({
     host: {
       position: "absolute",
@@ -335,7 +353,10 @@ const createStyles = (mobileColors: MobileColors) =>
       left: 0,
       right: 0,
       alignItems: "center",
-      paddingHorizontal: 20,
+      // The side insets matter in landscape on a notched device, where a fixed
+      // gutter runs the toast under the sensor housing.
+      paddingLeft: TOAST_HOST_GUTTER + insetLeft,
+      paddingRight: TOAST_HOST_GUTTER + insetRight,
       zIndex: 100,
       elevation: 100,
     },

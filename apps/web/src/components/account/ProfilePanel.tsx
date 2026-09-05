@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getOptionalUsPhoneError,
   getRequiredStaffEmailError,
@@ -18,10 +18,11 @@ import { SectionCard } from "@/components/settings/shared";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Modal from "@/components/Modal";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
-import { SelectableTag } from "@/components/ui/selectable-tag";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import {
   cancelOwnProfileChangeRequest,
   createOwnProfileChangeRequest,
@@ -33,11 +34,26 @@ import {
   type ProfileRequestedChanges,
   type SelfProfileRecord,
 } from "@/features/account/client";
-import { updateAppOnlyUser } from "@/features/organization/client";
+import {
+  fetchOrganizationUsers,
+  updateOrganizationMembershipGuarded,
+} from "@/features/organization/client";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
+import { PersonProfileHeader } from "@/components/staff/PersonProfileHeader";
+import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
+import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
-import type { Department, Employee, FocusArea, NamedItem } from "@/types";
+import type {
+  AdminPermissions,
+  Department,
+  DirectoryPerson,
+  Employee,
+  FocusArea,
+  NamedItem,
+  OrganizationRole,
+  OrganizationUser,
+} from "@/types";
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -70,7 +86,9 @@ interface ProfilePanelProps {
   roleLabel?: string;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
-  setManagementDepartmentIds: Dispatch<SetStateAction<number[]>>;
+  /** Refreshes the whole self-profile query after the management-access modal
+   *  saves - the shared editor doesn't hand back the new department list. */
+  refetchProfile: () => Promise<unknown>;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -121,10 +139,15 @@ export function ProfilePanel({
   roleLabel,
   setProfile,
   setEmployee,
-  setManagementDepartmentIds,
+  refetchProfile,
 }: ProfilePanelProps) {
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
+    user?.email ||
+    "";
 
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
@@ -204,46 +227,112 @@ export function ProfilePanel({
   );
   const showManagementAccess = managementDepartmentIds.length > 0;
 
-  const [isEditingAccess, setIsEditingAccess] = useState(false);
-  const [editDeptIds, setEditDeptIds] = useState<number[]>([]);
-  const [savingAccess, setSavingAccess] = useState(false);
+  // Same shape as the People directory panels: management access opens in a
+  // popup backed by the shared EmployeeManagementAccessEditor, not an inline
+  // department-toggle form of its own.
+  const [isEditingManagementAccess, setIsEditingManagementAccess] = useState(false);
+  const [managementAccessDirty, setManagementAccessDirty] = useState(false);
+  const closeManagementAccessEditor = useCallback(() => {
+    setManagementAccessDirty(false);
+    setIsEditingManagementAccess(false);
+  }, []);
+  const {
+    requestClose: requestManagementAccessClose,
+    unsavedChangesDialog: managementAccessUnsavedChangesDialog,
+  } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: managementAccessDirty,
+    onDiscard: closeManagementAccessEditor,
+  });
 
-  function startEditingAccess() {
-    setEditDeptIds(managementDepartmentIds);
-    setIsEditingAccess(true);
-  }
+  const selfOrgRole: OrganizationRole | null =
+    role === "user" || role === "admin" || role === "super_admin" ? role : null;
 
-  function cancelEditingAccess() {
-    setIsEditingAccess(false);
-  }
-
-  function toggleAccessDepartment(departmentId: number) {
-    setEditDeptIds((prev) =>
-      prev.includes(departmentId)
-        ? prev.filter((id) => id !== departmentId)
-        : [...prev, departmentId],
-    );
-  }
-
-  const accessHasChanges =
-    editDeptIds.length !== managementDepartmentIds.length ||
-    editDeptIds.some((id) => !managementDepartmentIds.includes(id));
-  const accessWouldOrphan = !isOnSchedule && editDeptIds.length === 0;
-
-  async function saveAccessChanges() {
-    if (!orgId || !user || savingAccess || accessWouldOrphan) return;
-    setSavingAccess(true);
-    try {
-      await updateAppOnlyUser(user.id, orgId, { departmentIds: editDeptIds });
-      setManagementDepartmentIds(editDeptIds);
-      setIsEditingAccess(false);
-      toast.success("Management access updated.");
-    } catch (err) {
-      toast.error(extractErrorMessage(err, "We couldn't update management access. Try again."));
-    } finally {
-      setSavingAccess(false);
+  // MemberAccessControls' permissions launcher (unlike its role picker) isn't
+  // self-gated, so an admin really can open it from their own profile - fetch
+  // the real membership record so that path has accurate initialPermissions
+  // and a working expectedUpdatedAt instead of silently no-op'ing on save.
+  const [selfMembership, setSelfMembership] = useState<OrganizationUser | null>(null);
+  useEffect(() => {
+    if (!canManageManagementAccess || !orgId || !user) {
+      setSelfMembership(null);
+      return;
     }
-  }
+    let cancelled = false;
+    fetchOrganizationUsers(orgId)
+      .then((users) => {
+        if (!cancelled) setSelfMembership(users.find((u) => u.id === user.id) ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setSelfMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageManagementAccess, orgId, user]);
+
+  const selfDirectoryPerson: DirectoryPerson | null =
+    employee && user
+      ? {
+          personId: employee.id,
+          source: "employee",
+          employeeId: employee.id,
+          employeeNumber: employee.employeeNumber ?? null,
+          userId: user.id,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone,
+          employeeStatus: employee.status,
+          orgRole: selfOrgRole,
+          hasAppAccess: true,
+          focusAreaIds: employee.focusAreaIds,
+          certificationId: employee.certificationId,
+          roleIds: employee.roleIds,
+          seniority: employee.seniority,
+          lastSignInAt: selfMembership?.lastSignInAt ?? null,
+          invitationStatus: null,
+          scheduledDepartmentIds: employee.departmentIds,
+          scheduledDeptAdminIds: employee.deptAdminIds,
+          managementDepartmentIds,
+          managementDeptAdminIds: [],
+          departmentIds: managementDepartmentIds,
+          deptAdminIds: [],
+          isManagementUser: showManagementAccess,
+          membershipUpdatedAt: selfMembership?.updatedAt ?? null,
+          adminPermissions: selfMembership?.adminPermissions ?? null,
+        }
+      : null;
+
+  const handleRoleChange = useCallback(
+    // Unreachable through this page's UI - MemberAccessControls renders the
+    // disabled, explained dropdown for isSelf and never calls this. Kept for
+    // parity with the People panels and as defense in depth.
+    async (newRole: OrganizationRole) => {
+      if (!orgId || !user || !selfMembership?.updatedAt) return;
+      const updated = await updateOrganizationMembershipGuarded({
+        orgId,
+        userId: user.id,
+        expectedUpdatedAt: selfMembership.updatedAt,
+        orgRole: newRole,
+      });
+      setSelfMembership(updated);
+    },
+    [orgId, user, selfMembership],
+  );
+
+  const handlePermissionsChange = useCallback(
+    async (perms: AdminPermissions) => {
+      if (!orgId || !user || !selfMembership?.updatedAt) return;
+      const updated = await updateOrganizationMembershipGuarded({
+        orgId,
+        userId: user.id,
+        expectedUpdatedAt: selfMembership.updatedAt,
+        adminPermissions: perms,
+      });
+      setSelfMembership(updated);
+    },
+    [orgId, user, selfMembership],
+  );
 
   const [showAddToSchedule, setShowAddToSchedule] = useState(false);
   const canAddToSchedule =
@@ -526,6 +615,16 @@ export function ProfilePanel({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PersonProfileHeader
+        avatarSeed={user?.id ?? employee?.id ?? ""}
+        name={displayName}
+        orgRole={selfOrgRole}
+        email={user?.email ?? employee?.email}
+        phone={employee?.phone}
+        employmentType={employee?.employmentType}
+        employeeNumber={employee?.employeeNumber}
+      />
+
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="flex items-start justify-between gap-3">
@@ -544,7 +643,7 @@ export function ProfilePanel({
               e.preventDefault();
               requestSave();
             }}
-            className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3"
+            className="flex flex-col gap-5"
           >
             {canEditProfileDirectly && (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -629,6 +728,7 @@ export function ProfilePanel({
               </div>
             </div>
             <EditEmployeePanel
+              flushHorizontal
               ref={workEditorRef}
               employee={employee}
               focusAreas={focusAreas}
@@ -678,88 +778,65 @@ export function ProfilePanel({
         </div>
       </SectionCard>
 
-      {showManagementAccess && (
+      <SectionCard>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
+              Access
+            </div>
+            <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              Your organization role and the permissions it carries.
+            </div>
+          </div>
+          {canManageManagementAccess && selfOrgRole ? (
+            <MemberAccessControls
+              orgRole={selfOrgRole}
+              adminPermissions={selfMembership?.adminPermissions}
+              onRoleChange={handleRoleChange}
+              onPermissionsChange={handlePermissionsChange}
+              isSelf
+            />
+          ) : (
+            <Field label="Role" value={ROLE_LABELS[role] ?? role} />
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Department assignment only applies to management involvement, so a
+       *  self-viewer with neither existing departments nor the permission to
+       *  start (canManageManagementAccess) never sees this card at all - the
+       *  same "not part of management" story the People panels tell. */}
+      {(canManageManagementAccess || showManagementAccess) && (
         <SectionCard>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                  Management access
+                  Management departments
                 </div>
                 <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                  Your organization role and management department assignment.
+                  Management department assignment.
                 </div>
               </div>
-              {canManageManagementAccess && !isEditingAccess && (
+              {canManageManagementAccess && employee && (
                 <Button
                   type="button"
-                  onClick={startEditingAccess}
+                  onClick={() => setIsEditingManagementAccess(true)}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
-                  Edit management access
+                  {showManagementAccess ? "Edit management access" : "Add to Management"}
                 </Button>
               )}
             </div>
 
-            <Field label="Role" value={ROLE_LABELS[role] ?? role} />
-
-            {isEditingAccess ? (
-              <div className="flex flex-col gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3">
-                <div>
-                  <label className="dg-label">Management departments</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allManagementDepartments.map((department) => (
-                      <SelectableTag
-                        key={department.id}
-                        selected={editDeptIds.includes(department.id)}
-                        onClick={() => toggleAccessDepartment(department.id)}
-                      >
-                        {department.name}
-                      </SelectableTag>
-                    ))}
-                  </div>
-                  {accessWouldOrphan && (
-                    <p className="dg-form-error">
-                      You must stay assigned to at least one management department.
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={saveAccessChanges}
-                    disabled={savingAccess || !accessHasChanges || accessWouldOrphan}
-                    className="dg-btn dg-btn-primary dg-btn-sm"
-                  >
-                    <ButtonLoading
-                      loading={savingAccess}
-                      spinnerSize={14}
-                      icon={<Check size={14} />}
-                    >
-                      Save changes
-                    </ButtonLoading>
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={cancelEditingAccess}
-                    disabled={savingAccess}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                  >
-                    <X size={14} />
-                    {getEditorDismissLabel({ hasUnsavedChanges: accessHasChanges })}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Field
-                label="Management departments"
-                value={
-                  managementDepartments.length > 0
-                    ? managementDepartments.map((d) => d.name).join(", ")
-                    : null
-                }
-              />
-            )}
+            <Field
+              label="Departments"
+              value={
+                managementDepartments.length > 0
+                  ? managementDepartments.map((d) => d.name).join(", ")
+                  : null
+              }
+            />
 
             {canAddToSchedule && (
               <Button
@@ -773,6 +850,30 @@ export function ProfilePanel({
           </div>
         </SectionCard>
       )}
+
+      {isEditingManagementAccess && orgId && employee && (
+        <Modal
+          title={showManagementAccess ? "Edit management access" : "Add to management"}
+          onClose={closeManagementAccessEditor}
+          onRequestClose={requestManagementAccessClose}
+          style={{ maxWidth: 560, width: "100%" }}
+        >
+          <EmployeeManagementAccessEditor
+            employee={employee}
+            orgId={orgId}
+            orgName="your organization"
+            managementDepartments={allManagementDepartments}
+            directoryPerson={selfDirectoryPerson}
+            onDirtyChange={setManagementAccessDirty}
+            onClose={closeManagementAccessEditor}
+            onCompleted={async (updatedEmployee) => {
+              if (updatedEmployee) setEmployee(updatedEmployee);
+              await refetchProfile();
+            }}
+          />
+        </Modal>
+      )}
+      {managementAccessUnsavedChangesDialog}
 
       {showAddToSchedule && employee && orgId && (
         <AddManagementUserToScheduleModal
@@ -874,7 +975,12 @@ export function ProfilePanel({
               <span
                 aria-hidden
                 className="dg-skeleton"
-                style={{ display: "inline-block", width: 180, height: 12, borderRadius: 4 }}
+                style={{
+                  display: "inline-block",
+                  width: 180,
+                  height: 12,
+                  borderRadius: "var(--dg-radius-xs)",
+                }}
               />
             ) : changeRequests.length > 0 ? (
               <p className="m-0 text-[13px] text-[var(--dg-color-text-muted)]">

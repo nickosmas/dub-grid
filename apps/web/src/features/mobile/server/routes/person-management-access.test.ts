@@ -10,6 +10,7 @@ const replaceMobilePendingInvitationAccessRow = vi.fn();
 const rollbackMobilePendingInvitationAccessReplacement = vi.fn();
 const updateMobileInvitationAssignmentsRow = vi.fn();
 const updateMobileMembershipAccessRow = vi.fn();
+const changeMobileMembershipOrgRole = vi.fn();
 const insertMobileAuditLogEntry = vi.fn();
 const sendInvitationEmail = vi.fn();
 const getInvitationEmailConfig = vi.fn();
@@ -20,6 +21,7 @@ vi.mock("@/features/mobile/server", () => ({ requireMobileAuth }));
 vi.mock("@/features/mobile/server/person-access", () => ({ loadMobilePersonWithAccess }));
 
 vi.mock("@dubgrid/data-access", () => ({
+  changeMobileMembershipOrgRole,
   createMobileEmployeeInvitationRow,
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
@@ -117,6 +119,7 @@ describe("mobile person management-access route", () => {
       updated_at: null,
     });
     revokeMobileEmployeeInvitationRow.mockResolvedValue(null);
+    changeMobileMembershipOrgRole.mockResolvedValue({ status: "changed" });
     rollbackMobilePendingInvitationAccessReplacement.mockResolvedValue(true);
     loadMobilePersonWithAccess.mockResolvedValue({
       person: makePerson(),
@@ -208,17 +211,56 @@ describe("mobile person management-access route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.result).toBe("membership_updated");
+    // Two writes: the database rejects a direct `org_role` column write
+    // (guard_org_role_change), so the role goes through the RPC and only the
+    // departments travel with the row update.
+    expect(changeMobileMembershipOrgRole).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ targetUserId: MEMBER_USER_ID, orgRole: "admin" }),
+    );
     expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
         userId: MEMBER_USER_ID,
-        orgRole: "admin",
         departmentIds: [9],
         // Dropped along with its department, rather than left dangling.
         deptAdminIds: [],
       }),
     );
+    expect(updateMobileMembershipAccessRow.mock.calls[0][1]).not.toHaveProperty("orgRole");
     expect(createMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+  });
+
+  // An unchanged role must not take the RPC path: it holds an advisory lock and
+  // writes a role_change_log row, which is a lot of machinery for a no-op.
+  it("leaves the role alone when only the departments changed", async () => {
+    loadMobilePersonWithAccess.mockResolvedValue({
+      person: makePerson({ userId: MEMBER_USER_ID, membershipUpdatedAt: "2026-05-01T00:00:00Z" }),
+      userId: MEMBER_USER_ID,
+      membership: {
+        user_id: MEMBER_USER_ID,
+        org_role: "admin",
+        department_ids: [10],
+        dept_admin_ids: [],
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+      pendingInvitation: null,
+    });
+    updateMobileMembershipAccessRow.mockResolvedValue({ user_id: MEMBER_USER_ID });
+
+    const { PUT } = await import("./person-management-access");
+    const response = await PUT(
+      makeRequest({
+        orgRole: "admin",
+        managementDepartmentIds: [9],
+        expectedMembershipUpdatedAt: "2026-05-01T00:00:00Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(changeMobileMembershipOrgRole).not.toHaveBeenCalled();
+    expect(updateMobileMembershipAccessRow).toHaveBeenCalled();
   });
 
   it("409s rather than overwriting a membership that changed elsewhere", async () => {

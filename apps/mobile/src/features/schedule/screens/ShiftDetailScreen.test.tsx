@@ -1020,7 +1020,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
   });
 
-  it("keeps absence names as the detail card heading with an under-title type pill", () => {
+  it("names the absence type in the detail card pill under an Absence eyebrow", () => {
     useQuery.mockImplementation(() => ({
       data: {
         entries: [
@@ -1067,11 +1067,13 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Absence")).toBeInTheDocument();
     expect(screen.getByText("Off Day")).toBeInTheDocument();
     expect(screen.getByLabelText("Absence Off Day")).toBeInTheDocument();
-    expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Absence");
-    expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Off Day");
+    // The pill names the absence type; "Absence" is the eyebrow above it, not
+    // the pill's own text. Matches the home card's MeTypePill.
+    expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Off Day");
+    expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Absence");
   });
 
-  it("keeps general shift names as the detail card heading with an under-title type pill", () => {
+  it("names the general shift in the detail card pill under a General shift eyebrow", () => {
     useQuery.mockImplementation(() => ({
       data: {
         entries: [
@@ -1126,8 +1128,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("General shift")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByLabelText("General shift Admin")).toBeInTheDocument();
-    expect(screen.getByLabelText("General shift Admin")).toHaveTextContent("General shift");
-    expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("Admin");
+    expect(screen.getByLabelText("General shift Admin")).toHaveTextContent("Admin");
+    expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("General shift");
   });
 
   it("filters swap options behind a horizontal date selector", () => {

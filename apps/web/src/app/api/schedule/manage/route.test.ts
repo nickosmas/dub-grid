@@ -54,6 +54,7 @@ describe("POST /api/schedule/manage", () => {
       serviceClient: { from: serviceFrom },
       actor: { id: "actor-user" },
       orgId,
+      permissions: { canEditShifts: true },
     }));
   });
 
@@ -336,6 +337,117 @@ describe("POST /api/schedule/manage", () => {
     expect(query.order).toHaveBeenCalledWith("date", { ascending: true });
     expect(query.range).toHaveBeenCalledWith(0, 499);
     expect(body.shifts[`${empId}_2026-08-02`]).toBeDefined();
+  });
+
+  function draftedCellQuery(orgId: string, empId: string) {
+    return chainableQuery({
+      data: [
+        {
+          id: "cell-1",
+          emp_id: empId,
+          date: "2026-08-02",
+          org_id: orgId,
+          version: 3,
+          series_id: null,
+          from_recurring: false,
+          created_by: "author-user",
+          updated_by: "author-user",
+          created_at: "2026-08-01T00:00:00.000Z",
+          updated_at: "2026-08-01T00:00:00.000Z",
+          snapshots: [
+            {
+              id: "snap-published",
+              cell_id: "cell-1",
+              org_id: orgId,
+              snapshot_kind: "published",
+              state_kind: "absence",
+              absence_type_id: 5,
+              custom_start_time: null,
+              custom_end_time: null,
+              segments: [],
+            },
+            {
+              id: "snap-draft",
+              cell_id: "cell-1",
+              org_id: orgId,
+              snapshot_kind: "draft",
+              state_kind: "absence",
+              absence_type_id: 6,
+              custom_start_time: null,
+              custom_end_time: null,
+              segments: [],
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+  }
+
+  const DRAFT_LABELS = [
+    [5, "Vacation"],
+    [6, "Bereavement"],
+  ];
+
+  it("withholds the draft from a viewer even when the body claims isScheduler", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+
+    requireOrgPermissions.mockImplementation(async (_req, id) => ({
+      userClient: { rpc: userRpc },
+      serviceClient: { from: serviceFrom },
+      actor: { id: "actor-user" },
+      orgId: id,
+      permissions: { canEditShifts: false },
+    }));
+    serviceFrom.mockReturnValue(draftedCellQuery(orgId, empId));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchShifts",
+        orgId,
+        // The exact escalation this guards: a staff caller asking for drafts.
+        isScheduler: true,
+        assignmentLabels: [],
+        absenceTypeLabels: DRAFT_LABELS,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const entry = (await response.json()).shifts[`${empId}_2026-08-02`];
+    expect(entry.draft).toBeNull();
+    expect(entry.draftKind).toBeNull();
+    expect(entry.isDraft).toBe(false);
+    expect(entry.createdBy).toBeNull();
+    expect(entry.updatedBy).toBeNull();
+    // The published absence still resolves, so the viewer keeps their schedule.
+    expect(entry.publishedAbsenceTypeId).toBe(5);
+    expect(entry.absenceTypeId).toBe(5);
+    expect(JSON.stringify(entry)).not.toContain("Bereavement");
+  });
+
+  it("still hands a scheduler both snapshots", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+
+    serviceFrom.mockReturnValue(draftedCellQuery(orgId, empId));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchShifts",
+        orgId,
+        // Deliberately false: the session decides, not the body.
+        isScheduler: false,
+        assignmentLabels: [],
+        absenceTypeLabels: DRAFT_LABELS,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const entry = (await response.json()).shifts[`${empId}_2026-08-02`];
+    expect(entry.draft).not.toBeNull();
+    expect(entry.absenceTypeId).toBe(6);
+    expect(entry.publishedAbsenceTypeId).toBe(5);
   });
 
   it("paginates fetchScheduleNotes through the service client", async () => {

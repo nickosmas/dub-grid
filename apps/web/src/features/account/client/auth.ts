@@ -138,8 +138,11 @@ export function getBrowserRealtimeChannels(): BrowserRealtimeChannel[] {
     : [];
 }
 
-export function createBrowserRealtimeChannel(name: string): BrowserRealtimeChannel {
-  return supabase.channel(name);
+export function createBrowserRealtimeChannel(
+  name: string,
+  options?: Parameters<typeof supabase.channel>[1],
+): BrowserRealtimeChannel {
+  return supabase.channel(name, options);
 }
 
 export async function untrackBrowserRealtimeChannel(channel: RealtimeChannel): Promise<void> {

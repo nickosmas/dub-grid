@@ -40,8 +40,8 @@ export { useIsInSandbox, useSandboxSourceOrgId } from "./useIsInSandbox";
 export { useDirectory } from "./useDirectory";
 export type { DirectoryData } from "./useDirectory";
 
-export { useCellLocks } from "./useCellLocks";
-export type { CellLock, OnlineUser } from "./useCellLocks";
+export { useSchedulePresence } from "./useSchedulePresence";
+export type { OnlineUser, SameAccountEditorSession } from "./useSchedulePresence";
 export {
   useReliableRealtimeBroadcasts,
   type ReliableBroadcastOptions,

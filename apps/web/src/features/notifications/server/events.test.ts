@@ -269,6 +269,27 @@ describe("dispatchNotificationEvent", () => {
     expect(recipients).not.toContain("super-1");
   });
 
+  it("uses friendly role names in the role_changed message", async () => {
+    fromMock.mockImplementation(() => makeSingleRowBuilder({ first_name: "Nic", last_name: "K" }));
+
+    await dispatchNotificationEvent("actor-1", {
+      action: "role_changed",
+      orgId: "org-1",
+      targetUserId: "target-1",
+      fromRole: "user",
+      toRole: "super_admin",
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      "target-1",
+      "org-1",
+      "system",
+      "Your role changed",
+      "Nic K changed your role from User to Super Admin.",
+      expect.anything(),
+    );
+  });
+
   it("does not notify the actor when admin_permissions_changed targets themselves", async () => {
     await dispatchNotificationEvent("self-user", {
       action: "admin_permissions_changed",

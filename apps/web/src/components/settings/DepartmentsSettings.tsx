@@ -52,7 +52,7 @@ const fieldStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-label)",
   fontWeight: 500,
   border: "1px solid var(--dg-color-border)",
-  borderRadius: 6,
+  borderRadius: "var(--dg-radius-sm)",
   background: "var(--dg-color-surface)",
   color: "var(--dg-color-text-primary)",
   outline: "none",
@@ -244,7 +244,7 @@ function FocusAreaRows({
                 style={{
                   background: "none",
                   border: "1px solid var(--dg-color-danger-border, #FECACA)",
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   cursor: "pointer",
                   color: "var(--dg-color-danger)",
                   padding: "5px 10px",
@@ -1062,7 +1062,7 @@ function DepartmentSection({
                       style={{
                         background: "none",
                         border: "1px solid var(--dg-color-danger-border, #FECACA)",
-                        borderRadius: 8,
+                        borderRadius: "var(--dg-radius-md)",
                         cursor: "pointer",
                         color: "var(--dg-color-danger)",
                         padding: "5px 10px",

@@ -38,6 +38,7 @@ export default function ResetPasswordScreen() {
 
   const codeInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory({
     always: true,
   });
@@ -175,13 +176,13 @@ export default function ResetPasswordScreen() {
             <Button
               label="Verify code"
               loading={submitting}
-              onPress={() => void verifyCode()}
+              onPress={() => verifyCode()}
               size="lg"
             />
             <Button
               disabled={cooldown > 0 || submitting}
               label={cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
-              onPress={() => void resendCode()}
+              onPress={() => resendCode()}
               tone="link"
             />
             <Button
@@ -211,10 +212,16 @@ export default function ResetPasswordScreen() {
                 setPassword(value);
                 if (error) setError(null);
               }}
+              // `returnKeyType="next"` promised a focus advance the field never
+              // made: with no `onSubmitEditing` the key only blurred, and
+              // without `blurOnSubmit={false}` the keyboard closed on the way.
+              blurOnSubmit={false}
+              onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
               placeholder="New password"
               ref={passwordInputRef}
               returnKeyType="next"
               secureTextEntry={!showPassword}
+              textContentType="newPassword"
               trailingAccessory={
                 <Button
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
@@ -239,8 +246,10 @@ export default function ResetPasswordScreen() {
               }}
               onSubmitEditing={() => void savePassword()}
               placeholder="Confirm password"
+              ref={confirmPasswordInputRef}
               returnKeyType="go"
               secureTextEntry={!showPassword}
+              textContentType="newPassword"
               value={confirmPassword}
             />
             {mismatchError ? <AuthFieldError message={mismatchError} /> : null}
@@ -253,7 +262,7 @@ export default function ResetPasswordScreen() {
               disabled={!canSubmitPassword}
               label="Update password"
               loading={submitting}
-              onPress={() => void savePassword()}
+              onPress={() => savePassword()}
               size="lg"
             />
           </AuthActions>

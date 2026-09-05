@@ -1,118 +1,63 @@
 "use client";
 
 import { useEffect } from "react";
-import { DubGridLogo } from "@/components/Logo";
 import { Button } from "@/components/Button";
+import { PageShell, Card } from "@/components/auth/AuthCard";
+import { AuthStateCard } from "@/components/auth/AuthStateCard";
+import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout } from "@/hooks";
 
+const RECHECK_INTERVAL_MS = 30_000;
+
 /**
- * Shown to authenticated users who can't advance org config — regular users
- * and admins without any manage-* permission — when they log in before the
- * org is fully configured. Blocks access to the app until a user with
- * configuration permissions completes setup.
+ * Shown to authenticated members who can't advance org config - regular users
+ * and admins without any manage-* permission - while the organization is not
+ * open to them yet: its configuration is incomplete, or no admin has finished
+ * their own onboarding. Blocks the app until that changes.
+ *
+ * Shares the gate surface with /billing-required, the other screen a member
+ * can be held on, so being held reads the same either way.
  */
 export default function SetupPendingScreen() {
   const { signOut } = useLogout();
 
-  // Auto-refresh every 30s to check if admin has completed setup
+  // A reload is what re-decides this, since the answer comes from the
+  // organization bootstrap the whole tree is built on.
   useEffect(() => {
-    const interval = setInterval(() => {
-      window.location.reload();
-    }, 30_000);
+    const interval = setInterval(() => window.location.reload(), RECHECK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        background:
-          "linear-gradient(to bottom, var(--dg-color-bg) 0%, var(--dg-color-brand-bg, #eff6ff) 100%)",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          textAlign: "center",
-        }}
-      >
-        {/* Logo */}
-        <div style={{ marginBottom: 28, display: "flex", justifyContent: "center" }}>
-          <DubGridLogo size={48} />
+    <PageShell>
+      <Card>
+        <div className="dg-auth-logo-block dg-auth-logo-block--spacious">
+          <DubGridLogo size={72} />
+          <DubGridWordmark />
         </div>
 
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: "var(--dg-type-page-title-weight)",
-            color: "var(--dg-color-text-primary)",
-            margin: "0 0 12px",
-            letterSpacing: "-0.02em",
-          }}
+        <AuthStateCard
+          heading="Setup in progress"
+          message="Your administrator is still setting up this organization. You'll be able to get in as soon as they finish."
         >
-          Setup in Progress
-        </h1>
-
-        <p
-          style={{
-            fontSize: 15,
-            color: "var(--dg-color-text-muted)",
-            lineHeight: 1.6,
-            margin: "0 0 32px",
-            maxWidth: 360,
-            marginLeft: "auto",
-            marginRight: "auto",
-          }}
-        >
-          Your administrator is still configuring the organization. You&apos;ll be able to access
-          the app once setup is complete. This page refreshes automatically.
-        </p>
-
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Button
-            onClick={() => window.location.reload()}
-            type="button"
-            style={{
-              padding: "10px 24px",
-              borderRadius: 10,
-              border: "none",
-              background: "var(--dg-color-brand)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "transform 150ms ease",
-            }}
-          >
-            Refresh
-          </Button>
-          <Button
-            onClick={() => signOut()}
-            type="button"
-            style={{
-              padding: "10px 24px",
-              borderRadius: 10,
-              border: "1px solid var(--dg-color-border)",
-              background: "var(--dg-color-surface)",
-              color: "var(--dg-color-text-primary)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "background 150ms ease",
-            }}
-          >
-            Sign Out
-          </Button>
-        </div>
-      </div>
-    </div>
+          <div className="dg-auth-gate-actions">
+            <Button
+              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
+              onClick={() => window.location.reload()}
+              type="button"
+            >
+              Check again
+            </Button>
+            <Button
+              className="dg-btn dg-btn-secondary dg-btn-lg dg-auth-state-primary"
+              onClick={() => signOut()}
+              type="button"
+            >
+              Sign out
+            </Button>
+          </div>
+        </AuthStateCard>
+      </Card>
+    </PageShell>
   );
 }

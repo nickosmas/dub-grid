@@ -15,6 +15,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { InlineError } from "../../../shared/components/InlineError";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import {
@@ -26,7 +27,7 @@ import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesG
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
-import type { ManagementAccessRole } from "./ManagementAccessSheet";
+import type { ManagementAccessRole } from "../lib/managementAccess";
 
 const ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
   { value: "user", label: "User" },
@@ -69,12 +70,18 @@ export function ManagementUserInviteSheet({
   visible,
   managementDepartments,
   isPending,
+  error,
   onDismiss,
   onSubmit,
 }: {
   visible: boolean;
   managementDepartments: MobileDepartment[];
   isPending: boolean;
+  /**
+   * Why the last submit failed. The sheet stays open on error, and a toast
+   * pushed from inside a `<Modal>` renders in the root window behind it.
+   */
+  error?: string | null;
   onDismiss: () => void;
   onSubmit: (body: MobileManagementUserInviteBody) => Promise<unknown>;
 }) {
@@ -176,6 +183,9 @@ export function ManagementUserInviteSheet({
               editable={!isPending}
               error={showErrors ? emailError : null}
               keyboardType="email-address"
+              autoComplete="email"
+              autoCorrect={false}
+              textContentType="emailAddress"
               label="Email"
               onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
               value={draft.email}
@@ -184,6 +194,8 @@ export function ManagementUserInviteSheet({
               editable={!isPending}
               error={showErrors ? phoneError : null}
               keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
               label="Phone (optional)"
               onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
               value={draft.phone}
@@ -233,6 +245,8 @@ export function ManagementUserInviteSheet({
             </View>
           </View>
         )}
+
+        {error ? <InlineError message={error} /> : null}
 
         <SheetActions>
           <Button

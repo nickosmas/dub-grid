@@ -83,7 +83,7 @@ describe("shared design token derivation", () => {
       {
         "mobile": {
           "brand": "#2563EB",
-          "cardRadius": 16,
+          "cardRadius": 20,
           "screenTitle": {
             "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
@@ -94,7 +94,7 @@ describe("shared design token derivation", () => {
         },
         "source": {
           "brand": "#2563EB",
-          "cardRadius": 16,
+          "cardRadius": 20,
           "screenTitle": {
             "fontFamily": "DMSans_700Bold",
             "fontSize": 22,

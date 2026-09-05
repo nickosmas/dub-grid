@@ -1,6 +1,8 @@
 import { StyleSheet } from "react-native";
 import {
+  mobileElevation,
   mobileRadii,
+  mobileRadius,
   mobileSpace,
   mobileSpacing,
   mobileText,
@@ -11,7 +13,7 @@ import {
 /**
  * The requests screen's stylesheet, split out of `RequestsScreen.tsx` for size.
  */
-export const createStyles = (mobileColors: MobileColors) =>
+export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
       gap: 10,
@@ -33,6 +35,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.cardBorder,
       padding: 16,
       gap: 10,
+      ...mobileElevation("card", isDark),
     },
     openShiftCard: {
       gap: 12,
@@ -166,13 +169,13 @@ export const createStyles = (mobileColors: MobileColors) =>
     },
     jobPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 7,
     },
     jobPillCompact: {
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       paddingHorizontal: 9,
       paddingVertical: 5,
     },
@@ -212,7 +215,7 @@ export const createStyles = (mobileColors: MobileColors) =>
     },
     mentoredPill: {
       alignSelf: "flex-start",
-      borderRadius: 8,
+      borderRadius: mobileRadius.md,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,

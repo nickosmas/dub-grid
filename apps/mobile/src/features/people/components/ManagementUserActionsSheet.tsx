@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { MobileDepartment, MobileManagementUser } from "@dubgrid/contracts";
@@ -10,6 +10,7 @@ import {
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { InlineError } from "../../../shared/components/InlineError";
 import {
   removeMobileManagementUser,
   updateMobileManagementUser,
@@ -17,7 +18,8 @@ import {
 } from "../../../shared/lib/api";
 import { getDepartmentNames, MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { mobileSpace } from "../../../shared/theme/tokens";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { ManagementUserAccessSheet } from "./ManagementUserAccessSheet";
@@ -59,10 +61,31 @@ export function ManagementUserActionsSheet({
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
+  const handoff = useModalHandoff();
   const [showAccessSheet, setShowAccessSheet] = useState(false);
+  const [isActionsHidden, setIsActionsHidden] = useState(false);
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
+  const [error, setError] = useState<string | null>(null);
+  // The last person this sheet was opened for, kept so it has something to draw
+  // while it animates out. Rendering straight off `managementUser` unmounted the
+  // `<Modal>` the moment the parent cleared it, so this one sheet vanished
+  // instantly while every other sheet in the app faded.
+  const [displayed, setDisplayed] = useState(managementUser);
+
+  useEffect(() => {
+    if (managementUser) {
+      setDisplayed(managementUser);
+      return;
+    }
+
+    // Fully closed. Forget which sub-sheet was on top so the next person opens
+    // on the actions list rather than wherever the last one left off.
+    setIsActionsHidden(false);
+    setShowAccessSheet(false);
+    setError(null);
+  }, [managementUser]);
 
   function invalidateRoster() {
     return Promise.all([
@@ -72,10 +95,13 @@ export function ManagementUserActionsSheet({
   }
 
   function closeEverything() {
+    // Whatever is on top leaves first, then the sheet underneath it. Both in one
+    // commit is the case iOS drops, which left the actions sheet on screen with
+    // a live backdrop after a successful save.
     setShowAccessSheet(false);
     setShowRemoveConfirmation(false);
     setInvitationConfirmAction(null);
-    onDismiss();
+    handoff(onDismiss);
   }
 
   const accessMutation = useMutation({
@@ -96,13 +122,18 @@ export function ManagementUserActionsSheet({
         expectedUpdatedAt: managementUser.updatedAt,
       });
     },
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update management access",
-        fallbackMessage: "We couldn't update their management access right now.",
-      });
+    // Inline, not a toast. This sheet stays open on failure, and a toast pushed
+    // from inside a `<Modal>` renders in the root window behind it — so the
+    // whole of the feedback was invisible and the button just stopped spinning.
+    onError: (mutationError) => {
+      setError(
+        getClientFriendlyErrorMessage(
+          mutationError,
+          "We couldn't update their management access right now.",
+        ),
+      );
     },
+    onMutate: () => setError(null),
     onSuccess: async (result) => {
       // Closed either way: the roster behind this sheet is what shows the
       // result, and a sheet left open over it would be showing the old row.
@@ -127,13 +158,15 @@ export function ManagementUserActionsSheet({
         expectedUpdatedAt: managementUser.updatedAt,
       });
     },
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update invitation",
-        fallbackMessage: "We couldn't update that invitation right now.",
-      });
+    onError: (mutationError) => {
+      setError(
+        getClientFriendlyErrorMessage(
+          mutationError,
+          "We couldn't update that invitation right now.",
+        ),
+      );
     },
+    onMutate: () => setError(null),
     onSuccess: async (result) => {
       closeEverything();
       await invalidateRoster();
@@ -145,12 +178,12 @@ export function ManagementUserActionsSheet({
     },
   });
 
-  if (!managementUser) return null;
+  if (!displayed) return null;
 
-  const fullName = getFullName(managementUser);
-  const isPendingInvite = managementUser.source === "pending_invite";
+  const fullName = getFullName(displayed);
+  const isPendingInvite = displayed.source === "pending_invite";
   const departmentNames = getDepartmentNames(
-    managementUser.managementDepartmentIds,
+    displayed.managementDepartmentIds,
     managementDepartments,
   );
   const isPending = accessMutation.isPending || invitationMutation.isPending;
@@ -162,13 +195,13 @@ export function ManagementUserActionsSheet({
           <SheetHeader
             subtitle={
               isPendingInvite
-                ? `Invitation pending · ${managementUser.email}`
-                : managementUser.email || "Management access only"
+                ? `Invitation pending · ${displayed.email}`
+                : displayed.email || "Management access only"
             }
             title={fullName}
           />
         }
-        visible={!showAccessSheet}
+        visible={managementUser != null && !isActionsHidden}
         onDismiss={onDismiss}
       >
         {/* One field, wrapped: the sheet body puts 16 between its direct
@@ -179,6 +212,8 @@ export function ManagementUserActionsSheet({
           </AppText>
           <AppText tone="muted">{departmentNames.join(", ") || "None"}</AppText>
         </View>
+
+        {error && !showAccessSheet ? <InlineError message={error} /> : null}
 
         <SheetActions>
           {isPendingInvite ? (
@@ -193,7 +228,13 @@ export function ManagementUserActionsSheet({
           <Button
             disabled={isPending}
             label="Edit Management Access"
-            onPress={() => setShowAccessSheet(true)}
+            // Sequenced, not swapped: presenting the access sheet in the same
+            // commit that dismisses this one is the case iOS refuses, and the
+            // access sheet could come up unreachable behind a dead backdrop.
+            onPress={() => {
+              setIsActionsHidden(true);
+              handoff(() => setShowAccessSheet(true));
+            }}
             tone="secondary"
           />
           <Button
@@ -211,10 +252,16 @@ export function ManagementUserActionsSheet({
       </BottomSheetModal>
 
       <ManagementUserAccessSheet
+        // The access sheet is the surface that failed while it is open, so the
+        // message belongs there rather than on the actions sheet behind it.
+        error={showAccessSheet ? error : null}
         isPending={accessMutation.isPending}
         managementDepartments={managementDepartments}
-        managementUser={managementUser}
-        onDismiss={() => setShowAccessSheet(false)}
+        managementUser={displayed}
+        onDismiss={() => {
+          setShowAccessSheet(false);
+          handoff(() => setIsActionsHidden(false));
+        }}
         onSubmit={(draft) =>
           new Promise<void>((resolve) => {
             accessMutation.mutate(draft, { onSettled: () => resolve() });
@@ -241,8 +288,8 @@ export function ManagementUserActionsSheet({
       <ConfirmationModal
         body={
           invitationConfirmAction === "resend"
-            ? `The current invitation for ${managementUser.email} will be canceled and a new one sent.`
-            : `The current invite link for ${managementUser.email} will stop working.`
+            ? `The current invitation for ${displayed.email} will be canceled and a new one sent.`
+            : `The current invite link for ${displayed.email} will stop working.`
         }
         confirmLabel={
           invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"

@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft } from "lucide-react";
 
 import { useState, useMemo } from "react";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -113,24 +114,13 @@ export default function CoveragePanel({
                 height: 36,
                 background: "transparent",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -280,7 +270,7 @@ export default function CoveragePanel({
                           alignItems: "center",
                           gap: 6,
                           padding: "4px 10px",
-                          borderRadius: 8,
+                          borderRadius: "var(--dg-radius-md)",
                           background: "var(--dg-color-bg-secondary)",
                           color: "var(--dg-color-text-muted)",
                           fontSize: "var(--dg-fs-footnote)",

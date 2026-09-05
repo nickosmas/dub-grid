@@ -1,4 +1,5 @@
 "use client";
+import { User } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,7 +40,6 @@ export default function ImpersonationBanner() {
   useEffect(() => {
     const expiresAt = imp?.expiresAt;
     if (!expiresAt) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountdown(null);
       return;
     }
@@ -110,19 +110,7 @@ export default function ImpersonationBanner() {
       }}
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
+        <User size={16} strokeWidth={2.5} />
         Impersonating <strong>{imp.targetEmail}</strong>
         {imp.targetOrgName && <span>({imp.targetOrgName})</span>}
         {imp.justification && (
@@ -146,7 +134,7 @@ export default function ImpersonationBanner() {
           style={{
             fontFamily: "var(--font-dm-mono, monospace)",
             background: "rgba(0,0,0,0.2)",
-            borderRadius: 6,
+            borderRadius: "var(--dg-radius-sm)",
             padding: "2px 8px",
             fontSize: "var(--dg-fs-caption, 12px)",
           }}
@@ -161,7 +149,7 @@ export default function ImpersonationBanner() {
           background: "rgba(255,255,255,0.2)",
           color: "var(--dg-color-text-inverse)",
           border: "1px solid rgba(255,255,255,0.4)",
-          borderRadius: 6,
+          borderRadius: "var(--dg-radius-sm)",
           padding: "4px 12px",
           fontSize: "var(--dg-fs-caption, 12px)",
           fontWeight: 700,

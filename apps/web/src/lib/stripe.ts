@@ -5,7 +5,8 @@ import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
+import { serverEnv } from "@/lib/env.server";
 
 let _stripe: Stripe | null | undefined;
 
@@ -84,12 +85,12 @@ function stripeCustomerId(
 
 function getStripe(): Stripe | null {
   if (_stripe !== undefined) return _stripe;
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!serverEnv?.STRIPE_SECRET_KEY) {
     logger.warn("STRIPE_SECRET_KEY not configured — billing features disabled");
     _stripe = null;
     return null;
   }
-  _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
+  _stripe = new Stripe(serverEnv?.STRIPE_SECRET_KEY, { apiVersion: "2026-03-25.dahlia" });
   return _stripe;
 }
 
@@ -131,7 +132,7 @@ export async function createCheckoutSession(
 ) {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
-  const priceId = process.env.STRIPE_PRICE_ID_MONTHLY;
+  const priceId = serverEnv?.STRIPE_PRICE_ID_MONTHLY;
   if (!priceId) throw new Error("STRIPE_PRICE_ID_MONTHLY not configured");
 
   return s.checkout.sessions.create({
@@ -382,7 +383,7 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = getSupabaseSecretKey();
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Supabase service role credentials not configured");

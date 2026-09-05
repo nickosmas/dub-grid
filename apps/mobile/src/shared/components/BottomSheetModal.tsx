@@ -1,15 +1,39 @@
-import { useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated from "react-native-reanimated";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { trackSheetPresentation } from "../lib/modal-presentation";
 import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
-import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
+
+/**
+ * Whether the subtree is rendered inside a sheet.
+ *
+ * A sheet is already the elevated thing on screen, so nothing inside it may
+ * cast a shadow of its own: stacking a card shadow on a sheet reads as grubby
+ * rather than as depth, and the sheet's own surface is what separates its
+ * content from the page. Shared surfaces (`ProfilePanel`, `ProfileList`) are
+ * used on both pages and sheets, so they read this rather than taking a prop —
+ * a prop is something a call site can forget, and this cannot be.
+ */
+/**
+ * Exported (not just the hook below) so `ConfirmationModal` can provide the
+ * same signal from its own popup card: that surface is elevated too, and a
+ * `ProfilePanel`/`ProfileList` nested in a confirmation's `children` needs the
+ * same "don't cast your own shadow" answer it would get inside a sheet.
+ */
+export const InsideSheetContext = createContext(false);
+
+/** True when the caller is somewhere beneath a `BottomSheetModal`. */
+export function useIsInsideSheet(): boolean {
+  return useContext(InsideSheetContext);
+}
 
 /** Padding below the sheet content, inside the sheet's own edge. */
 const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
@@ -55,6 +79,7 @@ export function BottomSheetModal({
   scrollable = false,
   accessibilityLabel = "Dismiss",
   accessibilityRole,
+  debugName,
   header,
   footer,
   children,
@@ -80,6 +105,12 @@ export function BottomSheetModal({
   /** Set "alert" for a blocking sheet the user must answer before continuing. */
   accessibilityRole?: "alert";
   /**
+   * Names this sheet in a stacking violation. Diagnostics only, never rendered.
+   * Worth setting on any sheet that shares a screen with others: without it the
+   * report can only say "Dismiss", which is every sheet's backdrop label.
+   */
+  debugName?: string;
+  /**
    * Rendered in the sheet's non-scrolling top region, which is also the drag
    * region. Put a sheet's title here rather than in `children` so the whole
    * header drags, not just the grabber.
@@ -93,18 +124,46 @@ export function BottomSheetModal({
   // Read live rather than at module scope: a module-scope `Dimensions.get`
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
-  // The sheet lifts itself over the keyboard. `KeyboardAvoidingView` cannot do
-  // this job here — see `useKeyboardInset` for the bottom strip it leaks.
-  const keyboardInset = useKeyboardInset();
+  // The sheet lifts itself over the keyboard rather than sitting in a
+  // `KeyboardAvoidingView`, which would take the backdrop up with it and leave a
+  // strip of undimmed app along the bottom.
+  //
+  // This value lives on the UI thread, so the lift is a real animation that
+  // tracks the keyboard frame by frame. It used to be `useState` feeding a
+  // `marginBottom` in `createStyles`, which rebuilt the entire StyleSheet on
+  // every keyboard event and landed the new margin as one un-animated jump —
+  // on iOS that jump raced the keyboard's own slide, which is what read as
+  // jitter. Reanimated's keyboard height is negative (it is meant for
+  // `translateY`), hence the negation.
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   // The sheet runs to the modal's bottom edge, so nothing lifts its content
   // clear of the system bars any more — that falls back to the content padding.
   const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
   const topGap = insets.top + SHEET_TOP_GAP;
   const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, topGap, bottomPadding, backdrop, keyboardInset),
-    [mobileColors, isDark, topGap, bottomPadding, backdrop, keyboardInset],
+    () => createStyles(mobileColors, isDark, topGap, bottomPadding, backdrop),
+    [mobileColors, isDark, topGap, bottomPadding, backdrop],
   );
+  const keyboardStyle = useAnimatedStyle(() => ({
+    marginBottom: -keyboardHeight.value - SHEET_OVERDRAG_LIMIT,
+  }));
+  // Reports what this sheet is doing to the presentation tracker, which is the
+  // only place that can see two sheets transitioning against each other. Keyed
+  // on `visible` alone so it fires once per real transition, not per re-render.
+  // The name is read through a ref so it stays out of the dependency list: a
+  // sheet whose title changes while it is open (a confirmation reusing one slot
+  // for two questions) would otherwise tear this down and re-run it, and report
+  // itself as two sheets trading places.
+  const presentationName = useRef(debugName ?? accessibilityLabel);
+  presentationName.current = debugName ?? accessibilityLabel;
+  useEffect(() => {
+    if (!visible) return;
+    const name = presentationName.current;
+    trackSheetPresentation("show", name);
+    return () => trackSheetPresentation("hide", name);
+  }, [visible]);
+
   const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();
@@ -154,65 +213,79 @@ export function BottomSheetModal({
     >
       {/* A Modal renders in its own native view hierarchy, which sits outside
           the root provider, so gesture-handler needs its own root in here. */}
-      <GestureHandlerRootView style={styles.gestureRoot}>
-        <View style={styles.root}>
-          <Animated.View
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
-          />
-          {/* Tapping outside dismisses, so there is nothing to tap when the
-              sheet is blocking. */}
-          {dismissDisabled ? null : (
-            <Pressable
-              accessibilityLabel={accessibilityLabel}
-              style={StyleSheet.absoluteFill}
-              onPress={handleDismiss}
+      <InsideSheetContext.Provider value>
+        <GestureHandlerRootView style={styles.gestureRoot}>
+          <View style={styles.root}>
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
             />
-          )}
-          <GestureDetector gesture={gesture}>
-            <Animated.View accessibilityRole={accessibilityRole} style={[styles.sheet, sheetStyle]}>
-              {/* The drag region. Deliberately tall and outside the ScrollView:
+            {/* Tapping outside dismisses, so there is nothing to tap when the
+              sheet is blocking. */}
+            {dismissDisabled ? null : (
+              <Pressable
+                accessibilityLabel={accessibilityLabel}
+                accessibilityRole="button"
+                style={StyleSheet.absoluteFill}
+                onPress={handleDismiss}
+              />
+            )}
+            <GestureDetector gesture={gesture}>
+              <Animated.View
+                accessibilityRole={accessibilityRole}
+                style={[styles.sheet, keyboardStyle, sheetStyle]}
+              >
+                {/* The drag region. Deliberately tall and outside the ScrollView:
                   a touch starting here can never be claimed by the scrolling
                   body, so the sheet always drags — without the user having to
                   hit the 40x4 handle itself. */}
-              <View style={styles.dragRegion}>
-                {/* Every sheet carries the handle, blocking ones included: it is
+                <View style={styles.dragRegion}>
+                  {/* Every sheet carries the handle, blocking ones included: it is
                     what marks the top of the sheet as the thing you grab, and a
                     blocking sheet answers that grab by following the finger a
                     little and settling back rather than by not moving. */}
-                <View style={styles.grabberArea}>
-                  <View style={styles.grabber} />
+                  <View style={styles.grabberArea}>
+                    <View style={styles.grabber} />
+                  </View>
+                  {header ? <View style={styles.header}>{header}</View> : null}
                 </View>
-                {header ? <View style={styles.header}>{header}</View> : null}
-              </View>
-              {scrollable ? (
-                <Animated.ScrollView
-                  ref={scrollRef}
-                  // No rubber-banding at either edge: both are where the sheet's
-                  // own drag takes over, and the two fighting reads as jitter.
-                  // `bounces` is the iOS half of that, `overScrollMode` Android's.
-                  bounces={false}
-                  overScrollMode="never"
-                  contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
-                  // The two together say whether the list has anywhere left to
-                  // scroll, which is what decides who owns an upward drag.
-                  onContentSizeChange={onScrollContentSizeChange}
-                  onLayout={onScrollViewLayout}
-                  onScroll={scrollHandler}
-                  scrollEventThrottle={16}
-                  showsVerticalScrollIndicator={false}
-                  style={styles.scrollArea}
-                >
-                  {children}
-                </Animated.ScrollView>
-              ) : (
-                <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>{children}</View>
-              )}
-              {footer ? <View style={styles.footer}>{footer}</View> : null}
-            </Animated.View>
-          </GestureDetector>
-        </View>
-      </GestureHandlerRootView>
+                {scrollable ? (
+                  <Animated.ScrollView
+                    ref={scrollRef}
+                    // No rubber-banding at either edge: both are where the sheet's
+                    // own drag takes over, and the two fighting reads as jitter.
+                    // `bounces` is the iOS half of that, `overScrollMode` Android's.
+                    bounces={false}
+                    overScrollMode="never"
+                    contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
+                    // Without this the list defaults to `"never"`, so the first
+                    // tap on a sheet's submit button while a field is focused was
+                    // swallowed dismissing the keyboard, and the user had to tap
+                    // twice. Every sheet with a form sits in here.
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                    // The two together say whether the list has anywhere left to
+                    // scroll, which is what decides who owns an upward drag.
+                    onContentSizeChange={onScrollContentSizeChange}
+                    onLayout={onScrollViewLayout}
+                    onScroll={scrollHandler}
+                    scrollEventThrottle={16}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.scrollArea}
+                  >
+                    {children}
+                  </Animated.ScrollView>
+                ) : (
+                  <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>
+                    {children}
+                  </View>
+                )}
+                {footer ? <View style={styles.footer}>{footer}</View> : null}
+              </Animated.View>
+            </GestureDetector>
+          </View>
+        </GestureHandlerRootView>
+      </InsideSheetContext.Provider>
     </Modal>
   );
 }
@@ -223,7 +296,6 @@ const createStyles = (
   topGap: number,
   bottomPadding: number,
   backdrop: "scrim" | "cover",
-  keyboardInset: number,
 ) =>
   StyleSheet.create({
     gestureRoot: {
@@ -262,10 +334,9 @@ const createStyles = (
       // into view over a strip of dimmed page, when what should read is a sheet
       // pinned to the edge with only its top moving.
       paddingBottom: SHEET_OVERDRAG_LIMIT,
-      // Plus whatever the keyboard is covering, so a sheet with a field in it
-      // rides above it. Folded into the same margin rather than handed to a
-      // `KeyboardAvoidingView` wrapper, which would take the backdrop up with it.
-      marginBottom: keyboardInset - SHEET_OVERDRAG_LIMIT,
+      // `marginBottom` is deliberately absent: it is animated, and lives in
+      // `keyboardStyle` on the component so the keyboard lift runs on the UI
+      // thread instead of rebuilding this StyleSheet on every keyboard event.
       // No side margins and no width of its own: the sheet stretches to the full
       // screen width by default and meets the bottom edge, so the top two
       // corners are its only edges ever in view.

@@ -196,7 +196,7 @@ export default function DashboardMockup() {
               style={{
                 width: 38,
                 height: 38,
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 border: "1px solid var(--dg-color-border)",
                 background: "var(--dg-color-surface)",
                 display: "flex",
@@ -232,7 +232,7 @@ export default function DashboardMockup() {
               display: "flex",
               alignItems: "center",
               padding: "0 14px",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               border: "1px solid var(--dg-color-border)",
               background: "var(--dg-color-surface)",
               fontSize: 12,
@@ -249,7 +249,7 @@ export default function DashboardMockup() {
           style={{
             display: "flex",
             border: "1px solid var(--dg-color-border)",
-            borderRadius: 6,
+            borderRadius: "var(--dg-radius-sm)",
             overflow: "hidden",
             background: "var(--dg-color-surface)",
           }}
@@ -277,7 +277,7 @@ export default function DashboardMockup() {
         style={{
           background: "var(--dg-color-surface)",
           border: "1px solid var(--dg-color-border)",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-xl)",
           padding: "16px 18px",
           display: "grid",
           gap: 14,
@@ -318,14 +318,14 @@ export default function DashboardMockup() {
               needs your attention.
             </p>
           </div>
-          {/* Action button — matches dg-btn-brand (filled brand, white text) */}
+          {/* Action button — matches dg-btn-primary (filled brand, white text) */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
               height: 38,
               padding: "0 16px",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               background: "var(--dg-color-brand)",
               color: "var(--dg-color-text-inverse)",
               fontSize: 13,
@@ -353,7 +353,7 @@ export default function DashboardMockup() {
                 style={{
                   background: "var(--dg-color-bg)",
                   border: "1px solid var(--dg-color-border)",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-radius-lg)",
                   padding: "12px 14px",
                 }}
               >
@@ -379,7 +379,7 @@ export default function DashboardMockup() {
                     style={{
                       width: 40,
                       height: 40,
-                      borderRadius: 10,
+                      borderRadius: "var(--dg-radius-lg)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -424,7 +424,7 @@ export default function DashboardMockup() {
           style={{
             background: "var(--dg-color-surface)",
             border: "1px solid var(--dg-color-border)",
-            borderRadius: 8,
+            borderRadius: "var(--dg-radius-md)",
             overflow: "hidden",
           }}
         >
@@ -469,7 +469,7 @@ export default function DashboardMockup() {
                   flexDirection: "column",
                   gap: 7,
                   padding: "14px 16px",
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   background: "var(--dg-color-bg)",
                   border: "1px solid var(--dg-color-border)",
                 }}
@@ -532,7 +532,7 @@ export default function DashboardMockup() {
           style={{
             background: "var(--dg-color-surface)",
             border: "1px solid var(--dg-color-border)",
-            borderRadius: 8,
+            borderRadius: "var(--dg-radius-md)",
             overflow: "hidden",
           }}
         >

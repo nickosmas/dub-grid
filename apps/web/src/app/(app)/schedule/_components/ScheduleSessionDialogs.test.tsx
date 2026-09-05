@@ -1,0 +1,49 @@
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ScheduleSessionEndedDialog, ScheduleSessionWarning } from "./ScheduleSessionDialogs";
+
+describe("ScheduleSessionDialogs", () => {
+  it("keeps same-account sessions visible with narrow takeover and local sign-out actions", async () => {
+    const endOtherSessions = vi.fn().mockResolvedValue(undefined);
+    const signOut = vi.fn();
+    render(
+      <ScheduleSessionWarning
+        sessionCount={2}
+        onEndOtherSessions={endOtherSessions}
+        onSignOutThisDevice={signOut}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("2 other tabs or devices");
+    expect(screen.getByRole("alert").getAttribute("style")).toContain("var(--dg-color-danger-bg)");
+    expect(screen.getByRole("alert").getAttribute("style")).toContain(
+      "var(--dg-color-danger-border)",
+    );
+    expect(screen.getByText(/devices will stay signed in/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "End other schedule sessions" }));
+    });
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(endOtherSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses singular session copy", () => {
+    render(
+      <ScheduleSessionWarning
+        sessionCount={1}
+        onEndOtherSessions={vi.fn()}
+        onSignOutThisDevice={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("1 other tab or device");
+  });
+
+  it("warns the ended editor that unsaved work was not saved", () => {
+    render(<ScheduleSessionEndedDialog onClose={vi.fn()} />);
+
+    expect(screen.getByText(/unsaved changes in this tab were not saved/i)).toBeTruthy();
+  });
+});

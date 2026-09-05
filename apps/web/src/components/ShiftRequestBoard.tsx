@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useState } from "react";
 import { useTheme } from "next-themes";
@@ -168,7 +169,7 @@ export default function ShiftRequestBoard({
           textTransform: "uppercase",
           letterSpacing: "0.04em",
           padding: "2px 7px",
-          borderRadius: 4,
+          borderRadius: "var(--dg-radius-xs)",
           background: colors.bg,
           color: colors.text,
           border: `1px solid ${colors.border}`,
@@ -269,7 +270,7 @@ export default function ShiftRequestBoard({
                   fontSize: "var(--dg-type-badge-size)",
                   fontWeight: 500,
                   padding: "2px 7px",
-                  borderRadius: 6,
+                  borderRadius: "var(--dg-radius-sm)",
                   background: "var(--dg-color-danger-bg, #FEF2F2)",
                   color: "var(--dg-color-danger-text, #991B1B)",
                   textTransform: "uppercase",
@@ -316,7 +317,7 @@ export default function ShiftRequestBoard({
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600,
                 padding: "2px 8px",
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 background: absenceTypeColors?.color || "var(--dg-color-surface-alt)",
                 color: absenceTypeColors?.text || "var(--dg-color-text-primary)",
                 border: `1px solid ${absenceTypeColors?.border || "var(--dg-color-border)"}`,
@@ -337,20 +338,7 @@ export default function ShiftRequestBoard({
             gap: 4,
           }}
         >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ flexShrink: 0 }}
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+          <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
           {timeRemainingLabel(req.expiresAt)}
         </div>
 
@@ -479,7 +467,7 @@ export default function ShiftRequestBoard({
                 minHeight: 56,
                 padding: "8px 10px",
                 border: "1px solid var(--dg-color-border)",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 fontSize: "var(--dg-fs-caption)",
                 fontFamily: "inherit",
                 resize: "vertical",
@@ -678,24 +666,13 @@ export default function ShiftRequestBoard({
                 height: 36,
                 background: "transparent",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>

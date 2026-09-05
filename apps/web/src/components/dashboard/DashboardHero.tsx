@@ -180,7 +180,7 @@ export default function DashboardHero({
         </div>
         <Link
           href={actionHref}
-          className="dg-btn dg-btn-brand"
+          className="dg-btn dg-btn-primary"
           style={{ whiteSpace: "nowrap", alignSelf: "center" }}
         >
           {actionLabel}
@@ -239,7 +239,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
           style={{
             width: 40,
             height: 40,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

@@ -479,6 +479,8 @@ export interface ScheduleNote {
   focusAreaId: number | null;
   status: "published" | "draft" | "draft_deleted";
   createdBy: string | null;
+  /** Last editor, used to attribute unpublished notes in the publish dialog. */
+  updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }

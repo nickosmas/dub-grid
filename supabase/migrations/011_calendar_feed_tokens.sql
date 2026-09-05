@@ -1,4 +1,7 @@
-CREATE TABLE public.calendar_feed_tokens (
+-- Idempotent so a retried push, or an environment provisioned from the
+-- canonical schema first, converges rather than failing on the second run.
+
+CREATE TABLE IF NOT EXISTS public.calendar_feed_tokens (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   org_id      UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -14,7 +17,7 @@ CREATE TABLE public.calendar_feed_tokens (
   CONSTRAINT calendar_feed_tokens_hash_format CHECK (token_hash ~ '^[0-9a-f]{64}$')
 );
 
-CREATE INDEX idx_calendar_feed_tokens_active_hash
+CREATE INDEX IF NOT EXISTS idx_calendar_feed_tokens_active_hash
   ON public.calendar_feed_tokens(token_hash)
   WHERE revoked_at IS NULL;
 

@@ -40,7 +40,6 @@ function makeServiceClient(rows: MockRows) {
       };
       return query;
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
 

@@ -32,11 +32,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
+  // Who published what, and the per-employee breakdown of every change, is a
+  // management record rather than part of seeing your own schedule. Staff keep
+  // the "published just now" banner (publish-history/recent) and the grid's
+  // published-range check (published-ranges), which are separate routes.
+  // canViewDashboardAnalytics is authz's derived "holds some management
+  // capability" flag, so every scheduler, publisher, approver and staff manager
+  // keeps this, and READ_ONLY_PERMS does not.
   const auth = await requireOrgPermissions(
     req,
     parsed.data.orgId,
     (permissions) =>
-      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewDashboardAnalytics,
   );
   if ("response" in auth) {
     return auth.response;

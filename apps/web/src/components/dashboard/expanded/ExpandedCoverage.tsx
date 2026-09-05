@@ -183,14 +183,14 @@ export default function ExpandedCoverage({
                             style={{
                               height: 8,
                               background: "var(--dg-color-border)",
-                              borderRadius: 4,
+                              borderRadius: "var(--dg-radius-xs)",
                               overflow: "hidden",
                             }}
                           >
                             <div
                               style={{
                                 height: 8,
-                                borderRadius: 4,
+                                borderRadius: "var(--dg-radius-xs)",
                                 width: `${Math.min(100, sec.pct)}%`,
                                 background: PCT_COLORS[pctColor],
                                 transition: "width 0.4s ease",

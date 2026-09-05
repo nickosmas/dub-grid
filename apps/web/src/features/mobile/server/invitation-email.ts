@@ -5,6 +5,7 @@ import { InviteEmail } from "@/emails/InviteEmail";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
+import { serverEnv } from "@/lib/env.server";
 
 /**
  * The one invitation email path the mobile API uses. Both the staff-invitation
@@ -18,13 +19,13 @@ export type InvitationEmailConfig = {
 };
 
 export function getInvitationEmailConfig(): InvitationEmailConfig | null {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = serverEnv?.RESEND_API_KEY;
   if (!apiKey) {
     return null;
   }
 
-  const from = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
-  if (!process.env.RESEND_FROM_EMAIL) {
+  const from = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  if (!serverEnv?.RESEND_FROM_EMAIL) {
     logger.warn("RESEND_FROM_EMAIL not set - using test domain for mobile invite");
   }
 

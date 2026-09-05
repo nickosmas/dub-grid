@@ -55,6 +55,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
   // null = still checking storage; once resolved we know whether to prompt.
   const [needsDecision, setNeedsDecision] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const applyDecision = useCallback((needed: boolean) => {
     // The storage read resolves after the screen behind is interactive, so a
@@ -81,10 +82,19 @@ export function ConsentGate({ children }: PropsWithChildren) {
   }, [applyDecision]);
 
   async function choose(analytics: boolean) {
+    if (saving) return;
+
     setSaving(true);
+    setError(null);
     try {
       await setStoredConsent(analytics);
       setNeedsDecision(false);
+    } catch {
+      // Device storage refused the write. Without this the rejection was
+      // swallowed by the `void` at the call site and `needsDecision` stayed
+      // true, so the user sat behind a sheet that cannot be dismissed with two
+      // buttons that appeared to do nothing at all. Say so, and let them retry.
+      setError("We couldn't save your choice on this device. Try again.");
     } finally {
       setSaving(false);
     }
@@ -103,31 +113,38 @@ export function ConsentGate({ children }: PropsWithChildren) {
       <BottomSheetModal
         accessibilityRole="alert"
         dismissDisabled
+        footer={
+          <SheetActions>
+            {/* Returning the promise is what latches the button against a second
+                tap. `void`-ing it left `useAsyncAction` with nothing to await, so
+                the only guard was a state flag that lands a render too late. */}
+            <Button
+              disabled={saving}
+              label="Accept all"
+              loading={saving}
+              onPress={() => choose(true)}
+              tone="primary"
+            />
+            <Button
+              disabled={saving}
+              label="Essential only"
+              onPress={() => choose(false)}
+              tone="secondary"
+            />
+          </SheetActions>
+        }
         header={<SheetHeader title="Your privacy" />}
         onDismiss={() => {}}
         visible={needsDecision === true}
       >
         <SheetCopy
           body="We use essential data to keep DubGrid working, including error monitoring. With your consent we also collect analytics to help us improve the app. You can change this any time in Profile, Privacy & data."
+          error={error}
           linkLabel="Read our cookie policy"
           // In-app: leaving for Safari mid-decision would drop the user out of
           // a sheet they still have to answer.
           onLinkPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
         />
-        <SheetActions>
-          <Button
-            disabled={saving}
-            label="Accept all"
-            onPress={() => void choose(true)}
-            tone="primary"
-          />
-          <Button
-            disabled={saving}
-            label="Essential only"
-            onPress={() => void choose(false)}
-            tone="secondary"
-          />
-        </SheetActions>
       </BottomSheetModal>
     </>
   );

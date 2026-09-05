@@ -300,13 +300,13 @@ const createStyles = (mobileColors: MobileColors) =>
       height: 38,
       borderRadius: 19,
       borderWidth: 1,
-      borderColor: "#93C5FD",
-      backgroundColor: "#DBEAFE",
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
     avatarOverflowText: {
       ...mobileText.bodyStrong,
-      color: "#1D4ED8",
+      color: mobileColors.textMuted,
     },
   });

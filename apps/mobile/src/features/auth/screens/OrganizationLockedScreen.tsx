@@ -43,7 +43,7 @@ function getDetailLine(
 
   if (!["trial_grace", "trial_ending_soon", "payment_attention_required"].includes(status.state)) {
     // The org looks fine now — a billing fix may have just landed.
-    return "This organization may be available again — try reloading.";
+    return "This organization may be available again. Try reloading.";
   }
 
   return null;

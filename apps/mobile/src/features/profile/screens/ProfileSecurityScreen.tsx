@@ -129,7 +129,7 @@ export default function ProfileSecurityScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "error"}
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
@@ -137,7 +137,7 @@ export default function ProfileSecurityScreen() {
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
           fillScreen
           title="Could not load security"

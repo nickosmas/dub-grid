@@ -170,7 +170,11 @@ async function handleGET(req: NextRequest, timer: Timer) {
       return NextResponse.json({
         org: null,
         isGridmaster: true,
-        entryGate: { onboardingCompleted: false, billingLocked: null },
+        entryGate: {
+          onboardingCompleted: false,
+          adminOnboardingCompleted: false,
+          billingLocked: null,
+        },
         activeEmployeeCount: 0,
         focusAreas: [],
         allAssignmentDefinitions: [],
@@ -204,11 +208,8 @@ async function handleGET(req: NextRequest, timer: Timer) {
     }
 
     const serviceClient = orgAuth.serviceClient;
-    const [configResults, employeeCountResult, onboardingResult] = await timeBootstrapStage(
-      timer,
-      deadlineAt,
-      "fanout",
-      () =>
+    const [configResults, employeeCountResult, onboardingResult, adminOnboardingResult] =
+      await timeBootstrapStage(timer, deadlineAt, "fanout", () =>
         Promise.all([
           // Authorization above is deliberately outside this cache. The cached
           // value is configuration for one org only; user, membership,
@@ -291,8 +292,24 @@ async function handleGET(req: NextRequest, timer: Timer) {
               .eq("org_id", authorizedOrgId)
               .maybeSingle(),
           ),
+          // Whether the organization is open to anyone else yet. A member who
+          // cannot configure the org waits until a super admin has been all the
+          // way through their own onboarding, not merely until the org's
+          // configuration counts as complete: an org can read as configured
+          // while its first super admin is still sitting on their welcome step.
+          // Deliberately outside the cached config slice, so the wait ends on
+          // the next fetch rather than up to a TTL later.
+          timeBootstrapStage(timer, deadlineAt, "admin_entry_gate", () =>
+            serviceClient
+              .from("organization_memberships")
+              .select("user_id", { count: "exact", head: true })
+              .eq("org_id", authorizedOrgId)
+              .eq("org_role", "super_admin")
+              .is("archived_at", null)
+              .not("onboarding_completed_at", "is", null),
+          ),
         ]),
-    );
+      );
 
     const [
       orgResult,
@@ -360,6 +377,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       isGridmaster: false,
       entryGate: {
         onboardingCompleted: Boolean(onboardingResult.data?.onboarding_completed_at),
+        adminOnboardingCompleted: (adminOnboardingResult.count ?? 0) > 0,
         billingLocked,
       },
       activeEmployeeCount: employeeCountResult.count ?? 0,

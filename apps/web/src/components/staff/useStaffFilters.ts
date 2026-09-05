@@ -1,12 +1,22 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import type { Employee, FocusArea, NamedItem } from "@/types";
+import { getEffectiveOrgRole, getOrgRolePrivilegeRank } from "@dubgrid/domain";
+import type { Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
 export type EmployeeTab = "all" | "active" | "inactive" | "removed";
-export type SortKey = "seniority" | "name";
+export type SortKey = "seniority" | "name" | "access";
+
+/** What the toolbar's sort dropdown offers, in the order it lists them. */
+export const STAFF_SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "seniority", label: "Sort: Seniority" },
+  { value: "name", label: "Sort: Name" },
+  { value: "access", label: "Sort: Access level" },
+];
 export type EmploymentTypeFilter = "all" | Employee["employmentType"];
 export type AccountLinkFilter = "all" | "linked" | "unlinked";
 export type ContactPresenceFilter = "all" | "present" | "missing";
+/** Everyone, or one access tier, matching the roster half's own role filter. */
+export type OrgRoleFilter = "all" | OrganizationRole;
 /**
  * A specific certification id, or the two presence cases. "any" is the People
  * page's certified-staff count; "none" is its support-staff complement.
@@ -27,6 +37,12 @@ interface UseStaffFiltersOptions {
   certifications: NamedItem[];
   roles: NamedItem[];
   regularUserMode?: boolean;
+  /**
+   * Effective access tier per employee, the same value the Access column
+   * prints. Absent while the viewer can't load directory data, which is also
+   * when the Access column and its filter stay hidden.
+   */
+  orgRoleByEmployeeId?: ReadonlyMap<string, OrganizationRole>;
 }
 
 export function useStaffFilters({
@@ -37,6 +53,7 @@ export function useStaffFilters({
   certifications,
   roles,
   regularUserMode = false,
+  orgRoleByEmployeeId,
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +65,7 @@ export function useStaffFilters({
   const [filterCertification, setFilterCertification] = useState<CertificationFilter>(null);
   const [filterRole, setFilterRole] = useState<number | null>(null);
   const [filterAccountLink, setFilterAccountLink] = useState<AccountLinkFilter>("all");
+  const [filterOrgRole, setFilterOrgRole] = useState<OrgRoleFilter>("all");
   const [filterEmailPresence, setFilterEmailPresence] = useState<ContactPresenceFilter>("all");
   const [filterPhonePresence, setFilterPhonePresence] = useState<ContactPresenceFilter>("all");
   const [page, setPage] = useState(1);
@@ -60,6 +78,7 @@ export function useStaffFilters({
     filterCertification !== null,
     filterRole !== null,
     !regularUserMode && filterAccountLink !== "all",
+    !regularUserMode && filterOrgRole !== "all",
     !regularUserMode && filterEmailPresence !== "all",
     !regularUserMode && filterPhonePresence !== "all",
   ].filter(Boolean).length;
@@ -73,6 +92,7 @@ export function useStaffFilters({
     setFilterCertification(null);
     setFilterRole(null);
     setFilterAccountLink("all");
+    setFilterOrgRole("all");
     setFilterEmailPresence("all");
     setFilterPhonePresence("all");
     setSearchQuery("");
@@ -84,9 +104,17 @@ export function useStaffFilters({
     );
   }, []);
 
+  /**
+   * Picking a key from the sort dropdown, as opposed to clicking a column
+   * header. Re-picking the key you already have is not a request to reverse
+   * the order, so this always lands ascending rather than toggling.
+   */
+  const setSortKey = useCallback((key: SortKey) => {
+    setSortConfig({ key, dir: "asc" });
+  }, []);
+
   // Reset page when filters/sort/tab change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [
     activeTab,
@@ -98,6 +126,7 @@ export function useStaffFilters({
     filterCertification,
     filterRole,
     filterAccountLink,
+    filterOrgRole,
     filterEmailPresence,
     filterPhonePresence,
     sortConfig,
@@ -200,6 +229,13 @@ export function useStaffFilters({
         regularUserMode ||
         filterAccountLink === "all" ||
         (filterAccountLink === "linked" ? Boolean(emp.userId) : !emp.userId);
+      // Access is an admin-only column, and an admin-only filter with it:
+      // nobody else is shown the tier it narrows on. Staff with no account
+      // count as Users, so picking that tier returns everyone but the admins.
+      const matchesOrgRole =
+        regularUserMode ||
+        filterOrgRole === "all" ||
+        getEffectiveOrgRole(orgRoleByEmployeeId?.get(emp.id)) === filterOrgRole;
       const matchesEmailPresence =
         regularUserMode ||
         filterEmailPresence === "all" ||
@@ -218,6 +254,7 @@ export function useStaffFilters({
         matchesCertification &&
         matchesRole &&
         matchesAccountLink &&
+        matchesOrgRole &&
         matchesEmailPresence &&
         matchesPhonePresence
       );
@@ -236,6 +273,8 @@ export function useStaffFilters({
     filterCertification,
     filterRole,
     filterAccountLink,
+    filterOrgRole,
+    orgRoleByEmployeeId,
     filterEmailPresence,
     filterPhonePresence,
     regularUserMode,
@@ -252,9 +291,21 @@ export function useStaffFilters({
           (a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)) * mul
         );
       }
+      if (sortConfig.key === "access") {
+        const rankComparison =
+          getOrgRolePrivilegeRank(orgRoleByEmployeeId?.get(a.id) ?? null) -
+          getOrgRolePrivilegeRank(orgRoleByEmployeeId?.get(b.id) ?? null);
+        // A tier holds many people, so name breaks the tie rather than leaving
+        // the order inside a tier down to whatever the list arrived in.
+        return (
+          (rankComparison ||
+            a.firstName.localeCompare(b.firstName) ||
+            a.lastName.localeCompare(b.lastName)) * mul
+        );
+      }
       return (a.seniority - b.seniority) * mul;
     });
-  }, [rawList, sortConfig]);
+  }, [rawList, sortConfig, orgRoleByEmployeeId]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
 
@@ -280,6 +331,7 @@ export function useStaffFilters({
     // Sort & filter
     sortConfig,
     handleSort,
+    setSortKey,
     filterEmploymentType,
     setFilterEmploymentType,
     filterDepartment,
@@ -294,6 +346,8 @@ export function useStaffFilters({
     setFilterRole,
     filterAccountLink,
     setFilterAccountLink,
+    filterOrgRole,
+    setFilterOrgRole,
     filterEmailPresence,
     setFilterEmailPresence,
     filterPhonePresence,

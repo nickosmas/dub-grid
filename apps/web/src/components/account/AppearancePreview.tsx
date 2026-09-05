@@ -56,7 +56,7 @@ export function AppearancePreview() {
           marginBottom: 8,
           padding: "5px 8px 5px 7px",
           background: "var(--dg-color-bg-secondary)",
-          borderRadius: 6,
+          borderRadius: "var(--dg-radius-sm)",
           display: "flex",
           alignItems: "center",
           gap: 7,
@@ -195,7 +195,7 @@ export function AppearancePreview() {
                     style={{
                       position: "absolute",
                       inset: 4,
-                      borderRadius: 6,
+                      borderRadius: "var(--dg-radius-sm)",
                       background: "var(--dg-color-text-subtle)",
                       color: "var(--dg-color-surface)",
                       display: "flex",
@@ -226,7 +226,7 @@ export function AppearancePreview() {
                         style={{
                           position: "absolute",
                           inset: 4,
-                          borderRadius: 6,
+                          borderRadius: "var(--dg-radius-sm)",
                           background: resolved.color,
                           color: resolved.text,
                           border: `1px solid ${resolved.border}`,

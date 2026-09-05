@@ -88,6 +88,16 @@ export function useSheetDragToDismiss({
   onDismiss: () => void;
 }) {
   const translateY = useSharedValue(travel);
+  // Read through a shared value rather than the closure so the position effect
+  // below doesn't depend on it. `travel` is the window height, and on Android
+  // that changes every time the keyboard opens or closes (`adjustResize`), which
+  // re-ran the effect *during* a drag dismissal and animated the sheet straight
+  // back up — the "sheet refuses to close" bug. Rotation did the same.
+  const travelValue = useSharedValue(travel);
+  // Whether the sheet is on its way out. The exit animation can be interrupted,
+  // and an interrupted animation still has to hand over to `onDismiss` — see the
+  // callback below.
+  const isDismissing = useSharedValue(false);
   // Where the sheet's own drag started, so a drag that begins as a scroll and
   // then hits the top of the list doesn't jump by the distance already scrolled.
   const dragOrigin = useSharedValue(0);
@@ -118,8 +128,12 @@ export function useSheetDragToDismiss({
   }, []);
 
   useEffect(() => {
-    translateY.value = withTiming(visible ? 0 : travel, OPEN_TIMING);
-  }, [dragDismissCount, translateY, travel, visible]);
+    travelValue.value = travel;
+  }, [travel, travelValue]);
+
+  useEffect(() => {
+    translateY.value = withTiming(visible ? 0 : travelValue.value, OPEN_TIMING);
+  }, [dragDismissCount, translateY, travelValue, visible]);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollOffset.value = event.contentOffset.y;
@@ -147,6 +161,12 @@ export function useSheetDragToDismiss({
       // and which of the sheet and the list owns the motion is decided per frame
       // below, by whether the list has anywhere left to go.
       .activeOffsetY([-DRAG_ACTIVATION_DISTANCE, DRAG_ACTIVATION_DISTANCE])
+      .onStart(() => {
+        "worklet";
+        // A finger on the sheet takes it back off the exit animation, so the
+        // interrupted-exit handover below must not fire for this one.
+        isDismissing.value = false;
+      })
       .onUpdate((event) => {
         "worklet";
         const dragged = event.translationY - dragOrigin.value;
@@ -193,10 +213,17 @@ export function useSheetDragToDismiss({
           return;
         }
 
-        translateY.value = withTiming(travel, DISMISS_TIMING, (finished) => {
-          if (finished) {
-            runOnJS(dismiss)();
-          }
+        isDismissing.value = true;
+        translateY.value = withTiming(travelValue.value, DISMISS_TIMING, () => {
+          "worklet";
+          // Deliberately not gated on `finished`. An exit that is cut short is
+          // still an exit the user asked for, and dropping it left the sheet
+          // mounted with no way to close it. `isDismissing` is the real guard:
+          // a new drag clears it in `onStart`, and clearing it here keeps a
+          // second interruption from dismissing twice.
+          if (!isDismissing.value) return;
+          isDismissing.value = false;
+          runOnJS(dismiss)();
         });
       })
       .onFinalize(() => {
@@ -214,20 +241,26 @@ export function useSheetDragToDismiss({
     dismiss,
     dismissible,
     dragOrigin,
+    isDismissing,
     scrollContentHeight,
     scrollOffset,
     scrollRef,
     scrollViewport,
     scrollable,
     translateY,
-    travel,
+    travelValue,
   ]);
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
   const backdropStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateY.value, [0, Math.max(travel, 1)], [1, 0], Extrapolation.CLAMP),
+    opacity: interpolate(
+      translateY.value,
+      [0, Math.max(travelValue.value, 1)],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
   }));
 
   return {

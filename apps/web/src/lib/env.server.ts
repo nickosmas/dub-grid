@@ -48,6 +48,11 @@ const serverSchema = z
     VERCEL_PROJECT_ID: z.string().optional(),
     VERCEL_TEAM_ID: z.string().optional(),
     VERCEL_ENV: z.string().optional(),
+    RESEND_FROM_EMAIL: z.string().optional(),
+    DEMO_RECIPIENT_EMAIL: z.string().optional(),
+    LOG_LEVEL: z.string().optional(),
+    RATE_LIMIT_IN_DEV: z.string().optional(),
+    PERF_TIMING: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (!isStrictProductionEnv) return;
@@ -71,7 +76,10 @@ const serverSchema = z
 
 function validateServerEnv() {
   // Only validate server env in server context (not in browser)
-  if (typeof window !== "undefined") return null;
+  // Real browsers get null; jsdom under test does not. Returning null in test
+  // meant server code under test saw no config, which is why call sites read
+  // process.env directly instead of this object.
+  if (typeof window !== "undefined" && process.env.NODE_ENV !== "test") return null;
 
   const result = serverSchema.safeParse(process.env);
   if (!result.success) {
@@ -92,4 +100,21 @@ function validateServerEnv() {
   return result.data;
 }
 
-export const serverEnv = validateServerEnv();
+type ServerEnv = z.infer<typeof serverSchema>;
+
+let serverMemo: ServerEnv | null | undefined;
+
+/** Lazy for the same reason as clientEnv: see the note in ./env. */
+function resolveServerEnv(): ServerEnv | null {
+  if (process.env.NODE_ENV === "test") return validateServerEnv();
+  if (serverMemo === undefined) serverMemo = validateServerEnv();
+  return serverMemo;
+}
+
+export const serverEnv = new Proxy({} as ServerEnv, {
+  get: (_target, prop: string) => resolveServerEnv()?.[prop as keyof ServerEnv],
+  has: (_target, prop: string) => {
+    const resolved = resolveServerEnv();
+    return resolved ? prop in resolved : false;
+  },
+}) as ServerEnv | null;

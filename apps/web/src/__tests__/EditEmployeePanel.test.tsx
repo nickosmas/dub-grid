@@ -577,7 +577,7 @@ describe("EditEmployeePanel", () => {
       expect(
         screen.getByText(/changing the email will revoke the pending invitation/i),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save & Send" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save & send" })).toBeInTheDocument();
       expect(onSave).not.toHaveBeenCalled();
     });
 
@@ -608,7 +608,7 @@ describe("EditEmployeePanel", () => {
 
       await changeEmail(user);
       await user.click(screen.getByRole("button", { name: "Save" }));
-      await user.click(screen.getByRole("button", { name: "Save & Send" }));
+      await user.click(screen.getByRole("button", { name: "Save & send" }));
 
       expect(onSaveWithReinvite).toHaveBeenCalledWith(
         expect.objectContaining({ email: "new.address@example.com" }),

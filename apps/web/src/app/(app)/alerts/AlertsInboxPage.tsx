@@ -1,8 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { Hint } from "@/components/ui/hint";
+import { hint } from "@/components/ui/hint.types";
 import {
   Archive,
   ArchiveRestore,
@@ -887,59 +897,59 @@ function ReadFilterTabs({
     <div
       role="tablist"
       aria-label="Filter by read state"
-      style={{
-        display: "inline-flex",
-        gap: 2,
-        padding: 3,
-        marginBottom: 12,
-        background: "var(--dg-color-bg-secondary)",
-        borderRadius: "var(--dg-radius-md)",
-      }}
+      className="dg-span-tabs dg-span-tabs--light"
+      // `.dg-span-tabs` is unlayered and sets `display: flex`, so this has to
+      // be inline to shrink-wrap the control. Same override as PrintOptionsModal.
+      style={{ display: "inline-flex", marginBottom: 12 }}
     >
-      {tabs.map((tab) => {
+      {tabs.map((tab, index) => {
         const active = value === tab.value;
+        const prevActive = index > 0 && value === tabs[index - 1].value;
+        const showDivider = index > 0 && !active && !prevActive;
         return (
-          <Button
-            key={tab.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(tab.value)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              height: 28,
-              padding: "0 12px",
-              border: "none",
-              borderRadius: "var(--dg-radius-sm)",
-              cursor: "pointer",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: active ? 600 : 500,
-              color: active ? "var(--dg-color-text-primary)" : "var(--dg-color-text-muted)",
-              background: active ? "var(--dg-color-surface)" : "transparent",
-              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-              fontFamily: "inherit",
-              transition: "background 120ms ease, color 120ms ease",
-            }}
-          >
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span
+          <Fragment key={tab.value}>
+            {index > 0 && (
+              <div
                 style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  padding: "1px 6px",
-                  borderRadius: 999,
-                  background: active ? "var(--dg-color-brand-bg)" : "var(--dg-color-surface)",
-                  color: active ? "var(--dg-color-brand)" : "var(--dg-color-text-muted)",
-                  fontVariantNumeric: "tabular-nums",
+                  width: 1,
+                  height: 16,
+                  background: showDivider ? "var(--dg-color-border)" : "transparent",
+                  flexShrink: 0,
+                  alignSelf: "center",
                 }}
-              >
-                {tab.count}
-              </span>
+              />
             )}
-          </Button>
+            <Button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(tab.value)}
+              className={`dg-span-tab${active ? " active" : ""}`}
+            >
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    padding: "0 4px",
+                    fontSize: "var(--dg-fs-micro)",
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    background: active ? "rgba(255,255,255,0.25)" : "var(--dg-color-border-light)",
+                    color: active ? "inherit" : "var(--dg-color-text-muted)",
+                    marginLeft: 3,
+                  }}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </Button>
+          </Fragment>
         );
       })}
     </div>
@@ -1311,18 +1321,19 @@ function NotificationRow({
                 : 1;
             if (groupCount <= 1) return null;
             return (
-              <span
-                title={`Part of ${groupCount} related alerts`}
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--dg-color-text-muted)",
-                  background: "var(--dg-color-bg-secondary)",
-                  borderRadius: 999,
-                  padding: "1px 8px",
-                }}
-              >
-                ×{groupCount}
-              </span>
+              <Hint content={hint(`Part of ${groupCount} related alerts`)}>
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-text-muted)",
+                    background: "var(--dg-color-bg-secondary)",
+                    borderRadius: 999,
+                    padding: "1px 8px",
+                  }}
+                >
+                  ×{groupCount}
+                </span>
+              </Hint>
             );
           })()}
           {isUnread && (
@@ -1458,7 +1469,7 @@ function ListPlaceholder() {
                 width: "40%",
                 height: 12,
                 background: "var(--dg-color-bg-secondary)",
-                borderRadius: 4,
+                borderRadius: "var(--dg-radius-xs)",
               }}
             />
             <div
@@ -1466,7 +1477,7 @@ function ListPlaceholder() {
                 width: "70%",
                 height: 10,
                 background: "var(--dg-color-bg-secondary)",
-                borderRadius: 4,
+                borderRadius: "var(--dg-radius-xs)",
               }}
             />
           </div>

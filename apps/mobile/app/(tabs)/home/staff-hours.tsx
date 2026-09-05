@@ -12,6 +12,7 @@ import {
 import { StaffHoursRow } from "../../../src/features/dashboard/components/StaffHoursCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
+import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
@@ -23,6 +24,9 @@ export default function StaffHoursExpandedScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
+  // Drilling in from Home used to lose pull-to-refresh entirely: these routes
+  // share Home's cached query, so the only way to refresh was to back out.
+  const manualRefresh = useManualRefresh(() => dashboardQuery.refetch());
   const [sortMode, setSortMode] = useState<SortMode>("overtime");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -40,7 +44,9 @@ export default function StaffHoursExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen bottomPaddingMode="tabbed">
+      // A skeleton stands in for content; it must not scroll, and there is
+      // nothing to pull-to-refresh while the thing is still loading.
+      <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
         {contentState.showSkeleton ? (
           <DashboardListSkeleton rows={4} variant="trailingBadges" />
         ) : null}
@@ -81,7 +87,11 @@ export default function StaffHoursExpandedScreen() {
     (sortMode === "alphabetical" ? 1 : 0) + (focusAreaFilter !== "all" ? 1 : 0);
 
   return (
-    <Screen bottomPaddingMode="tabbed">
+    <Screen
+      bottomPaddingMode="tabbed"
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
+    >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
         title="Filter overtime watch"

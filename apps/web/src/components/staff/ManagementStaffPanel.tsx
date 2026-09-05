@@ -1,4 +1,5 @@
 "use client";
+import { ChevronRight, Clock } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
@@ -7,7 +8,7 @@ import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
-import { getInitials, formatRelativeTime } from "@/lib/utils";
+import { getInitials, formatRelativeTime, getDirectoryPersonAvatarSeed } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { validatePhone, validateRequired } from "@/components/FormField";
 import {
@@ -24,6 +25,7 @@ import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
+import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -386,10 +388,14 @@ export function ManagementStaffPanel({
       ? `${person.firstName} ${person.lastName}`.trim()
       : person.email;
   const initials = getInitials(displayName);
-  const avatarTone = getAvatarTone(person.personId, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(getDirectoryPersonAvatarSeed(person), resolvedTheme === "dark");
 
-  const statusConfig = isPending
-    ? isExpired
+  // Only the invitation states earn a pill. Active/Inactive read as noise on a
+  // page about one person, but an invitation nobody has accepted (or one that
+  // has expired) is not something the rest of the panel says anywhere.
+  const statusConfig = !isPending
+    ? null
+    : isExpired
       ? {
           bg: "var(--dg-color-danger-bg)",
           text: "var(--dg-color-danger-text)",
@@ -401,27 +407,7 @@ export function ManagementStaffPanel({
           text: "var(--dg-color-warning-text)",
           dot: "var(--dg-color-warning)",
           label: "Pending",
-        }
-    : person.employeeStatus === "removed"
-      ? {
-          bg: "var(--dg-color-danger-bg)",
-          text: "var(--dg-color-danger-text)",
-          dot: "var(--dg-color-danger)",
-          label: "Removed",
-        }
-      : person.employeeStatus === "inactive"
-        ? {
-            bg: "var(--dg-color-warning-bg)",
-            text: "var(--dg-color-warning-text)",
-            dot: "var(--dg-color-warning)",
-            label: "Inactive",
-          }
-        : {
-            bg: "var(--dg-color-success-bg)",
-            text: "var(--dg-color-success-text)",
-            dot: "var(--dg-color-success)",
-            label: "Active",
-          };
+        };
 
   const labelStyle: React.CSSProperties = {
     display: "block",
@@ -446,8 +432,9 @@ export function ManagementStaffPanel({
     outline: "none",
   };
 
-  // Role + permission controls, shared with the on-schedule staff panel.
-  // Self-gates on the callbacks, which the parent passes only to managers.
+  // Role + permission controls, the same ones StaffDetailPanel renders for
+  // on-schedule staff. Self-gates on the callbacks, which the parent passes
+  // only to managers.
   const accessControls = (
     <MemberAccessControls
       orgRole={person.orgRole}
@@ -501,7 +488,7 @@ export function ManagementStaffPanel({
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--dg-color-border-light)"
-                  : `2px solid ${avatarTone.borderColor}`,
+                  : `1px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}
@@ -521,6 +508,7 @@ export function ManagementStaffPanel({
                 >
                   {displayName}
                 </span>
+                <AccessInsignia orgRole={person.orgRole} size="md" />
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   {isOnSchedule && (
                     <span
@@ -539,30 +527,32 @@ export function ManagementStaffPanel({
                       On Schedule
                     </span>
                   )}
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 600,
-                      background: statusConfig.bg,
-                      color: statusConfig.text,
-                    }}
-                  >
+                  {statusConfig && (
                     <span
                       style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: "50%",
-                        background: statusConfig.dot,
-                        flexShrink: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        background: statusConfig.bg,
+                        color: statusConfig.text,
                       }}
-                    />
-                    {statusConfig.label}
-                  </span>
+                    >
+                      <span
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          background: statusConfig.dot,
+                          flexShrink: 0,
+                        }}
+                      />
+                      {statusConfig.label}
+                    </span>
+                  )}
                 </div>
               </div>
               <div
@@ -603,18 +593,7 @@ export function ManagementStaffPanel({
                   }}
                 >
                   View full profile
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="9 6 15 12 9 18" />
-                  </svg>
+                  <ChevronRight size={10} strokeWidth={2.5} />
                 </Link>
               )}
             </div>
@@ -1026,23 +1005,13 @@ export function ManagementStaffPanel({
                             color: "var(--dg-color-text-secondary)",
                           }}
                         >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                          <Clock
+                            size={14}
                             style={{
                               color: "var(--dg-color-text-faint)",
                               flexShrink: 0,
                             }}
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
+                          />
                           <MaybeHint
                             content={
                               person.lastSignInAt
@@ -1166,12 +1135,7 @@ export function ManagementStaffPanel({
                       <Button
                         onClick={handleRevoke}
                         disabled={revoking}
-                        className="dg-btn dg-btn-primary"
-                        style={{
-                          background: "var(--dg-color-danger)",
-                          border: "none",
-                          color: "var(--dg-color-text-inverse)",
-                        }}
+                        className="dg-btn dg-btn-danger-filled"
                       >
                         <ButtonLoading loading={revoking} spinnerSize={14}>
                           Confirm

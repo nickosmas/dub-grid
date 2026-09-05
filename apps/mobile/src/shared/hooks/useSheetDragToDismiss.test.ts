@@ -1,7 +1,47 @@
 import { act, renderHook } from "@testing-library/react";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 import { capturedPanGestures } from "../../test/gesture-handler-stub";
 import { useSheetDragToDismiss } from "./useSheetDragToDismiss";
+
+// The reanimated stub resolves `withTiming` synchronously, which is what every
+// test below wants — there are no frames to wait for. The exit-animation tests
+// are the exception: they need the sheet to be *mid-flight* so something can
+// interrupt it, so they flip this on and fire the callback themselves.
+const timing = vi.hoisted(() => ({
+  defer: false,
+  pending: [] as Array<(finished: boolean) => void>,
+}));
+
+vi.mock("react-native-reanimated", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-native-reanimated")>();
+
+  return {
+    ...actual,
+    withTiming: (toValue: unknown, _config?: unknown, callback?: (finished: boolean) => void) => {
+      if (timing.defer) {
+        if (callback) timing.pending.push(callback);
+        return toValue;
+      }
+
+      callback?.(true);
+      return toValue;
+    },
+  };
+});
+
+afterEach(() => {
+  timing.defer = false;
+  timing.pending = [];
+});
+
+/** Ends the in-flight exit the way a cancelled Reanimated animation does. */
+function interruptPendingAnimations() {
+  act(() => {
+    const callbacks = timing.pending;
+    timing.pending = [];
+    callbacks.forEach((callback) => callback(false));
+  });
+}
 
 const WINDOW_HEIGHT = 844;
 
@@ -9,14 +49,14 @@ function renderSheetDrag(
   options: { scrollable?: boolean; dismissible?: boolean; visible?: boolean } = {},
 ) {
   const onDismiss = vi.fn();
-  let props = { visible: options.visible ?? true };
+  let props = { visible: options.visible ?? true, travel: WINDOW_HEIGHT };
   const view = renderHook(
-    (next: { visible: boolean }) =>
+    (next: { visible: boolean; travel: number }) =>
       useSheetDragToDismiss({
         dismissible: options.dismissible ?? true,
         onDismiss,
         scrollable: options.scrollable ?? false,
-        travel: WINDOW_HEIGHT,
+        travel: next.travel,
         visible: next.visible,
       }),
     { initialProps: props },
@@ -24,7 +64,13 @@ function renderSheetDrag(
   const gesture = capturedPanGestures.at(-1);
 
   function setVisible(visible: boolean) {
-    props = { visible };
+    props = { ...props, visible };
+    act(() => view.rerender(props));
+  }
+
+  /** What the Android keyboard does to the window height, and what rotation does. */
+  function setTravel(travel: number) {
+    props = { ...props, travel };
     act(() => view.rerender(props));
   }
 
@@ -72,7 +118,18 @@ function renderSheetDrag(
     });
   }
 
-  return { drag, dragTo, gesture, measureList, onDismiss, scrollTo, setVisible, translateY, view };
+  return {
+    drag,
+    dragTo,
+    gesture,
+    measureList,
+    onDismiss,
+    scrollTo,
+    setTravel,
+    setVisible,
+    translateY,
+    view,
+  };
 }
 
 describe("useSheetDragToDismiss", () => {
@@ -207,6 +264,50 @@ describe("useSheetDragToDismiss", () => {
     dragTo(-200);
 
     expect(translateY()).toBeLessThan(0);
+  });
+
+  it("still closes when the window height changes mid-exit", () => {
+    // The "sheet refuses to close" report. On Android the keyboard closing
+    // resizes the window, so `travel` changed while the sheet was animating
+    // out; the position effect re-ran, cancelled the exit, and the dismissal
+    // was dropped because it only fired on `finished`.
+    timing.defer = true;
+    const { drag, onDismiss, setTravel } = renderSheetDrag();
+
+    drag({ to: 140 });
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    setTravel(WINDOW_HEIGHT - 320);
+    interruptPendingAnimations();
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a cut-short exit to a new drag instead of dismissing behind it", () => {
+    timing.defer = true;
+    const { drag, gesture, onDismiss } = renderSheetDrag();
+
+    drag({ to: 140 });
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // A finger back on the sheet before it finished leaving owns it again.
+    act(() => {
+      gesture?.__handlers.onStart?.({});
+    });
+    interruptPendingAnimations();
+
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("dismisses once, not per interruption", () => {
+    timing.defer = true;
+    const { drag, onDismiss } = renderSheetDrag();
+
+    drag({ to: 140 });
+    interruptPendingAnimations();
+    interruptPendingAnimations();
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("measures the drag from where the list reached its top, not from the touch", () => {

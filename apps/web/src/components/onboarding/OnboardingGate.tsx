@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect } from "react";
+import { Suspense, useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
@@ -13,6 +13,7 @@ import {
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { useAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
+import { resolveOnboardingDecision } from "./onboarding-decision";
 
 /** Routes where the onboarding gate should never intercept. */
 const PUBLIC_ROUTES = [
@@ -27,6 +28,13 @@ const PUBLIC_ROUTES = [
   "/privacy",
   "/cookie-policy",
   "/onboarding",
+  // The organization gate in the proxy is terminal: a member held there has no
+  // organization to be onboarded into yet. Without this the wizard painted
+  // straight over the screen explaining the wait, and finishing it dropped the
+  // user back on that same screen. Bootstrap is the other reason: it answers a
+  // locked organization with a 403, which reads here as a failed bootstrap and
+  // covers the gate with the recovery screen instead.
+  "/billing-required",
   "/forgot-password",
   "/reset-password",
   "/verify-email",
@@ -157,96 +165,99 @@ function OnboardingCheck({
     await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
   }, [queryClient]);
 
+  // Onboarding was completed in this session — never re-mount a wizard, even if
+  // a refetch momentarily reads onboarding-status as not-completed. Closes the
+  // config→orientation double-show race. (Server onboarding_completed_at remains
+  // the cross-session source of truth for the queries above.)
+  const onboardingComplete = isOnboardingComplete(userId, orgId);
+
+  // Latched for the life of this mount, in an effect so a discarded
+  // concurrent/strict-mode render can never set it. App Router keeps the gate
+  // mounted across in-app navigation, so this covers a whole visit; a hard
+  // refresh re-decides from scratch.
+  const appShownRef = useRef(false);
+
+  const decision = resolveOnboardingDecision({
+    // A failed bootstrap has no organization for the wizard steps to render,
+    // and an in-flight query would otherwise cover the page while the client
+    // has no path to recover.
+    bootstrapUnavailable: Boolean(loadError) && !org,
+    completedThisSession: onboardingComplete,
+    appAlreadyShown: appShownRef.current,
+    orgLoading,
+    entryGate,
+    onBillingRecoveryRoute: isBillingRecoveryRoute(pathname, section),
+    // Adding employees is a post-wizard task on the People page, so it doesn't
+    // gate org setup completion. setupStatus.isComplete is the configuration
+    // contract (focus areas + schedule definitions + certifications + roles).
+    setupComplete: setupStatus.isComplete,
+    // Only roles that can actually advance org config get the setup wizard.
+    // canManageOrg covers gridmaster (filtered earlier) + super_admin + any
+    // manage-* perm. Admins without a manage-* perm have nothing to do in the
+    // config wizard, so they wait (SetupPendingScreen) until a super_admin
+    // finishes, then get the orientation.
+    canCompleteSetup: canManageOrg,
+    // Only treat the bootstrap as reliable once it is for THIS org. On a login
+    // that switches orgs, useOrganizationData briefly resolves a different one,
+    // so freezing the phase then could latch the wrong wizard.
+    orgDataReliable: Boolean(org) && org?.id === orgId,
+    frozenPhase: getOnboardingPhase(userId, orgId),
+  });
+
+  const settledAppRender = decision.kind === "app" && decision.settled;
+  useEffect(() => {
+    if (settledAppRender) appShownRef.current = true;
+  }, [settledAppRender]);
+
   // Consume the post-login auth-transition flag once we've reached a settled
   // state (onboarding already complete, or a final wizard/app decision). Done in
   // an effect, NOT during render, so a discarded concurrent/strict-mode render
   // can't clear the splash flag before the navigation that needs it. (M-5)
-  const onboardingComplete = isOnboardingComplete(userId, orgId);
   const reachedFinalDecision = onboardingComplete || (!orgLoading && entryGate !== null);
   useEffect(() => {
     if (reachedFinalDecision) consumeAuthTransition();
   }, [reachedFinalDecision]);
 
-  // Onboarding was completed in this session — never re-mount a wizard, even if
-  // a refetch momentarily reads onboarding-status as not-completed. Closes the
-  // config→orientation double-show race. (Server onboarding_completed_at remains
-  // the cross-session source of truth for the queries above.)
-  // This check must come before the other gate-loading branches. A failed
-  // bootstrap has no organization for the wizard steps to render, and an
-  // in-flight billing or onboarding query would otherwise cover the page with
-  // AuthSplash while the client has no path to recover.
-  if (loadError && !org) {
-    return (
-      <OrganizationBootstrapRecovery
-        automaticallyRetry={bootstrapRetryable}
-        onRetry={retryOrganizationBootstrap}
-      />
-    );
-  }
-
-  if (onboardingComplete) {
-    return <>{children}</>;
-  }
-
-  // A post-login handoff needs a branded transition while the onboarding
-  // decision resolves. Ordinary signed-in refreshes keep the app visible so
-  // their page-level loading states can render instead of a full-screen gate.
-  if (entryGate?.billingLocked) {
-    if (isBillingRecoveryRoute(pathname, section)) {
-      return <>{children}</>;
-    }
-    return <BillingRedirect />;
-  }
-
-  if (orgLoading || entryGate === null) {
-    return authTransitionPending ? <AuthTransitionScreen phase="workspace" /> : <>{children}</>;
-  }
-
-  // (auth-transition flag is consumed by the effect above once settled — M-5)
-
-  // Adding employees is a post-wizard task on the People page, so it doesn't
-  // gate org setup completion. setupStatus.isComplete is the configuration
-  // contract (focus areas + schedule definitions + certifications + roles).
-  const liveSetupComplete = setupStatus.isComplete;
-  // Only roles that can actually advance org config get the setup wizard.
-  // canManageOrg covers gridmaster (filtered earlier) + super_admin + any
-  // manage-* perm. Admins without a manage-* perm have nothing to do in the
-  // config wizard, so they wait (SetupPendingScreen) until a super_admin
-  // finishes, then get the orientation.
-  const canCompleteSetup = canManageOrg;
-
   // Pick the wizard variant once and freeze it for the session. A super_admin
-  // completes org setup *inside* the config wizard, flipping liveSetupComplete
+  // completes org setup *inside* the config wizard, flipping setup completeness
   // to true mid-flow; without the freeze that swaps the config wizard out for
   // the orientation wizard (the "two wizards in a row" bug).
-  //
-  // Only freeze when the bootstrap is reliably for THIS org (org.id === orgId).
-  // On a login that switches orgs, useOrganizationData briefly resolves a
-  // different org, so freezing then could latch the wrong phase. When it's not
-  // yet reliable we fall back to live status (no freeze) — which self-corrects
-  // on the next render and never sticks wrong, instead of stalling on a splash.
-  // Non-managers also stay on live status so pending-screen → orientation works.
-  const orgDataReliable = Boolean(org) && org?.id === orgId;
-  let phase = getOnboardingPhase(userId, orgId);
-  if (!phase) {
-    phase = liveSetupComplete ? "orientation" : "config";
-    if (canCompleteSetup && orgDataReliable) {
-      freezeOnboardingPhase(userId, orgId, phase);
-    }
-  }
+  const freezePhase = decision.kind === "wizard" ? decision.freezePhase : null;
+  useEffect(() => {
+    if (freezePhase) freezeOnboardingPhase(userId, orgId, freezePhase);
+  }, [freezePhase, userId, orgId]);
 
-  if (phase === "config") {
-    if (!canCompleteSetup) {
+  switch (decision.kind) {
+    case "bootstrap-recovery":
+      return (
+        <OrganizationBootstrapRecovery
+          automaticallyRetry={bootstrapRetryable}
+          onRetry={retryOrganizationBootstrap}
+        />
+      );
+    case "billing-redirect":
+      return <BillingRedirect />;
+    case "app":
+      // A post-login handoff needs a branded transition while the onboarding
+      // decision resolves. Ordinary signed-in refreshes keep the app visible so
+      // their page-level loading states can render instead of a full-screen gate.
+      if (!decision.settled && authTransitionPending) {
+        return <AuthTransitionScreen phase="workspace" />;
+      }
+      return <>{children}</>;
+    case "setup-pending":
       return <SetupPendingScreen />;
-    }
-    // /setup as a standalone route was removed in the onboarding refactor
-    // (commit d7e7b96). Render the wizard inline so users with incomplete
-    // org setup see it on whatever route they landed on after login.
-    return <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={false} />;
+    case "wizard":
+      // /setup as a standalone route was removed in the onboarding refactor
+      // (commit d7e7b96). Render the wizard inline so users with incomplete
+      // org setup see it on whatever route they landed on after login.
+      return (
+        <OnboardingWizard
+          role={role}
+          orgId={orgId}
+          userId={userId}
+          isOrgSetup={decision.isOrgSetup}
+        />
+      );
   }
-
-  // orientation
-  if (entryGate.onboardingCompleted) return <>{children}</>;
-
-  return <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={true} />;
 }

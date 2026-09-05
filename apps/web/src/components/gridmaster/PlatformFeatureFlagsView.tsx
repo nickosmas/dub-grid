@@ -58,7 +58,7 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
   mobile_api: {
     label: "Mobile App",
     description:
-      "Powers the entire mobile app. Turning this off makes the mobile app completely unusable for every organization until it's turned back on — use with caution.",
+      "Powers the entire mobile app. Turning this off makes the mobile app completely unusable for every organization until it's turned back on. Use with caution.",
   },
   cron_trial_expiry: {
     label: "Trial Expiry Reminders",
@@ -300,7 +300,7 @@ export default function PlatformFeatureFlagsView() {
               ? `This affects every organization on the platform immediately. ${pendingInfo.description}`
               : `This restores it for every organization on the platform immediately. ${pendingInfo.description}`
           }
-          confirmLabel={pendingFlag.enabled ? "Turn It Off" : "Turn It On"}
+          confirmLabel={pendingFlag.enabled ? "Turn it off" : "Turn it on"}
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}
           onConfirm={() => {

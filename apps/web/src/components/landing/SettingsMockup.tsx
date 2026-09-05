@@ -65,7 +65,7 @@ export default function SettingsMockup() {
       <div
         style={{
           background: "var(--dg-color-surface)",
-          borderRadius: 10,
+          borderRadius: "var(--dg-radius-lg)",
           border: "1px solid var(--dg-color-border)",
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
           padding: 20,
@@ -105,7 +105,7 @@ export default function SettingsMockup() {
                     fontWeight: 500,
                     padding: "0 12px",
                     border: `1px solid ${field.dirty ? "var(--dg-color-border-focus)" : "var(--dg-color-border)"}`,
-                    borderRadius: 6,
+                    borderRadius: "var(--dg-radius-sm)",
                     color: "var(--dg-color-text-secondary)",
                     background: "var(--dg-color-surface)",
                     boxShadow: field.dirty ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
@@ -146,7 +146,7 @@ export default function SettingsMockup() {
                   fontWeight: 600,
                   padding: "0 16px",
                   border: "1px solid var(--dg-color-border)",
-                  borderRadius: 6,
+                  borderRadius: "var(--dg-radius-sm)",
                   color: "var(--dg-color-text-secondary)",
                   background: "transparent",
                 }}
@@ -162,7 +162,7 @@ export default function SettingsMockup() {
                 fontSize: 13,
                 fontWeight: 600,
                 padding: "0 16px",
-                borderRadius: 6,
+                borderRadius: "var(--dg-radius-sm)",
                 color: "var(--dg-color-text-inverse)",
                 background: "var(--dg-color-brand)",
               }}

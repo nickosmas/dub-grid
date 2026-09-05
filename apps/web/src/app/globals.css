@@ -62,6 +62,7 @@
   --color-warning-text: var(--dg-color-warning-text);
   --color-warning-border: var(--dg-color-warning-border);
   --color-warning-dark: var(--dg-color-warning-dark);
+  --color-insignia-crown: var(--dg-color-insignia-crown);
   --color-danger: var(--dg-color-danger);
   --color-danger-bg: var(--dg-color-danger-bg);
   --color-danger-text: var(--dg-color-danger-text);
@@ -225,6 +226,10 @@
   --dg-grid-name-col-mobile: 160px;
   --dg-duration-fast: 150ms;
   --dg-duration-standard: 200ms;
+  /* 4px was the app's de-facto smallest radius long before it had a name:
+     76 call sites used the literal. Naming it is what lets them join the
+     scale rather than drift off it. */
+  --dg-radius-xs: 4px;
   --dg-radius-sm: 6px;
   --dg-radius-md: 8px;
   --dg-radius-lg: 10px;
@@ -277,6 +282,10 @@
   --dg-color-text-label: #666666;
   --dg-color-text-inverse: #ffffff;
   --dg-color-on-brand-text: #ffffff;
+  /* The amber fill is the same in both themes, so its label is too. White on
+     amber measures 2.15:1; this dark amber reads 6.97:1 and keeps the button
+     one warm object rather than a hazard sign. */
+  --dg-color-on-warning-text: #451a03;
   --dg-color-on-brand-surface: #ffffff;
   --dg-color-brand: #2563eb;
   --dg-color-brand-light: #3b82f6;
@@ -299,11 +308,19 @@
   --dg-color-success-bg: #f0fdf4;
   --dg-color-success-text: #166534;
   --dg-color-success-border: #bbf7d0;
+  /* Fill for a solid success button. The brightest green that still clears AA
+     against white: --dg-color-success itself is only 3.3:1. */
+  --dg-color-success-solid: #15803d;
+  --dg-color-on-success-text: #ffffff;
   --dg-color-warning: #f59e0b;
   --dg-color-warning-bg: #fffbeb;
   --dg-color-warning-text: #92400e;
   --dg-color-warning-border: #fde68a;
   --dg-color-warning-dark: #d97706;
+  /* Super Admin avatar insignia. Deeper than --dg-color-warning so the white
+     crown reads, and deliberately not redefined for dark: the insignia is a
+     solid chip ringed in the surface behind it, so only the ring changes. */
+  --dg-color-insignia-crown: #d97706;
   --dg-color-danger: #ef4444;
   --dg-color-danger-bg: #fef2f2;
   --dg-color-danger-text: #b91c1c;
@@ -424,6 +441,9 @@
   --dg-color-success-bg: #122118;
   --dg-color-success-text: #4ade80;
   --dg-color-success-border: #1e4029;
+  /* Inverted here: a bright fill carries dark text, 6.5:1. */
+  --dg-color-success-solid: #22c55e;
+  --dg-color-on-success-text: #052e16;
   --dg-color-warning-bg: #241c0b;
   --dg-color-warning-text: #fbbf24;
   --dg-color-warning-border: #3f2f10;
@@ -654,7 +674,8 @@ textarea {
     color 150ms ease,
     transform 80ms ease,
     opacity 150ms ease,
-    filter 150ms ease;
+    filter 150ms ease,
+    outline-color 150ms ease;
   white-space: nowrap;
   text-decoration: none;
 }
@@ -673,6 +694,7 @@ textarea {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+  outline: none;
 }
 
 .dg-btn:focus-visible {
@@ -695,20 +717,6 @@ textarea {
   background: var(--dg-color-brand-light);
 }
 
-.dg-btn-brand {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-  border: none;
-}
-
-.dg-btn-brand:hover {
-  background: var(--dg-color-brand-light);
-}
-
-.dg-btn-brand:active {
-  background: var(--dg-color-brand-light);
-}
-
 /* Secondary */
 .dg-btn-secondary {
   background: var(--dg-color-surface);
@@ -716,9 +724,10 @@ textarea {
   border: 1px solid var(--dg-color-control-active-border);
 }
 
+/* Hover moves the fill only. A border that darkens under the cursor reads as
+   the button changing size, so the border is left as structure. */
 .dg-btn-secondary:hover {
   background: var(--dg-color-surface-hover);
-  border-color: var(--dg-color-border-strong);
 }
 
 .dg-btn-secondary:active {
@@ -748,7 +757,7 @@ textarea {
 /* Danger */
 .dg-btn-danger {
   background: var(--dg-color-danger-bg);
-  color: var(--dg-color-danger);
+  color: var(--dg-color-danger-text);
   border: 1px solid var(--dg-color-danger-border);
 }
 
@@ -773,6 +782,38 @@ textarea {
 
 .dg-btn-danger-filled:active {
   background: color-mix(in srgb, var(--dg-color-danger) 90%, black);
+}
+
+/* Success (soft affirmative, e.g. reactivating a staff member) */
+/* Solid, not tinted: this is the affirmative action on a staff record, and the
+   pale fill read as disabled. */
+.dg-btn-success {
+  background: var(--dg-color-success-solid);
+  color: var(--dg-color-on-success-text);
+  border: 1px solid var(--dg-color-success-solid);
+}
+
+.dg-btn-success:hover {
+  background: color-mix(in srgb, var(--dg-color-success-solid) 95%, black);
+}
+
+.dg-btn-success:active {
+  background: color-mix(in srgb, var(--dg-color-success-solid) 90%, black);
+}
+
+/* Info (soft, for a secondary button in its toggled-on state) */
+.dg-btn-info {
+  background: var(--dg-color-info-bg);
+  color: var(--dg-color-accent-text);
+  border: 1px solid var(--dg-color-info-border);
+}
+
+.dg-btn-info:hover {
+  background: var(--dg-color-info-border);
+}
+
+.dg-btn-info:active {
+  background: var(--dg-color-info-border);
 }
 
 /* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
@@ -1142,7 +1183,7 @@ textarea {
 /* Warning filled (bench/attention CTA) */
 .dg-btn-warning-filled {
   background: var(--dg-color-warning);
-  color: var(--dg-color-text-inverse);
+  color: var(--dg-color-on-warning-text);
   border: 1px solid var(--dg-color-warning);
 }
 
@@ -1163,7 +1204,20 @@ textarea {
 
 .dg-btn-dashed:hover {
   background: var(--dg-color-bg-secondary);
-  border-color: var(--dg-color-text-muted);
+}
+
+/* Toggled-on state for a button whose menu or overlay is open. A class rather
+   than an inline background, because an inline one outranks every :hover rule
+   above and leaves the button dead under the cursor. Placed last so it wins
+   over the variant it modifies. */
+.dg-btn-toggled {
+  background: var(--dg-color-brand-bg);
+  border-color: var(--dg-color-brand-border);
+  color: var(--dg-color-brand);
+}
+
+.dg-btn-toggled:hover {
+  background: var(--dg-color-brand-border);
 }
 
 /* Large variant (marketing/auth CTAs — landing page, login/auth submit buttons) */
@@ -1195,6 +1249,26 @@ textarea {
   min-height: var(--dg-btn-h-xs);
   padding: 0 var(--dg-btn-px-xs);
   gap: 6px;
+}
+
+/* Icon-only button: square, so a lone glyph isn't stranded in text padding.
+   Declared after the size modifiers so its zero padding wins, and the width
+   follows whichever size the button is wearing. */
+.dg-btn-icon {
+  width: var(--dg-btn-h);
+  padding: 0;
+}
+
+.dg-btn-icon.dg-btn-lg {
+  width: var(--dg-btn-h-lg);
+}
+
+.dg-btn-icon.dg-btn-sm {
+  width: var(--dg-btn-h-sm);
+}
+
+.dg-btn-icon.dg-btn-xs {
+  width: var(--dg-btn-h-xs);
 }
 
 /* Hover row (settings list items) */
@@ -1235,6 +1309,14 @@ textarea {
   background: var(--dg-color-bg);
   color: var(--dg-color-text-subtle);
   cursor: not-allowed;
+}
+
+/* Read-only is not disabled. The value still has to read and copy cleanly, so
+   it keeps full text color and a text cursor; the recessed fill is the cue
+   that it cannot be edited. This carries the signal for a removed employee's
+   record, which used to be a blanket 50% dim over the whole card. */
+.dg-input[readonly] {
+  background: var(--dg-color-bg);
 }
 
 .dg-input-error {
@@ -2054,6 +2136,11 @@ textarea {
   line-height: 1;
   font-family: inherit;
   transition: background 150ms ease;
+}
+
+/* Keeps a hovered row from fusing with the selected one below it. */
+.dg-menu-item + .dg-menu-item {
+  margin-top: 2px;
 }
 
 .dg-menu-item:hover {
@@ -3340,6 +3427,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* ── Dashboard Card ─────────────────────────────────────── */
 .dg-card {
+  --dg-card-padding-x: 18px;
   background: var(--dg-color-surface);
   border: 1px solid var(--dg-color-border);
   border-radius: var(--dg-radius-md);
@@ -3348,7 +3436,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 .dg-card-header {
-  padding: 14px 18px;
+  padding: 14px var(--dg-card-padding-x);
   border-bottom: 1px solid var(--dg-color-border-light);
   display: flex;
   align-items: center;
@@ -3368,7 +3456,13 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 .dg-card-body {
-  padding: 16px 18px;
+  padding: 16px var(--dg-card-padding-x);
+}
+
+/* Side padding only, for an embedded editor that brings its own vertical rhythm. */
+.dg-card-body-sides {
+  padding-left: var(--dg-card-padding-x);
+  padding-right: var(--dg-card-padding-x);
 }
 
 /* ── Form Layout Helpers ───────────────────────────────── */
@@ -3797,8 +3891,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-decoration: underline;
 }
 
+.dg-auth-link:hover {
+  color: var(--dg-color-text-primary);
+}
+
 .dg-auth-link--subtle {
   color: var(--dg-color-text-subtle);
+}
+
+.dg-auth-link--subtle:hover {
+  color: var(--dg-color-text-label);
 }
 
 .dg-auth-footer {
@@ -3826,6 +3928,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-decoration: underline;
 }
 
+.dg-auth-sentence-link:hover {
+  color: var(--dg-color-text-primary);
+}
+
 .dg-auth-footer-separator {
   margin: 0 4px;
 }
@@ -3837,6 +3943,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   color: var(--dg-color-text-label);
   cursor: pointer;
   font: inherit;
+}
+
+.dg-auth-footer-button:hover {
+  color: var(--dg-color-text-primary);
 }
 
 .dg-auth-form {
@@ -3964,6 +4074,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-decoration: underline;
 }
 
+.dg-auth-policy-link:hover {
+  color: var(--dg-color-brand-light);
+}
+
 .dg-terms-acceptance {
   display: flex;
   width: 100%;
@@ -4061,6 +4175,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-align: center;
 }
 
+.dg-auth-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .dg-password-input {
   position: relative;
 }
@@ -4081,6 +4201,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   color: var(--dg-color-text-subtle);
   cursor: pointer;
   transform: translateY(-50%);
+  transition: color 150ms ease;
+}
+
+.dg-password-input__toggle:hover {
+  color: var(--dg-color-text-primary);
 }
 
 .dg-subdomain-field {
@@ -4305,6 +4430,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   /* Typography — responsive overrides */
   :root {
     --dg-toolbar-h: var(--dg-toolbar-h-mobile);
+    /* 44px is the touch-target floor, and it is already what the toolbar uses
+       here, so the default button stops being the odd one out. Only the
+       default: sm, xs and ghost stay compact where density is the point. */
+    --dg-btn-h: var(--dg-btn-h-lg);
     --dg-type-page-title-size: var(--dg-type-page-title-size-mobile);
     --dg-type-section-title-size: var(--dg-type-section-title-size-mobile);
     --dg-fs-page-title: var(--dg-fs-page-title-mobile);
@@ -4354,6 +4483,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
   .dg-span-tabs {
     height: var(--dg-toolbar-h);
+  }
+
+  .dg-span-tab {
+    padding: 0 8px;
   }
 
   .dg-nav-tab {
@@ -4637,6 +4770,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     transition: background 120ms ease;
   }
 
+  /* Same reason as .dg-menu-item: a pressed row must not fuse with the
+     current one next to it. Group labels already separate their own runs. */
+  .dg-bottom-sheet-drill-item + .dg-bottom-sheet-drill-item {
+    margin-top: 2px;
+  }
+
   .dg-bottom-sheet-drill-item:active {
     background: var(--dg-color-bg-secondary);
   }
@@ -4690,17 +4829,17 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     border-bottom: 1px solid var(--dg-color-border-light);
   }
 
+  /* Colors come from the shared avatar palette, applied inline by the caller. */
   .dg-bottom-sheet-avatar {
     width: 32px;
     height: 32px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: var(--dg-color-brand);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: 700;
-    color: var(--dg-color-on-brand-text);
     flex-shrink: 0;
   }
 

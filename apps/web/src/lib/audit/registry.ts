@@ -315,7 +315,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? ` — ${note}` : ""}`;
+      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
     },
     suppressKeys: ["note"],
   },
@@ -336,7 +336,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? ` — ${note}` : ""}`;
+      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
     },
     suppressKeys: ["note"],
   },
@@ -694,7 +694,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const span = start && end ? ` for ${formatDateRange(start, end)}` : "";
       return occurrences === null
         ? `Created a repeating shift${span}`
-        : `Created a repeating shift${span} — ${pluralize(occurrences, "shift")}`;
+        : `Created a repeating shift${span}: ${pluralize(occurrences, "shift")}`;
     },
     details: (d) => {
       const rows: DetailItem[] = [];
@@ -721,7 +721,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const affected = d.number("shiftsAffected");
       return affected === null
         ? "Removed a repeating shift"
-        : `Removed a repeating shift — ${pluralize(affected, "shift")} cleared`;
+        : `Removed a repeating shift: ${pluralize(affected, "shift")} cleared`;
     },
     suppressKeys: ["shiftsAffected"],
   },
@@ -915,7 +915,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const rows = d.number("rowCount");
       return rows === null
         ? "Exported the activity log"
-        : `Exported the activity log — ${pluralize(rows, "record")}`;
+        : `Exported the activity log: ${pluralize(rows, "record")}`;
     },
     // The `filters` blob is the raw query, not something a reader needs.
     details: () => [],
@@ -991,7 +991,7 @@ export function describeUnknownAction(action: string): string {
   const [, verb] = action.split(".");
   const subject = titleCase(action.split(".")[0] ?? action);
   if (!verb) return `${subject} activity`;
-  return `${titleCase(verb)} — ${subject.toLowerCase()}`;
+  return `${titleCase(verb)}: ${subject.toLowerCase()}`;
 }
 
 export function getAuditCategory(action: string): AuditCategory | null {

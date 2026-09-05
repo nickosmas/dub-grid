@@ -5,6 +5,7 @@ import {
   mobileManagementAccessResponseSchema,
 } from "@dubgrid/contracts";
 import {
+  changeMobileMembershipOrgRole,
   createMobileEmployeeInvitationRow,
   fetchMobileDepartmentRows,
   insertMobileAuditLogEntry,
@@ -15,14 +16,13 @@ import {
   updateMobileInvitationAssignmentsRow,
   updateMobileMembershipAccessRow,
 } from "@dubgrid/data-access";
-import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { requireMobileAuth } from "@/features/mobile/server";
 import {
   createInvitationEmailUnavailableResponse,
   getInvitationEmailConfig,
   sendInvitationEmail,
 } from "@/features/mobile/server/invitation-email";
+import { requireManagementAccessActor } from "@/features/mobile/server/management-access-actor";
 import {
   loadMobilePersonWithAccess,
   type LoadedMobilePerson,
@@ -66,52 +66,6 @@ async function findInvalidManagementDepartmentIds(
   return departmentIds.filter((id) => !managementIds.has(id));
 }
 
-/**
- * Shared gate for both verbs: granting management access and setting org roles
- * is super_admin-or-gridmaster, the same bar web holds this behind, and never
- * something you may do to your own account.
- */
-async function requireManagementAccessActor(req: NextRequest, employeeId: string) {
-  const auth = await requireMobileAuth(req);
-  if ("response" in auth) return auth;
-
-  if (!auth.permissions.canManageUsers) {
-    return {
-      response: NextResponse.json(
-        { error: "You don't have permission to manage management access." },
-        { status: 403 },
-      ),
-    };
-  }
-
-  const loaded = await loadMobilePersonWithAccess(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    employeeId,
-  );
-  if (!loaded) {
-    return { response: NextResponse.json({ error: "Employee not found" }, { status: 404 }) };
-  }
-  if (loaded.person.status === "removed") {
-    return {
-      response: NextResponse.json(
-        { error: "Removed staff can't be given management access." },
-        { status: 400 },
-      ),
-    };
-  }
-  if (loaded.userId && loaded.userId === auth.user.id) {
-    return {
-      response: NextResponse.json(
-        { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
-        { status: 403 },
-      ),
-    };
-  }
-
-  return { auth, loaded };
-}
-
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const gated = await requireManagementAccessActor(req, id);
@@ -151,11 +105,37 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return conflictResponse(loaded.person);
     }
 
+    // Two writes, because the database allows only one path to `org_role`: a
+    // direct column write is rejected by `guard_org_role_change`. The role goes
+    // through the RPC first, and the departments through the row update after.
+    if (loaded.membership.org_role !== parsed.data.orgRole) {
+      const outcome = await changeMobileMembershipOrgRole(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        targetUserId: loaded.userId,
+        actorUserId: auth.user.id,
+        orgRole: parsed.data.orgRole,
+        expectedUpdatedAt: parsed.data.expectedMembershipUpdatedAt,
+      });
+      if (outcome.status === "conflict") {
+        const latest = await loadMobilePersonWithAccess(auth.serviceClient, auth.currentOrg.id, id);
+        return conflictResponse(latest?.person ?? loaded.person);
+      }
+      if (outcome.status === "blocked") {
+        return NextResponse.json({ error: outcome.message }, { status: 400 });
+      }
+    }
+
+    // The RPC bumps the membership's `updated_at`, so the guard this write
+    // carries has to be re-read rather than reusing the caller's.
+    const latestMembership = await loadMobilePersonWithAccess(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      id,
+    );
     const updated = await updateMobileMembershipAccessRow(auth.serviceClient, {
       orgId: auth.currentOrg.id,
       userId: loaded.userId,
-      expectedUpdatedAt: parsed.data.expectedMembershipUpdatedAt,
-      orgRole: parsed.data.orgRole,
+      expectedUpdatedAt: latestMembership?.membership?.updated_at ?? null,
       departmentIds,
       // Department-admin grants only make sense inside departments the person
       // is actually in, so dropping a department drops its admin grant too.

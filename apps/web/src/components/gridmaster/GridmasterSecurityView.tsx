@@ -1,9 +1,10 @@
 "use client";
+import { User } from "lucide-react";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
-import { Button } from "@/components/Button";
+import { Pagination } from "@/components/ui/pagination";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -138,7 +139,7 @@ function statusBadge(status: GridmasterUserSession["status"]) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 700,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: colors.bg,
         color: colors.text,
         border: `1px solid ${colors.border}`,
@@ -637,42 +638,12 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           onOpen={setSelectedSession}
         />
 
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "12px 16px",
-            borderTop: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            disabled={page === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-          >
-            Previous
-          </Button>
-          <span
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--dg-color-text-muted)",
-              fontFamily: "var(--font-dm-mono), monospace",
-            }}
-          >
-            Page {page + 1}
-          </span>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            disabled={sessions.length < SESSIONS_PAGE_SIZE}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
-        </div>
+        <Pagination
+          page={page + 1}
+          hasNext={sessions.length >= SESSIONS_PAGE_SIZE}
+          onPageChange={(next) => setPage(next - 1)}
+          className="border-t border-[var(--dg-color-border-light)]"
+        />
       </div>
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div
@@ -818,21 +789,7 @@ export default function GridmasterSecurityView({
               <div style={{ padding: 16 }}>
                 <EmptyState
                   size="compact"
-                  icon={
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  }
+                  icon={<User size={24} />}
                   title="No impersonation sessions"
                   description="Recent gridmaster impersonations appear here."
                 />

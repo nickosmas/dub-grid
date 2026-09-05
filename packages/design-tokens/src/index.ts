@@ -9,12 +9,7 @@ export {
   type AnimatedLogoTiming,
 } from "./animated-logo";
 
-export {
-  getAvatarTone,
-  getAvatarGradientTone,
-  type AvatarTone,
-  type AvatarGradientTone,
-} from "./avatar-tone";
+export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
 
 export {
   mobileIconToneTokens,
@@ -94,6 +89,10 @@ export const lightColorTokens = {
   warningText: "#92400E",
   warningSoft: "#FFFBEB",
   warningBorder: "#FDE68A",
+  // The Super Admin avatar insignia. A step deeper than `warning`, which is too
+  // light to carry the white crown. Theme-stable: the insignia is a solid chip
+  // ringed in the surface behind it, so only the ring tracks the theme.
+  insigniaCrown: "#D97706",
   danger: "#EF4444",
   dangerText: "#B91C1C",
   dangerSoft: "#FEF2F2",
@@ -161,6 +160,7 @@ export const darkColorTokens: ColorTokens = {
   warningText: "#FBBF24",
   warningSoft: "#241C0B",
   warningBorder: "#3F2F10",
+  insigniaCrown: "#D97706",
   danger: "#EF4444",
   dangerText: "#FF5C5C",
   dangerSoft: "#2A1414",
@@ -239,8 +239,19 @@ export const toastToneTokens = {
   warning: { background: "#D97706", border: "#92400E" },
 } as const;
 
+/**
+ * The three named surface roles, and the nesting ramp between them: a card is
+ * `card`, a panel or tile sitting directly on a card is `control`, and a chip
+ * or pill inside that is `mobileRadiusTokens.md`. Each step down is 8, which is
+ * what keeps a nested corner reading as concentric with the one around it.
+ *
+ * Anything that is visually a card uses `card`, not a local number. Mobile card
+ * surfaces had drifted to four different values (16, 22, 24 and 28) across the
+ * dashboard, the schedule hero, the Your Week card and team groups, which is
+ * the drift this vocabulary exists to prevent.
+ */
 export const radiusTokens = {
-  card: 16,
+  card: 20,
   control: 12,
   pill: 999,
 } as const;

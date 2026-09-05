@@ -210,7 +210,7 @@ describe("ProfilePasswordScreen", () => {
     expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
   });
 
-  it("asks before a back press throws away a part-entered password", () => {
+  it("asks before a back press throws away a part-entered password", async () => {
     render(<ProfilePasswordScreen />);
 
     fireEvent.change(screen.getByLabelText("Current password"), {
@@ -225,7 +225,10 @@ describe("ProfilePasswordScreen", () => {
 
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Discard" }));
 
-    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    // The exit is sequenced behind the confirmation's own dismissal.
+    await waitFor(() => {
+      expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    });
   });
 
   it("keeps what was typed when the back press is called off", () => {

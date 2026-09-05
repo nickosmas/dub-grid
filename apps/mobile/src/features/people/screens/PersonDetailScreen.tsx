@@ -3,7 +3,6 @@ import {
   Linking,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -31,31 +30,36 @@ import {
 } from "@dubgrid/contracts";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
-import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
+  changeMobilePersonOrgRole,
+  checkMobilePersonContact,
   createMobilePersonInvitation,
   getMobilePerson,
   parseMobileAccountLinkChallenge,
-  removeMobilePersonManagementAccess,
+  parseMobileContactConflict,
+  parseMobileStaffFieldErrors,
   resendMobilePersonInvitation,
   revokeMobilePersonInvitation,
   updateMobilePerson,
-  updateMobilePersonManagementAccess,
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
+  type MobileStaffField,
 } from "../../../shared/lib/api";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import {
   getDepartmentNames,
   getScheduledDepartmentNames,
   MANAGEMENT_DEPARTMENT_LABELS,
 } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -79,8 +83,6 @@ import {
   ProfileActionStack,
   ProfileChoiceGroup,
   ProfileHero,
-  ProfileHeroFacts,
-  ProfileHeroFactsRow,
   ProfileInfoRow,
   ProfileList,
   ProfilePanel,
@@ -90,12 +92,12 @@ import {
 } from "../../profile/components/ProfilePrimitives";
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
+import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
+import { hasManagementAccess } from "../lib/managementAccess";
 import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
-import {
-  hasManagementAccess,
-  ManagementAccessSheet,
-  type ManagementAccessDraft,
-} from "../components/ManagementAccessSheet";
+import { AccessStatusRow } from "../components/AccessStatusRow";
+import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
+import { getPersonOrgRole, OrgRoleSheet, type OrgRole } from "../components/OrgRoleSheet";
 
 type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
@@ -106,6 +108,9 @@ type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
  * follow the answer.
  */
 type DeactivateOutcome = "inactive" | "remove";
+
+/** Draft fields the server can reject on its own, so a rejection can be retired. */
+const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
 
 type EditDraft = {
   firstName: string;
@@ -122,10 +127,6 @@ type EditDraft = {
 
 function getFullName(person: MobilePerson): string {
   return `${person.firstName} ${person.lastName}`.trim() || person.email || "Unnamed person";
-}
-
-function formatStatusLabel(status: MobilePerson["status"]): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function formatDate(value: string | null): string {
@@ -187,6 +188,9 @@ export default function PersonDetailScreen() {
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  // Employee numbers are an employee-details fact, not a directory one: web
+  // keeps its ID column and staff detail page behind the same permission.
+  const canViewEmployeeDetails = Boolean(bootstrapQuery.data?.permissions.canViewEmployeeDetails);
   // A person's own employee record belongs to the Profile tab. Resolve that
   // from bootstrap before enabling this query so a pasted /person/[id] URL
   // cannot briefly fetch and render the duplicate teammate-profile surface.
@@ -203,10 +207,29 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  // Why the last write failed, shown inside the surface that failed. These
+  // confirmations and sheets all stay open on error, and they are `<Modal>`s —
+  // their own native windows — so the toasts these handlers used to push
+  // rendered in the root window behind them and were never seen. A failed save
+  // or deactivate simply stopped spinning and said nothing at all. Only one
+  // confirmation is ever open, so the two share one slot.
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
+  const [showOrgRole, setShowOrgRole] = useState(false);
   const [showManagementAccess, setShowManagementAccess] = useState(false);
+  const [orgRoleError, setOrgRoleError] = useState<string | null>(null);
+  /**
+   * Field errors the server found, kept apart from the ones this screen can work
+   * out itself. A duplicate email or phone is only knowable server-side, and
+   * without somewhere to put the answer it landed in a toast while the offending
+   * input stayed unmarked and Save stayed live to fail the same way again.
+   */
+  const [serverFieldErrors, setServerFieldErrors] = useState<
+    Partial<Record<MobileStaffField, string>>
+  >({});
   const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
 
   const personQuery = useQuery({
@@ -244,6 +267,63 @@ export default function PersonDetailScreen() {
       router.replace("/(tabs)/profile");
     }
   }, [isSelf]);
+
+  // Only what actually changed and is worth asking about: an untouched field
+  // can't have become a duplicate, and a malformed one has a format error to
+  // show already.
+  const draftEmail = draft?.email.trim() ?? "";
+  const draftPhone = draft?.phone.trim() ?? "";
+  const emailToCheck =
+    editing && draftEmail && draftEmail !== person?.email && !getOptionalStaffEmailError(draftEmail)
+      ? draftEmail
+      : "";
+  const phoneToCheck =
+    editing && draftPhone && draftPhone !== person?.phone && !getOptionalUsPhoneError(draftPhone)
+      ? draftPhone
+      : "";
+
+  // Web debounces the same pre-flight at 400ms, and soft-fails it: a flaky
+  // check must never be the thing that stops a legitimate save, since the 409
+  // on submit is still there as the real gate.
+  useEffect(() => {
+    if (!accessToken || !person || (!emailToCheck && !phoneToCheck)) {
+      setServerFieldErrors((current) =>
+        current.email || current.phone
+          ? { ...current, email: undefined, phone: undefined }
+          : current,
+      );
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void checkMobilePersonContact(accessToken, {
+        email: emailToCheck || undefined,
+        phone: phoneToCheck || undefined,
+        excludeEmployeeId: person.id,
+        currentUserId: person.userId,
+      })
+        .then((result) => {
+          if (cancelled) return;
+          setServerFieldErrors((current) => ({
+            ...current,
+            email: result.email?.conflict
+              ? EMAIL_CONFLICT_MESSAGES[result.email.reason ?? "employee_duplicate"]
+              : undefined,
+            phone: result.phone?.conflict ? PHONE_CONFLICT_MESSAGE : undefined,
+          }));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setServerFieldErrors((current) => ({ ...current, email: undefined, phone: undefined }));
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [accessToken, emailToCheck, phoneToCheck, person]);
 
   // Adjusted during render, not in an effect. An effect runs *after* the
   // browser paints, so on the frame where `person` first arrived the draft was
@@ -286,16 +366,33 @@ export default function PersonDetailScreen() {
   const updateMutation = useMutation({
     mutationFn: async (body: MobilePersonUpdateBody) =>
       updateMobilePerson(accessToken!, personId!, body),
+    onMutate: () => setConfirmationError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not save person",
-        fallbackMessage: "We couldn't save those staff details right now.",
-      });
+      // A rejection the server pinned to a field belongs on that field, not in
+      // a banner: the confirmation closes, the input goes red, and Save stays
+      // disabled until it changes.
+      const conflict = parseMobileContactConflict(error);
+      const fieldErrors = conflict
+        ? { [conflict.field]: conflict.message }
+        : parseMobileStaffFieldErrors(error);
+      if (fieldErrors) {
+        setServerFieldErrors((current) => ({ ...current, ...fieldErrors }));
+        setShowSaveConfirmation(false);
+        pushToast({
+          tone: "warning",
+          title: "Check the highlighted field",
+          message: Object.values(fieldErrors)[0] ?? "Some details need another look.",
+        });
+        return;
+      }
+      setConfirmationError(
+        getClientFriendlyErrorMessage(error, "We couldn't save those staff details right now."),
+      );
     },
     onSuccess: async (result) => {
       updateCachedPerson(result.person);
       setEditing(false);
+      setServerFieldErrors({});
       setDraft(makeDraft(result.person));
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
@@ -316,12 +413,11 @@ export default function PersonDetailScreen() {
         expectedVersion: input.expectedVersion,
         note: input.note,
       }),
+    onMutate: () => setConfirmationError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update status",
-        fallbackMessage: "We couldn't update that teammate right now.",
-      });
+      setConfirmationError(
+        getClientFriendlyErrorMessage(error, "We couldn't update that teammate right now."),
+      );
     },
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
@@ -404,45 +500,33 @@ export default function PersonDetailScreen() {
     },
   });
 
-  const managementAccessMutation = useMutation({
-    mutationFn: async (input: { draft: ManagementAccessDraft } | { remove: true }) => {
+  const orgRoleMutation = useMutation({
+    mutationFn: async (orgRole: OrgRole) => {
       if (!person) throw new Error("Person unavailable");
-      const guards = {
+      return changeMobilePersonOrgRole(accessToken!, person.id, {
+        orgRole,
         expectedMembershipUpdatedAt: person.membershipUpdatedAt,
         expectedInvitationUpdatedAt: person.pendingInvitation?.updatedAt ?? null,
-      };
-      return "remove" in input
-        ? removeMobilePersonManagementAccess(accessToken!, person.id, guards)
-        : updateMobilePersonManagementAccess(accessToken!, person.id, {
-            ...guards,
-            orgRole: input.draft.orgRole,
-            managementDepartmentIds: input.draft.managementDepartmentIds,
-            email: person.email || undefined,
-          });
-    },
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update management access",
-        fallbackMessage: "We couldn't update their management access right now.",
       });
+    },
+    onMutate: () => setOrgRoleError(null),
+    onError: (error) => {
+      setOrgRoleError(
+        getClientFriendlyErrorMessage(error, "We couldn't change that role right now."),
+      );
     },
     onSuccess: async (result) => {
       updateCachedPerson(result.person);
-      setShowManagementAccess(false);
+      setShowOrgRole(false);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
+      if (result.result === "unchanged") return;
       pushToast({
         tone: "success",
-        title:
-          result.result === "access_removed"
-            ? "Management access removed"
-            : result.result === "invitation_sent"
-              ? "Management invitation sent"
-              : "Management access updated",
+        title: result.result === "invitation_replaced" ? "Invitation replaced" : "Role updated",
         message:
-          result.result === "invitation_sent"
-            ? "They'll join management once they accept."
-            : "Their management access was updated.",
+          result.result === "invitation_replaced"
+            ? "A replacement invitation is on its way."
+            : "Their access updates immediately.",
       });
     },
   });
@@ -473,12 +557,16 @@ export default function PersonDetailScreen() {
     // Someone with management access doesn't need at least one focus area to
     // fall back on — they can come off the schedule entirely and keep managing.
     const hasManagementAccess = person.managementDepartmentIds.length > 0;
+    // A conflict the server already told us about counts here too, or Save
+    // would keep reopening the confirmation to fail on the same duplicate.
+    const serverError = Object.values(serverFieldErrors).find(Boolean) ?? null;
     if (
       firstNameError ||
       lastNameError ||
       emailError ||
       phoneError ||
       notesError ||
+      serverError ||
       (draft.focusAreaIds.length === 0 && !hasManagementAccess)
     ) {
       pushToast({
@@ -489,6 +577,7 @@ export default function PersonDetailScreen() {
           emailError ??
           phoneError ??
           notesError ??
+          serverError ??
           `Select at least one ${singularLabelNoun(focusAreaLabel)}.`,
         tone: "warning",
       });
@@ -534,8 +623,9 @@ export default function PersonDetailScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
-        onRefresh={manualRefresh.refresh}
-        refreshing={manualRefresh.isRefreshing}
+        // A skeleton must not scroll, and there is nothing to pull-to-refresh
+        // while the profile is still loading.
+        scrollEnabled={false}
       >
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
@@ -559,7 +649,6 @@ export default function PersonDetailScreen() {
         bottomPaddingMode="tabbed"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
-        scrollEnabled={false}
       >
         <StatusBanner
           actionLabel="Try again"
@@ -581,7 +670,6 @@ export default function PersonDetailScreen() {
         bottomPaddingMode="tabbed"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
-        scrollEnabled={false}
       >
         <EmptyStateCard
           fillScreen
@@ -622,26 +710,39 @@ export default function PersonDetailScreen() {
   // never on the grid — telling them they'll come "off the schedule" would be
   // describing something that never happened. Same split web makes.
   const isOnSchedule = person.focusAreaIds.length > 0;
-  const orgRoleBadge = getMobileOrgRoleHeroBadge(person.orgRole);
-  // The three app-account states, as one chip, in the same words the People
-  // rows use. None of them says "Active": that word belongs to the staff-status
-  // chip beside this one, and printing it twice made the pair read as two
-  // answers to the same question rather than two different facts. Only the
-  // middle state is one anyone has to act on, so it is the only one with colour.
-  const accountChip = person.userId
-    ? {
-        label: "App access",
-        tone: "neutral" as const,
-        icon: "phone-portrait-outline" as const,
-      }
+  // Through the shared resolver so the badge and the picker inside the sheet
+  // can't disagree: an invitation's `roleToAssign` is the role until it is
+  // accepted, and reading `orgRole` alone showed a pending Admin as "User".
+  const orgRoleBadge = getMobileOrgRoleHeroBadge(getPersonOrgRole(person));
+  // The badge is the role control, the way web's Access column is. It only
+  // becomes one where there is something to write to: a membership, or an
+  // invitation carrying the role until it is accepted. Someone with neither has
+  // no access record at all, so web prints a dash and offers no dropdown; here
+  // the badge stays the plain "User" pill with the hint below it.
+  const canChangeOrgRole =
+    canManageManagementAccess &&
+    !isSelf &&
+    person.status !== "removed" &&
+    (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
+  // Only the two states someone might act on get a banner. A person who
+  // already has an account needs no announcement that they do, and the body
+  // line naming the next move is for the managers who can make it.
+  const invitationBanner = person.userId
+    ? null
     : person.pendingInvitation
-      ? { label: "Invitation pending", tone: "warning" as const, icon: "mail-outline" as const }
+      ? {
+          title: "Invitation pending",
+          body: person.pendingInvitation.email
+            ? `Sent to ${person.pendingInvitation.email}.`
+            : undefined,
+          tone: "warning" as const,
+        }
       : {
-          label: "No app access",
-          tone: "neutral" as const,
-          icon: "mail-open-outline" as const,
+          title: "No app access",
+          body: canManageEmployees ? "Send an invitation to give app access." : undefined,
+          tone: "info" as const,
         };
-  const avatarTone = getAvatarTone(person.id, isDark);
+  const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
   // does comes from the selected option, not from which button opened it.
@@ -668,6 +769,7 @@ export default function PersonDetailScreen() {
   function closeStatusConfirmation() {
     setConfirmAction(null);
     setDeactivateOutcome("inactive");
+    setConfirmationError(null);
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
     setInactiveNote("");
@@ -767,13 +869,23 @@ export default function PersonDetailScreen() {
         }
       />
 
-      {/* The hero carries the same three facts the old meta grid did, and no
-          more: the org tier as its badge (web's People table calls it
-          "Access" too), then status and where their app account stands. */}
+      {/* The hero states the access tier and nothing else. Status and account
+          chips used to sit under the avatar too, which made three competing
+          labels out of a heading; status still reads from the Activate /
+          Deactivate button and the "Status updated" row below. */}
       <ProfileHero
         align="center"
         badge={orgRoleBadge.label}
+        badgeAccessibilityLabel={`App access: ${orgRoleBadge.label}`}
         badgeTone={orgRoleBadge.tone}
+        onBadgePress={
+          canChangeOrgRole
+            ? () => {
+                setOrgRoleError(null);
+                setShowOrgRole(true);
+              }
+            : undefined
+        }
         avatarStyle={{
           backgroundColor: avatarTone.backgroundColor,
           borderColor: avatarTone.borderColor,
@@ -781,22 +893,9 @@ export default function PersonDetailScreen() {
         }}
         avatarTextStyle={{ color: avatarTone.textColor }}
         initials={getProfileInitials(fullName)}
-        statusTone={person.status === "active" ? "success" : "muted"}
+        orgRole={person.orgRole}
         title={fullName}
-      >
-        {/* Every chip on one line. The access tier is the hero's badge now,
-            the same pill the profile tab and the People rows print, rather
-            than a muted line of its own down here. */}
-        <ProfileHeroFacts>
-          <ProfileHeroFactsRow>
-            <Chip
-              label={formatStatusLabel(person.status)}
-              tone={person.status === "active" ? "success" : "neutral"}
-            />
-            <Chip icon={accountChip.icon} label={accountChip.label} tone={accountChip.tone} />
-          </ProfileHeroFactsRow>
-        </ProfileHeroFacts>
-      </ProfileHero>
+      />
 
       {!editing ? (
         <ProfileQuickActions>
@@ -841,6 +940,18 @@ export default function PersonDetailScreen() {
         </ProfileQuickActions>
       ) : null}
 
+      {/* Where the app account stands, one line under the actions rather than a
+          chip competing with the name. Someone with an account needs no banner:
+          the states worth surfacing are the two a manager can act on. */}
+      {!editing && invitationBanner ? (
+        <StatusBanner
+          body={invitationBanner.body}
+          bordered={false}
+          title={invitationBanner.title}
+          tone={invitationBanner.tone}
+        />
+      ) : null}
+
       {editing ? (
         <EditPanel
           certificationLabel={certificationLabel}
@@ -851,8 +962,20 @@ export default function PersonDetailScreen() {
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
           hasChanges={hasChanges}
           hasManagementAccess={person.managementDepartmentIds.length > 0}
+          serverFieldErrors={serverFieldErrors}
           onCancel={guard.requestClose}
-          onChange={setDraft}
+          onChange={(next) => {
+            // A server verdict only holds for the value it was given. Editing
+            // the field retires it and lets the debounced check speak again.
+            setServerFieldErrors((current) => {
+              const cleared = { ...current };
+              for (const key of SERVER_CHECKED_FIELDS) {
+                if (draft[key] !== next[key]) cleared[key] = undefined;
+              }
+              return cleared;
+            });
+            setDraft(next);
+          }}
           onDiscard={guard.discard}
           onSave={handleSave}
           roleLabel={roleLabel}
@@ -884,12 +1007,16 @@ export default function PersonDetailScreen() {
           <ProfileSection title="Staffing">
             <ProfileList>
               {/* Web prints this beside the name in its staff header, and it is
-                  how people are identified in payroll conversations. */}
-              <ProfileInfoRow
-                iconName="card-outline"
-                label="Employee ID"
-                value={`#${person.employeeNumber}`}
-              />
+                  how people are identified in payroll conversations. Regular
+                  users have no business with a colleague's payroll identifier,
+                  so it rides on the same permission web gates it behind. */}
+              {canViewEmployeeDetails ? (
+                <ProfileInfoRow
+                  iconName="card-outline"
+                  label="Employee ID"
+                  value={`#${person.employeeNumber}`}
+                />
+              ) : null}
               <ProfileInfoRow
                 iconName="briefcase-outline"
                 label="Employment"
@@ -981,17 +1108,22 @@ export default function PersonDetailScreen() {
             {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
                 <ProfileActionRow>
+                  {/* A filled control, not a link: it sits beside a solid
+                      Revoke, and a bare label next to one reads as the
+                      caption on it rather than the peer action it is. Neutral
+                      rather than brand, so the destructive half of the pair
+                      stays the only one asking for attention. */}
                   <Button
                     compact
                     label="Reinvite"
                     loading={invitationMutation.isPending}
                     onPress={() => setInvitationConfirmAction("resend")}
-                    tone="link"
+                    tone="neutral"
                   />
                   <Button
                     compact
                     disabled={invitationMutation.isPending}
-                    label="Revoke"
+                    label="Revoke Invite"
                     onPress={() => setInvitationConfirmAction("revoke")}
                     tone="danger"
                   />
@@ -1006,10 +1138,25 @@ export default function PersonDetailScreen() {
                 />
               )
             ) : null}
+            {/* The mirror of Remove from Schedule, which lives in the edit
+                panel. Only offered to someone who isn't on the grid at all;
+                anyone with focus areas changes them in that panel instead. */}
+            {canManageEmployees && person.status !== "removed" && !isOnSchedule ? (
+              <Button
+                compact
+                label="Add to Schedule"
+                onPress={() =>
+                  router.push({
+                    pathname: "/person/[id]/schedule",
+                    params: { id: person.id },
+                  })
+                }
+                tone="secondary"
+              />
+            ) : null}
             {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
               <Button
                 compact
-                disabled={managementAccessMutation.isPending}
                 label={hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"}
                 onPress={() => setShowManagementAccess(true)}
                 tone="secondary"
@@ -1054,8 +1201,12 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body="The staff profile will be updated."
         confirmLabel="Save"
+        error={confirmationError}
         loading={updateMutation.isPending}
-        onCancel={() => setShowSaveConfirmation(false)}
+        onCancel={() => {
+          setConfirmationError(null);
+          setShowSaveConfirmation(false);
+        }}
         onConfirm={confirmSave}
         title="Save these changes?"
         visible={showSaveConfirmation}
@@ -1073,6 +1224,7 @@ export default function PersonDetailScreen() {
               ? "primary"
               : "danger"
         }
+        error={confirmationError}
         loading={statusMutation.isPending}
         onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
@@ -1100,35 +1252,40 @@ export default function PersonDetailScreen() {
           </SelectionSection>
         ) : null}
         {confirmAction === "deactivate" || confirmAction === "remove" ? (
-          <TextInput
-            onChangeText={setInactiveNote}
+          <ProfileTextInput
+            accessibilityLabel="Reason"
+            autoCapitalize="sentences"
+            label="Reason"
             placeholder={
               resolvedStatusAction === "remove"
                 ? "Reason (optional) - e.g. Left the company"
                 : "Reason (optional) - e.g. On leave until June"
             }
-            placeholderTextColor={mobileColors.textSubtle}
-            style={styles.input}
             value={inactiveNote}
+            onChangeText={setInactiveNote}
           />
         ) : null}
       </ConfirmationModal>
       <ManagementAccessSheet
-        isPending={managementAccessMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowManagementAccess(false)}
-        onRemove={() =>
+        person={person}
+        visible={showManagementAccess}
+      />
+      <OrgRoleSheet
+        error={orgRoleError}
+        isPending={orgRoleMutation.isPending}
+        onDismiss={() => {
+          setOrgRoleError(null);
+          setShowOrgRole(false);
+        }}
+        onSubmit={(orgRole) =>
           new Promise<void>((resolve) => {
-            managementAccessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
-          })
-        }
-        onSubmit={(nextDraft) =>
-          new Promise<void>((resolve) => {
-            managementAccessMutation.mutate({ draft: nextDraft }, { onSettled: () => resolve() });
+            orgRoleMutation.mutate(orgRole, { onSettled: () => resolve() });
           })
         }
         person={person}
-        visible={showManagementAccess}
+        visible={showOrgRole}
       />
       <ConfirmationModal
         body={invitationConfirmationBody}
@@ -1262,6 +1419,7 @@ function EditPanel({
   useCompactRoleCertificationLabels,
   hasChanges,
   hasManagementAccess,
+  serverFieldErrors,
   onChange,
   onCancel,
   onDiscard,
@@ -1278,6 +1436,7 @@ function EditPanel({
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   hasChanges: boolean;
+  serverFieldErrors: Partial<Record<MobileStaffField, string>>;
   onChange: (draft: EditDraft) => void;
   onCancel: () => void;
   onDiscard: () => void;
@@ -1288,11 +1447,14 @@ function EditPanel({
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "phone" | "email" | "contactNotes" | null
   >(null);
+  // The format rule wins over the duplicate verdict where both apply: a
+  // malformed address was never checked for uniqueness, and saying it is taken
+  // would be describing something that wasn't asked.
   const fieldErrors = {
-    firstName: getStaffNameError(draft.firstName, "First name"),
-    lastName: getStaffNameError(draft.lastName, "Last name"),
-    phone: getOptionalUsPhoneError(draft.phone),
-    email: getOptionalStaffEmailError(draft.email),
+    firstName: getStaffNameError(draft.firstName, "First name") ?? serverFieldErrors.firstName,
+    lastName: getStaffNameError(draft.lastName, "Last name") ?? serverFieldErrors.lastName,
+    phone: getOptionalUsPhoneError(draft.phone) ?? serverFieldErrors.phone,
+    email: getOptionalStaffEmailError(draft.email) ?? serverFieldErrors.email,
     contactNotes: getStaffNotesError(draft.contactNotes),
     focusAreaIds:
       draft.focusAreaIds.length === 0 && !hasManagementAccess
@@ -1313,6 +1475,42 @@ function EditPanel({
 
   return (
     <>
+      {/* What their schedule access is right now, and what saving would do to
+          it. Only someone with management access can be taken off the schedule:
+          for anyone else the focus areas are the whole staff record, and
+          clearing them is what Deactivate is for. */}
+      <ProfileSection>
+        <AccessStatusRow
+          actionLabel={
+            hasManagementAccess && draft.focusAreaIds.length > 0
+              ? "Remove from Schedule"
+              : undefined
+          }
+          disabled={saving}
+          label={focusAreaLabel}
+          note={
+            hasManagementAccess && draft.focusAreaIds.length === 0
+              ? "Saving now removes them from the schedule. They'll keep management access."
+              : undefined
+          }
+          statusText={
+            draft.focusAreaIds.length > 0
+              ? `Scheduled - ${draft.focusAreaIds.length} ${
+                  draft.focusAreaIds.length === 1
+                    ? singularLabelNoun(focusAreaLabel).toLowerCase()
+                    : focusAreaLabel.toLowerCase()
+                }`
+              : "Not scheduled"
+          }
+          tone={draft.focusAreaIds.length > 0 ? "active" : "neutral"}
+          onAction={
+            hasManagementAccess && draft.focusAreaIds.length > 0
+              ? () => setField("focusAreaIds", [])
+              : undefined
+          }
+        />
+      </ProfileSection>
+
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput
@@ -1352,6 +1550,8 @@ function EditPanel({
             error={fieldErrors.phone}
             focused={focusedField === "phone"}
             keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
             label="Phone"
             placeholder="Phone"
             value={draft.phone}
@@ -1371,6 +1571,9 @@ function EditPanel({
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
+            autoComplete="email"
+            autoCorrect={false}
+            textContentType="emailAddress"
             label="Email"
             placeholder="Email"
             value={draft.email}
@@ -1490,22 +1693,6 @@ const createStyles = (mobileColors: MobileColors) =>
     noteText: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
-    },
-    input: {
-      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-      // Omitting `fontFamily` also avoids the Android EditText
-      // non-interactive bug when DM Sans hasn't loaded.
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: "400",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      color: mobileColors.textPrimary,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
     },
     modalInfoPanel: {
       backgroundColor: mobileColors.surfaceSecondary,

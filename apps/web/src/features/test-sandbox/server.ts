@@ -213,7 +213,7 @@ export async function createSandboxForUser(input: {
     const { data: orgRow, error: insertErr } = await serviceClient
       .from("organizations")
       .insert({
-        name: sourceOrg?.name ? `${sourceOrg.name} — Sandbox` : "Sandbox organization",
+        name: sourceOrg?.name ? `${sourceOrg.name} (Sandbox)` : "Sandbox organization",
         slug,
         workspace_kind: "sandbox",
         sandbox_owner_user_id: actor.id,

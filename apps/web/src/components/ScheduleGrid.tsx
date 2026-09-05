@@ -19,7 +19,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Users, UserPen } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
@@ -63,6 +63,7 @@ import {
   getCertName,
   getRoleAbbrs,
   getEmployeeDisplayName,
+  getAvatarInitials,
   fmt12h,
   fmt12hShort,
 } from "@/lib/utils";
@@ -77,7 +78,7 @@ import {
   visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
-import { lightColorTokens, darkColorTokens } from "@dubgrid/design-tokens";
+import { lightColorTokens, darkColorTokens, getAvatarTone } from "@dubgrid/design-tokens";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import {
   buildShiftJobPairKey,
@@ -205,7 +206,8 @@ interface LegacyScheduleGridProps {
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
-  cellLocks?: Map<string, { userName: string }>;
+  /** Purely informational: who else currently has each cell open. Never blocks. */
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   /** When true, show who created each shift below the cell */
   showAudit?: boolean;
   /** Returns the creator's first name for compact grid display */
@@ -310,7 +312,8 @@ interface SectionBlockProps {
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  cellLocks?: Map<string, { userName: string }>;
+  /** Purely informational: who else currently has each cell open. Never blocks. */
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   onCellHover?: (cellId: GridCellId) => void;
@@ -670,7 +673,7 @@ const SectionBlock = memo(function SectionBlock({
   publishDiffForKey,
   certifications,
   orgRoles,
-  cellLocks,
+  cellEditors,
   showAudit,
   createdByNameForKey,
   onCellHover,
@@ -1005,18 +1008,18 @@ const SectionBlock = memo(function SectionBlock({
   );
 
   const triggerCellActivation = useCallback(
-    (emp: Employee, date: Date, isLocked: boolean, trigger: "click" | "keyboard") => {
+    (emp: Employee, date: Date, trigger: "click" | "keyboard") => {
       const dateKey = formatDateKey(date);
       const cellId = buildCellId(emp.id, dateKey);
       const cellKey = getGridCellKey(cellId);
       if (bulkDeleteMode) {
-        if (!isLocked && bulkSelectableCellKeys?.has(cellKey) && onToggleBulkDeleteCell) {
+        if (bulkSelectableCellKeys?.has(cellKey) && onToggleBulkDeleteCell) {
           onToggleBulkDeleteCell(cellId);
         }
         return;
       }
 
-      if (isCellInteractive && !isLocked) {
+      if (isCellInteractive) {
         handleCellClick(emp, date, sectionName, trigger);
       }
     },
@@ -1130,19 +1133,7 @@ const SectionBlock = memo(function SectionBlock({
             }}
           >
             More days
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
           </Button>
         )}
         {!fitToContainer && canScrollLeft && (
@@ -1169,19 +1160,7 @@ const SectionBlock = memo(function SectionBlock({
               cursor: "pointer",
             }}
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
             Earlier days
           </Button>
         )}
@@ -1423,8 +1402,8 @@ const SectionBlock = memo(function SectionBlock({
                         const openShiftHint = os.calledOffBy
                           ? `Called off by ${os.calledOffBy}`
                           : os.viewerEligible === false
-                            ? `${needed} needed — click for details`
-                            : `${needed} needed — click to volunteer`;
+                            ? `${needed} needed, click for details`
+                            : `${needed} needed, click to volunteer`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -1442,7 +1421,7 @@ const SectionBlock = memo(function SectionBlock({
                                 maxWidth: "100%",
                                 padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
                                 minWidth: 0,
-                                borderRadius: 6,
+                                borderRadius: "var(--dg-radius-sm)",
                                 border: `1.5px dashed ${scPill?.border ?? "var(--dg-color-warning-border, #F59E0B)"}`,
                                 background: scPill?.color ?? "var(--dg-color-surface)",
                                 color: scPill?.text ?? "var(--dg-color-warning-text, #92400E)",
@@ -1595,7 +1574,7 @@ const SectionBlock = memo(function SectionBlock({
                       <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
                         <span
                           style={{
-                            fontSize: "var(--dg-fs-label)",
+                            fontSize: "var(--dg-fs-body-sm)",
                             fontWeight: 600,
                             color:
                               hasHighlightedSearch && isHighlighted
@@ -1680,8 +1659,11 @@ const SectionBlock = memo(function SectionBlock({
                       const noteTypes =
                         activeIndicatorIdsForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                       const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
-                      const cellLock = cellLocks?.get(cellKey);
-                      const isLocked = !!cellLock;
+                      const cellEditor = cellEditors?.get(cellKey);
+                      const hasPeerEditor = !!cellEditor;
+                      const cellEditorTone = cellEditor
+                        ? getAvatarTone(cellEditor.userId, isDarkTheme)
+                        : null;
                       const auditName = createdByNameForKey?.(emp.id, date) ?? null;
                       const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                       const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
@@ -1776,7 +1758,7 @@ const SectionBlock = memo(function SectionBlock({
                       // The lock avatar outranks everything else in the top-right
                       // corner: it is the only mark that explains why a cell will
                       // not open. Everything else there starts past it.
-                      const cornerLockClearance = isLocked ? LOCK_CORNER_CLEARANCE : 0;
+                      const cornerLockClearance = hasPeerEditor ? LOCK_CORNER_CLEARANCE : 0;
 
                       const showDiffCellTint = !!draftKind || showsPublishDiff;
                       // The row above paints its own bottom stroke inside its
@@ -1788,14 +1770,13 @@ const SectionBlock = memo(function SectionBlock({
                       const cellId = buildCellId(emp.id, dateKey);
                       const bulkCellKey = getGridCellKey(cellId);
                       const isBulkSelectable =
-                        bulkDeleteMode && !isLocked && !!bulkSelectableCellKeys?.has(bulkCellKey);
+                        bulkDeleteMode && !!bulkSelectableCellKeys?.has(bulkCellKey);
                       const isBulkSelected =
                         bulkDeleteMode && !!bulkSelectedCellKeys?.has(bulkCellKey);
                       const isActiveCell = areGridCellIdsEqual(activeCellId, cellId);
                       const hasDraggableEntry =
                         canDragShifts &&
                         !bulkDeleteMode &&
-                        !isLocked &&
                         !!shiftLabel &&
                         shiftLabel !== "OFF" &&
                         draftKind !== "deleted";
@@ -1820,7 +1801,7 @@ const SectionBlock = memo(function SectionBlock({
                           data={{
                             cellId,
                           }}
-                          disabled={!isCellInteractive || isLocked || bulkDeleteMode}
+                          disabled={!isCellInteractive || bulkDeleteMode}
                           className="dg-grid-cell"
                           role="gridcell"
                           aria-label={
@@ -1834,7 +1815,7 @@ const SectionBlock = memo(function SectionBlock({
                           data-date-key={dateKey}
                           data-section-id={sectionId}
                           data-interactive={isCellInteractive ? "true" : "false"}
-                          data-locked={isLocked ? "true" : "false"}
+                          data-peer-editing={hasPeerEditor ? "true" : "false"}
                           data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
                           data-slot="cell"
                           data-leading-divider={
@@ -1858,26 +1839,14 @@ const SectionBlock = memo(function SectionBlock({
                           }}
                           onFocus={() => onCellFocus?.(cellId)}
                           onMouseEnter={() => onCellHover?.(cellId)}
-                          onClick={() =>
-                            triggerCellActivation(
-                              emp,
-                              date,
-                              isLocked || !isCellInteractive,
-                              "click",
-                            )
-                          }
+                          onClick={() => triggerCellActivation(emp, date, "click")}
                           onContextMenu={(event) =>
                             triggerCellContextMenu(event, event.currentTarget, cellId, emp, date)
                           }
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
-                              triggerCellActivation(
-                                emp,
-                                date,
-                                isLocked || !isCellInteractive,
-                                "keyboard",
-                              );
+                              triggerCellActivation(emp, date, "keyboard");
                             }
                             if (event.shiftKey && event.key === "F10") {
                               triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
@@ -1990,8 +1959,7 @@ const SectionBlock = memo(function SectionBlock({
                                   const labels = cellAbsenceType
                                     ? [shiftLabel]
                                     : shiftLabel.split("/");
-                                  const isPubDiff =
-                                    !draftKind && showsPublishDiff ? publishDiff : null;
+                                  const isPubDiff = showsPublishDiff ? publishDiff : null;
                                   const publishFrom =
                                     publishDiff?.from ??
                                     assignmentIdsFromPublishState(
@@ -3187,7 +3155,7 @@ const SectionBlock = memo(function SectionBlock({
                                       border: isDraftDelete
                                         ? "2px dashed var(--dg-color-danger-dark)"
                                         : "1px solid var(--dg-color-danger-border)",
-                                      borderRadius: 8,
+                                      borderRadius: "var(--dg-radius-md)",
                                       ...(isDraftDelete
                                         ? {}
                                         : {
@@ -3345,9 +3313,9 @@ const SectionBlock = memo(function SectionBlock({
                                 )}
                               </>
                             )}
-                            {isLocked && cellLock && (
+                            {cellEditor && (
                               <MaybeHint
-                                content={`Being edited by ${cellLock.userName}`}
+                                content={`Being edited by ${cellEditor.userName}`}
                                 side="top"
                               >
                                 <span
@@ -3357,11 +3325,19 @@ const SectionBlock = memo(function SectionBlock({
                                     right: 2,
                                     width: 20,
                                     height: 20,
+                                    boxSizing: "border-box",
                                     borderRadius: "50%",
-                                    background: "var(--dg-color-brand)",
-                                    color: "var(--dg-color-text-inverse)",
-                                    fontSize: "var(--dg-type-badge-size)",
-                                    fontWeight: 600,
+                                    // The person's own chip, the same one the
+                                    // roster and the people table draw, so the
+                                    // marker reads as the same someone.
+                                    background: cellEditorTone?.backgroundColor,
+                                    border: `1px solid ${cellEditorTone?.borderColor}`,
+                                    color: cellEditorTone?.textColor,
+                                    // Two initials at the badge size run wider
+                                    // than this 20px circle, so the marker
+                                    // sizes its own text off the ring instead.
+                                    fontSize: 9,
+                                    fontWeight: 700,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -3370,12 +3346,7 @@ const SectionBlock = memo(function SectionBlock({
                                     pointerEvents: "none",
                                   }}
                                 >
-                                  {cellLock.userName
-                                    .split(/\s+/)
-                                    .map((w) => w[0])
-                                    .join("")
-                                    .toUpperCase()
-                                    .slice(0, 2)}
+                                  {getAvatarInitials(cellEditor.userName)}
                                 </span>
                               </MaybeHint>
                             )}
@@ -3574,7 +3545,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
-  cellLocks,
+  cellEditors,
   showAudit,
   createdByNameForKey,
   onCellHover,
@@ -3899,7 +3870,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishDiffForKey={publishDiffForKey}
                     certifications={certifications}
                     orgRoles={orgRoles}
-                    cellLocks={cellLocks}
+                    cellEditors={cellEditors}
                     showAudit={showAudit}
                     createdByNameForKey={createdByNameForKey}
                     onCellHover={onCellHover}
@@ -4122,7 +4093,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
         publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
         publishDiffForKey={model.accessors.publishDiffForKey}
-        cellLocks={model.cellLocks}
+        cellEditors={model.cellEditors}
         showAudit={model.options.showAudit}
         createdByNameForKey={model.accessors.createdByNameForKey}
         onCellHover={handleCellHover}
@@ -4150,7 +4121,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
               background: activeDrag.pillColor,
               color: activeDrag.pillText,
               border: `1px solid ${activeDrag.pillText}20`,
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               padding: "6px 16px",
               fontSize: "var(--dg-fs-title)",
               fontWeight: 600,

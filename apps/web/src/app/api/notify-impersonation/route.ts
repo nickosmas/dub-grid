@@ -12,7 +12,8 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, requireSupabaseUrl } from "@/lib/supabase-keys";
+import { serverEnv } from "@/lib/env.server";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -59,8 +60,8 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Config check ──────────────────────────────────────────────────
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const apiKey = serverEnv?.RESEND_API_KEY;
+  const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
   if (!apiKey) {
     return NextResponse.json(
       { success: false, error: "Email service not configured" },
@@ -85,8 +86,8 @@ export async function POST(req: NextRequest) {
 
   const isStart = type === "start";
   const subject = isStart
-    ? `Account access notice — ${targetOrgName || "DubGrid"}`
-    : `Account access ended — ${targetOrgName || "DubGrid"}`;
+    ? `Account access notice: ${targetOrgName || "DubGrid"}`
+    : `Account access ended: ${targetOrgName || "DubGrid"}`;
 
   const html = await render(
     createElement(ImpersonationNoticeEmail, {
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       const serviceRoleKey = getSupabaseSecretKey();
       if (ip && serviceRoleKey) {
         try {
-          const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
+          const supabaseAdmin = createClient(requireSupabaseUrl(), serviceRoleKey);
           await supabaseAdmin
             .from("impersonation_sessions")
             .update({ ip_address: ip })

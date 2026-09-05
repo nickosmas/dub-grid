@@ -22,6 +22,7 @@ import {
   normalizeMultilineText,
 } from "@/lib/form-validation";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { serverEnv } from "@/lib/env.server";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -116,10 +117,10 @@ export async function POST(req: NextRequest) {
   });
 
   // ── Build email ───────────────────────────────────────────────────────
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const apiKey = serverEnv?.RESEND_API_KEY;
+  const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
 
-  const recipientEmail = process.env.DEMO_RECIPIENT_EMAIL;
+  const recipientEmail = serverEnv?.DEMO_RECIPIENT_EMAIL;
 
   if (!apiKey || !recipientEmail) {
     logger.error("RESEND_API_KEY or DEMO_RECIPIENT_EMAIL not set");

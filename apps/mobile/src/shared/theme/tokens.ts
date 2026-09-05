@@ -42,9 +42,11 @@ import type { TextStyle, ViewStyle } from "react-native";
  * white card to register.
  *
  * Honest limit: a light fill on a light page cannot reach WCAG's 3:1 for
- * non-text UI, and no design system achieves it. These values land around
- * 1.28:1, which is clearly perceivable. The accessibility guarantee is the
- * *label* contrast (13.4:1 neutral, 5.2:1 secondary), not the fill.
+ * non-text UI, and no design system achieves it. These land at 1.22:1 (neutral)
+ * and 1.28:1 (secondary) against the white page — perceivable, but only just,
+ * and the neutral one is deliberately near that line. The accessibility
+ * guarantee is the *label* contrast (12.0:1 neutral, 5.2:1 secondary), not the
+ * fill.
  */
 /**
  * Fills for `<Button>`'s solid tones. Deliberately fixed across themes, the way
@@ -100,33 +102,58 @@ const BUTTON_SOLID_FILLS = {
 const MOBILE_LIGHT = {
   ...BUTTON_SOLID_FILLS,
   /**
-   * The light page: a subtle gray the white cards sit on.
+   * The light page: plain white, the same value as `surface`.
    *
-   * The page ground is chrome, not brand. It carries the header bar (on iOS the
-   * large-title header is transparent and shows this color through it) and the
-   * ground between cards, and a blue that strong made every screen read as a
-   * tinted surface rather than as white content on a neutral page. Blue now
-   * appears where it means something — the brand wash on the splash and auth
-   * shells, `controlSecondaryBg`, the button and icon tones.
+   * This is a deliberate reversal. The page used to be a slate gray (#EFF2F6)
+   * so that white cards separated from it by fill alone, at 1.12:1 — and that
+   * ratio was the *only* thing drawing a card's edge, since `cardBorder` is
+   * transparent in light mode. Product direction is now a white page with cards
+   * lifted off it, so the separation moves wholesale from fill to shadow:
+   * `mobileElevation("card")` carries it, and it was strengthened in the same
+   * change precisely because it is now load-bearing rather than decorative.
    *
-   * Gray, not colorless: it stays in the slate family the rest of the light ramp
-   * uses (`surfaceSecondary` #F1F5F9, `borderSubtle` #E2E8F0), so blue sits 7
-   * steps above red rather than sharing it. That tint is what keeps it from
-   * going warm-dead next to the brand, which is what sank the earlier #EBEFF5.
+   * The consequence to keep in mind: **a card with no elevation is invisible in
+   * light mode.** Anything that wants to read as a distinct surface on this page
+   * needs `getCardSurfaceStyle` (or its own elevation), not just `surface` as a
+   * fill. `contrast.test.ts` no longer holds a card/page fill ratio for that
+   * reason, and holds the shadow's strength instead.
    *
-   * Light, and about as light as it can go: 1.12:1 against a white card. That
-   * is the floor `contrast.test.ts` holds for card separation, and it is a floor
-   * rather than a preference — `cardBorder` is transparent in light mode, so
-   * this ratio is the *only* thing drawing a card's edge, with the shadow. The
-   * next step up the slate ramp (#F1F5F9) measures 1.096:1 and cards start
-   * dissolving into the page. Anything lighter than this has to buy a hairline
-   * border back first.
+   * The neutral *fills* that sit on this page (`controlNeutralBg`,
+   * `skeletonBase`) keep their slate tint and now carry more of the visual
+   * weight, since they are the only tinted shapes left on a white ground.
    *
    * Dark mode is untouched — its surfaces already separate on their own.
    */
-  background: "#EFF2F6",
-  /** Neutral control fill. On a white card: 1.10 -> 1.29. Same slate as the page. */
-  controlNeutralBg: "#DFE3E9",
+  background: "#FFFFFF",
+  /**
+   * Neutral control fill — the Filter button, chips, the segmented-control
+   * track, and `tone="plain"`.
+   *
+   * Lightened from #DFE3E9 (1.288:1) to 1.219:1 against white, by direction.
+   * Worth knowing what that spends: buttons carry neither a border nor a
+   * shadow, so this fill is the *only* thing drawing one, and `contrast.test.ts`
+   * had to drop its soft-fill floor from 1.25 to 1.20 to admit it. That floor
+   * exists because borderless controls once shipped at 1.04:1, which is not a
+   * perceivable edge — this now sits much nearer that line than before, and
+   * anything lighter needs a border or a shadow bought back first.
+   */
+  controlNeutralBg: "#E5E9EE",
+  /**
+   * Edge for the neutral control fills above: the segmented-control track and
+   * the tab strip's idle tabs.
+   *
+   * Its own token because neither existing border works here. `borderSubtle`
+   * (#E2E8F0) and `border` are tuned against `surface` and `background`, which
+   * are white; against a light-grey control fill of nearly the same value
+   * `borderSubtle` measures 1.01:1 and is drawn but invisible.
+   *
+   * Deliberately softer than `border` (#CBD5E1, 1.22:1 here), which read as a
+   * hard outline around what is meant to be a quiet control. This lands at
+   * 1.12:1 on the fill: present as a hairline, not as a stroke. That is close
+   * to the floor. Below about 1.06 it stops registering at all and the
+   * invisible-border bug comes back.
+   */
+  controlNeutralBorder: "#D6DDE5",
   /** Secondary control fill. On a white card: 1.09 -> 1.28. */
   controlSecondaryBg: "#D6E4FB",
   /**
@@ -136,22 +163,25 @@ const MOBILE_LIGHT = {
    */
   controlSecondaryFg: "#1D4ED8",
   /**
-   * Card edge. Transparent in light mode: the page is tinted enough that a
-   * white card reads on its own, and a border on top of the shadow looks like
-   * an outline sticker.
+   * Card edge. Transparent in light mode: the page is white, so a card shares
+   * its fill with the ground and the shadow draws the whole edge. A stroke on
+   * top of that shadow reads as an outline sticker, which is why cards carry
+   * none. Dark mode keeps the hairline, where a shadow on near-black is
+   * invisible and the edge is all there is.
    *
    * Transparent rather than `borderWidth: 0` so the 1px still occupies layout
    * and nothing reflows when the theme flips.
    */
   cardBorder: "transparent",
   /**
-   * Skeleton placeholder fill. Has to read on *both* grounds a skeleton lands
-   * on: a white card and the `#EFF2F6` page. `borderSubtle` (#E2E8F0) was the
-   * old fill and measures 1.13:1 on white, which barely registers as a shape;
-   * this lands at 1.30:1 there and 1.16:1 on the page, so a block is legible
-   * wherever it sits. Held at the page's old, darker value on purpose: a
-   * placeholder wants *more* presence than the ground it sits on, so it did not
-   * follow the page lighter.
+   * Skeleton placeholder fill. Both grounds a skeleton lands on — a card and the
+   * page — are now white, so this only has one ratio to satisfy rather than two:
+   * 1.30:1 on white. `borderSubtle` (#E2E8F0) was the old fill and measures
+   * 1.13:1 there, which barely registers as a shape.
+   *
+   * Deliberately not lightened to follow the page. A placeholder wants *more*
+   * presence than the ground it sits on, and on a white page it is now one of
+   * the few tinted shapes carrying the layout.
    */
   skeletonBase: "#DEE2E8",
   /**
@@ -176,6 +206,13 @@ const MOBILE_DARK = {
   /** Dark surfaces already separate well, so the page background is unchanged. */
   background: darkColorTokens.background,
   controlNeutralBg: "#26262B",
+  /**
+   * Dark counterpart, softened alongside the light one. A dark hairline needs
+   * more ratio than a light one to read at the same strength (the previous
+   * pair sat at 1.22:1 light against 1.34:1 dark), so this holds that
+   * relationship at the softer end: 1.20:1 against the fill.
+   */
+  controlNeutralBorder: "#333339",
   controlSecondaryBg: "#1B2E4E",
   /** Brighter than light mode's, to stay legible on a dark fill. */
   controlSecondaryFg: "#7FB0FF",
@@ -330,6 +367,31 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
     textColor: resolved.text,
   };
 }
+
+/**
+ * How far the OS text-size setting is allowed to scale mobile type.
+ *
+ * React Native honours that setting with no ceiling of its own, and the OS
+ * ceilings are high: iOS Larger Text reaches 310% and Android 200%. Uncapped, a
+ * 17px row title renders at 53px, which no card layout survives.
+ *
+ * 1.5 is the ceiling this app holds. It gives someone who has raised their text
+ * size most of what they asked for while leaving the fixed-size furniture (date
+ * tiles, shift pills, count badges) able to hold its content.
+ *
+ * A cap is the second line of defence, not the first. The first is a layout
+ * that grows: rows stack rather than sit in two columns, containers use
+ * `minHeight` rather than `height`, and nothing that must stay readable is
+ * pinned to a fixed width. The Your Week row is the worked example: it used to
+ * put the shift name and the time in two columns with the time refusing to
+ * shrink, so a raised text size squeezed the name into a column narrow enough
+ * to break "Visiting Nursing" mid-word.
+ *
+ * `MAX_FONT_SCALE_FIXED` is the tighter ceiling for the few surfaces whose
+ * height genuinely cannot move, such as the floating tab bar.
+ */
+export const MAX_FONT_SCALE = 1.5;
+export const MAX_FONT_SCALE_FIXED = 1.3;
 
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 

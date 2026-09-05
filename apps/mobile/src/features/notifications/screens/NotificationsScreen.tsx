@@ -37,9 +37,10 @@ import { queryClient } from "../../../shared/lib/query-client";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileElevation,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -117,7 +118,8 @@ function formatRelativeTime(value: string): string {
 
 export default function NotificationsScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -292,7 +294,7 @@ export default function NotificationsScreen() {
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "error" && contentState.kind !== "empty"}
+      scrollEnabled={contentState.kind !== "loading"}
     >
       <View style={styles.headerArea}>
         <SearchBar
@@ -405,7 +407,8 @@ interface NotificationCardProps {
 
 function NotificationCard({ notification, onPress, onArchive }: NotificationCardProps) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
   const action = extractNotificationAction(notification.metadata);
@@ -456,28 +459,34 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
         {isUnread ? <View style={styles.unreadDot} /> : null}
       </View>
       <View style={styles.cardActions}>
-        {action && actionSupported ? (
-          <Button
-            fullWidth={false}
-            icon="arrow-forward"
-            iconPosition="trailing"
-            label={action.label}
-            onPress={(event) => {
-              // Sits inside a pressable row; without this the row navigates too.
-              event.stopPropagation?.();
-              openNotificationAction(action.href);
-            }}
-            size="sm"
-            tone="secondary"
-          />
-        ) : action ? (
-          <View style={styles.webOnlyHint}>
-            <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
-            <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
-          </View>
-        ) : (
-          <View />
-        )}
+        {/* The leading slot owns the space left of the archive button and
+            centres whatever sits in it. A `fullWidth={false}` button carries
+            `alignSelf: "flex-start"`, which beats any `alignItems` on the row
+            itself, so the action can only be centred by a wrapper it cannot
+            override. `flex: 1` is also what lets the archive button stay pinned
+            to the trailing edge, which is why this is not `justifyContent`. */}
+        <View style={styles.cardActionsLead}>
+          {action && actionSupported ? (
+            <Button
+              fullWidth={false}
+              icon="arrow-forward"
+              iconPosition="trailing"
+              label={action.label}
+              onPress={(event) => {
+                // Sits inside a pressable row; without this the row navigates too.
+                event.stopPropagation?.();
+                openNotificationAction(action.href);
+              }}
+              size="sm"
+              tone="secondary"
+            />
+          ) : action ? (
+            <View style={styles.webOnlyHint}>
+              <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
+              <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
+            </View>
+          ) : null}
+        </View>
         <Button
           accessibilityLabel={isArchived ? "Restore from archive" : "Archive"}
           icon={isArchived ? "archive" : "archive-outline"}
@@ -495,7 +504,7 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     headerArea: {
       gap: 10,
@@ -521,6 +530,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 10,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
+      ...mobileElevation("card", isDark),
     },
     alertCardMuted: {
       backgroundColor: mobileColors.surfaceSecondary,
@@ -598,10 +608,13 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 1,
       borderRadius: 999,
     },
+    cardActionsLead: {
+      flex: 1,
+      alignItems: "center",
+    },
     cardActions: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
       marginLeft: 42,
       paddingTop: 10,
       borderTopWidth: StyleSheet.hairlineWidth,

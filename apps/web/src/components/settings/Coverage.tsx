@@ -372,7 +372,7 @@ function CoverageOptionRow({
           alignItems: "center",
           gap: 12,
           padding: "10px 8px",
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           cursor: "pointer",
           transition: "background 0.15s",
           width: "100%",
@@ -486,7 +486,7 @@ function CoverageOptionRow({
                 style={{
                   width: 72,
                   padding: "6px 8px",
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   border: "1px solid var(--dg-color-border)",
                   textAlign: "center",
                 }}
@@ -535,7 +535,7 @@ function CoverageOptionRow({
                     style={{
                       width: "100%",
                       padding: "6px 8px",
-                      borderRadius: 8,
+                      borderRadius: "var(--dg-radius-md)",
                       border: "1px solid var(--dg-color-border)",
                       textAlign: "center",
                     }}

@@ -11,7 +11,21 @@ import type {
   Invitation,
 } from "@/types";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
-import { BarChart3, User, Layers, Shield, BriefcaseBusiness } from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  AlertTriangle,
+  BriefcaseBusiness,
+  CalendarDays,
+  Clock,
+  Layers,
+  Shield,
+  TrendingUp,
+  User,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { toDarkPillColors } from "@/lib/colors";
+import { SINGLE_SHIFT_PILL_RADIUS } from "@/components/schedule-grid/gridHelpers";
 import {
   computeEmployeeHoursHistory,
   computeShiftDistribution,
@@ -53,6 +67,8 @@ export function OverviewTab({
   scheduleOverview,
   timeZone,
 }: OverviewTabProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const overviewRange = useMemo(
     () => getProfileOverviewDateRange(new Date(), timeZone),
     [timeZone],
@@ -83,6 +99,17 @@ export function OverviewTab({
     [employee.id, shifts, assignmentById, overviewRange.startDate, overviewRange.endDate],
   );
 
+  // Assignment colors are stored as light-tuned pastels, so they need the same
+  // dark remap the schedule pills get before they land on an ink-black card.
+  const distributionSegments = useMemo(
+    () =>
+      shiftDistribution.map((item) => ({
+        ...item,
+        swatch: isDarkTheme ? toDarkPillColors(item.color).bg : item.color,
+      })),
+    [shiftDistribution, isDarkTheme],
+  );
+
   const overtimeSummary = useMemo(() => computeOvertimeSummary(hoursHistory), [hoursHistory]);
 
   const totalShifts = hoursHistory.reduce((sum, week) => sum + week.shiftCount, 0);
@@ -93,7 +120,6 @@ export function OverviewTab({
         ) / 10
       : 0;
 
-  const topCode = shiftDistribution.length > 0 ? shiftDistribution[0] : null;
   const totalDistributionShifts = shiftDistribution.reduce((sum, item) => sum + item.count, 0);
 
   const certificationName = employee.certificationId
@@ -144,43 +170,37 @@ export function OverviewTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="dg-card">
-        <div className="dg-card-header">
-          <div>
-            <div className="dg-card-title flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
-              Summary
-            </div>
-            <div className="dg-card-subtitle">
-              Hours, shift volume, and recent staffing patterns.
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 divide-y divide-[var(--dg-color-border-light)] sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0 lg:divide-x lg:divide-[var(--dg-color-border-light)]">
-          <MetricCell
-            value={thisWeekHours ? `${thisWeekHours.totalHours}h` : "—"}
-            label="This Week"
-            detail={
-              thisWeekHours?.isOvertime
-                ? `+${thisWeekHours.overtimeHours}h overtime`
-                : thisWeekHours && thisWeekHours.totalHours > 0
-                  ? "No overtime this week"
-                  : "No scheduled hours yet"
-            }
-            danger={thisWeekHours?.isOvertime}
-          />
-          <MetricCell value={`${averageWeeklyHours}h`} label="Avg / Week" />
-          <MetricCell value={String(totalShifts)} label={`Shifts (${WEEK_COUNT}wk)`} />
-          <MetricCell
-            value={String(overtimeSummary.weeksWithOT)}
-            label="OT Weeks"
-            danger={overtimeSummary.weeksWithOT > 0}
-          />
-          <MetricCell
-            value={topCode ? topCode.name || topCode.label : "—"}
-            label={topCode ? `${topCode.percentage}% of shifts` : "Top Code"}
-          />
-        </div>
+      <div
+        data-testid="overview-summary"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <MetricCard
+          label="This Week"
+          value={thisWeekHours ? `${thisWeekHours.totalHours}h` : "—"}
+          detail={
+            thisWeekHours?.isOvertime
+              ? `+${thisWeekHours.overtimeHours}h overtime`
+              : thisWeekHours && thisWeekHours.totalHours > 0
+                ? "No overtime this week"
+                : "No scheduled hours yet"
+          }
+          icon={Clock}
+          tone={thisWeekHours?.isOvertime ? "warning" : "brand"}
+          danger={thisWeekHours?.isOvertime}
+        />
+        <MetricCard label="Avg / Week" value={`${averageWeeklyHours}h`} icon={TrendingUp} />
+        <MetricCard
+          label={`Shifts (${WEEK_COUNT}wk)`}
+          value={String(totalShifts)}
+          icon={CalendarDays}
+        />
+        <MetricCard
+          label="OT Weeks"
+          value={String(overtimeSummary.weeksWithOT)}
+          icon={AlertTriangle}
+          tone={overtimeSummary.weeksWithOT > 0 ? "warning" : "neutral"}
+          danger={overtimeSummary.weeksWithOT > 0}
+        />
       </div>
 
       {scheduleOverview}
@@ -281,34 +301,46 @@ export function OverviewTab({
               </div>
             ) : (
               <div>
-                <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
-                  {shiftDistribution.map((item, index) => (
+                <div
+                  className="mb-4 flex h-6 overflow-hidden bg-muted"
+                  style={{
+                    // Matches the schedule grid's shift pills rather than a
+                    // capsule, so the two charts read as the same family.
+                    borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                    border: "1px solid var(--dg-color-border-strong)",
+                  }}
+                >
+                  {distributionSegments.map((item, index) => (
                     <div
                       key={item.assignmentId}
                       className="h-full transition-all duration-500"
                       style={{
                         width: `${totalDistributionShifts > 0 ? (item.count / totalDistributionShifts) * 100 : 0}%`,
-                        backgroundColor: item.color,
-                        borderRadius:
-                          index === 0 && shiftDistribution.length === 1
-                            ? "9999px"
-                            : index === 0
-                              ? "9999px 0 0 9999px"
-                              : index === shiftDistribution.length - 1
-                                ? "0 9999px 9999px 0"
-                                : "0",
+                        backgroundColor: item.swatch,
+                        // One line per seam: the outline lives on the track, and
+                        // each segment but the last draws the single divider it
+                        // shares with its neighbor. The seam runs a step darker
+                        // than the frame because it has to separate two fills
+                        // rather than sit against the card.
+                        borderRight:
+                          index < distributionSegments.length - 1
+                            ? "1px solid var(--dg-color-text-subtle)"
+                            : undefined,
                       }}
                     />
                   ))}
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  {shiftDistribution.map((item) => (
+                  {distributionSegments.map((item) => (
                     <div key={item.assignmentId} className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                          style={{ backgroundColor: item.color }}
+                          style={{
+                            backgroundColor: item.swatch,
+                            boxShadow: "0 0 0 0.5px var(--dg-color-border-strong)",
+                          }}
                         />
                         <span className="text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                           {item.name}
@@ -332,32 +364,54 @@ export function OverviewTab({
   );
 }
 
-function MetricCell({
-  value,
+const METRIC_CARD_TONES = {
+  brand: { badge: "var(--dg-color-brand-bg)", icon: "var(--dg-color-brand)" },
+  neutral: { badge: "var(--dg-color-bg-secondary)", icon: "var(--dg-color-text-subtle)" },
+  warning: { badge: "var(--dg-color-warning-bg)", icon: "var(--dg-color-warning-text)" },
+} as const;
+
+/** The directory's summary card, reused so a person reads like the roster. */
+function MetricCard({
   label,
+  value,
   detail,
+  icon: Icon,
+  tone = "neutral",
   danger,
 }: {
-  value: string;
   label: string;
+  value: string;
   detail?: string;
+  icon: LucideIcon;
+  tone?: keyof typeof METRIC_CARD_TONES;
   danger?: boolean;
 }) {
+  const palette = METRIC_CARD_TONES[tone];
   return (
-    <div className="flex flex-col items-center justify-center px-3 py-4">
-      <div
-        className="text-xl font-bold leading-none tracking-tight"
-        style={{ color: danger ? "var(--dg-color-danger)" : "var(--dg-color-text-primary)" }}
-      >
-        {value}
-      </div>
-      <div className="dg-type-field-title mt-1.5 text-center">{label}</div>
-      {detail ? (
-        <div className="mt-1 text-center text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
-          {detail}
+    <Card size="sm">
+      <CardContent className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="dg-type-field-title truncate">{label}</p>
+          <p
+            className="mt-0.5 text-2xl font-bold tracking-tight tabular-nums"
+            style={{ color: danger ? "var(--dg-color-danger)" : undefined }}
+          >
+            {value}
+          </p>
+          {detail ? (
+            <p className="mt-0.5 text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
+              {detail}
+            </p>
+          ) : null}
         </div>
-      ) : null}
-    </div>
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+          style={{ background: palette.badge }}
+        >
+          <Icon className="h-5 w-5" style={{ color: palette.icon }} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

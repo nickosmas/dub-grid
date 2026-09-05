@@ -12,6 +12,7 @@ import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
+import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
  * Vercel Edge Proxy for RBAC Route Protection
@@ -151,7 +152,7 @@ export async function proxy(req: NextRequest) {
   // refresh, getUser, etc.) are silently blocked by CSP after a successful
   // server-side login, leaving the user stuck on the login page.
   const isLocalSupabase = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    getSupabaseUrl() ?? "",
   );
   const devConnectExtras = isLocalSupabase
     ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
@@ -245,20 +246,16 @@ export async function proxy(req: NextRequest) {
   // Use @supabase/ssr to read the session from cookies. This correctly handles
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie
   // reconstruction used by @supabase/ssr browser clients.
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    requireSupabasePublishableKey(),
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
-        },
+  const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
       },
     },
-  );
+  });
 
   const {
     data: { session },
@@ -427,7 +424,7 @@ export async function proxy(req: NextRequest) {
           // -check its sessionId against the authoritative impersonation_
           // sessions row before trusting targetOrgId/targetUserId, the same
           // way the sandbox cookie is re-verified against the DB below.
-          const supabaseUrl3 = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseUrl3 = getSupabaseUrl();
           const serviceKey3 = getSupabaseSecretKey();
           const verified =
             typeof impData.sessionId === "string" && supabaseUrl3 && serviceKey3
@@ -489,7 +486,7 @@ export async function proxy(req: NextRequest) {
         res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
       } else {
         try {
-          const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseUrl2 = getSupabaseUrl();
           const serviceKey = getSupabaseSecretKey();
           if (supabaseUrl2 && serviceKey) {
             const svc = createClient(supabaseUrl2, serviceKey, {

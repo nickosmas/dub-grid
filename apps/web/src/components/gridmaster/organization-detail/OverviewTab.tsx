@@ -150,7 +150,7 @@ export function OverviewTab({
   useEffect(() => {
     setEditing(false);
     resetEditState();
-  }, [organization.id, organization.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps -- reset when persisted org state changes
+  }, [organization.id, organization.updatedAt]);
 
   async function handleSave() {
     if (!nextOrganization.name) return;
@@ -414,7 +414,12 @@ export function OverviewTab({
                     <span
                       aria-hidden
                       className="dg-skeleton"
-                      style={{ display: "inline-block", width: 36, height: 12, borderRadius: 4 }}
+                      style={{
+                        display: "inline-block",
+                        width: 36,
+                        height: 12,
+                        borderRadius: "var(--dg-radius-xs)",
+                      }}
                     />
                   ) : (
                     employeeCount.toString()

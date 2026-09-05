@@ -75,7 +75,7 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("shows an 'Off' placeholder for an absence day instead of dropping it", () => {
+  it("renders an absence as its own pill, not a blank day", () => {
     useQuery.mockReturnValue({
       isLoading: false,
       data: {
@@ -92,6 +92,15 @@ describe("MyScheduleCard", () => {
               seriesId: null,
               fromRecurring: false,
             },
+            presentation: {
+              label: "PTO",
+              shiftName: null,
+              focusAreaId: null,
+              focusAreaName: null,
+              startTime: null,
+              endTime: null,
+              segments: [],
+            },
           }),
         ],
       },
@@ -99,7 +108,11 @@ describe("MyScheduleCard", () => {
 
     render(<MyScheduleCard accessToken="token" />);
 
-    expect(screen.getByText("Off")).toBeInTheDocument();
+    // An absence is a real scheduled thing, so it gets a pill carrying the
+    // absence type's own name and colours. Only a day with nothing on it at all
+    // falls through to the em dash.
+    expect(screen.getByText("PTO")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when the query has no range at all", () => {
@@ -111,6 +124,28 @@ describe("MyScheduleCard", () => {
     render(<MyScheduleCard accessToken="token" />);
 
     expect(screen.getByText("You're not scheduled this week")).toBeInTheDocument();
+  });
+
+  it("says the fetch failed rather than claiming there are no shifts", () => {
+    // The card owns its own query and the dashboard's content state deliberately
+    // excludes its error, so a dropped request used to fall through to the empty
+    // state and tell the user they were not scheduled. In a scheduling app that
+    // is a wrong answer, not a missing one.
+    const refetch = vi.fn();
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: undefined,
+      error: new Error("boom"),
+      refetch,
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    expect(screen.queryByText("You're not scheduled this week")).not.toBeInTheDocument();
+    expect(screen.getByText("Could not load your schedule")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   // The card used to return null while its query loaded, which meant it

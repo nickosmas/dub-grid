@@ -275,7 +275,7 @@ interface RenderGridOptions {
     publishedAt: string;
     publishedBy: string;
   } | null;
-  cellLocks?: Map<string, { userName: string }>;
+  cellEditors?: Map<string, { userId: string; userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   coverageRequirements?: CoverageRequirement[];
@@ -323,7 +323,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     orgRoles: options.orgRoles ?? [],
     coverageRequirements: options.coverageRequirements,
     absenceTypeMap: options.absenceTypeMap,
-    cellLocks: options.cellLocks,
+    cellEditors: options.cellEditors,
     resolvePublisherName: options.resolvePublisherName,
     openShifts: options.openShifts as any,
     activeFocusArea: options.activeFocusArea ?? null,
@@ -1852,7 +1852,7 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
-      cellLocks: new Map([[`emp-1_2024-01-07`, { userName: "Mina Ray" }]]),
+      cellEditors: new Map([[`emp-1_2024-01-07`, { userId: "user-mina", userName: "Mina Ray" }]]),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
@@ -2005,6 +2005,103 @@ describe("ScheduleGrid", () => {
 
     expect(badge?.textContent).toBe("Was D");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
+  });
+
+  it("still shows the publish-diff badge when a concurrent draft has no badge of its own", () => {
+    observedWidth = 1600;
+
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      assignments[0],
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "S",
+        name: "South Shift",
+        color: "#DBEAFE",
+        border: "#2563EB",
+        text: "#1E3A8A",
+        categoryId: 1,
+        focusAreaId: 2,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      draftKindForKey: () => "new",
+      showPublishDiffOverlay: true,
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "S",
+      assignmentIdsForKey: () => [2],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        from: [1],
+        to: [2],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const draftBadge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const publishBadge = firstCell.querySelector(
+      '[data-publish-badge="modified"]',
+    ) as HTMLElement | null;
+
+    expect(draftBadge).toBeNull();
+    expect(publishBadge).not.toBeNull();
+  });
+
+  it("prefers the draft badge over a publish-diff badge on the same cell", () => {
+    observedWidth = 1600;
+
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      assignments: localAssignmentDefinitions,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "deleted",
+        from: [1],
+        to: [],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const draftBadge = firstCell.querySelector(
+      '[data-draft-badge="modified"]',
+    ) as HTMLElement | null;
+    const publishBadge = firstCell.querySelector("[data-publish-badge]") as HTMLElement | null;
+
+    expect(draftBadge).not.toBeNull();
+    expect(publishBadge).toBeNull();
   });
 
   it("uses segment labels for publish replacement badges when they include job text", () => {
@@ -2672,6 +2769,29 @@ describe("ScheduleGrid", () => {
     expect(activeCells).toHaveLength(1);
   });
 
+  // Another editor's marker is informational. Blocking on it is exactly the
+  // behaviour that was removed, so this pins that it cannot come back.
+  it("still opens a cell another editor has open, and marks it", () => {
+    const onActivateCell = vi.fn();
+    renderGrid({
+      cellEditors: new Map([
+        ["emp-1_2024-01-07", { userId: "user-other", userName: "Another user" }],
+      ]),
+      onActivateCell,
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    fireEvent.click(firstCell);
+
+    expect(firstCell.dataset.peerEditing).toBe("true");
+    expect(onActivateCell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cellId: { empId: "emp-1", dateKey: "2024-01-07", sectionId: 1 },
+        trigger: "click",
+      }),
+    );
+  });
+
   it("toggles selectable cells in bulk delete mode instead of opening the editor", () => {
     const onActivateCell = vi.fn();
     const onToggleBulkDeleteCell = vi.fn();
@@ -2729,21 +2849,20 @@ describe("ScheduleGrid", () => {
     expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
   });
 
-  it("does not select locked cells in bulk delete mode", () => {
+  it("still selects a cell another editor has open in bulk delete mode", () => {
     const onToggleBulkDeleteCell = vi.fn();
     renderGrid({
       bulkDeleteMode: true,
       bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
-      cellLocks: new Map([["emp-1_2024-01-07", { userName: "Sam" }]]),
+      cellEditors: new Map([["emp-1_2024-01-07", { userId: "user-sam", userName: "Sam" }]]),
       onToggleBulkDeleteCell,
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     fireEvent.click(firstCell);
 
-    expect(firstCell.dataset.locked).toBe("true");
-    expect(firstCell.dataset.bulkSelectable).toBeUndefined();
-    expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
+    expect(firstCell.dataset.peerEditing).toBe("true");
+    expect(onToggleBulkDeleteCell).toHaveBeenCalled();
   });
 
   it("suppresses context menus and keyboard activation in bulk delete mode", () => {

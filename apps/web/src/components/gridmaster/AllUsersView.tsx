@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "next-themes";
@@ -40,7 +41,7 @@ function RoleBadge({ role }: { role: string }) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: c.bg,
         color: c.text,
         border: `1px solid ${c.border}`,
@@ -62,7 +63,7 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: "var(--dg-color-danger-bg)",
         color: "var(--dg-color-danger)",
         textTransform: "uppercase",
@@ -386,15 +387,9 @@ export default function AllUsersView({
             Showing {filtered.length} of {users.length}
           </span>
           <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Search
+              size={13}
+              strokeWidth={2.5}
               style={{
                 position: "absolute",
                 left: 10,
@@ -402,10 +397,7 @@ export default function AllUsersView({
                 transform: "translateY(-50%)",
                 color: "var(--dg-color-text-faint)",
               }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            />
             <input
               className="dg-input"
               value={search}
@@ -607,9 +599,9 @@ export default function AllUsersView({
       {/* Force logout confirm */}
       {forceLogoutConfirm && (
         <ConfirmDialog
-          title="Force Logout"
+          title="Force logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
-          confirmLabel="Force Logout"
+          confirmLabel="Force logout"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
           onConfirm={() => handleForceLogout(forceLogoutConfirm)}
@@ -622,7 +614,7 @@ export default function AllUsersView({
         <ConfirmDialog
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
-          confirmLabel="Send Reset Email"
+          confirmLabel="Send reset email"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
           onConfirm={() => handlePasswordReset(resetConfirm)}
@@ -927,7 +919,11 @@ export default function AllUsersView({
                                 <td style={tdStyle}>
                                   <div
                                     className="dg-skeleton"
-                                    style={{ width: "70%", height: 12, borderRadius: 4 }}
+                                    style={{
+                                      width: "70%",
+                                      height: 12,
+                                      borderRadius: "var(--dg-radius-xs)",
+                                    }}
                                   />
                                 </td>
                                 <td style={tdStyle}>
@@ -939,7 +935,11 @@ export default function AllUsersView({
                                 <td style={tdStyle}>
                                   <div
                                     className="dg-skeleton"
-                                    style={{ width: 96, height: 12, borderRadius: 4 }}
+                                    style={{
+                                      width: 96,
+                                      height: 12,
+                                      borderRadius: "var(--dg-radius-xs)",
+                                    }}
                                   />
                                 </td>
                               </tr>

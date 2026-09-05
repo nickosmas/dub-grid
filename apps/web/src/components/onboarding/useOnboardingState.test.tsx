@@ -39,7 +39,7 @@ describe("useOnboardingState completion", () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => useOnboardingState("user-1", "org-1", [{ id: "done", label: "Done" }]),
+      () => useOnboardingState("user-1", "org-1", [{ id: "done", label: "Done" }], "user"),
       { wrapper },
     );
 
@@ -73,7 +73,7 @@ describe("useOnboardingState completion", () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => useOnboardingState("user-1", "org-1", [{ id: "done", label: "Done" }]),
+      () => useOnboardingState("user-1", "org-1", [{ id: "done", label: "Done" }], "user"),
       { wrapper },
     );
 

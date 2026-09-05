@@ -12,11 +12,9 @@ import {
   AppState,
   Animated,
   LayoutAnimation,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   useWindowDimensions,
   type AppStateStatus,
@@ -59,13 +57,11 @@ import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import {
-  useIsDarkMode,
-  useMobileColors,
-  useThemeMode,
-} from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
+  MAX_FONT_SCALE_FIXED,
   mobileBorderColorFromText,
   mobileMotion,
   mobileRadii,
@@ -185,6 +181,11 @@ import {
   getOpenShiftTimeRange,
 } from "../lib/openShiftPresentation";
 
+/**
+ * Shared by the two personal-scope sections that read the shift-requests query,
+ * so a single failure raises a single toast rather than one from each.
+ */
+const SCHEDULE_REQUESTS_ERROR_TOAST_KEY = "schedule-requests-error";
 const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
 const OPEN_SHIFT_STACK_SIDE_INSET = 6;
 const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
@@ -221,12 +222,12 @@ const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
 const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
-if (
-  Platform.OS === "android" &&
-  typeof UIManager.setLayoutAnimationEnabledExperimental === "function"
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// `setLayoutAnimationEnabledExperimental` used to be the Android opt-in for
+// `LayoutAnimation`. Under the New Architecture it does nothing but warn on
+// every launch ("is currently a no-op in the New Architecture"), so calling it
+// bought a permanent LogBox entry and no animation. The `configureNext` calls
+// below stay: they still animate where the platform supports them, and they
+// degrade to an un-animated layout change where it doesn't.
 
 type ScheduleScope = "mine" | "team";
 type RequestActionBody =
@@ -1652,27 +1653,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // Mirrors the `fillScreen` branches below: every one of them is meant to be
-  // the whole page, not a card sharing a scroll with something else. The
-  // loading skeleton always wins first in that same ternary chain, so it has
-  // to win here too, or a still-loading blocked/unlinked screen would lose
-  // its scroll before the skeleton it's showing needs it.
-  const isFillScreenState =
-    contentState.kind !== "loading" &&
-    (contentState.kind === "error" ||
-      isBlockedTeamView ||
-      (!isTeamScope && !linkedEmployee) ||
-      (isTeamScope && shiftGroups.length === 0));
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
-      stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
       <View>
         {/* The focus-area pills carry per-day counts, so they can't paint before
@@ -1902,7 +1894,7 @@ function MonthDayCell({
       accessibilityLabel={accessible ? `Select ${dateLabel}` : undefined}
       accessibilityRole={accessible ? "button" : undefined}
       accessibilityState={accessible ? { selected: day.isSelected } : undefined}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       onPress={onPress}
       style={styles.monthCalendarDaySlot}
     >
@@ -1916,7 +1908,7 @@ function MonthDayCell({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
           style={[
             styles.dateHighlightText,
             day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
@@ -1950,7 +1942,7 @@ function IconControlButton({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       hitSlop={10}
       onPress={onPress}
       style={({ pressed }) => [
@@ -1972,7 +1964,7 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
     <Pressable
       accessibilityLabel="Open alerts"
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
+      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       hitSlop={10}
       onPress={() => router.push("/alerts")}
       style={({ pressed }) => [
@@ -2204,8 +2196,7 @@ function MeTypePill({
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const mobileColors = useMobileColors();
-  const { resolvedTheme } = useThemeMode();
-  const isDark = resolvedTheme === "dark";
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (entries.length === 0) {
@@ -2266,7 +2257,10 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text maxFontSizeMultiplier={1.5} style={styles.meHeroCollaboratorOverflowText}>
+              <Text
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.meHeroCollaboratorOverflowText}
+              >
                 +{overflowCount}
               </Text>
             </View>
@@ -2558,8 +2552,12 @@ function UpcomingShiftsSection({
             >
               <View style={styles.upcomingDateColumn}>
                 <View style={styles.upcomingDateTile}>
-                  <Text style={styles.upcomingDateWeekday}>{dateParts.weekdayLabel}</Text>
-                  <Text style={styles.upcomingDateDay}>{dateParts.dayLabel}</Text>
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateWeekday}>
+                    {dateParts.weekdayLabel}
+                  </Text>
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingDateDay}>
+                    {dateParts.dayLabel}
+                  </Text>
                   {isToday ? (
                     <View
                       pointerEvents="none"
@@ -2589,20 +2587,32 @@ function UpcomingShiftsSection({
                         style={styles.upcomingShiftRow}
                       >
                         <View style={styles.upcomingShiftCopy}>
-                          {shouldShowShiftName || splitSegments.length > 1 ? (
-                            <View style={styles.upcomingShiftTitleRow}>
-                              <View style={styles.upcomingShiftTitleMeta}>
-                                {shouldShowShiftName ? (
-                                  <Text style={styles.upcomingShiftTitle}>{shiftName}</Text>
-                                ) : null}
-                                {splitSegments.length > 1 ? (
-                                  <SplitShiftBadge
-                                    count={splitSegments.length}
-                                    compact
-                                    label={splitShiftLabel}
-                                  />
-                                ) : null}
-                              </View>
+                          {/* Title and time stack rather than sitting in two
+                              columns. Side by side, the time never gave width
+                              back, so at a raised OS text size the name was
+                              squeezed into a column narrow enough to break
+                              mid-word ("Visitin / g Nursin / g"). */}
+                          {shouldShowShiftName || splitSegments.length > 1 || timeRange ? (
+                            <View style={styles.upcomingShiftHeading}>
+                              {shouldShowShiftName || splitSegments.length > 1 ? (
+                                <View style={styles.upcomingShiftTitleMeta}>
+                                  {shouldShowShiftName ? (
+                                    <Text
+                                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                      style={styles.upcomingShiftTitle}
+                                    >
+                                      {shiftName}
+                                    </Text>
+                                  ) : null}
+                                  {splitSegments.length > 1 ? (
+                                    <SplitShiftBadge
+                                      count={splitSegments.length}
+                                      compact
+                                      label={splitShiftLabel}
+                                    />
+                                  ) : null}
+                                </View>
+                              ) : null}
                               {timeRange ? (
                                 <View style={styles.upcomingShiftTime}>
                                   <Ionicons
@@ -2610,29 +2620,29 @@ function UpcomingShiftsSection({
                                     name="time-outline"
                                     size={14}
                                   />
-                                  <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
+                                  <Text
+                                    maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                    style={styles.upcomingShiftTimeText}
+                                  >
+                                    {timeRange}
+                                  </Text>
                                 </View>
                               ) : null}
                             </View>
                           ) : null}
                           {focusAreaName ? (
-                            <Text style={styles.upcomingShiftArea}>{focusAreaName}</Text>
+                            <Text
+                              maxFontSizeMultiplier={MAX_FONT_SCALE}
+                              style={styles.upcomingShiftArea}
+                            >
+                              {focusAreaName}
+                            </Text>
                           ) : null}
                           <MeTypePill
                             chip={typeChip}
                             compact
                             isMentored={item.segment.isMentored === true}
                           />
-                          {timeRange && !shouldShowShiftName && splitSegments.length <= 1 ? (
-                            <View style={styles.upcomingShiftTime}>
-                              <Ionicons
-                                color={mobileColors.textMuted}
-                                name="time-outline"
-                                size={14}
-                              />
-                              <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
-                            </View>
-                          ) : null}
                         </View>
 
                         <View style={styles.upcomingShiftAction}>
@@ -2713,8 +2723,12 @@ function OpenShiftsSection({
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load open shifts",
-        fallbackMessage: "We couldn't load open shifts right now.",
+        title: "Could not load shift requests",
+        fallbackMessage: "We couldn't load shift requests right now.",
+        // This section and the cover-requests section below render together in
+        // personal scope and read the same query, so one failure used to raise
+        // two differently-titled toasts. One failure, one toast.
+        dedupeKey: SCHEDULE_REQUESTS_ERROR_TOAST_KEY,
       });
     }
   }, [requestsError, pushToast]);
@@ -3096,14 +3110,14 @@ function ShiftCoverRequestsSection({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { resolvedTheme } = useThemeMode();
   const { pushToast } = useToast();
   useEffect(() => {
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load requests",
-        fallbackMessage: "We couldn't load cover requests right now.",
+        title: "Could not load shift requests",
+        fallbackMessage: "We couldn't load shift requests right now.",
+        dedupeKey: SCHEDULE_REQUESTS_ERROR_TOAST_KEY,
       });
     }
   }, [requestsError, pushToast]);
@@ -3118,13 +3132,8 @@ function ShiftCoverRequestsSection({
 
       <View style={styles.requestList}>
         {requests.map((request) => {
-          const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
-          const jobChip = getRequestJobChip(
-            mobileColors,
-            resolvedTheme === "dark",
-            request,
-            "requester",
-          );
+          const avatarTone = getAvatarTone(request.requesterEmpId, isDark);
+          const jobChip = getRequestJobChip(mobileColors, isDark, request, "requester");
           const shiftName = getRequestShiftName(request, "requester");
           const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
           const focusAreaName = getRequestFocusAreaName(request, "requester");
@@ -3157,7 +3166,7 @@ function ShiftCoverRequestsSection({
                     ]}
                   >
                     <Text
-                      maxFontSizeMultiplier={1.5}
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
                       {getInitials(request.requesterName)}
@@ -3228,13 +3237,12 @@ function TeamShiftMemberRow({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
-  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
+  const avatarTone = getAvatarTone(entry.employeeId, isDark);
   const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
-  const roleChip = getTeamMemberRoleChip(mobileColors, resolvedTheme === "dark", entry, segment);
+  const roleChip = getTeamMemberRoleChip(mobileColors, isDark, entry, segment);
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -3255,7 +3263,7 @@ function TeamShiftMemberRow({
         ]}
       >
         <Text
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
         >
           {getInitials(entry.employeeName)}

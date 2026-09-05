@@ -22,6 +22,7 @@ const clientSchema = z.object({
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   NEXT_PUBLIC_VERCEL_URL: z.string().optional(),
+  NEXT_PUBLIC_PERF_TIMING: z.string().optional(),
 });
 
 function validateClientEnv() {
@@ -32,6 +33,14 @@ function validateClientEnv() {
     NEXT_PUBLIC_BASE_DOMAIN: process.env.NEXT_PUBLIC_BASE_DOMAIN,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     NEXT_PUBLIC_VERCEL_URL: process.env.NEXT_PUBLIC_VERCEL_URL,
+    // These four are declared in the schema above but were never passed here,
+    // so they always parsed as undefined. Named literally, not looked up in a
+    // loop: Next only inlines NEXT_PUBLIC_* for static member access.
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    NEXT_PUBLIC_PERF_TIMING: process.env.NEXT_PUBLIC_PERF_TIMING,
   });
   if (!result.success) {
     console.error(
@@ -44,7 +53,29 @@ function validateClientEnv() {
   return result.data;
 }
 
-// NEXT_PUBLIC_* vars are inlined by Next.js at build time into every bundle
-// (server and client alike), so this validates regardless of runtime context —
-// only test env is skipped, to keep vitest output quiet.
-export const clientEnv = process.env.NODE_ENV !== "test" ? validateClientEnv() : null;
+type ClientEnv = z.infer<typeof clientSchema>;
+
+let clientMemo: ClientEnv | null | undefined;
+
+/**
+ * Resolved lazily rather than snapshotted at import.
+ *
+ * A module-level const captured process.env once, before any test had a chance
+ * to set it, so `vi.stubEnv` was invisible here. That is the real reason so
+ * much code read the raw variable instead of this object: reading it through
+ * here simply did not work under test. Under test we re-validate per access so
+ * stubs are honoured; everywhere else the first result is memoised.
+ */
+function resolveClientEnv(): ClientEnv | null {
+  if (process.env.NODE_ENV === "test") return validateClientEnv();
+  if (clientMemo === undefined) clientMemo = validateClientEnv();
+  return clientMemo;
+}
+
+export const clientEnv = new Proxy({} as ClientEnv, {
+  get: (_target, prop: string) => resolveClientEnv()?.[prop as keyof ClientEnv],
+  has: (_target, prop: string) => {
+    const resolved = resolveClientEnv();
+    return resolved ? prop in resolved : false;
+  },
+}) as ClientEnv | null;

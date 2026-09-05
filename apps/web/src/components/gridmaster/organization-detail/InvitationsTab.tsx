@@ -139,7 +139,7 @@ export function InvitationsTab({
                           style={{
                             display: "inline-block",
                             padding: "2px 8px",
-                            borderRadius: 4,
+                            borderRadius: "var(--dg-radius-xs)",
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
                             color: status.color,
@@ -196,7 +196,7 @@ export function InvitationsTab({
         <ConfirmDialog
           title="Revoke Invitation"
           message={`Revoke the invitation for "${revokeConfirm.email}"? They will not be able to use the current invite link after this change.`}
-          confirmLabel="Revoke Invitation"
+          confirmLabel="Revoke"
           variant="danger"
           isLoading={revoking === revokeConfirm.id}
           onConfirm={() => handleRevoke(revokeConfirm)}

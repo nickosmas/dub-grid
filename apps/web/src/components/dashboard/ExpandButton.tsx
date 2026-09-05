@@ -24,8 +24,12 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
         transition: "background 0.15s, color 0.15s, transform 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--dg-color-brand-bg)";
-        e.currentTarget.style.color = "var(--dg-color-brand)";
+        // Same neutral hover as `.dg-close-btn` in globals.css: this is the other
+        // quiet icon affordance sitting in a panel header, so it should not read
+        // as a brand-tinted action.
+        e.currentTarget.style.background =
+          "color-mix(in srgb, var(--dg-color-text-primary) 12%, transparent)";
+        e.currentTarget.style.color = "var(--dg-color-text-primary)";
         e.currentTarget.style.transform = "translateY(-1px)";
       }}
       onMouseLeave={(e) => {

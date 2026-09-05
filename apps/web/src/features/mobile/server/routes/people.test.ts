@@ -123,6 +123,9 @@ describe("mobile people route", () => {
       permissions: {
         canManageEmployees: true,
         canViewStaff: true,
+        // authz derives this from canManageEmployees (applyViewImplications),
+        // so a real manager always carries it.
+        canViewEmployeeDetails: true,
       },
       serviceClient: {},
     });
@@ -204,6 +207,7 @@ describe("mobile people route", () => {
       permissions: {
         canManageEmployees: false,
         canViewStaff: true,
+        canViewEmployeeDetails: false,
       },
       serviceClient: {},
     });

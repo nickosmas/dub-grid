@@ -22,7 +22,7 @@ export default function OrganizationChangeReviewModal({
       description="Review these organization changes before saving. Sensitive updates should be confirmed carefully because they affect the whole organization."
       changes={changes}
       saving={saving}
-      confirmLabel="Confirm Save"
+      confirmLabel="Save"
       warningText="This save includes sensitive organization changes."
       onCancel={onCancel}
       onConfirm={onConfirm}

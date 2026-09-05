@@ -13,16 +13,21 @@ import type {
   Organization,
   ShiftCategory,
 } from "@/types";
+import type { BillingAccessState } from "@dubgrid/domain";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { fetchWithTimeout, RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 const ORGANIZATION_BOOTSTRAP_TIMEOUT_MS = 5_000;
+const ORGANIZATION_ACCESS_STATUS_TIMEOUT_MS = 8_000;
 
 export interface OrganizationBootstrap {
   org: Organization | null;
   isGridmaster: boolean;
   entryGate: {
     onboardingCompleted: boolean;
+    /** Org-wide: a super admin has finished their own onboarding, so the
+     *  organization is open to members who cannot configure it themselves. */
+    adminOnboardingCompleted: boolean;
     /** Only present for a super-admin's own organization. */
     billingLocked: boolean | null;
   };
@@ -122,6 +127,24 @@ export function getOrganizationBootstrapRetryDelay(error: unknown, failureCount:
   }
   const cappedDelay = Math.min(1_000 * 2 ** failureCount, 30_000);
   return Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
+}
+
+export type OrganizationAccessState = BillingAccessState | "archived" | "unknown";
+
+export interface OrganizationAccessStatus {
+  /** True once the proxy's organization gate would no longer hold the caller. */
+  available: boolean;
+  state: OrganizationAccessState;
+}
+
+export function fetchOrganizationAccessStatus(
+  signal?: AbortSignal,
+): Promise<OrganizationAccessStatus> {
+  return requestOrganizationJson<OrganizationAccessStatus>(
+    "/api/organization/access-status",
+    { signal },
+    ORGANIZATION_ACCESS_STATUS_TIMEOUT_MS,
+  );
 }
 
 export function fetchOrganizationDirectory(

@@ -11,8 +11,10 @@ import {
   getProfileOverviewDateRange,
 } from "@/features/account/shared/profile-schedule";
 import type {
+  AbsenceType,
   AssignmentDefinition,
   Employee,
+  JobDefinition,
   FocusArea,
   NamedItem,
   RecurringShift,
@@ -25,7 +27,9 @@ interface SelfWorkOverviewProps {
   focusAreas: FocusArea[];
   focusAreaLabel?: string;
   assignments: AssignmentDefinition[];
+  absenceTypes?: AbsenceType[];
   shiftCategories: ShiftCategory[];
+  jobs?: JobDefinition[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   shifts: ShiftMap;
@@ -38,7 +42,9 @@ export function SelfWorkOverview({
   focusAreas,
   focusAreaLabel,
   assignments,
+  absenceTypes,
   shiftCategories,
+  jobs,
   certifications,
   orgRoles,
   shifts,
@@ -84,7 +90,13 @@ export function SelfWorkOverview({
       scheduleOverview={
         <div className="flex flex-col gap-4">
           <CalendarSubscriptionCard />
-          <RecurringScheduleCard recurringShifts={recurringShifts} />
+          <RecurringScheduleCard
+            recurringShifts={recurringShifts}
+            assignments={assignments}
+            absenceTypes={absenceTypes}
+            shiftCategories={shiftCategories}
+            jobs={jobs}
+          />
         </div>
       }
     />

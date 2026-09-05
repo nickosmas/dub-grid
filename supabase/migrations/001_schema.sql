@@ -883,6 +883,57 @@ CREATE TABLE public.schedule_draft_sessions (
 );
 
 
+-- ── schedule_editor_session_terminations ────────────────────────────────────
+-- Durable, owner-scoped tombstones for schedule editor instances. These end
+-- only an opaque browser editor session; they never revoke an auth session.
+
+CREATE TABLE public.schedule_editor_session_terminations (
+  id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                       UUID NOT NULL,
+  user_id                      UUID NOT NULL,
+  editor_session_id            UUID NOT NULL,
+  ended_by_editor_session_id   UUID NOT NULL,
+  ended_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (org_id, user_id, editor_session_id),
+  CONSTRAINT schedule_editor_termination_not_self
+    CHECK (editor_session_id <> ended_by_editor_session_id)
+);
+
+CREATE INDEX idx_schedule_editor_terminations_owner
+  ON public.schedule_editor_session_terminations(user_id, org_id, ended_at DESC);
+
+
+-- ── calendar_feed_tokens ─────────────────────────────────────────────────────
+-- Service-only hashed capability tokens for cookie-free published schedule
+-- feeds. Mirrored from 011_calendar_feed_tokens.sql.
+
+CREATE TABLE public.calendar_feed_tokens (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  org_id      UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  token_hash  TEXT NOT NULL,
+  issued_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at  TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT calendar_feed_tokens_scope_unique UNIQUE (user_id, org_id, employee_id),
+  CONSTRAINT calendar_feed_tokens_hash_unique UNIQUE (token_hash),
+  CONSTRAINT calendar_feed_tokens_hash_format CHECK (token_hash ~ '^[0-9a-f]{64}$')
+);
+
+CREATE INDEX idx_calendar_feed_tokens_active_hash
+  ON public.calendar_feed_tokens(token_hash)
+  WHERE revoked_at IS NULL;
+
+COMMENT ON TABLE public.calendar_feed_tokens IS
+  'Service-only hashed capability tokens for cookie-free published schedule feeds.';
+COMMENT ON COLUMN public.calendar_feed_tokens.token_hash IS
+  'SHA-256 hash of the private feed token. The raw token is disclosed only when issued.';
+
+
 -- ── publish_history ──────────────────────────────────────────────────────────
 
 CREATE TABLE public.publish_history (
@@ -1212,6 +1263,11 @@ ALTER TABLE public.shift_requests
 ALTER TABLE public.schedule_draft_sessions
   ADD CONSTRAINT schedule_draft_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT schedule_draft_sessions_saved_by_fkey FOREIGN KEY (saved_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+-- schedule_editor_session_terminations
+ALTER TABLE public.schedule_editor_session_terminations
+  ADD CONSTRAINT schedule_editor_terminations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT schedule_editor_terminations_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- recurring_shifts_draft_sessions
 ALTER TABLE public.recurring_shifts_draft_sessions

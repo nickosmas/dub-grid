@@ -146,7 +146,6 @@ export async function fetchRecentPublishHistory(
     .order("published_at", { ascending: false });
   if (error) throw error;
   if (!data || data.length === 0) return [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((row: any) => ({
     id: row.id,
     publishedBy: row.published_by,
@@ -176,7 +175,6 @@ export async function fetchPublishedDateRanges(
     .gte("end_date", rangeStart);
   if (error) throw error;
   if (!data || data.length === 0) return [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((row: any) => ({
     startDate: row.start_date,
     endDate: row.end_date,
@@ -213,7 +211,6 @@ export async function fetchPublishHistory(
     p_offset: offset,
   });
   if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((row: any) => ({
     id: row.id,
     publishedBy: row.published_by,
@@ -237,7 +234,7 @@ export async function fetchScheduleNotes(
     let query = supabase
       .from("schedule_notes")
       .select(
-        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, updated_by, created_at, updated_at",
       )
       .eq("org_id", orgId);
     if (startDate) query = query.gte("date", startDate);
@@ -260,6 +257,7 @@ export async function fetchScheduleNotes(
     focusAreaId: row.focus_area_id,
     status: row.status,
     createdBy: row.created_by,
+    updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));

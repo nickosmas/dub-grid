@@ -1,6 +1,25 @@
 import { act, renderHook } from "@testing-library/react";
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { useUnsavedChangesGuard } from "./useUnsavedChangesGuard";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Let the confirmation finish leaving. The exit behind it is deliberately
+ * sequenced (`useModalHandoff`), because tearing down a confirmation and the
+ * sheet under it in one commit leaves the sheet stuck on screen.
+ */
+function completeModalHandoff() {
+  act(() => {
+    vi.runAllTimers();
+  });
+}
 
 function renderGuard(options: { isDirty?: boolean; disabled?: boolean } = {}) {
   const onDiscard = vi.fn();
@@ -69,9 +88,15 @@ describe("useUnsavedChangesGuard", () => {
     requestClose();
     confirm();
 
+    // The confirmation goes immediately and the reset with it; only the exit
+    // waits for that modal to finish leaving.
     expect(onDiscard).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
     expect(view.result.current.confirmationProps.visible).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+
+    completeModalHandoff();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the edit and the surface when the discard is declined", () => {
@@ -112,6 +137,7 @@ describe("useUnsavedChangesGuard", () => {
     expect(exit).not.toHaveBeenCalled();
 
     confirm();
+    completeModalHandoff();
 
     expect(exit).toHaveBeenCalledTimes(1);
     // The navigation guard pops the screen itself; closing the panel too would

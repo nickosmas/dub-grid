@@ -4,13 +4,15 @@ import { cn } from "@/lib/utils";
 export type StatusPillTone = "success" | "warning" | "danger" | "info" | "neutral";
 export type StatusPillVariant = "status" | "category";
 
+// No tooltip prop by design: this renders on the server (the landing page uses
+// it), and <Hint> is client-only. Callers that need one wrap the pill in
+// <MaybeHint> from their own client component.
 interface StatusPillProps {
   tone?: StatusPillTone;
   variant?: StatusPillVariant;
   bordered?: boolean;
   dot?: boolean;
   children: ReactNode;
-  title?: string;
   className?: string;
   "aria-label"?: string;
 }
@@ -55,7 +57,6 @@ export function StatusPill({
   bordered = true,
   dot,
   children,
-  title,
   className,
   "aria-label": ariaLabel,
 }: StatusPillProps) {
@@ -64,7 +65,11 @@ export function StatusPill({
   const showDot = dot ?? (variant === "status" && tone !== "neutral");
   const style: CSSProperties = {
     background:
-      variant === "category" ? `color-mix(in srgb, ${vars.bg} 96%, ${vars.text})` : vars.bg,
+      variant === "category"
+        ? tone === "neutral"
+          ? "var(--dg-color-bg-secondary)"
+          : `color-mix(in srgb, ${vars.bg} 96%, ${vars.text})`
+        : vars.bg,
     color: vars.text,
     ...(bordered ? { border: `1px solid ${vars.border}` } : {}),
   };
@@ -73,7 +78,6 @@ export function StatusPill({
     <span
       aria-label={ariaLabel}
       data-status-pill-variant={variant}
-      title={title}
       className={cn(
         "inline-flex items-center gap-1.5 px-2 py-0.5 tracking-normal whitespace-nowrap",
         variant === "category"

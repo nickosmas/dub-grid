@@ -8,6 +8,8 @@ export const SUPABASE = {
   token: "{{ .Token }}",
   /** Site origin (no trailing slash) used to resolve the logo image. */
   siteUrl: "{{ .SiteURL }}",
+  oldEmail: "{{ .OldEmail }}",
+  newEmail: "{{ .NewEmail }}",
 } as const;
 
 // Preview-only logoUrl, so the dev preview loads the brand images. The

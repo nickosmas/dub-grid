@@ -1,4 +1,5 @@
 import pino from "pino";
+import { serverEnv } from "@/lib/env.server";
 
 /**
  * Structured logger for DubGrid.
@@ -6,7 +7,7 @@ import pino from "pino";
  * - Pretty-printed in development
  */
 const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
+  level: serverEnv?.LOG_LEVEL || "info",
   ...(process.env.NODE_ENV !== "production" && {
     transport: {
       target: "pino/file",

@@ -14,6 +14,7 @@ import {
   type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "../_lib/operations";
+import { getImportTargetCellKeys } from "../_lib/import-cell-keys";
 
 export type ImportPreviewState = {
   sourceRange: string;
@@ -49,6 +50,7 @@ export function useScheduleImport({
   updateScheduleOperation,
   finishScheduleOperation,
   clearScheduleOperation,
+  canMutateCells,
 }: {
   org: { id: string } | null;
   spanWeeks: 1 | 2 | "month";
@@ -66,6 +68,7 @@ export function useScheduleImport({
   ) => void;
   finishScheduleOperation: (kind: ScheduleOperation["kind"], detail?: string) => void;
   clearScheduleOperation: (kind: ScheduleOperation["kind"]) => void;
+  canMutateCells: (cellKeys: string[]) => boolean;
 }) {
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
@@ -97,14 +100,14 @@ export function useScheduleImport({
       });
 
       if (outcomes.length === 0) {
-        toast.info("Nothing to import — the previous period has no shifts.");
+        toast.info("Nothing to import: the previous period has no shifts.");
         return;
       }
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
       if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
         toast.info(
-          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, employeeNameById)}.`,
+          `Nothing new to import: ${formatImportPreviousSkipDescription(outcomes, breakdown, employeeNameById)}.`,
         );
         return;
       }
@@ -130,6 +133,7 @@ export function useScheduleImport({
 
   const handleImportPrevious = useCallback(async () => {
     if (!org || spanWeeks === "month" || !importPreview) return;
+    if (!canMutateCells(getImportTargetCellKeys(importPreview.outcomes))) return;
 
     const expected = importPreview.breakdown.imported;
     startScheduleOperation({
@@ -182,7 +186,7 @@ export function useScheduleImport({
 
       if (breakdown.imported === 0) {
         toast.info(
-          skipDescription ? `Nothing imported — ${skipDescription}.` : "Nothing imported.",
+          skipDescription ? `Nothing imported: ${skipDescription}.` : "Nothing imported.",
           breakdown.totalSkipped > 0
             ? { action: { label: "View details", onClick: () => setShowImportResults(true) } }
             : undefined,
@@ -223,6 +227,7 @@ export function useScheduleImport({
     updateScheduleOperation,
     finishScheduleOperation,
     clearScheduleOperation,
+    canMutateCells,
   ]);
 
   const cancelImportConfirm = useCallback(() => {

@@ -154,7 +154,6 @@ export function useIdleTimer({
       document.removeEventListener("visibilitychange", handleWake);
       window.removeEventListener("pageshow", handleWake);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, timeoutMs, warningMs, throttleMs]);
 
   return { phase, secondsRemaining, stayActive };

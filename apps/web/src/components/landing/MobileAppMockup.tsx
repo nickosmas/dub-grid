@@ -382,7 +382,7 @@ function IconChip({ tone, children }: { tone: Tone; children: React.ReactNode })
       style={{
         width: 32,
         height: 32,
-        borderRadius: 10,
+        borderRadius: "var(--dg-radius-lg)",
         border: `1px solid ${t.border}`,
         background: t.bg,
         display: "flex",
@@ -691,7 +691,7 @@ function ScheduleScreen() {
               <div
                 style={{
                   alignSelf: "flex-start",
-                  borderRadius: 8,
+                  borderRadius: "var(--dg-radius-md)",
                   border: `1px solid ${C.warningBorder}`,
                   background: C.warningSoft,
                   paddingLeft: 9,
@@ -796,7 +796,7 @@ function ScheduleScreen() {
             {/* upcomingHoursBadge */}
             <div
               style={{
-                borderRadius: 12,
+                borderRadius: "var(--dg-radius-xl)",
                 background: C.brandSoft,
                 paddingLeft: 14,
                 paddingRight: 14,
@@ -1265,7 +1265,7 @@ function RequestsScreen() {
                       <div
                         style={{
                           minHeight: 44,
-                          borderRadius: 12,
+                          borderRadius: "var(--dg-radius-xl)",
                           paddingLeft: 14,
                           paddingRight: 14,
                           paddingTop: 10,
@@ -1532,7 +1532,7 @@ function AdminHomeScreenMockup() {
                     minWidth: 0,
                     overflow: "hidden",
                     background: C.surfaceSecondary,
-                    borderRadius: 12,
+                    borderRadius: "var(--dg-radius-xl)",
                     border: `1px solid ${C.borderSubtle}`,
                     padding: 12,
                     display: "flex",
@@ -1624,7 +1624,7 @@ function AdminHomeScreenMockup() {
                   flexDirection: "column",
                   gap: 8,
                   background: C.surfaceSecondary,
-                  borderRadius: 12,
+                  borderRadius: "var(--dg-radius-xl)",
                   border: `1px solid ${C.borderSubtle}`,
                   padding: 12,
                 }}

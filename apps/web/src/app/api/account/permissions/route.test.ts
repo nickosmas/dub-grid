@@ -157,6 +157,56 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.isGridmaster).toBe(false);
   });
 
+  it("resolves a promotion from the membership row while the claim is still stale", async () => {
+    // change_user_role writes the membership immediately but cannot re-mint an
+    // access token that is already issued, so the claim trails the promotion.
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+    );
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.role).toBe("super_admin");
+    expect(body.permissions.isSuperAdmin).toBe(true);
+    expect(body.permissions.orgId).toBe(ORG_ID);
+    expect(body.mfaNagRequired).toBe(true);
+  });
+
+  it("keeps a promoted-but-inactive member read-only", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+    );
+    enqueue("employees", { data: { status: "inactive" } });
+    enqueue("organization_memberships", {
+      data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+    });
+
+    const response = await request();
+
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(true);
+    expect(body.permissions.canManageEmployees).toBe(false);
+  });
+
+  it("fails closed to user permissions when the membership for the claimed org is gone", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "admin" }),
+    );
+    enqueue("organization_memberships", { data: null });
+
+    const response = await request();
+
+    const body = await response.json();
+    expect(body.permissions.role).toBe("user");
+    expect(body.permissions.orgId).toBe(ORG_ID);
+    expect(serviceFrom).not.toHaveBeenCalledWith("profiles");
+  });
+
   it("drops an inactive admin to read-only permissions", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "admin" }),

@@ -1,3 +1,4 @@
+import { clientEnv } from "@/lib/env";
 /** Shared email helpers. Templates live in src/emails/ (react-email). */
 
 /** Strip control characters (including CRLF, null bytes) to prevent email header injection. */
@@ -12,8 +13,8 @@ export function sanitizeHeaderValue(str: string): string {
  */
 export function emailBaseUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null) ||
+    clientEnv?.NEXT_PUBLIC_SITE_URL ||
+    (clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv?.NEXT_PUBLIC_VERCEL_URL}` : null) ||
     "http://localhost:3000"
   );
 }

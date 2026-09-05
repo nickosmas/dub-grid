@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown, ChevronLeft, User } from "lucide-react";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ import dynamic from "next/dynamic";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
+import { useAvatarTone } from "@/hooks/useAvatarTone";
 import {
   SidebarProvider,
   Sidebar,
@@ -166,7 +168,7 @@ function OrgSearchCombobox({
               fontWeight: 600,
               background: "var(--dg-color-bg-secondary)",
               border: "1px solid var(--dg-color-border)",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               padding: "3px 10px",
               color: "var(--dg-color-text-primary)",
               whiteSpace: "nowrap",
@@ -318,7 +320,7 @@ function OrgSearchCombobox({
                             color: "var(--dg-color-text-subtle)",
                             background: "var(--dg-color-bg-secondary)",
                             padding: "1px 6px",
-                            borderRadius: 4,
+                            borderRadius: "var(--dg-radius-xs)",
                             textTransform: "uppercase",
                           }}
                         >
@@ -332,7 +334,7 @@ function OrgSearchCombobox({
                           color: "var(--dg-color-text-subtle)",
                           background: "var(--dg-color-bg-secondary)",
                           padding: "1px 8px",
-                          borderRadius: 4,
+                          borderRadius: "var(--dg-radius-xs)",
                         }}
                       >
                         {empCount}
@@ -389,6 +391,7 @@ export default function GridmasterPortal() {
 
   const displayName = userName || "Gridmaster";
   const initials = getAvatarInitials(userName, "GM");
+  const avatarTone = useAvatarTone(authUser?.id ?? "");
 
   const handleSignOut = useCallback(() => {
     setSigningOut(true);
@@ -788,7 +791,7 @@ export default function GridmasterPortal() {
                 gap: 8,
                 background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
                 border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 padding: "4px 8px 4px 4px",
                 minHeight: 44,
                 cursor: "pointer",
@@ -812,14 +815,16 @@ export default function GridmasterPortal() {
                 style={{
                   width: 28,
                   height: 28,
+                  boxSizing: "border-box",
                   borderRadius: "50%",
-                  background: "var(--dg-color-brand)",
+                  background: avatarTone.backgroundColor,
+                  border: `1px solid ${avatarTone.borderColor}`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--dg-color-text-inverse)",
+                  color: avatarTone.textColor,
                   flexShrink: 0,
                 }}
               >
@@ -850,23 +855,16 @@ export default function GridmasterPortal() {
                   Gridmaster
                 </div>
               </div>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-muted)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <ChevronDown
+                size={12}
+                strokeWidth={2.5}
+                color="var(--dg-color-text-muted)"
                 style={{
                   flexShrink: 0,
                   transition: "transform 150ms ease",
                   transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                 }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              />
             </Button>
 
             {menuOpen && (
@@ -881,19 +879,7 @@ export default function GridmasterPortal() {
                     window.location.href = "/profile";
                   }}
                 >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <User size={13} />
                   Profile
                 </Button>
                 <div className="dg-menu-divider" />
@@ -1140,18 +1126,7 @@ export default function GridmasterPortal() {
                   (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-muted)";
                 }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
+                <ChevronLeft size={14} />
                 All Organizations
               </Button>
               <OrganizationDetail

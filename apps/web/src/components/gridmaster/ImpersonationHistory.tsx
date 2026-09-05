@@ -1,9 +1,10 @@
 "use client";
+import { Clock } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterImpersonationHistory } from "@/features/gridmaster/client";
-import { Button } from "@/components/Button";
+import { Pagination } from "@/components/ui/pagination";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
@@ -53,7 +54,7 @@ function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: nu
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: config.bg,
         color: config.text,
         border: `1px solid ${config.border}`,
@@ -338,60 +339,17 @@ export default function ImpersonationHistory() {
               </div>
             </div>
           ) : (
-            <EmptyState
-              icon={
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              }
-              title="No impersonation sessions yet"
-            />
+            <EmptyState icon={<Clock size={24} />} title="No impersonation sessions yet" />
           )}
 
           {/* Pagination */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              justifyContent: "center",
-              alignItems: "center",
-              marginTop: 16,
-            }}
-          >
-            <Button
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-            >
-              Previous
-            </Button>
-            <span
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                fontFamily: "var(--font-dm-mono), monospace",
-              }}
-            >
-              {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
-            </span>
-            <Button
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={entries.length < PAGE_SIZE}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
+          <Pagination
+            page={page + 1}
+            hasNext={entries.length >= PAGE_SIZE}
+            onPageChange={(next) => setPage(next - 1)}
+            summary={`Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + entries.length}`}
+            className="mt-4"
+          />
         </>
       )}
     </>

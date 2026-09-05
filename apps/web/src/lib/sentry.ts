@@ -23,7 +23,6 @@ type CaptureContext = { extra?: Record<string, unknown>; [key: string]: unknown 
 
 // ── No-op implementations ─────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const noop = (...args: unknown[]) => {};
 
 const devLogger = {
@@ -43,7 +42,6 @@ const devLogger = {
 // The `require("@sentry/nextjs")` inside is therefore never seen by the
 // bundler's module resolver during dev builds.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _sdk: Record<string, any> | undefined;
 
 /**
@@ -73,7 +71,6 @@ export const sentryReady: Promise<void> = new Promise((resolve) => {
 
 if (process.env.NODE_ENV !== "development") {
   if (typeof window === "undefined") {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     _sdk = require("@sentry/nextjs");
     _resolveReady();
   } else {
@@ -204,27 +201,23 @@ export const logger: typeof devLogger = {
  * Returns null when the SDK is unavailable (dev, or a failed load), so the
  * caller simply attaches nothing.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadReplayIntegration(): Promise<any | null> {
   await sentryReady;
   return _sdk?.replayIntegration?.() ?? null;
 }
 
 // addIntegration — lets us attach replay lazily once analytics consent is granted
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const addIntegration: (integration: any) => void = (integration) => {
   dispatch(() => _sdk!.addIntegration(integration));
 };
 
 // getClient — used to detect whether replay was already attached. Returns
 // undefined until the SDK is loaded; await sentryReady first if that matters.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getClient: () => any = () => _sdk?.getClient?.();
 
 // captureRouterTransitionStart — exported from instrumentation-client.ts.
 // Must stay synchronous and pass its argument through: Next calls it during a
 // navigation and does not wait on it.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const captureRouterTransitionStart: (...args: any[]) => any = (...args) => {
   if (_sdk) return _sdk.captureRouterTransitionStart?.(...args);
   return args[0];
@@ -232,7 +225,6 @@ export const captureRouterTransitionStart: (...args: any[]) => any = (...args) =
 
 // captureRequestError — exported from instrumentation.ts on the server, where
 // the SDK is always loaded synchronously by the time this can be called.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const captureRequestError: (...args: any[]) => any = (...args) => {
   dispatch(() => _sdk!.captureRequestError(...args));
 };

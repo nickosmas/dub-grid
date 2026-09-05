@@ -1308,7 +1308,7 @@ const datePickerButtonStyle: CSSProperties = {
   fontFamily: "inherit",
   gap: 8,
   justifyContent: "space-between",
-  minHeight: 40,
+  minHeight: "var(--dg-toolbar-h)",
   minWidth: 0,
   padding: "0 10px 0 12px",
   textAlign: "left",
@@ -1326,7 +1326,7 @@ const datePickerLabelStyle: CSSProperties = {
 const calendarPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-md)",
   boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   padding: 12,
   width: 292,
@@ -1386,7 +1386,7 @@ const calendarDayStyle: CSSProperties = {
   alignItems: "center",
   background: "transparent",
   borderColor: "transparent",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-md)",
   borderStyle: "solid",
   borderWidth: 1,
   color: "var(--dg-color-text-primary)",
@@ -1422,7 +1422,7 @@ const calendarDayDisabledStyle: CSSProperties = {
 
 const metricStyle: CSSProperties = {
   border: "1px solid var(--dg-color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-md)",
   background: "var(--dg-color-surface)",
   padding: 14,
 };
@@ -1445,7 +1445,7 @@ const targetDropdownButtonStyle: CSSProperties = {
   display: "flex",
   fontFamily: "inherit",
   justifyContent: "space-between",
-  minHeight: 40,
+  minHeight: "var(--dg-toolbar-h)",
   minWidth: 0,
   padding: "0 10px 0 12px",
   textAlign: "left",
@@ -1472,7 +1472,7 @@ const targetDropdownSummaryStyle: CSSProperties = {
 const targetDropdownPopoverStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
   border: "1px solid var(--dg-color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-md)",
   boxShadow: "0 18px 40px rgba(0, 0, 0, 0.14)",
   maxHeight: "min(420px, calc(100vh - 80px))",
   overflowY: "auto",
@@ -1516,7 +1516,7 @@ const targetEmptyStyle: CSSProperties = {
 
 const tableShellStyle: CSSProperties = {
   border: "1px solid var(--dg-color-border)",
-  borderRadius: 8,
+  borderRadius: "var(--dg-radius-md)",
   background: "var(--dg-color-surface)",
   overflow: "hidden",
 };

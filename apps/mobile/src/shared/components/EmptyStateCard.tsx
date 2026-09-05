@@ -2,8 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
-import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { fillScreenAnchorStyles } from "./fill-screen-anchor";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { MAX_FONT_SCALE, mobileText, type MobileColors } from "../theme/tokens";
 
 /**
  * Empty states are centred: an icon badge, then the copy, then the way out.
@@ -14,19 +15,14 @@ import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../
  * `design/no-decorative-ai-icons` now fails the build on it, and the prop stays
  * required so an empty state always names what it stands for.
  *
- * `compact` renders inside a card, and gets its own tinted panel. That panel is
- * load-bearing, not decoration: a `Card` has a left-aligned header and, when it
- * has content, left-aligned rows — so centred copy sitting loose underneath
- * reads as misaligned. Bounding it in a panel makes the centring deliberate,
- * because the panel is visibly its own container. The full-page variants own
- * the viewport and have nothing to align against, so they get no panel; a small
- * tinted box stranded mid-screen would read as a stray card.
+ * `compact` renders inside a card. Neither variant draws a panel of its own:
+ * the card is already a bounded, lifted surface, so a box inside it reads as an
+ * outline sticker rather than as structure.
  *
- * The badge differs by variant on purpose. In a card it is a lifted circle in
- * the card's own surface colour with a muted glyph, so it reads as a quiet
- * placeholder inside an otherwise busy dashboard. A full-page empty is the only
- * thing on screen and is the moment to be direct, so it keeps the larger brand
- * badge.
+ * The badge differs by variant on purpose. In a card it is a small neutral disc
+ * with a muted glyph, so it reads as a quiet placeholder inside an otherwise
+ * busy dashboard. A full-page empty is the only thing on screen and is the
+ * moment to be direct, so it keeps the larger brand badge.
  */
 export function EmptyStateCard({
   iconName,
@@ -54,25 +50,17 @@ export function EmptyStateCard({
   fillScreen?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const compactStyles = useMemo(
-    () => createCompactStyles(mobileColors, isDark),
-    [mobileColors, isDark],
-  );
+  const compactStyles = useMemo(() => createCompactStyles(mobileColors), [mobileColors]);
   const variant = compact ? compactStyles : styles;
-  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
-  // reliably fills the non-scrolling container's remaining space and centers
-  // within it, with none of the viewport-height guessing a ScrollView forces.
-  const fillStyle =
-    !compact && fillScreen
-      ? {
-          flex: 1,
-          justifyContent: "center" as const,
-        }
-      : null;
+  // `Screen`'s `contentContainerStyle` carries `flexGrow: 1`, so `flex: 1` here
+  // claims the viewport's leftover space even inside a scroll view, and the two
+  // spacers place the message within it. See `fill-screen-anchor` for why not
+  // dead centre.
+  const isFilling = !compact && fillScreen;
   return (
-    <View style={[variant.card, fillStyle]}>
+    <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
+      {isFilling ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
       <View style={variant.iconFrame}>
         <Ionicons
           color={compact ? mobileColors.textMuted : mobileColors.brand}
@@ -81,8 +69,14 @@ export function EmptyStateCard({
         />
       </View>
       <View style={variant.copy}>
-        <Text style={variant.title}>{title}</Text>
-        {body ? <Text style={variant.body}>{body}</Text> : null}
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
+          {title}
+        </Text>
+        {body ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.body}>
+            {body}
+          </Text>
+        ) : null}
       </View>
       {actionLabel && onAction ? (
         <View style={variant.actionRow}>
@@ -100,14 +94,18 @@ export function EmptyStateCard({
           )}
         </View>
       ) : null}
+      {isFilling ? <View style={fillScreenAnchorStyles.spacerBelow} /> : null}
     </View>
   );
 }
 
-// Owns the page: centred on the ground itself, with no panel behind it.
+// Owns the page: sits on the ground itself, with no panel behind it.
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     card: {
+      // No panel. This sits inside a card, and information belongs directly on
+      // that card's surface rather than in a box drawn on top of it. The
+      // centring below is what keeps it deliberate now that nothing bounds it.
       paddingHorizontal: 4,
       paddingVertical: 32,
       gap: 16,
@@ -146,16 +144,15 @@ const createStyles = (mobileColors: MobileColors) =>
     },
   });
 
-// Inside a card: the panel is what lets centred copy sit under a left-aligned
-// card header without reading as misaligned.
-const createCompactStyles = (mobileColors: MobileColors, isDark: boolean) =>
+// Inside a card: smaller badge and copy than the full-page variant, and no
+// panel of its own, because the card is the container.
+const createCompactStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     card: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      // One step tighter than the card's own radius, so the panel nests inside
-      // it rather than tracing it.
-      borderRadius: mobileRadii.control,
-      paddingHorizontal: 20,
+      // No panel. The card this sits in is already a bounded, lifted surface,
+      // so a second box drawn inside it reads as an outline sticker rather than
+      // as structure. The centring and the badge carry the shape instead.
+      paddingHorizontal: 4,
       paddingVertical: 24,
       gap: 12,
       alignItems: "center",
@@ -164,14 +161,10 @@ const createCompactStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      // The card's own surface, lifted off the panel it sits on. That reads in
-      // both themes: a white disc on the light slate panel, and the dark card
-      // colour on the dark panel, where the hairline does the separating that
-      // a shadow cannot.
-      backgroundColor: mobileColors.surface,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      ...mobileElevation("raised", isDark),
+      // Filled rather than outlined. With the panel gone there is no nearby
+      // edge for a hairline to echo, and the card's own surface colour would
+      // leave a white disc invisible on a white card.
+      backgroundColor: mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
     },

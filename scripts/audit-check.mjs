@@ -48,6 +48,42 @@ const ALLOWLIST = [
       "a major downgrade off SDK 54. Revisit when image-size publishes a patched release or Expo " +
       "moves Metro onto one.",
   },
+  {
+    ids: ["GHSA-qxc2-j82w-r537"],
+    package: "@faker-js/faker",
+    reviewBy: "2026-12-01",
+    reason:
+      "Arbitrary code execution through `faker.helpers.fake()`, which evaluates the template string " +
+      "it is handed. Reachable only by passing attacker-controlled text to that one function, and " +
+      "nothing here calls it: faker arrives as a transitive dependency of @snaplet/copycat, which " +
+      "@snaplet/seed uses, and both are devDependencies that run only in the seed scripts " +
+      "(`npm run seed`, `db:reset`) against templates we write ourselves. There is no fix to take: " +
+      "the advisory covers <= 10.4.0, and @snaplet/copycat 6.0.0 is the newest published version " +
+      "but pins @faker-js/faker ^8.4.1, so the patched 10.5.0 sits two majors outside the range " +
+      "copycat declares. Forcing it through an override would hand the seed tooling a data " +
+      "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
+  },
+  {
+    ids: [
+      "GHSA-5jgf-p345-68v8",
+      "GHSA-f65p-4m7j-42xc",
+      "GHSA-fph4-wmhf-6fwf",
+      "GHSA-jqff-g426-hqxp",
+    ],
+    package: "fast-uri",
+    reviewBy: "2026-12-01",
+    reason:
+      "Host confusion and SSRF in URI parsing, all four fixed in 3.1.6. The overrides block pulls " +
+      "every copy npm will let it reach up to 3.1.7. Two stay behind at 3.1.5, both inside the " +
+      "apps/web workspace subtree: @sentry/nextjs > webpack > schema-utils > ajv > fast-uri, and " +
+      "react-email > conf > ajv > fast-uri. A root `overrides` block does not reach into a " +
+      "workspace subtree under `install-strategy=nested`, and neither an exact pin nor a full " +
+      "lockfile re-resolution moved them. Neither copy parses untrusted input: the first validates " +
+      "webpack's own config schema during a build, the second backs the react-email CLI behind " +
+      "`npm run email:build`, so both run on a developer machine or in CI over files we wrote, and " +
+      "neither ships in the web bundle or the server runtime. Revisit when ajv's dependents " +
+      "publish on a fixed fast-uri, or when npm applies root overrides inside workspaces.",
+  },
 ];
 
 /** Every GHSA id in `via`, following the chains npm nests inside each other. */
@@ -70,14 +106,26 @@ function collectAdvisoryIds(name, vulnerabilities, seen = new Set()) {
 }
 
 function runAudit() {
+  let payload;
   try {
     // Exits non-zero whenever it finds anything, so the throw is the normal
     // path and the payload is on the error.
-    return JSON.parse(execFileSync("npm", ["audit", "--json"], { encoding: "utf8" }));
+    payload = JSON.parse(execFileSync("npm", ["audit", "--json"], { encoding: "utf8" }));
   } catch (error) {
-    if (error.stdout) return JSON.parse(error.stdout);
-    throw error;
+    if (!error.stdout) throw error;
+    payload = JSON.parse(error.stdout);
   }
+
+  // A registry 503 exits non-zero and prints JSON too, but an error body rather
+  // than a report. It parses cleanly and carries no vulnerabilities, so without
+  // this check it reads as a spotless tree: every allowlist entry matches
+  // nothing and the gate tells you to delete advisories it never looked at. A
+  // report always carries `metadata`, so its absence is the reliable signal.
+  if (!payload.metadata) {
+    const reason = payload.error?.summary ?? payload.error?.code ?? "no report in the response";
+    throw new Error(reason);
+  }
+  return payload;
 }
 
 const SEVERITY_ORDER = ["info", "low", "moderate", "high", "critical"];
@@ -96,7 +144,19 @@ function main(argv) {
     for (const id of entry.ids) allowedIds.set(id, entry);
   }
 
-  const { vulnerabilities = {} } = runAudit();
+  let report;
+  try {
+    report = runAudit();
+  } catch (error) {
+    console.error(`\n✗ npm audit did not return a report: ${error.message}`);
+    console.error(
+      "  The gate could not read the tree, so it cannot clear it. Re-run, and if the\n" +
+        "  registry keeps failing, leave this red rather than acting on an empty result.",
+    );
+    return 1;
+  }
+
+  const { vulnerabilities = {} } = report;
   const blocking = [];
   const suppressed = [];
   const matchedEntries = new Set();

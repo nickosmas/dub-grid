@@ -124,7 +124,7 @@ function DisplayModePreviewPill({
       style={{
         background: resolved.color,
         border: `1px solid ${borderColor(resolved.text)}`,
-        borderRadius: 8,
+        borderRadius: "var(--dg-radius-md)",
         color: resolved.text,
         display: "flex",
         flex: 1,

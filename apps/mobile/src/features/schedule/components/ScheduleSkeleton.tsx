@@ -9,16 +9,15 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { type MobileColors } from "../../../shared/theme/tokens";
+import { mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
 
 /**
  * The personal schedule: the rounded hero, then the upcoming-shifts card.
  *
  * Both surfaces are the screen's own styles, borrowed from
- * `scheduleScreenStyles` — the hero is a 24-radius gradient card and the
- * upcoming list a 28-radius card with 132pt rows, neither of which the old
- * flat-bar skeleton resembled.
+ * `scheduleScreenStyles`. The hero is a gradient card and the upcoming list a
+ * card with 132pt rows, neither of which the old flat-bar skeleton resembled.
  */
 export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
   const mobileColors = useMobileColors();
@@ -143,7 +142,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     heroDateTile: {
       backgroundColor: mobileColors.surface,
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       height: 64,
       minWidth: 58,
       opacity: 0.4,
@@ -156,7 +155,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 16,
+      borderRadius: mobileRadii.control,
       height: 68,
       width: 60,
     },

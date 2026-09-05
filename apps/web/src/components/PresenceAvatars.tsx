@@ -1,39 +1,155 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { OnlineUser } from "@/hooks/useCellLocks";
+import type { OnlineUser } from "@/hooks/useSchedulePresence";
 import { getAvatarInitials } from "@/lib/utils";
-import { getAvatarGradientTone } from "@dubgrid/design-tokens";
+import { useAvatarTone } from "@/hooks/useAvatarTone";
 
 const MAX_VISIBLE = 4;
+/** Grace for the pointer to travel from the label onto the card without it closing. */
+const ROSTER_CLOSE_DELAY_MS = 160;
 
-function avatarGradient(userId: string): string {
-  const tone = getAvatarGradientTone(userId);
-  return `linear-gradient(135deg, ${tone.gradientFrom}, ${tone.gradientTo})`;
+/** Extra detail the roster card shows when it has been loaded for a user. */
+export interface PresenceProfile {
+  orgRole?: string | null;
+  email?: string | null;
 }
 
 interface PresenceAvatarsProps {
   onlineUsers: OnlineUser[];
+  profiles?: Map<string, PresenceProfile>;
+  /** Called when the roster opens, so profile detail can be fetched on demand. */
+  onRosterOpen?: () => void;
 }
 
 function displayPresenceName(user: OnlineUser): string {
-  return user.isSameUser ? "Me" : user.userName;
+  return user.userName;
 }
 
-export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
+function Avatar({
+  user,
+  size,
+  showStatusDot,
+}: {
+  user: OnlineUser;
+  size: number;
+  showStatusDot: boolean;
+}) {
+  const tone = useAvatarTone(user.userId);
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        boxSizing: "border-box",
+        borderRadius: "50%",
+        background: tone.backgroundColor,
+        border: `1px solid ${tone.borderColor}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "var(--dg-fs-footnote)",
+        fontWeight: 700,
+        color: tone.textColor,
+        flexShrink: 0,
+      }}
+    >
+      {getAvatarInitials(user.userName)}
+      {showStatusDot && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: -1,
+            right: -1,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: user.editingCell ? "var(--dg-color-brand)" : "var(--dg-color-success)",
+            border: "2px solid var(--dg-color-surface)",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Viewing/editing is deliberately not surfaced: presence only marks a cell as
+// being edited while an edit panel is open, so plenty of real editing reads as
+// "viewing". Reinstate once presence tracks activity rather than panel state.
+
+export default function PresenceAvatars({
+  onlineUsers,
+  profiles,
+  onRosterOpen,
+}: PresenceAvatarsProps) {
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterPos, setRosterPos] = useState<{ x: number; y: number } | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const labelRef = useRef<HTMLButtonElement | null>(null);
 
-  if (onlineUsers.length === 0) return null;
+  const cancelClose = useCallback(() => {
+    if (!closeTimerRef.current) return;
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
 
-  const visible = onlineUsers.slice(0, MAX_VISIBLE);
-  const overflow = onlineUsers.length - MAX_VISIBLE;
-  const hoveredUserData = onlineUsers.find((u) => u.editorSessionId === hoveredUser);
+  const openRoster = useCallback(() => {
+    cancelClose();
+    const rect = labelRef.current?.getBoundingClientRect();
+    if (rect) setRosterPos({ x: rect.left, y: rect.bottom });
+    setRosterOpen((wasOpen) => {
+      if (!wasOpen) onRosterOpen?.();
+      return true;
+    });
+  }, [cancelClose, onRosterOpen]);
+
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setRosterOpen(false);
+    }, ROSTER_CLOSE_DELAY_MS);
+  }, [cancelClose]);
+
+  useEffect(() => cancelClose, [cancelClose]);
+
+  useEffect(() => {
+    if (!rosterOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        cancelClose();
+        setRosterOpen(false);
+        labelRef.current?.blur();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [rosterOpen, cancelClose]);
+
+  const otherUsers = onlineUsers.filter((user) => !user.isSameUser);
+
+  if (otherUsers.length === 0) return null;
+
+  const visible = otherUsers.slice(0, MAX_VISIBLE);
+  const overflow = otherUsers.length - MAX_VISIBLE;
+  const hoveredUserData = otherUsers.find((u) => u.editorSessionId === hoveredUser);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-      <span
+      <button
+        ref={labelRef}
+        type="button"
+        aria-expanded={rosterOpen}
+        aria-haspopup="dialog"
+        onMouseEnter={openRoster}
+        onMouseLeave={scheduleClose}
+        onFocus={openRoster}
+        onBlur={scheduleClose}
+        onClick={() => (rosterOpen ? setRosterOpen(false) : openRoster())}
         style={{
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 600,
@@ -43,6 +159,10 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
           display: "flex",
           alignItems: "center",
           gap: 4,
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
         }}
       >
         <span
@@ -54,8 +174,8 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             background: "var(--dg-color-success)",
           }}
         />
-        <span role="status">{onlineUsers.length} online</span>
-      </span>
+        <span role="status">{otherUsers.length} online</span>
+      </button>
 
       {visible.map((user, i) => (
         <div
@@ -72,37 +192,14 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             setTooltipPos(null);
           }}
           style={{
-            position: "relative",
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: avatarGradient(user.userId),
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "var(--dg-fs-footnote)",
-            fontWeight: 700,
-            color: "var(--dg-color-text-inverse)",
-            flexShrink: 0,
             marginLeft: i === 0 ? 0 : -8,
             border: "2px solid var(--dg-color-surface)",
+            borderRadius: "50%",
             cursor: "default",
             zIndex: MAX_VISIBLE - i,
           }}
         >
-          {getAvatarInitials(user.userName)}
-          <span
-            style={{
-              position: "absolute",
-              bottom: -1,
-              right: -1,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: user.editingCell ? "var(--dg-color-brand)" : "var(--dg-color-success)",
-              border: "2px solid var(--dg-color-surface)",
-            }}
-          />
+          <Avatar user={user} size={28} showStatusDot />
         </div>
       ))}
 
@@ -129,6 +226,106 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
         </div>
       )}
 
+      {rosterOpen &&
+        rosterPos &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-label="Editors online"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+            style={{
+              position: "fixed",
+              left: rosterPos.x,
+              top: rosterPos.y + 8,
+              minWidth: 260,
+              maxWidth: 340,
+              maxHeight: "60vh",
+              overflowY: "auto",
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              borderRadius: "var(--dg-radius-lg)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)",
+              zIndex: 10000,
+              padding: 12,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--dg-color-text-primary)",
+                marginBottom: 8,
+              }}
+            >
+              Editors online
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {otherUsers.map((user) => {
+                const profile = profiles?.get(user.userId);
+                const details = [profile?.orgRole, profile?.email].filter(Boolean) as string[];
+                return (
+                  <div
+                    key={user.editorSessionId}
+                    style={{ display: "flex", alignItems: "flex-start", gap: 8 }}
+                  >
+                    <Avatar user={user} size={28} showStatusDot={false} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {displayPresenceName(user)}
+                        </span>
+                      </div>
+
+                      {details.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-badge)",
+                            color: "var(--dg-color-text-faint)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {details.join(" · ")}
+                        </div>
+                      )}
+
+                      {user.sessionCount > 1 && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-badge)",
+                            color: "var(--dg-color-text-faint)",
+                          }}
+                        >
+                          {`${user.sessionCount} tabs or devices`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {hoveredUser &&
         tooltipPos &&
         hoveredUserData &&
@@ -141,7 +338,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               transform: "translate(-50%, -100%)",
               background: "var(--dg-color-surface)",
               padding: "6px 12px",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               boxShadow: "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
               zIndex: 10000,
               fontSize: "var(--dg-fs-caption)",
@@ -152,17 +349,6 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             }}
           >
             {displayPresenceName(hoveredUserData)}
-            {hoveredUserData.editingCell && (
-              <span
-                style={{
-                  fontWeight: 400,
-                  color: "var(--dg-color-text-muted)",
-                  marginLeft: 6,
-                }}
-              >
-                editing
-              </span>
-            )}
             {hoveredUserData.sessionCount > 1 && (
               <span
                 style={{
@@ -171,9 +357,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
                   marginLeft: 6,
                 }}
               >
-                {hoveredUserData.isSameUser
-                  ? "another session open"
-                  : `${hoveredUserData.sessionCount} sessions`}
+                {`${hoveredUserData.sessionCount} sessions`}
               </span>
             )}
           </div>,

@@ -11,6 +11,8 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { clientEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -60,9 +62,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Config check ────────────────────────────────────────────────────
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
-  if (!process.env.RESEND_FROM_EMAIL) {
+  const apiKey = serverEnv?.RESEND_API_KEY;
+  const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  if (!serverEnv?.RESEND_FROM_EMAIL) {
     logger.warn("RESEND_FROM_EMAIL not set — using test domain (onboarding@resend.dev)");
   }
 
@@ -112,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   // ── Build email ─────────────────────────────────────────────────────
   const baseUrl = emailBaseUrl();
-  if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
+  if (!clientEnv?.NEXT_PUBLIC_SITE_URL && !clientEnv?.NEXT_PUBLIC_VERCEL_URL) {
     logger.warn(
       "No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links",
     );

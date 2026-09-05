@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GridmasterBillingView from "@/components/gridmaster/GridmasterBillingView";
@@ -123,7 +123,10 @@ describe("GridmasterBillingView", () => {
     await user.click(screen.getByRole("button", { name: "Extend trial" }));
     await user.clear(await screen.findByLabelText("Trial extension days"));
     await user.type(screen.getByLabelText("Trial extension days"), "21");
-    await user.click(screen.getByRole("button", { name: "Extend Trial" }));
+    // The row trigger and the dialog confirm are both "Extend trial", so scope
+    // the confirm to the dialog rather than matching whichever comes first.
+    const extendDialog = await screen.findByRole("dialog", { name: "Extend trial" });
+    await user.click(within(extendDialog).getByRole("button", { name: "Extend trial" }));
 
     await waitFor(() => {
       expect(mockUpdateGridmasterSubscription).toHaveBeenCalledWith({

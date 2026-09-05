@@ -1,6 +1,36 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { createInterface } from "node:readline/promises";
 import { connectSqlClient } from "./lib/db-client";
+
+/**
+ * Project refs this script will not drop, whatever the operator types.
+ *
+ * A staging project makes this script routine, and routine is exactly when a
+ * stale `.env.remote` or a copied command reaches the wrong database. The ref
+ * is not a secret: it is the hostname of the public API URL.
+ *
+ * Overriding is deliberately awkward. `ALLOW_PRODUCTION_RESET` has to name the
+ * exact ref, so no blanket truthy value opens it, and `CONFIRM_RESET=yes` does
+ * not bypass it: automation can skip the prompt but never the denylist.
+ */
+const PRODUCTION_PROJECT_REFS = new Set(
+  (process.env.PRODUCTION_PROJECT_REFS ?? "xpoylacxkbphnudsupuu")
+    .split(",")
+    .map((ref) => ref.trim())
+    .filter(Boolean),
+);
+
+function refuseProductionReset(ref: string): void {
+  if (!PRODUCTION_PROJECT_REFS.has(ref)) return;
+  if (process.env.ALLOW_PRODUCTION_RESET === ref) {
+    console.warn(`\n⚠️  Production reset explicitly authorised for "${ref}".\n`);
+    return;
+  }
+  console.error(`\n✗ "${ref}" is a production project. This script drops the public schema.`);
+  console.error("  Point .env.remote at staging, or run migrations with `supabase db push`.");
+  console.error(`  To override deliberately: ALLOW_PRODUCTION_RESET=${ref}`);
+  process.exit(1);
+}
 
 /**
  * Require the operator to type the project ref back before we DROP its schema
@@ -11,7 +41,9 @@ async function confirmDestructiveReset(ref: string): Promise<void> {
   if (process.env.CONFIRM_RESET === "yes") return;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   console.warn(
-    `\n⚠️  This will DROP SCHEMA public CASCADE on REMOTE project "${ref}" — ALL DATA IS LOST.`,
+    `\n⚠️  This will reset REMOTE project "${ref}" — ALL DATA IS LOST.\n` +
+      "   Drops the public schema, deletes every auth user, replays all migrations,\n" +
+      "   and records the migration ledger. Signed-in accounts will not survive.",
   );
   const answer = await rl.question(`Type the project ref "${ref}" to confirm: `);
   rl.close();
@@ -23,7 +55,7 @@ async function confirmDestructiveReset(ref: string): Promise<void> {
 
 /**
  * Resets the remote Supabase database by dropping the public schema
- * and re-running all 4 consolidated migration files.
+ * and re-running every numbered migration file in lexical order.
  *
  * Called by `npm run db:reset:remote` which loads .env.remote via --env-file.
  */
@@ -50,6 +82,7 @@ async function main() {
   }
 
   const ref = new URL(supabaseUrl).hostname.split(".")[0];
+  refuseProductionReset(ref);
   await confirmDestructiveReset(ref);
   console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
 
@@ -62,13 +95,25 @@ async function main() {
   await db.query("GRANT ALL ON SCHEMA public TO postgres");
   await db.query("GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role");
 
-  // Run each migration file in order
-  const migrations = [
-    "supabase/migrations/001_schema.sql",
-    "supabase/migrations/002_functions_triggers.sql",
-    "supabase/migrations/003_rls_policies.sql",
-    "supabase/migrations/004_grants.sql",
-  ];
+  // Dropping `public` alone leaves auth.users fully populated, which is worse
+  // than either extreme: those accounts still authenticate, but the profile and
+  // membership rows the JWT hook reads to build their claims are gone. Clear
+  // them here, once the foreign keys that pointed at them no longer exist.
+  console.log("Clearing auth users...");
+  const { rows: authRows } = await db.query("SELECT count(*)::int AS cnt FROM auth.users");
+  await db.query("DELETE FROM auth.users");
+  console.log(`  ${authRows[0].cnt} auth user(s) removed`);
+
+  // Run every numbered migration in lexical order. Keeping discovery here
+  // prevents remote resets from silently omitting forward migrations.
+  const migrationsDirectory = "supabase/migrations";
+  const migrations = readdirSync(migrationsDirectory)
+    .filter((file) => /^\d{3}_[a-z0-9_]+\.sql$/.test(file))
+    .sort()
+    .map((file) => `${migrationsDirectory}/${file}`);
+  if (migrations.length === 0) {
+    throw new Error(`No numbered migrations found in ${migrationsDirectory}.`);
+  }
 
   for (const file of migrations) {
     const sql = readFileSync(file, "utf-8");
@@ -95,6 +140,31 @@ async function main() {
       process.exit(1);
     }
   }
+
+  // Replaying the files as raw SQL applies the schema but tells Supabase
+  // nothing, leaving the ledger empty. Branching and `supabase db push` both
+  // read that ledger to decide what to apply, so an unrecorded reset looks like
+  // a database that has received no migrations at all and the next push tries
+  // to replay 001 over a populated schema. Record what we just ran.
+  console.log("\nRecording the migration ledger...");
+  await db.query("CREATE SCHEMA IF NOT EXISTS supabase_migrations");
+  await db.query(
+    `CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+       version TEXT PRIMARY KEY, statements TEXT[], name TEXT
+     )`,
+  );
+  for (const file of migrations) {
+    const base = file.split("/").pop() ?? file;
+    const version = base.slice(0, 3);
+    const name = base.slice(4).replace(/\.sql$/, "");
+    await db.query(
+      `INSERT INTO supabase_migrations.schema_migrations (version, name)
+       VALUES ($1, $2)
+       ON CONFLICT (version) DO UPDATE SET name = EXCLUDED.name`,
+      [version, name],
+    );
+  }
+  console.log(`  ${migrations.length} migration(s) recorded`);
 
   // Verify grants are correct — this catches the exact bug where
   // DROP SCHEMA + CREATE SCHEMA wipes Supabase's default grants

@@ -10,6 +10,17 @@ interface ConfirmDialogProps {
   message: string | React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /**
+   * Colours the confirm button, so it has to describe the consequence rather
+   * than the prominence:
+   * - `danger` (red) destroys or removes something.
+   * - `warning` (orange) has a side effect beyond the obvious one: archiving,
+   *   revoking a live invitation, changing a role, signing other sessions out.
+   * - `info` (brand) is an ordinary action. Every plain save, export, or
+   *   confirm belongs here, however important the thing being saved is. A
+   *   confirm dialog is already the caution; an orange button on a save reads
+   *   as "this might go wrong" and spends the colour that real warnings need.
+   */
   variant?: "danger" | "warning" | "info";
   /**
    * Overrides the busy state the dialog works out for itself. Only needed when

@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown, User } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -30,6 +31,7 @@ import { fetchOrganizationBilling } from "@/features/billing/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
@@ -291,7 +293,7 @@ export default function Header({ orgName }: HeaderProps) {
   });
 
   const { user: authUser } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -313,7 +315,6 @@ export default function Header({ orgName }: HeaderProps) {
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
     const cached = sessionStorage.getItem("dg_user_name");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (cached) setUserName(cached);
   }, []);
 
@@ -354,23 +355,27 @@ export default function Header({ orgName }: HeaderProps) {
 
   const displayName = userName || "Account";
   const initials = getAvatarInitials(userName, "?");
+  // Seeded by auth user id, the same seed presence uses, so you appear to
+  // yourself in the same color your team sees on the schedule grid.
+  const avatarSeed = authUser?.id ?? "";
+  const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const roleLabel = ROLE_LABELS[role] ?? "User";
   const canShowBillingNotice =
     Boolean(orgId) && !isUserViewActive && !isImpersonating && (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
-    // In sandbox mode, signing out would orphan the sandbox, so confirm the
-    // exit first (it discards the sandbox) and only then complete logout.
-    if (isInSandbox) {
-      setLogoutConfirmOpen(true);
-      return;
-    }
+    // Always confirm before signing out — in sandbox mode the confirmation
+    // also warns that it permanently discards the sandbox.
+    setLogoutConfirmOpen(true);
+  }, []);
+
+  const handleConfirmSignOut = useCallback(() => {
     // signOut() hard-navigates to /goodbye?scope=local; the destination owns
     // the actual session teardown. No teardown happens here, so there's no
     // race with ProtectedRoute, no Supabase auth-lock contention, no need to
     // pre-clear view-as-user.
     signOut();
-  }, [isInSandbox, signOut]);
+  }, [signOut]);
 
   const handleExitAndSignOut = useCallback(async () => {
     setExitingForLogout(true);
@@ -386,16 +391,28 @@ export default function Header({ orgName }: HeaderProps) {
   }, [signOut]);
 
   const logoutConfirmDialog = logoutConfirmOpen ? (
-    <ConfirmDialog
-      title="Exit sandbox to sign out"
-      message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
-      confirmLabel="Exit & sign out"
-      cancelLabel="Cancel"
-      variant="danger"
-      isLoading={exitingForLogout}
-      onConfirm={handleExitAndSignOut}
-      onCancel={() => setLogoutConfirmOpen(false)}
-    />
+    isInSandbox ? (
+      <ConfirmDialog
+        title="Exit sandbox to sign out"
+        message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
+        confirmLabel="Exit & sign out"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={exitingForLogout}
+        onConfirm={handleExitAndSignOut}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
+    ) : (
+      <ConfirmDialog
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign out"
+        cancelLabel="Cancel"
+        variant="info"
+        onConfirm={handleConfirmSignOut}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
+    )
   ) : null;
 
   /* ── Mobile Header ─────────────────────────────────────── */
@@ -490,6 +507,7 @@ export default function Header({ orgName }: HeaderProps) {
           isGridmaster={isGridmaster}
           displayName={displayName}
           initials={initials}
+          avatarTone={avatarTone}
           roleLabel={roleLabel}
           onSignOut={handleSignOut}
           isUserViewActive={isUserViewActive}
@@ -683,14 +701,16 @@ export default function Header({ orgName }: HeaderProps) {
               style={{
                 width: 28,
                 height: 28,
+                boxSizing: "border-box",
                 borderRadius: "50%",
-                background: "var(--dg-color-brand)",
+                background: avatarTone.backgroundColor,
+                border: `1px solid ${avatarTone.borderColor}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-footnote)",
                 fontWeight: 700,
-                color: "var(--dg-color-text-inverse)",
+                color: avatarTone.textColor,
                 flexShrink: 0,
               }}
             >
@@ -723,23 +743,16 @@ export default function Header({ orgName }: HeaderProps) {
                     {roleLabel}
                   </div>
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--dg-color-text-muted)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <ChevronDown
+                  size={12}
+                  strokeWidth={2.5}
+                  color="var(--dg-color-text-muted)"
                   style={{
                     flexShrink: 0,
                     transition: "transform 150ms ease",
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                />
               </>
             )}
           </Button>
@@ -761,19 +774,7 @@ export default function Header({ orgName }: HeaderProps) {
                   router.push("/profile");
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+                <User size={13} />
                 Profile
               </Button>
               {canOpenSandbox && (

@@ -69,7 +69,7 @@ export default function MfaNagBanner() {
           background: "rgba(255,255,255,0.2)",
           color: "var(--dg-color-text-inverse)",
           border: "1px solid rgba(255,255,255,0.4)",
-          borderRadius: 6,
+          borderRadius: "var(--dg-radius-sm)",
           padding: "2px 10px",
           fontSize: "var(--dg-fs-caption, 12px)",
           fontWeight: 700,

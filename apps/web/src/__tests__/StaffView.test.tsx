@@ -450,7 +450,11 @@ describe("StaffView", () => {
           orgId="org-1"
           canManageEmployees={false}
           canViewEmployeeDetails={false}
-          canViewRecurringShifts
+          // A genuine regular user cannot hold this: per-person permissions are
+          // offered only for org_role "admin", so every non-admin resolves to
+          // READ_ONLY_PERMS. The fixture previously granted it, which described
+          // a partial-permission admin rather than the user this test names.
+          canViewRecurringShifts={false}
           canManageRecurringShifts={false}
           departments={managementDepartments}
         />,
@@ -464,6 +468,26 @@ describe("StaffView", () => {
       expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
       expect(screen.queryByRole("gridcell")).not.toBeInTheDocument();
       expect(vi.mocked(fetchOrganizationInvitations)).not.toHaveBeenCalled();
+    });
+
+    it("reaches the recurring section on view permission alone, without staff management", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          canManageEmployees={false}
+          canViewRecurringShifts
+          canManageRecurringShifts={false}
+          departments={managementDepartments}
+        />,
+      );
+
+      // canViewRecurringShifts is exactly what api/schedule/recurring requires,
+      // so pairing it with staff-management rights here left the granted
+      // permission unreachable for anyone who held only it.
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
     });
 
     it("still loads invitation state for People administrators", async () => {
@@ -767,7 +791,7 @@ describe("StaffView", () => {
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
       expect((await screen.findAllByRole("gridcell"))[0]).toHaveAttribute("tabindex", "-1");
       expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     });
 
     it("saves recurring shift changes through the recurring upsert helper", async () => {
@@ -808,11 +832,11 @@ describe("StaffView", () => {
 
       await user.click((await screen.findAllByRole("gridcell"))[0]);
       await user.click(screen.getByRole("button", { name: "pick-D" }));
-      await user.click(screen.getByRole("button", { name: "Save Changes" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
       const confirmDialog = await screen.findByRole("dialog", {
         name: "Save Recurring Schedule Changes?",
       });
-      await user.click(within(confirmDialog).getByRole("button", { name: "Save Changes" }));
+      await user.click(within(confirmDialog).getByRole("button", { name: "Save" }));
 
       // One bulk request for the whole grid, not one call per (employee, day).
       expect(mockedSaveRecurringShifts).toHaveBeenCalledTimes(1);

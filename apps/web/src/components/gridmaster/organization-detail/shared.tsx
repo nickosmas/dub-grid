@@ -57,7 +57,7 @@ export function MiniStat({ label, value }: { label: string; value: number }) {
         textAlign: "center",
         padding: "12px 16px",
         background: "var(--dg-color-bg)",
-        borderRadius: 8,
+        borderRadius: "var(--dg-radius-md)",
         minWidth: 80,
       }}
     >

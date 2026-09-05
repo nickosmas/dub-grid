@@ -242,17 +242,26 @@ const eslintConfig = defineConfig([
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],
     ignores: [
+      // The validators themselves: these are what everything else imports, so
+      // they are the one place process.env has to be read directly.
       "apps/web/src/lib/env.ts",
+      "apps/web/src/lib/env.server.ts",
+      "apps/web/src/lib/supabase-keys.ts",
       "apps/web/src/**/*.test.ts",
       "apps/web/src/**/*.test.tsx",
       "apps/web/src/**/__tests__/**",
     ],
     rules: {
-      "no-restricted-properties": [
+      // NODE_ENV and NEXT_RUNTIME are deliberately exempt. The bundler inlines
+      // them as literals so `if (process.env.NODE_ENV !== "production")` blocks
+      // get eliminated; reading them off a validated object instead is a runtime
+      // property access the bundler cannot fold, which would ship dev-only code
+      // to production. They are build discriminators, not app configuration.
+      "no-restricted-syntax": [
         "warn",
         {
-          object: "process",
-          property: "env",
+          selector:
+            'MemberExpression[object.object.name="process"][object.property.name="env"]:not([property.name="NODE_ENV"]):not([property.name="NEXT_RUNTIME"]):not([property.name="npm_package_version"])',
           message:
             'Import validated env vars instead of reading process.env directly: clientEnv from "@/lib/env", or serverEnv from "@/lib/env.server" (server-only — importing it from a client component ships the server schema to the browser).',
         },

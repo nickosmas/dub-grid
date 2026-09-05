@@ -111,6 +111,32 @@ describe("useTabsGate canViewRequestsTab", () => {
     expect(screen.getByText("network-connection-recovery")).toBeTruthy();
   });
 
+  it("keeps the tab tree mounted when a refetch fails but data is still cached", () => {
+    // Returning an element here unmounts the whole navigator, so remounting it
+    // throws the user back to the first tab having lost every screen's scroll
+    // position, search text, filters and open sheets. A backgrounded app coming
+    // back on a flaky connection hit that every time. With cached data the
+    // screens keep rendering it and surface their own errors.
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { id: "org-1", featureFlags: {} },
+        effectiveRole: "user",
+        linkedEmployee: { focusAreaIds: [1], departmentIds: [] },
+        permissions: { canViewSchedule: true, canApproveShiftRequests: false },
+      },
+      error: new Error("network"),
+      isError: true,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({}),
+    });
+
+    render(<TestHost />);
+
+    expect(screen.queryByText("network-connection-recovery")).toBeNull();
+  });
+
   it("shows the Requests tab for an employee on the schedule", () => {
     mockReady({ focusAreaIds: [1], canApproveShiftRequests: false });
 

@@ -1,11 +1,77 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyRecurringSchedules, deleteShift, publishSchedule, upsertShift } from "./api";
+import {
+  applyRecurringSchedules,
+  deleteShift,
+  endScheduleEditorSession,
+  endScheduleEditorSessions,
+  fetchScheduleEditorSessionStatus,
+  publishSchedule,
+  upsertShift,
+} from "./api";
 import type { ScheduleCellInput } from "@/types";
 
 describe("schedule client api", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("keeps schedule-editor takeover separate from authentication sessions", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ ended: true, endedAt: "2026-09-02T22:00:00.000Z" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await endScheduleEditorSession({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      targetEditorSessionId: "22222222-2222-4222-8222-222222222222",
+      endingEditorSessionId: "33333333-3333-4333-8333-333333333333",
+    });
+    await endScheduleEditorSessions({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      targetEditorSessionIds: [
+        "22222222-2222-4222-8222-222222222222",
+        "44444444-4444-4444-8444-444444444444",
+      ],
+      endingEditorSessionId: "33333333-3333-4333-8333-333333333333",
+    });
+    await fetchScheduleEditorSessionStatus({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      editorSessionId: "22222222-2222-4222-8222-222222222222",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/schedule/editor-sessions");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        body: JSON.stringify({
+          orgId: "11111111-1111-4111-8111-111111111111",
+          targetEditorSessionIds: ["22222222-2222-4222-8222-222222222222"],
+          endingEditorSessionId: "33333333-3333-4333-8333-333333333333",
+        }),
+      }),
+    );
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        body: JSON.stringify({
+          orgId: "11111111-1111-4111-8111-111111111111",
+          targetEditorSessionIds: [
+            "22222222-2222-4222-8222-222222222222",
+            "44444444-4444-4444-8444-444444444444",
+          ],
+          endingEditorSessionId: "33333333-3333-4333-8333-333333333333",
+        }),
+      }),
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "/api/schedule/editor-sessions?orgId=11111111-1111-4111-8111-111111111111&editorSessionId=22222222-2222-4222-8222-222222222222",
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/auth/sign-out"),
+      expect.anything(),
+    );
   });
 
   it("publishes the reviewed local calendar date range instead of UTC-shifted dates", async () => {

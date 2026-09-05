@@ -1,4 +1,13 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
+import { resetSheetPresentationTracking } from "../shared/lib/modal-presentation";
+
+// The sheet-depth counter is module state. Testing Library unmounts between
+// tests, which balances it, but a test that throws mid-render can leave a sheet
+// counted forever and fail every later test in the file for the wrong reason.
+afterEach(() => {
+  resetSheetPresentationTracking();
+});
 
 // jsdom's own localStorage sometimes fails to install here — Node's own
 // experimental global `localStorage` getter (which throws without

@@ -285,16 +285,22 @@ multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
   the gap grows to the full status-plus-navigation bar. Neither prop does
   anything on iOS.
 - **Never wrap the sheet in a `KeyboardAvoidingView`.** It lifts itself over the
-  keyboard by `useKeyboardInset()` instead. On Android React Native runs
-  `keyboardDidHide` through the same handler as a frame change, and that event
-  reports `screenY` as the _height_ of the visible display frame rather than as
-  its bottom edge; inside a full-screen modal the two differ by the system bars,
-  so the view keeps a bottom inset the size of the navigation bar long after the
-  keyboard is gone. The sheet **and its backdrop** both live in that box, so both
-  lifted off the bottom of the screen and the undimmed app showed through the
-  strip underneath. `useKeyboardInset` answers a hide with zero whatever the
-  event's coordinates say, and only the sheet reads it — the backdrop always
-  spans the whole modal.
+  keyboard with an animated `marginBottom` driven by
+  `useReanimatedKeyboardAnimation()`, and **only the sheet reads it** — a
+  `KeyboardAvoidingView` would take the backdrop up too and leave a strip of
+  undimmed app along the bottom edge. That height is negative (the library means
+  it for `translateY`), so the sheet negates it.
+- **Keyboard geometry has exactly one owner: `<KeyboardProvider>` in
+  `app/_layout.tsx`.** `Screen`, `AuthShell` and the sheet all read from it.
+  Do not add a `KeyboardAvoidingView`, a `Keyboard.addListener` inset, or an
+  `automaticallyAdjustKeyboardInsets` of your own; those were the three
+  mechanisms this replaced, and none of them did anything on Android. Keep the
+  lift on the UI thread — a `useState` fed into `StyleSheet.create` rebuilds the
+  whole sheet stylesheet per keyboard event and lands as an un-animated jump
+  that races the keyboard's own slide, which is what read as jitter.
+- **The sheet's `ScrollView` sets `keyboardShouldPersistTaps="handled"`.**
+  Without it the default is `"never"`, and the first tap on a sheet's submit
+  button while a field is focused is swallowed dismissing the keyboard.
 
 ### Unsaved changes
 
@@ -410,6 +416,21 @@ sweeps in phase. It is off entirely under reduce motion.
   the viewport with nothing to align against, so they take **no** panel — a small
   tinted box stranded mid-screen reads as a stray card. Empty state inside a
   card ⇒ `compact`.
+- **`fillScreen` states stay in the scroll view; only skeletons leave it.**
+  `Screen`'s `contentContainerStyle` carries `flexGrow: 1`, so a `flex: 1` child
+  has the viewport's leftover space to claim without dropping out of scroll
+  mode. Reach for `scrollEnabled={false}` for a **skeleton** and nothing else: a
+  placeholder should not scroll and has nothing to refresh. Using it for an
+  error or empty state costs two things — an iOS `headerLargeTitle` has nothing
+  left to collapse against, so it sits permanently expanded and pushes the page
+  down, and pull-to-refresh needs a scroll gesture to hang off, so it disappears
+  from exactly the screens most likely to want a retry. (`AdminHomeScreen`'s
+  empty state told the user to "pull to refresh" while doing this.)
+- **A page-owning empty or error state sits above centre, not dead centre.**
+  `fill-screen-anchor` owns the ratio for both `EmptyStateCard` and
+  `StatusBanner`, as two flex spacers rather than a fixed offset so it lands at
+  the same fraction on every screen size. Centring in _all_ the leftover space
+  marooned the message far below the filter row it belongs to.
 - **Decorative "AI" iconography is lint-enforced out of the codebase.** The
   `design/no-decorative-ai-icons` rule fails the build on `sparkles*`, lucide
   `Sparkle`/`Wand*`, and the sparkle/wand emoji. It carries its own `files`

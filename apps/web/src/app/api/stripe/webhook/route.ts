@@ -12,6 +12,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type Stripe from "stripe";
+import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret = serverEnv?.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     logger.error("STRIPE_WEBHOOK_SECRET not configured");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });

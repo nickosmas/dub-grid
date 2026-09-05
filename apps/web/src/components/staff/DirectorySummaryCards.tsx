@@ -12,7 +12,10 @@ export function DirectorySummaryCards({
   showEmploymentCounts?: boolean;
 }) {
   return (
-    <div className={`grid grid-cols-1 gap-4 ${showEmploymentCounts ? "sm:grid-cols-3" : ""}`}>
+    // The column track stays three wide whether or not the employment cards
+    // show, so the one card a non-manager gets is a card rather than a banner
+    // with its icon stranded at the far edge.
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <Card
         size="sm"
         className="border-[var(--dg-color-brand-border)]"

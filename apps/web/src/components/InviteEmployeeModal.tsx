@@ -317,7 +317,7 @@ export default function InviteEmployeeModal({
             style={{
               padding: "12px 16px",
               background: "var(--dg-color-bg-secondary)",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               fontSize: "var(--dg-fs-body-sm)",
               color: "var(--dg-color-text-secondary)",
             }}
@@ -429,7 +429,7 @@ export default function InviteEmployeeModal({
                   style={{
                     marginTop: 8,
                     padding: "8px 12px",
-                    borderRadius: 6,
+                    borderRadius: "var(--dg-radius-sm)",
                     background: "var(--dg-color-danger-bg)",
                     color: "var(--dg-color-danger-text)",
                     fontSize: "var(--dg-fs-footnote)",
@@ -448,7 +448,7 @@ export default function InviteEmployeeModal({
                     style={{
                       marginTop: 8,
                       padding: "8px 12px",
-                      borderRadius: 6,
+                      borderRadius: "var(--dg-radius-sm)",
                       background: "var(--dg-color-info-bg)",
                       color: "var(--dg-color-info-text)",
                       fontSize: "var(--dg-fs-footnote)",

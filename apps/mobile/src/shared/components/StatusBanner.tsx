@@ -2,17 +2,23 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
+import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { MAX_FONT_SCALE, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
 
+// `borderlessBackgroundColor` is the tone's border colour used as a fill. The
+// soft tints are a step off white, which is enough behind an outline and not
+// enough without one: drop the outline and the fill is the only thing left to
+// separate the banner from the page, so it steps up the same hue's ramp.
 const createStatusBannerTone = (mobileColors: MobileColors) =>
   ({
     error: {
       backgroundColor: mobileColors.dangerSoft,
       borderColor: mobileColors.dangerBorder,
+      borderlessBackgroundColor: mobileColors.dangerBorder,
       iconColor: mobileColors.dangerText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -23,6 +29,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     warning: {
       backgroundColor: mobileColors.warningSoft,
       borderColor: mobileColors.warningBorder,
+      borderlessBackgroundColor: mobileColors.warningBorder,
       iconColor: mobileColors.warningText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -33,6 +40,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     info: {
       backgroundColor: mobileColors.brandSoft,
       borderColor: mobileColors.brandBorder,
+      borderlessBackgroundColor: mobileColors.brandBorder,
       iconColor: mobileColors.brand,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -43,6 +51,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
     success: {
       backgroundColor: mobileColors.successSoft,
       borderColor: mobileColors.successBorder,
+      borderlessBackgroundColor: mobileColors.successBorder,
       iconColor: mobileColors.successText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -60,6 +69,7 @@ export function StatusBanner({
   actionLabel,
   onAction,
   fillScreen = false,
+  bordered = true,
 }: {
   title: string;
   body?: string;
@@ -68,6 +78,11 @@ export function StatusBanner({
   actionLabel?: string;
   onAction?: () => void;
   fillScreen?: boolean;
+  /**
+   * Drop the outline where the banner is a quiet aside rather than an
+   * interruption, and the tinted fill alone is enough to set it off.
+   */
+  bordered?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -92,17 +107,31 @@ export function StatusBanner({
     <View
       style={[
         styles.banner,
-        {
-          backgroundColor: palette.backgroundColor,
-          borderColor: palette.borderColor,
-        },
+        bordered
+          ? { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor }
+          : {
+              backgroundColor: palette.borderlessBackgroundColor,
+              borderWidth: 0,
+            },
       ]}
     >
       <View style={styles.copyRow}>
         <Ionicons color={palette.iconColor} name={palette.iconName} size={24} style={styles.icon} />
         <View style={styles.copy}>
-          <Text style={[styles.title, { color: palette.titleColor }]}>{title}</Text>
-          {body ? <Text style={[styles.body, { color: palette.bodyColor }]}>{body}</Text> : null}
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={[styles.title, { color: palette.titleColor }]}
+          >
+            {title}
+          </Text>
+          {body ? (
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={[styles.body, { color: palette.bodyColor }]}
+            >
+              {body}
+            </Text>
+          ) : null}
         </View>
       </View>
       {actionLabel && onAction ? (
@@ -133,26 +162,35 @@ function CenteredStatus({
 }) {
   const mobileColors = useMobileColors();
   const centeredStyles = useMemo(() => createCenteredStyles(mobileColors), [mobileColors]);
-  // Paired with `Screen`'s `scrollEnabled={false}`: a plain `flex: 1` here
-  // reliably fills the non-scrolling container's remaining space and centers
-  // within it, with none of the viewport-height guessing a ScrollView forces.
-  const fillStyle = fillScreen
-    ? {
-        flex: 1,
-        justifyContent: "center" as const,
-      }
-    : null;
-
+  // `Screen`'s `contentContainerStyle` carries `flexGrow: 1`, so `flex: 1` here
+  // claims the viewport's leftover space even inside a scroll view, and the two
+  // spacers place the message within it. See `fill-screen-anchor` for why not
+  // dead centre.
   return (
-    <View style={[centeredStyles.card, fillStyle]}>
+    <View style={[centeredStyles.card, fillScreen ? fillScreenAnchorStyles.fill : null]}>
+      {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
       <Ionicons color={iconColor} name={iconName} size={32} />
       <View style={centeredStyles.copy}>
-        <Text style={centeredStyles.title}>{title}</Text>
-        {body ? <Text style={centeredStyles.body}>{body}</Text> : null}
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.title}>
+          {title}
+        </Text>
+        {body ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.body}>
+            {body}
+          </Text>
+        ) : null}
       </View>
       {actionLabel && onAction ? (
-        <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
+        // Wrapped, not placed directly: `fullWidth={false}` gives the button
+        // `alignSelf: "flex-start"`, and that beats the `alignItems: "center"`
+        // on the card around it — so the action sat hard left under centred
+        // copy. The wrapper is the flex child that stretches, and the button
+        // centres inside it. `EmptyStateCard` solves it the same way.
+        <View style={centeredStyles.actionRow}>
+          <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
+        </View>
       ) : null}
+      {fillScreen ? <View style={fillScreenAnchorStyles.spacerBelow} /> : null}
     </View>
   );
 }
@@ -199,6 +237,10 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
     },
     copy: {
       gap: 6,
+      alignItems: "center",
+    },
+    actionRow: {
+      alignSelf: "stretch",
       alignItems: "center",
     },
     title: {

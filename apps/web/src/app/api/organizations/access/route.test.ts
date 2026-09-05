@@ -13,6 +13,10 @@ const profileMaybeSingle = vi.fn();
 const getUserById = vi.fn();
 const auditInsert = vi.fn();
 const superAdminCountIs = vi.fn();
+const buildMembershipAccessChanges = vi.fn(
+  (..._args: unknown[]) => [] as Array<{ key: string; label: string }>,
+);
+const rpc = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -30,7 +34,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/access-management", () => ({
-  buildMembershipAccessChanges: vi.fn(() => []),
+  buildMembershipAccessChanges: (...args: unknown[]) => buildMembershipAccessChanges(...args),
   buildMembershipRemovalChanges: vi.fn(() => []),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
@@ -107,6 +111,7 @@ vi.mock("@/lib/supabase-service", () => ({
       throw new Error(`Unexpected table: ${table}`);
     },
     auth: { admin: { getUserById } },
+    rpc: (...args: unknown[]) => rpc(...args),
   }),
 }));
 
@@ -171,5 +176,85 @@ describe("DELETE /api/organizations/access", () => {
       expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
     );
     expect(body.success).toBe(true);
+  });
+});
+
+function makePatchRequest(body: Record<string, unknown>) {
+  return new NextRequest("http://localhost/api/organizations/access", {
+    method: "PATCH",
+    body: JSON.stringify({
+      orgId: REQUESTED_ORG_ID,
+      userId: TARGET_USER_ID,
+      expectedUpdatedAt: UPDATED_AT,
+      ...body,
+    }),
+  });
+}
+
+describe("PATCH /api/organizations/access notifications", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateCsrfOrigin.mockReturnValue(null);
+    requireAuthenticatedUser.mockResolvedValue({ user: { id: ACTOR_ID, email: "actor@test.com" } });
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    requireOrgPermissions.mockResolvedValue({ orgId: REQUESTED_ORG_ID });
+    profileMaybeSingle.mockResolvedValue({
+      data: { first_name: "Target", last_name: "User", platform_role: "none", created_at: null },
+      error: null,
+    });
+    getUserById.mockResolvedValue({ data: { user: { email: "target@test.com" } } });
+    auditInsert.mockResolvedValue({ error: null });
+    membershipUpdateEq3.mockResolvedValue({ data: { id: "m-1" }, error: null });
+    rpc.mockResolvedValue({ error: null });
+    buildMembershipAccessChanges.mockReturnValue([{ key: "orgRole", label: "Role" }]);
+  });
+
+  it("sends only the role notification when a promotion clears admin permissions", async () => {
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "user",
+        admin_permissions: { canViewStaff: true, canViewSchedule: true },
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(makePatchRequest({ orgRole: "super_admin" }));
+
+    expect(res.status).toBe(200);
+    expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      ACTOR_ID,
+      expect.objectContaining({ action: "role_changed", fromRole: "user", toRole: "super_admin" }),
+    );
+  });
+
+  it("still spells out permission edits that leave the role alone", async () => {
+    membershipSelectEq2.mockResolvedValue({
+      data: {
+        user_id: TARGET_USER_ID,
+        org_id: REQUESTED_ORG_ID,
+        org_role: "admin",
+        admin_permissions: { canViewStaff: true, canEditShifts: false },
+        updated_at: UPDATED_AT,
+      },
+      error: null,
+    });
+
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      makePatchRequest({ adminPermissions: { canViewStaff: true, canEditShifts: true } }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      ACTOR_ID,
+      expect.objectContaining({ action: "admin_permissions_changed" }),
+    );
   });
 });

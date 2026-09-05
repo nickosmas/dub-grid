@@ -88,7 +88,11 @@ describe("loadMobilePeoplePayload", () => {
         currentOrg: { id: ORG_ID },
         serviceClient: {},
         user: { id: USER_ID },
-        permissions: { canManageEmployees: false, canViewStaff: true },
+        permissions: {
+          canManageEmployees: false,
+          canViewStaff: true,
+          canViewEmployeeDetails: false,
+        },
       } as never,
       {
         fetchMobilePeople: vi.fn(async () => [self, coworker, inactive]),
@@ -120,7 +124,11 @@ describe("loadMobilePeoplePayload", () => {
         currentOrg: { id: ORG_ID },
         serviceClient: {},
         user: { id: USER_ID },
-        permissions: { canManageEmployees: true, canViewStaff: true },
+        permissions: {
+          canManageEmployees: true,
+          canViewStaff: true,
+          canViewEmployeeDetails: true,
+        },
       } as never,
       {
         fetchMobilePeople: vi.fn(async () => [self]),
@@ -129,5 +137,33 @@ describe("loadMobilePeoplePayload", () => {
     );
 
     expect(payload.people).toEqual([self]);
+  });
+
+  it("hands contact details to a view-only admin, matching the web People table", async () => {
+    const coworker = makePerson({ id: "employee-coworker", userId: "user-coworker" });
+
+    const payload = await loadMobilePeoplePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        // Granted "View employee details" without staff management: web shows
+        // them contact details, so mobile must not blank them.
+        permissions: {
+          canManageEmployees: false,
+          canViewStaff: true,
+          canViewEmployeeDetails: true,
+        },
+      } as never,
+      {
+        fetchMobilePeople: vi.fn(async () => [coworker]),
+        mapEmployeeToMobilePerson: vi.fn((person) => person),
+      } as never,
+    );
+
+    expect(payload.people[0]).toMatchObject({
+      email: coworker.email,
+      phone: coworker.phone,
+    });
   });
 });

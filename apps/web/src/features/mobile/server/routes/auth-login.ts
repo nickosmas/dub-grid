@@ -12,7 +12,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
-import { getSupabasePublishableKey } from "@/lib/supabase-keys";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 async function hashEmail(email: string): Promise<string> {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   }
 
   const serviceClient = getServiceClient();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   const anonKey = getSupabasePublishableKey();
   if (!supabaseUrl || !anonKey) {
     return json({ error: "Server misconfigured" }, { status: 500 });

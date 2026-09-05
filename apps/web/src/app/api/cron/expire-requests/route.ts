@@ -4,6 +4,7 @@ import { dispatchNotificationEvent } from "@/features/notifications/server/event
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
 const BATCH_LIMIT = 500;
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
+  const secret = serverEnv?.CRON_SECRET;
   if (!secret) {
     logger.error("CRON_SECRET not configured — refusing to run expire-requests");
     return NextResponse.json({ error: "Not configured" }, { status: 503 });

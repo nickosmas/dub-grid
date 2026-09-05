@@ -1,3 +1,4 @@
+import { clientEnv } from "@/lib/env";
 /**
  * PostHog wrapper.
  *
@@ -20,8 +21,8 @@ let loading: Promise<PostHogClient | null> | null = null;
 function loadAndInit(): Promise<PostHogClient | null> {
   if (loading) return loading;
 
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+  const key = clientEnv?.NEXT_PUBLIC_POSTHOG_KEY;
+  const host = clientEnv?.NEXT_PUBLIC_POSTHOG_HOST;
   if (typeof window === "undefined" || !key || !host) {
     return Promise.resolve(null);
   }

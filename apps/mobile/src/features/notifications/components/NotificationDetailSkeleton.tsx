@@ -8,8 +8,8 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileElevation, mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
 
 /**
  * A single alert.
@@ -26,7 +26,8 @@ export function NotificationDetailSkeleton({
   metadataRows?: number;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={styles.container}>
@@ -62,7 +63,7 @@ export function NotificationDetailSkeleton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     container: {
       gap: 14,
@@ -85,6 +86,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderWidth: 1,
       gap: 8,
       padding: 14,
+      ...mobileElevation("card", isDark),
     },
     metadataRow: {
       flexDirection: "row",

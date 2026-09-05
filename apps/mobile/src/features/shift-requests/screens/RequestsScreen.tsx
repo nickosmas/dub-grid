@@ -145,7 +145,8 @@ function hasMentoredSegments(
 
 function MentoredPill() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -404,7 +405,8 @@ function CardIcon({
   muted?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   return (
     <View style={[styles.cardIconFrame, muted && styles.cardIconFrameMuted]}>
       <Ionicons color={mobileColors.brand} name={name} size={18} />
@@ -414,7 +416,8 @@ function CardIcon({
 
 export default function RequestsScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   const params = useLocalSearchParams<{
     requestId?: string | string[];
     tab?: string | string[];
@@ -804,28 +807,17 @@ export default function RequestsScreen() {
     visibleTabs,
   ]);
   const activeTab = selectedTab ?? defaultTab;
-  // Mirrors the `fillScreen` branches below: loading and error/global-empty
-  // win outright, then each tab owns whether its own list is empty.
-  const isFillScreenState =
-    contentState.kind !== "loading" &&
-    (contentState.kind === "error" ||
-      (activeTab === "history"
-        ? historyContentState.kind !== "ready"
-        : contentState.kind === "empty" ||
-          (activeTab === "available"
-            ? availableOpenShiftFeed.totalCount === 0
-            : activeTab === "all"
-              ? allRequests.length === 0
-              : activeTab === "mine"
-                ? myRequests.length === 0
-                : approvalRequests.length === 0)));
 
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={!isFillScreenState}
+      // A skeleton is a placeholder, not content: it must not scroll, and there
+      // is nothing to pull-to-refresh while the thing is already loading.
+      // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
+      // state real space to centre in without leaving scroll mode.
+      scrollEnabled={contentState.kind !== "loading"}
     >
       {/* Active request counts wait for their shared data. History resolves
           independently so a slow archive cannot hide active request actions. */}
@@ -1061,7 +1053,7 @@ function RequestCard({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const shiftLabel = getRequestShiftLabel(request);
   const timeRange = getRequestTimeRange(request);
@@ -1331,7 +1323,7 @@ function OpenShiftCard({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const openShiftChipTone = statusChipTones.open;
   const shiftLabel = getOpenShiftLabel(openShift);
@@ -1447,7 +1439,8 @@ function JobPill({
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -1519,7 +1512,8 @@ function JobPill({
 
 function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors]);
   return (
     <View
       accessibilityLabel={`Shift ${label}`}

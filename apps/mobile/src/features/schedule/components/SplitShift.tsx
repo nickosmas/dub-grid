@@ -330,7 +330,7 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentBlockDetail: {
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
-      borderRadius: 12,
+      borderRadius: mobileRadii.control,
       borderWidth: 1,
       padding: 12,
     },

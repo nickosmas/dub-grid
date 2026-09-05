@@ -7,6 +7,8 @@ import { Redirect, router } from "expo-router";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import { Button } from "../../../shared/components/Button";
+import { AuthField } from "../components/AuthField";
+import { InlineError } from "../../../shared/components/InlineError";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { AuthShell } from "../components/AuthShell";
 import {
@@ -67,17 +69,6 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
   return ".dubgrid.com";
 }
 
-function InlineError({ message }: { message: string }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  return (
-    <View style={styles.errorRow}>
-      <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
-      <Text style={styles.errorText}>{message}</Text>
-    </View>
-  );
-}
-
 function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
@@ -132,9 +123,6 @@ export default function LoginScreen() {
   const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [slowSubmission, setSlowSubmission] = useState(false);
-  const [focusedField, setFocusedField] = useState<"organization" | "email" | "password" | null>(
-    null,
-  );
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
@@ -412,35 +400,22 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.fields}>
-            <View
-              style={[
-                styles.inputRow,
-                focusedField === "organization" && styles.inputRowFocused,
-                error ? styles.inputRowError : null,
-              ]}
-            >
-              <TextInput
-                accessibilityLabel="Organization"
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputAccessoryViewID={inputAccessoryViewID}
-                placeholder="yourorg"
-                placeholderTextColor={mobileColors.placeholderText}
-                returnKeyType="go"
-                style={[styles.input, styles.inputFlex]}
-                value={orgSlug}
-                onBlur={() => setFocusedField(null)}
-                onChangeText={(value) => {
-                  setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                  setError(null);
-                }}
-                onSubmitEditing={() => handleOrganizationContinue()}
-                onFocus={() => setFocusedField("organization")}
-              />
-              <View style={styles.suffix}>
-                <Text style={styles.suffixText}>{orgSuffix}</Text>
-              </View>
-            </View>
+            <AuthField
+              accessibilityLabel="Organization"
+              autoCapitalize="none"
+              autoCorrect={false}
+              hasError={Boolean(error)}
+              inputAccessoryViewID={inputAccessoryViewID}
+              placeholder="yourorg"
+              returnKeyType="go"
+              suffix={orgSuffix}
+              value={orgSlug}
+              onChangeText={(value) => {
+                setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                setError(null);
+              }}
+              onSubmitEditing={() => handleOrganizationContinue()}
+            />
 
             {error ? <InlineError message={error} /> : null}
           </View>
@@ -487,71 +462,51 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.fields}>
-            <View
-              style={[
-                styles.inputRow,
-                focusedField === "email" && styles.inputRowFocused,
-                error ? styles.inputRowError : null,
-              ]}
-            >
-              <TextInput
-                accessibilityLabel="Email"
-                ref={emailInputRef}
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                blurOnSubmit={false}
-                inputAccessoryViewID={inputAccessoryViewID}
-                keyboardType="email-address"
-                placeholder="Email"
-                placeholderTextColor={mobileColors.placeholderText}
-                returnKeyType="next"
-                style={[styles.input, styles.inputFlex]}
-                textContentType="emailAddress"
-                value={email}
-                onBlur={() => setFocusedField(null)}
-                onChangeText={setEmail}
-                onFocus={() => setFocusedField("email")}
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
-              />
-            </View>
+            <AuthField
+              accessibilityLabel="Email"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              blurOnSubmit={false}
+              hasError={Boolean(error)}
+              inputAccessoryViewID={inputAccessoryViewID}
+              keyboardType="email-address"
+              placeholder="Email"
+              ref={emailInputRef}
+              returnKeyType="next"
+              textContentType="emailAddress"
+              value={email}
+              onChangeText={setEmail}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+            />
 
-            <View
-              style={[
-                styles.inputRow,
-                focusedField === "password" && styles.inputRowFocused,
-                error ? styles.inputRowError : null,
-              ]}
-            >
-              <TextInput
-                accessibilityLabel="Password"
-                ref={passwordInputRef}
-                autoCapitalize="none"
-                autoComplete="password"
-                autoCorrect={false}
-                inputAccessoryViewID={inputAccessoryViewID}
-                placeholder="Password"
-                placeholderTextColor={mobileColors.placeholderText}
-                returnKeyType="done"
-                secureTextEntry={!showPassword}
-                style={[styles.input, styles.inputFlex]}
-                textContentType="password"
-                value={password}
-                onBlur={() => setFocusedField(null)}
-                onChangeText={setPassword}
-                onFocus={() => setFocusedField("password")}
-                onSubmitEditing={() => handleLogin()}
-              />
-              <View style={styles.eyeButton}>
-                <Button
-                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  icon={showPassword ? "eye-off-outline" : "eye-outline"}
-                  iconOnly
-                  onPress={() => setShowPassword((current) => !current)}
-                  tone="ghost"
-                />
-              </View>
-            </View>
+            <AuthField
+              accessibilityLabel="Password"
+              autoCapitalize="none"
+              autoComplete="password"
+              autoCorrect={false}
+              hasError={Boolean(error)}
+              inputAccessoryViewID={inputAccessoryViewID}
+              placeholder="Password"
+              ref={passwordInputRef}
+              returnKeyType="done"
+              secureTextEntry={!showPassword}
+              textContentType="password"
+              trailingAccessory={
+                <View style={styles.eyeButton}>
+                  <Button
+                    accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                    icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                    iconOnly
+                    onPress={() => setShowPassword((current) => !current)}
+                    tone="ghost"
+                  />
+                </View>
+              }
+              value={password}
+              onChangeText={setPassword}
+              onSubmitEditing={() => handleLogin()}
+            />
 
             {error ? <InlineError message={error} /> : null}
           </View>
@@ -605,28 +560,26 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.fields}>
-            <View style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}>
-              <TextInput
-                ref={mfaInputRef}
-                accessibilityLabel="Verification code"
-                autoComplete="one-time-code"
-                inputAccessoryViewID={inputAccessoryViewID}
-                inputMode="numeric"
-                keyboardType="number-pad"
-                maxLength={6}
-                onChangeText={(value) => {
-                  setMfaCode(value.replace(/\D/g, "").slice(0, 6));
-                  setError(null);
-                }}
-                placeholder="000000"
-                placeholderTextColor={mobileColors.placeholderText}
-                returnKeyType="done"
-                style={[styles.input, styles.codeInput]}
-                textContentType="oneTimeCode"
-                value={mfaCode}
-                onSubmitEditing={() => handleMfaVerify()}
-              />
-            </View>
+            <AuthField
+              accessibilityLabel="Verification code"
+              autoComplete="one-time-code"
+              hasError={Boolean(error)}
+              inputAccessoryViewID={inputAccessoryViewID}
+              inputMode="numeric"
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="000000"
+              ref={mfaInputRef}
+              returnKeyType="done"
+              textContentType="oneTimeCode"
+              value={mfaCode}
+              variant="code"
+              onChangeText={(value) => {
+                setMfaCode(value.replace(/\D/g, "").slice(0, 6));
+                setError(null);
+              }}
+              onSubmitEditing={() => handleMfaVerify()}
+            />
 
             {error ? <InlineError message={error} /> : null}
           </View>
@@ -692,57 +645,6 @@ const createStyles = (mobileColors: MobileColors) =>
     fields: {
       gap: 12,
     },
-    inputRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      minHeight: 54,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1.5,
-      borderColor: mobileColors.inputBorder,
-      backgroundColor: mobileColors.surface,
-    },
-    inputRowFocused: {
-      borderColor: mobileColors.inputBorderFocused,
-    },
-    inputRowError: {
-      borderColor: mobileColors.inputBorderError,
-    },
-    codeRow: {
-      minHeight: 62,
-    },
-    input: {
-      // No fontFamily: an explicit DM Sans family on TextInput breaks
-      // Android EditText interactivity when the font hasn't loaded yet.
-      // System font keeps the input safe; surrounding Text stays DM Sans.
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: "400",
-      color: mobileColors.textPrimary,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    inputFlex: {
-      flex: 1,
-    },
-    codeInput: {
-      flex: 1,
-      textAlign: "center",
-      fontSize: 26,
-      lineHeight: 32,
-      letterSpacing: 10,
-      fontWeight: "600",
-    },
-    suffix: {
-      alignSelf: "stretch",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-      borderLeftWidth: 1,
-      borderLeftColor: mobileColors.borderSubtle,
-    },
-    suffixText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
-    },
     // Centres the round toggle inside the field's trailing edge. The button
     // brings its own 44pt target, so this only handles the inset.
     eyeButton: {
@@ -789,16 +691,5 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textMuted,
       textAlign: "center",
       lineHeight: 20,
-    },
-    errorRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 8,
-      paddingHorizontal: 4,
-    },
-    errorText: {
-      ...mobileText.meta,
-      color: mobileColors.dangerText,
-      flex: 1,
     },
   });

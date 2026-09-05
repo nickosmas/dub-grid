@@ -24,7 +24,7 @@ import type {
   AssignmentDefinition,
 } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { History } from "lucide-react";
+import { ChevronLeft, History, User } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import {
@@ -71,7 +71,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-success-bg)",
             color: "var(--dg-color-success-text)",
             fontWeight: 600,
@@ -85,7 +85,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-info-bg)",
             color: "var(--dg-color-info-text)",
             fontWeight: 600,
@@ -99,7 +99,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-danger-bg)",
             color: "var(--dg-color-danger-text)",
             fontWeight: 600,
@@ -389,20 +389,7 @@ export function ExpandedChangesGrouped({
                 gap: 4,
               }}
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.5 }}
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <User size={12} style={{ opacity: 0.5 }} />
               {empName}
               <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                 ({sorted.length} change{sorted.length !== 1 ? "s" : ""})
@@ -510,7 +497,12 @@ export default function PublishHistoryPanel({
   const subtitle = loading ? (
     <span
       className="dg-skeleton"
-      style={{ display: "inline-block", width: 88, height: 10, borderRadius: 4 }}
+      style={{
+        display: "inline-block",
+        width: 88,
+        height: 10,
+        borderRadius: "var(--dg-radius-xs)",
+      }}
     />
   ) : (
     `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
@@ -552,24 +544,13 @@ export default function PublishHistoryPanel({
                 height: 36,
                 background: "transparent",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -625,11 +606,11 @@ export default function PublishHistoryPanel({
                 >
                   <div
                     className="dg-skeleton"
-                    style={{ width: 140, height: 12, borderRadius: 4 }}
+                    style={{ width: 140, height: 12, borderRadius: "var(--dg-radius-xs)" }}
                   />
                   <div
                     className="dg-skeleton"
-                    style={{ width: "60%", height: 10, borderRadius: 4 }}
+                    style={{ width: "60%", height: 10, borderRadius: "var(--dg-radius-xs)" }}
                   />
                   <div
                     className="dg-skeleton"

@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 
 /**
  * Syncs the auth-email half of `supabase/config.toml` to the linked remote
- * Supabase project: the six compiled templates in `supabase/templates/`, their
- * subject lines, and the OTP length/expiry those emails are written around.
+ * Supabase project: the compiled templates in `supabase/templates/` (the six
+ * auth-action emails plus four security-notification emails), their subject
+ * lines, and the OTP length/expiry those emails are written around.
  *
  * Why this and not `supabase config push`: that command pushes the *entire*
  * `[auth]` block, and ours holds local-dev values — `site_url` of 127.0.0.1, a
@@ -29,6 +30,10 @@ const TEMPLATE_KEYS = [
   "email_change",
   "recovery",
   "reauthentication",
+  "password_changed_notification",
+  "email_changed_notification",
+  "mfa_factor_enrolled_notification",
+  "mfa_factor_unenrolled_notification",
 ] as const;
 
 type TemplateKey = (typeof TEMPLATE_KEYS)[number];

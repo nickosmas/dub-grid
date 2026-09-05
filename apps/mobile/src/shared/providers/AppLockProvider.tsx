@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -49,6 +50,12 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   const enabled = useAppLockEnabled();
   const [locked, setLocked] = useState(false);
   const [authenticating, setAuthenticating] = useState(false);
+  // Whether this lock has already raised the system prompt on its own. Without
+  // it, cancelling Face ID put the effect below straight back into
+  // `attemptUnlock` — `locked` was still true and `authenticating` had just
+  // gone false — so the prompt reappeared the instant it was dismissed, forever,
+  // with the sheet's own Unlock button unreachable underneath it.
+  const hasPromptedRef = useRef(false);
 
   const attemptUnlock = useCallback(async () => {
     setAuthenticating(true);
@@ -69,6 +76,11 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       if (result.success) {
         setLocked(false);
       }
+    } catch {
+      // `authenticateAsync` rejects rather than resolving `{ success: false }`
+      // when the activity isn't ready for it, which on Android happens exactly
+      // when this runs: as the app resumes. Leave the sheet up; the Unlock
+      // button is the retry.
     } finally {
       setAuthenticating(false);
     }
@@ -101,11 +113,19 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     };
   }, [accessToken, enabled]);
 
+  // Raise the system prompt once per lock. Every retry after that is the user
+  // pressing Unlock, which is what keeps a declined check from becoming a loop.
   useEffect(() => {
-    if (locked && !authenticating) {
-      void attemptUnlock();
+    if (!locked) {
+      hasPromptedRef.current = false;
+      return;
     }
-  }, [locked, authenticating, attemptUnlock]);
+
+    if (hasPromptedRef.current) return;
+
+    hasPromptedRef.current = true;
+    void attemptUnlock();
+  }, [locked, attemptUnlock]);
 
   const showLock = !appLockUnsupported && Boolean(accessToken) && enabled && locked;
 
@@ -120,14 +140,16 @@ export function AppLockProvider({ children }: PropsWithChildren) {
         accessibilityRole="alert"
         backdrop="cover"
         dismissDisabled
+        footer={
+          <SheetActions>
+            <Button label="Unlock" loading={authenticating} onPress={() => void attemptUnlock()} />
+          </SheetActions>
+        }
         header={<SheetHeader icon="lock-closed-outline" title="DubGrid is locked" />}
         visible={showLock}
         onDismiss={() => {}}
       >
         <SheetCopy body="Verify it's you to continue." />
-        <SheetActions>
-          <Button label="Unlock" loading={authenticating} onPress={() => void attemptUnlock()} />
-        </SheetActions>
       </BottomSheetModal>
     </>
   );

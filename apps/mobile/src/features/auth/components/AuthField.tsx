@@ -1,14 +1,8 @@
 import { forwardRef, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../../shared/components/AppText";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import {
-  mobileRadii,
-  mobileSpace,
-  mobileText,
-  type MobileColors,
-} from "../../../shared/theme/tokens";
+import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 
 /**
  * The app's auth text field: a bordered row that owns its own focus state, with
@@ -80,20 +74,13 @@ export const AuthField = forwardRef<
   );
 });
 
-/** Inline validation message, paired with a field or a whole stage. */
-export function AuthFieldError({ message }: { message: string }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
-  return (
-    <View style={styles.errorRow}>
-      <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
-      <AppText style={styles.errorText} tone="danger" variant="meta">
-        {message}
-      </AppText>
-    </View>
-  );
-}
+/**
+ * Inline validation message, paired with a field or a whole stage.
+ *
+ * Kept as a named re-export so auth screens can go on importing it from beside
+ * the field it annotates; the component itself is shared.
+ */
+export { InlineError as AuthFieldError } from "../../../shared/components/InlineError";
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
@@ -143,15 +130,5 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 14,
       borderLeftWidth: 1,
       borderLeftColor: mobileColors.borderSubtle,
-    },
-    errorRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: mobileSpace.sm,
-      paddingHorizontal: mobileSpace.xs,
-    },
-    errorText: {
-      flex: 1,
-      lineHeight: mobileText.meta.lineHeight,
     },
   });

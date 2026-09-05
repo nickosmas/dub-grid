@@ -311,7 +311,7 @@ describe("ProfileWorkScreen", () => {
     expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
   });
 
-  it("asks before a back press throws away an edit, and leaves once discarded", () => {
+  it("asks before a back press throws away an edit, and leaves once discarded", async () => {
     render(<ProfileWorkScreen />);
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
@@ -326,7 +326,11 @@ describe("ProfileWorkScreen", () => {
     // Asserting the action actually lands is the point: `usePreventRemove`
     // reads the render-time flag, so a guard that dispatches before React has
     // committed it vetoes its own exit and the back button silently dies.
-    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    // It lands a beat later now — the exit waits for the confirmation modal to
+    // finish leaving, because dismissing both at once is what iOS drops.
+    await waitFor(() => {
+      expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    });
   });
 
   it("keeps the edit when the back press is called off", () => {

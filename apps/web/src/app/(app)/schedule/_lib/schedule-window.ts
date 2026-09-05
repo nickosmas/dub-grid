@@ -9,7 +9,12 @@ import type { ScheduleNote } from "@/types";
  */
 export type ScheduleNoteMap = Record<
   string,
-  { indicatorTypeId: number; status: "published" | "draft" | "draft_deleted" }[]
+  {
+    indicatorTypeId: number;
+    status: "published" | "draft" | "draft_deleted";
+    /** Last editor, so unpublished notes can be attributed at publish time. */
+    updatedBy: string | null;
+  }[]
 >;
 
 export function scheduleNoteKey(empId: string, date: string, focusAreaId: number | null): string {
@@ -28,7 +33,11 @@ export function buildScheduleNoteMap(noteRows: ScheduleNote[]): ScheduleNoteMap 
   for (const note of noteRows) {
     const key = scheduleNoteKey(note.empId, note.date, note.focusAreaId);
     if (!noteMap[key]) noteMap[key] = [];
-    noteMap[key].push({ indicatorTypeId: note.indicatorTypeId, status: note.status });
+    noteMap[key].push({
+      indicatorTypeId: note.indicatorTypeId,
+      status: note.status,
+      updatedBy: note.updatedBy,
+    });
   }
   return noteMap;
 }

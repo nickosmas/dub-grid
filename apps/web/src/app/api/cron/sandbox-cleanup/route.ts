@@ -3,6 +3,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 const STALE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
+  const secret = serverEnv?.CRON_SECRET;
   if (!secret) {
     logger.error("CRON_SECRET not configured — refusing to run sandbox-cleanup");
     return NextResponse.json({ error: "Not configured" }, { status: 503 });

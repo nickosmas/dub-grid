@@ -34,7 +34,7 @@ export default function CookiePreferencesManager() {
     <div
       style={{
         padding: "16px 20px",
-        borderRadius: 10,
+        borderRadius: "var(--dg-radius-lg)",
         border: "1px solid var(--dg-color-border)",
         background: "var(--dg-color-surface-hover)",
         display: "flex",
@@ -66,7 +66,7 @@ export default function CookiePreferencesManager() {
             ? analyticsEnabled
               ? "All cookies accepted (essential + analytics)"
               : "Essential cookies only"
-            : "No preference set — the consent banner will appear on your next visit"}
+            : "No preference set. The consent banner will appear on your next visit"}
         </p>
       </div>
       {consent !== "none" && (

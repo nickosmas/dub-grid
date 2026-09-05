@@ -26,6 +26,7 @@ import {
   mobilePersonCreateResponseSchema,
   mobilePeopleResponseSchema,
   mobilePersonInvitationResponseSchema,
+  mobilePersonOrgRoleResponseSchema,
   mobilePersonStatusUpdateResponseSchema,
   mobilePersonUpdateResponseSchema,
   mobilePushTokenResponseSchema,
@@ -58,6 +59,7 @@ import {
   type MobileProfileMfaStatusUpdateBody,
   type MobileProfilePhoneUpdateBody,
   type MobileProfileResponse,
+  type MobilePersonOrgRoleBody,
   type MobilePersonStatusUpdateBody,
   type MobilePersonUpdateBody,
   type MobileScheduleRange,
@@ -308,6 +310,80 @@ export function parseMobileNameMismatchError(error: unknown): MobileNameMismatch
   }
 
   return new MobileNameMismatchError(challenge.details);
+}
+
+export type MobileStaffField = "firstName" | "lastName" | "email" | "phone" | "contactNotes";
+
+export type MobileContactConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
+
+const CONTACT_CONFLICT_FIELDS: Record<string, MobileStaffField> = {
+  email: "email",
+  phone: "phone",
+  name: "firstName",
+};
+
+/**
+ * A save the server rejected for a duplicate email, phone or name, mapped back
+ * onto the field that caused it. Without this the 409's message lands in a
+ * toast, the offending input stays unmarked, and Save stays enabled to fail the
+ * same way again.
+ */
+export function parseMobileContactConflict(
+  error: unknown,
+): { field: MobileStaffField; message: string } | null {
+  if (!(error instanceof ApiResponseError) || error.status !== 409) {
+    return null;
+  }
+  const payload = error.payload;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as { code?: unknown; field?: unknown; message?: unknown };
+  if (candidate.code !== "EMPLOYEE_CONTACT_CONFLICT" || typeof candidate.field !== "string") {
+    return null;
+  }
+
+  const field = CONTACT_CONFLICT_FIELDS[candidate.field];
+  if (!field) return null;
+
+  return {
+    field,
+    message:
+      typeof candidate.message === "string" && candidate.message
+        ? candidate.message
+        : "That value is already used by another person on your team.",
+  };
+}
+
+/**
+ * The per-field errors a 400 carries when the server's own validation rejected
+ * the body, so a rule the client missed still lands on the right input.
+ */
+export function parseMobileStaffFieldErrors(
+  error: unknown,
+): Partial<Record<MobileStaffField, string>> | null {
+  if (!(error instanceof ApiResponseError) || error.status !== 400) {
+    return null;
+  }
+  const payload = error.payload;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const fieldErrors = (payload as { fieldErrors?: unknown }).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== "object") {
+    return null;
+  }
+
+  const mapped: Partial<Record<MobileStaffField, string>> = {};
+  for (const [key, value] of Object.entries(fieldErrors as Record<string, unknown>)) {
+    if (typeof value === "string" && value) {
+      mapped[key as MobileStaffField] = value;
+    }
+  }
+
+  return Object.keys(mapped).length > 0 ? mapped : null;
 }
 
 export function getBootstrap(
@@ -806,6 +882,36 @@ export function createMobilePerson(accessToken: string, body: MobilePersonCreate
   );
 }
 
+export type MobileContactCheckResult = {
+  email: { conflict: boolean; reason?: MobileContactConflictReason } | null;
+  phone: { conflict: boolean } | null;
+};
+
+/**
+ * Pre-flight duplicate check for the add and edit person forms. Callers treat a
+ * failure as "no conflict found": a flaky check must never be what stops a
+ * legitimate save, and the 409 on submit is still there as the real gate.
+ */
+export function checkMobilePersonContact(
+  accessToken: string,
+  body: {
+    email?: string;
+    phone?: string;
+    excludeEmployeeId?: string;
+    currentUserId?: string | null;
+  },
+) {
+  return mobileApiRequest(
+    "/api/mobile/v1/people/contact-check",
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => value as MobileContactCheckResult,
+  );
+}
+
 export function getMobilePerson(accessToken: string, personId: string) {
   return mobileApiRequest(
     `/api/mobile/v1/people/${personId}`,
@@ -892,6 +998,27 @@ export function revokeMobilePersonInvitation(
       body: JSON.stringify(body),
     },
     (value) => mobilePersonInvitationResponseSchema.parse(value),
+  );
+}
+
+/**
+ * The org role on its own. Separate from management access on purpose: the
+ * access badge on a person's profile sets the role without touching whichever
+ * departments they manage.
+ */
+export function changeMobilePersonOrgRole(
+  accessToken: string,
+  personId: string,
+  body: MobilePersonOrgRoleBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/access`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+    (value) => mobilePersonOrgRoleResponseSchema.parse(value),
   );
 }
 

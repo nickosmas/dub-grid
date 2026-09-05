@@ -145,7 +145,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: mobileSpace.xl,
       gap: mobileSpace.lg,
       ...mobileElevation("card", isDark),
@@ -172,17 +172,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexWrap: "wrap",
       gap: 10,
     },
+    // Kept boxed, unlike the empty-state panel. These three tiles are nothing
+    // but text, so a soft hairline is the only thing grouping each label with
+    // its number. Borderless, the columns ran together and the values stopped
+    // reading as a row. `control` radius nests inside the card's.
     tile: {
       flexGrow: 1,
       flexBasis: "30%",
       minWidth: 0,
-      overflow: "hidden",
-      backgroundColor: mobileColors.surfaceSecondary,
+      padding: 12,
+      gap: 6,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      padding: 12,
-      gap: 6,
     },
     tileHeader: {
       flexDirection: "row",
@@ -207,7 +209,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       // Nudge into the tile's top-right corner, matching the shared Card
       // component's icon treatment. Kept smaller than the tile's own padding
-      // (12) so it stays inside the tile's overflow:hidden bounds.
+      // (12) so it stays inside the tile's bounds.
       marginTop: -4,
       marginRight: -4,
     },

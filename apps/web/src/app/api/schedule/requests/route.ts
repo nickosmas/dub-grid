@@ -232,6 +232,37 @@ export async function POST(req: NextRequest) {
           .eq("org_id", data.orgId)
           .order("created_at", { ascending: false });
 
+        // Reviewing requests across the org is a management capability. Everyone
+        // else is scoped server-side rather than trusting the caller to pass
+        // `empId`, which no client actually did: a staff session was receiving
+        // every pending call-off in the organisation, absence type included, and
+        // only the board's tab gating kept it off screen.
+        const canReviewEveryRequest =
+          auth.permissions.isGridmaster ||
+          auth.permissions.isSuperAdmin ||
+          auth.permissions.canManageEmployees ||
+          auth.permissions.canApproveShiftRequests ||
+          auth.permissions.canEditShifts;
+
+        if (!canReviewEveryRequest) {
+          const actorEmployeeId = await fetchActorEmployeeId(
+            auth.serviceClient,
+            auth.actor.id,
+            auth.orgId,
+          );
+          // The untargeted open pickups are the volunteer pool the Available
+          // Shifts tab is built from, so scoping to "mine" alone would empty it.
+          const visibleClauses = ["and(type.eq.pickup,status.eq.open,target_emp_id.is.null)"];
+          if (actorEmployeeId) {
+            assertSafeFilterValue(actorEmployeeId, "actorEmployeeId");
+            visibleClauses.unshift(
+              `requester_emp_id.eq.${actorEmployeeId}`,
+              `target_emp_id.eq.${actorEmployeeId}`,
+            );
+          }
+          query = query.or(visibleClauses.join(","));
+        }
+
         if (data.status?.length) {
           query = query.in("status", data.status as ShiftRequestStatus[]);
         }

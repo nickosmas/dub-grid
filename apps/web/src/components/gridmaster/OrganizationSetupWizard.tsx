@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
@@ -554,7 +555,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || !name.trim()}
             onClick={handleDetailsNext}
           >
@@ -747,7 +748,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={
               saving ||
               !superAdminFirstName.trim() ||
@@ -871,7 +872,7 @@ export default function OrganizationSetupWizard({
               </div>
               <Button
                 type="button"
-                className="dg-btn dg-btn-brand"
+                className="dg-btn dg-btn-primary"
                 disabled={sendingEmail}
                 onClick={handleSendPendingEmail}
                 style={{ whiteSpace: "nowrap" }}
@@ -905,7 +906,7 @@ export default function OrganizationSetupWizard({
             </Button>
             <Button
               type="button"
-              className="dg-btn dg-btn-brand"
+              className="dg-btn dg-btn-primary"
               style={{ padding: "12px 24px" }}
               onClick={() => setCurrentStep("config")}
             >
@@ -949,7 +950,7 @@ export default function OrganizationSetupWizard({
                     alignItems: "center",
                     gap: 8,
                     padding: "10px 16px",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     border: `2px solid ${shiftDisplayMode === value ? "var(--dg-color-primary)" : "var(--dg-color-border)"}`,
                     background:
                       shiftDisplayMode === value ? "var(--dg-color-primary-bg)" : "transparent",
@@ -1041,19 +1042,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeDepartmentRow(idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1139,19 +1128,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeFocusArea(idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1208,19 +1185,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeNamedItem(setCertifications, idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1273,19 +1238,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeNamedItem(setOrgRoles, idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1392,19 +1345,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => setShiftCategories((prev) => prev.filter((_, i) => i !== idx))}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1466,7 +1407,7 @@ export default function OrganizationSetupWizard({
                   key={job.id}
                   style={{
                     border: "1px solid var(--dg-color-border)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     padding: 12,
                     marginBottom: 10,
                     background: "var(--dg-color-bg-secondary)",
@@ -1494,7 +1435,7 @@ export default function OrganizationSetupWizard({
                         width: 36,
                         height: 36,
                         border: "1px solid var(--dg-color-border)",
-                        borderRadius: 6,
+                        borderRadius: "var(--dg-radius-sm)",
                         cursor: "pointer",
                         padding: 2,
                         flexShrink: 0,
@@ -1535,19 +1476,7 @@ export default function OrganizationSetupWizard({
                         onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
                         style={{ padding: "6px 8px" }}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        <X size={14} />
                       </Button>
                     )}
                   </div>
@@ -1679,7 +1608,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving}
             onClick={() => setSetupConfirmAction("save-configuration")}
           >
@@ -1821,19 +1750,7 @@ export default function OrganizationSetupWizard({
                   }}
                   disabled={employeeRows.length <= 1}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X size={14} />
                 </Button>
               </div>
             ))}
@@ -1864,7 +1781,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || readyEmployeeCount === 0}
             onClick={() => setSetupConfirmAction("create-employees")}
           >
@@ -2058,7 +1975,7 @@ export default function OrganizationSetupWizard({
           </Button>
           <Button
             type="button"
-            className="dg-btn dg-btn-brand"
+            className="dg-btn dg-btn-primary"
             disabled={saving || selectedCount === 0}
             onClick={() => setSetupConfirmAction("send-invitations")}
           >

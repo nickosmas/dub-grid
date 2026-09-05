@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getSupabasePublishableKey } from "@/lib/supabase-keys";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 
 export function createMobileUserClient(accessToken: string): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getSupabaseUrl();
   const anonKey = getSupabasePublishableKey();
 
   if (!url || !anonKey) {

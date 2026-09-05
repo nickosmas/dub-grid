@@ -20,8 +20,8 @@ describe("OverviewTab", () => {
       />,
     );
 
-    const summary = screen.getByText("Summary").closest(".dg-card");
-    expect(summary?.nextElementSibling).toHaveTextContent("Recurring schedule card");
+    const summary = screen.getByTestId("overview-summary");
+    expect(summary.nextElementSibling).toHaveTextContent("Recurring schedule card");
   });
 
   it("shows assigned focus areas in details using the organization's custom label", () => {

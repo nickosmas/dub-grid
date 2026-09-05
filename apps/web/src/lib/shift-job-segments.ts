@@ -121,16 +121,13 @@ function buildSegmentLabel(
   return `${primary} · ${secondary}`;
 }
 
-export function createShiftJobCompatibilityMaps(input: {
-  assignments?: AssignmentDefinition[];
-  shiftCategories: ShiftCategory[];
-  jobs: JobDefinition[];
-  shiftDisplayMode?: ShiftDisplayMode;
-}): SegmentCompatibilityMaps {
-  const assignments = input.assignments ?? [];
-  const shiftById = new Map(input.shiftCategories.map((shift) => [shift.id, shift]));
-  const jobById = new Map(input.jobs.map((job) => [job.id, job]));
-  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+/**
+ * Pair-keyed assignment lookup, for surfaces that need an assignment's color or
+ * name from a stored shift/job pair without the rest of the compatibility maps.
+ */
+export function createAssignmentDefinitionByPairMap(
+  assignments: AssignmentDefinition[],
+): Map<string, AssignmentDefinition> {
   const assignmentByPair = new Map<string, AssignmentDefinition>();
 
   for (const assignment of assignments) {
@@ -141,11 +138,25 @@ export function createShiftJobCompatibilityMaps(input: {
     assignmentByPair.set(buildShiftJobPairKey(shiftId, jobId), assignment);
   }
 
+  return assignmentByPair;
+}
+
+export function createShiftJobCompatibilityMaps(input: {
+  assignments?: AssignmentDefinition[];
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
+  shiftDisplayMode?: ShiftDisplayMode;
+}): SegmentCompatibilityMaps {
+  const assignments = input.assignments ?? [];
+  const shiftById = new Map(input.shiftCategories.map((shift) => [shift.id, shift]));
+  const jobById = new Map(input.jobs.map((job) => [job.id, job]));
+  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+
   return {
     shiftById,
     jobById,
     assignmentById,
-    assignmentByPair,
+    assignmentByPair: createAssignmentDefinitionByPairMap(assignments),
     shiftDisplayMode: input.shiftDisplayMode ?? "code",
   };
 }

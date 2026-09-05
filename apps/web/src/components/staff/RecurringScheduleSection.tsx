@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -21,6 +22,7 @@ import {
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   toDarkPillColors,
+  visiblePillBorder,
 } from "@/lib/colors";
 import {
   deleteRecurringDraft,
@@ -49,6 +51,7 @@ import type {
   ShiftJobSegment,
 } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type ShiftCellPopoverProps = {
@@ -214,7 +217,16 @@ function ShiftCellPopover({
               multiSelect={false}
               closeOnSelect={true}
             />
-            {(currentSegments.length > 0 || currentAbsenceTypeId) && (
+          </div>
+          {(currentSegments.length > 0 || currentAbsenceTypeId) && (
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "10px 16px",
+                borderTop: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-surface)",
+              }}
+            >
               <Button
                 onClick={() => {
                   onSelect(null);
@@ -222,17 +234,16 @@ function ShiftCellPopover({
                 }}
                 className="dg-btn dg-btn-ghost"
                 style={{
-                  marginTop: 12,
                   width: "100%",
                   color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
                 }}
               >
-                Clear Shift
+                Clear selection
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         <ScrollOverflowCue />
       </PopoverContent>
@@ -357,7 +368,7 @@ function RecurringShiftPill({
           border: isDirty
             ? "2px dashed var(--dg-color-text-subtle)"
             : "1px dashed var(--dg-color-border-light)",
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -377,11 +388,14 @@ function RecurringShiftPill({
   const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
   const pillBackground = darkPill?.bg ?? rawPillBackground;
   const pillText = darkPill?.text ?? rawPillText;
-  const fallbackBorder = darkPill
-    ? `1px solid ${borderColor(pillText)}`
-    : absenceType
-      ? `1px solid ${absenceType.border}`
-      : `1px solid ${borderColor(pillText)}`;
+  // absence_types.border_color defaults to 'transparent', so a stored border is
+  // not necessarily a visible one — derive from the text colour when it isn't,
+  // the way every other pill surface does via resolveShiftPillColors.
+  const fallbackBorder = `1px solid ${
+    !darkPill && absenceType
+      ? visiblePillBorder(absenceType.border, pillText)
+      : borderColor(pillText)
+  }`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
@@ -405,7 +419,7 @@ function RecurringShiftPill({
         left: 4,
         background: pillBackground,
         border: isDirty ? `2px dashed ${pillText}` : fallbackBorder,
-        borderRadius: 8,
+        borderRadius: "var(--dg-radius-md)",
         color: pillText,
         display: "flex",
         flexDirection: "column",
@@ -490,7 +504,6 @@ export interface RecurringScheduleSectionProps {
   absenceTypes?: AbsenceType[];
   shiftDisplayMode?: ShiftDisplayMode;
   defaultShiftEnabled?: boolean;
-  useCompactRoleCertificationLabels?: boolean;
 }
 
 export function RecurringScheduleSection({
@@ -508,7 +521,6 @@ export function RecurringScheduleSection({
   absenceTypes = [],
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
-  useCompactRoleCertificationLabels = false,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -972,7 +984,7 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-primary"
               style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
             >
-              <ButtonLoading loading={saving}>Save Changes</ButtonLoading>
+              <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
             </Button>
           </div>
         </div>
@@ -1019,15 +1031,9 @@ export function RecurringScheduleSection({
         )}
         <div style={{ flex: 1, minWidth: isMobile ? "100%" : 0 }} />
         <div style={{ position: "relative", width: isMobile ? "100%" : undefined }}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-text-faint)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <Search
+            size={14}
+            color="var(--dg-color-text-faint)"
             style={{
               position: "absolute",
               left: 10,
@@ -1035,10 +1041,7 @@ export function RecurringScheduleSection({
               transform: "translateY(-50%)",
               pointerEvents: "none",
             }}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          />
           <input
             type="text"
             placeholder="Search"
@@ -1177,11 +1180,10 @@ export function RecurringScheduleSection({
             const rowBg = isCurrentUser ? "var(--dg-color-today-bg)" : "var(--dg-color-surface)";
             const certAbbr =
               employee.certificationId != null
-                ? getCertAbbr(
-                    employee.certificationId,
-                    certifications,
-                    useCompactRoleCertificationLabels,
-                  )
+                ? // Always compact here: the name column is a fixed 220px (140px on
+                  // mobile), so a full certification name overruns the employee
+                  // name beside it. DESIGNATION_COLORS is keyed by abbreviation too.
+                  getCertAbbr(employee.certificationId, certifications, true)
                 : null;
             const designationColors = certAbbr
               ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR)
@@ -1218,7 +1220,7 @@ export function RecurringScheduleSection({
                     <div
                       style={{
                         fontWeight: 600,
-                        fontSize: "var(--dg-fs-label)",
+                        fontSize: "var(--dg-fs-body-sm)",
                         color: "var(--dg-color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -1235,7 +1237,7 @@ export function RecurringScheduleSection({
                             fontSize: "var(--dg-fs-micro)",
                             fontWeight: 700,
                             padding: "1px 5px",
-                            borderRadius: 10,
+                            borderRadius: "var(--dg-radius-lg)",
                             background: "var(--dg-color-brand-bg)",
                             color: "var(--dg-color-brand)",
                             whiteSpace: "nowrap",
@@ -1394,8 +1396,8 @@ export function RecurringScheduleSection({
               ? `Save ${dirtyCount} recurring schedule change${dirtyCount === 1 ? "" : "s"}? These templates affect future schedule generation.`
               : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
           }
-          confirmLabel={pendingRecurringAction === "save" ? "Save Changes" : "Discard"}
-          variant={pendingRecurringAction === "save" ? "warning" : "danger"}
+          confirmLabel={pendingRecurringAction === "save" ? "Save" : "Discard"}
+          variant={pendingRecurringAction === "save" ? "info" : "danger"}
           isLoading={saving}
           onConfirm={() => {
             const action = pendingRecurringAction;

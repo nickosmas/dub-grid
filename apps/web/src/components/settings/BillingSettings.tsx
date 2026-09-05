@@ -165,7 +165,7 @@ function BillingMetric({
           style={{
             width: 40,
             height: 40,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -751,8 +751,14 @@ export default function BillingSettings({ organization }: { organization: { id: 
                     gap: 8,
                   }}
                 >
-                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
-                  <div className="dg-skeleton" style={{ width: 64, height: 20, borderRadius: 4 }} />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: 90, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+                  />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: 64, height: 20, borderRadius: "var(--dg-radius-xs)" }}
+                  />
                 </div>
               ))}
             </div>

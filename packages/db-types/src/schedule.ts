@@ -51,6 +51,7 @@ export interface DbScheduleNote {
   focus_area_id: number | null;
   status: "published" | "draft" | "draft_deleted";
   created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }

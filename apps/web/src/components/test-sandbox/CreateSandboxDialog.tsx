@@ -64,7 +64,7 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
           style={{
             marginTop: 8,
             padding: "8px 12px",
-            borderRadius: 8,
+            borderRadius: "var(--dg-radius-md)",
             border: "1px solid var(--dg-color-danger-border)",
             background: "var(--dg-color-danger-bg)",
             color: "var(--dg-color-danger)",

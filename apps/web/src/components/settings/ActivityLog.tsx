@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
@@ -8,6 +9,7 @@ import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { Pagination as SharedPagination } from "@/components/ui/pagination";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
   ACTIVITY_CATEGORIES,
@@ -41,21 +43,7 @@ const ACTION_TONES = {
 // Icons
 // ---------------------------------------------------------------------------
 
-const SEARCH_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
+const SEARCH_ICON = <Search size={14} />;
 
 // ---------------------------------------------------------------------------
 // Shared styles
@@ -368,44 +356,13 @@ function Pagination({
   entryCount: number;
   pageSize: number;
 }) {
-  const start = page * pageSize + 1;
-  const end = page * pageSize + entryCount;
-  const hasPrev = page > 0;
-  const hasNext = entryCount >= pageSize;
-
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "12px 0 4px",
-        fontSize: "var(--dg-fs-footnote)",
-        color: "var(--dg-color-text-muted)",
-      }}
-    >
-      <span>
-        Showing {start}–{end}
-      </span>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Button
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-          onClick={() => onPageChange(page - 1)}
-          disabled={!hasPrev}
-          style={{ opacity: hasPrev ? 1 : 0.4 }}
-        >
-          Previous
-        </Button>
-        <Button
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-          onClick={() => onPageChange(page + 1)}
-          disabled={!hasNext}
-          style={{ opacity: hasNext ? 1 : 0.4 }}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
+    <SharedPagination
+      page={page + 1}
+      hasNext={entryCount >= pageSize}
+      onPageChange={(next) => onPageChange(next - 1)}
+      summary={`Showing ${page * pageSize + 1}–${page * pageSize + entryCount}`}
+    />
   );
 }
 
@@ -423,10 +380,22 @@ function SkeletonTable() {
             borderBottom: "1px solid var(--dg-color-border-light)",
           }}
         >
-          <div className="dg-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ flex: 1, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ width: 120, height: 12, borderRadius: 4 }} />
+          <div
+            className="dg-skeleton"
+            style={{ width: 80, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ width: 70, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ flex: 1, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ width: 120, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
         </div>
       ))}
     </div>

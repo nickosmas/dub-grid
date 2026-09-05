@@ -98,7 +98,7 @@ export function ExtendTrialDialog({
 
   return (
     <ConfirmDialog
-      title="Extend Trial"
+      title="Extend trial"
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <span>Extend the trial for {org.orgName} by how many days?</span>
@@ -113,7 +113,7 @@ export function ExtendTrialDialog({
           />
         </div>
       }
-      confirmLabel="Extend Trial"
+      confirmLabel="Extend trial"
       variant="warning"
       isLoading={isLoading}
       confirmDisabled={!days.trim()}

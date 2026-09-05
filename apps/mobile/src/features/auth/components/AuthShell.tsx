@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Platform, StyleSheet, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Pressable } from "../../../shared/components/Pressable";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
@@ -13,6 +14,12 @@ import { mobileSpace } from "../../../shared/theme/tokens";
  * header shares it so the two share a left edge.
  */
 const MAX_COLUMN_WIDTH = 380;
+
+/**
+ * Breathing room left between the focused field and the top of the keyboard, so
+ * a field that has just been scrolled into view isn't flush against it.
+ */
+const KEYBOARD_BOTTOM_OFFSET = mobileSpace["2xl"];
 
 /**
  * The frame every public auth screen sits in: brand header, gradient halo,
@@ -37,27 +44,34 @@ export function AuthShell({
   const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: mobileColors.background }]}>
-      {/* Sits behind the brand header and fades out before the fields start. */}
+    <View style={[styles.root, { backgroundColor: mobileColors.background }]}>
+      {/* Outside the safe area on purpose. It is `position: absolute; top: 0`,
+          and Yoga positions an absolute child from its parent's *padding* edge —
+          so inside the `SafeAreaView` the aurora started below the notch and
+          left a flat band of background across the status bar. */}
       <GradientBackdrop height="100%" kind="aurora" />
-      {/* Constrained to the same column as the fields below, so the logo's left
+      <SafeAreaView style={styles.safeArea}>
+        {/* Constrained to the same column as the fields below, so the logo's left
           edge lines up with the copy instead of drifting out on wide screens. */}
-      <View style={styles.brandRow}>
-        <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
-          <Image
-            accessibilityIgnoresInvertColors
-            accessibilityLabel="DubGrid logo"
-            source={require("../../../../assets/images/logo-blue.png")}
-            style={styles.brandMark}
-          />
-          <DubGridWordmark color={mobileColors.textPrimary} fontSize={20} />
-        </Pressable>
-      </View>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardArea}
-      >
-        <ScrollView
+        <View style={styles.brandRow}>
+          <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
+            <Image
+              accessibilityIgnoresInvertColors
+              accessibilityLabel="DubGrid logo"
+              source={require("../../../../assets/images/logo-blue.png")}
+              style={styles.brandMark}
+            />
+            <DubGridWordmark color={mobileColors.textPrimary} fontSize={20} />
+          </Pressable>
+        </View>
+        {/* One scroll view that knows about the keyboard, in place of a
+            `KeyboardAvoidingView` wrapping a plain one. The old pairing stacked
+            three bottom insets on iOS — the safe area, the full keyboard height
+            the KAV measures from the screen bottom, and the padding below —
+            and did nothing at all on Android, where `behavior` was undefined.
+            Keyboard geometry now comes from the app-wide `<KeyboardProvider>`. */}
+        <KeyboardAwareScrollView
+          bottomOffset={KEYBOARD_BOTTOM_OFFSET}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: getScreenBottomPadding("stack", insets.bottom) },
@@ -65,12 +79,13 @@ export function AuthShell({
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          style={styles.keyboardArea}
         >
           <View style={styles.column}>{children}</View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-      {footer}
-    </SafeAreaView>
+        </KeyboardAwareScrollView>
+        {footer}
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -98,6 +113,9 @@ export function AuthActions({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
   },

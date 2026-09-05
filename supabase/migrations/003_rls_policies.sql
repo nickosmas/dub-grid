@@ -36,7 +36,9 @@ ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile_change_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_editor_session_terminations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calendar_feed_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_publish_changes ENABLE ROW LEVEL SECURITY;
 
@@ -422,6 +424,91 @@ CREATE POLICY "admin_update_draft_sessions"
 CREATE POLICY "admin_delete_draft_sessions"
   ON public.schedule_draft_sessions FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canEditShifts'));
+
+
+-- ── schedule_editor_session_terminations ────────────────────────────────────
+
+CREATE POLICY "users_select_own_schedule_editor_terminations"
+  ON public.schedule_editor_session_terminations FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+    AND EXISTS (
+      SELECT 1
+      FROM public.organizations AS organization
+      WHERE organization.id = schedule_editor_session_terminations.org_id
+        AND organization.archived_at IS NULL
+        AND organization.suspended_at IS NULL
+    )
+  );
+
+CREATE POLICY "schedule_editors_end_own_editor_sessions"
+  ON public.schedule_editor_session_terminations FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+    AND EXISTS (
+      SELECT 1
+      FROM public.organizations AS organization
+      WHERE organization.id = schedule_editor_session_terminations.org_id
+        AND organization.archived_at IS NULL
+        AND organization.suspended_at IS NULL
+    )
+    AND (
+      public.caller_org_role() = 'super_admin'
+      OR public.check_admin_permission('canEditShifts')
+      OR public.check_admin_permission('canEditNotes')
+    )
+  );
+
+
+-- ── schedule Realtime Broadcast + Presence ─────────────────────────────────
+-- Authorization is evaluated when a private channel is joined. Match the
+-- complete topic string instead of casting client-controlled text to UUID so a
+-- malformed topic fails closed without raising an exception.
+
+DROP POLICY IF EXISTS "schedule_members_receive_realtime" ON realtime.messages;
+CREATE POLICY "schedule_members_receive_realtime"
+  ON realtime.messages FOR SELECT TO authenticated
+  USING (
+    realtime.messages.extension IN ('broadcast', 'presence')
+    AND EXISTS (
+      SELECT 1
+      FROM public.organizations AS organization
+      WHERE (SELECT realtime.topic()) = 'schedule:' || organization.id::TEXT
+        AND organization.archived_at IS NULL
+        AND organization.suspended_at IS NULL
+        AND (
+          organization.id = public.caller_org_id()
+          OR public.is_own_sandbox_org(organization.id)
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS "schedule_editors_send_realtime" ON realtime.messages;
+CREATE POLICY "schedule_editors_send_realtime"
+  ON realtime.messages FOR INSERT TO authenticated
+  WITH CHECK (
+    realtime.messages.extension IN ('broadcast', 'presence')
+    AND EXISTS (
+      SELECT 1
+      FROM public.organizations AS organization
+      WHERE (SELECT realtime.topic()) = 'schedule:' || organization.id::TEXT
+        AND organization.archived_at IS NULL
+        AND organization.suspended_at IS NULL
+        AND (
+          (
+            organization.id = public.caller_org_id()
+            AND (
+              public.caller_org_role() = 'super_admin'
+              OR public.check_admin_permission('canEditShifts')
+              OR public.check_admin_permission('canEditNotes')
+            )
+          )
+          OR public.is_own_sandbox_org(organization.id)
+        )
+    )
+  );
 
 
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────

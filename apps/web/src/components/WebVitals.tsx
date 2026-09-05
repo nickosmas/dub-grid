@@ -1,9 +1,10 @@
 "use client";
 
 import { useReportWebVitals } from "next/web-vitals";
+import { clientEnv } from "@/lib/env";
 
 const PERF_TIMING =
-  process.env.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
+  clientEnv?.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
 
 /**
  * Perf-baseline Web Vitals capture (LCP / INP / TTFB / CLS / FCP).
@@ -15,7 +16,6 @@ const PERF_TIMING =
 export default function WebVitals() {
   useReportWebVitals((metric) => {
     if (!PERF_TIMING) return;
-    // eslint-disable-next-line no-console
     console.debug(
       `%c[web-vitals] ${metric.name}`,
       "color:#30d158",

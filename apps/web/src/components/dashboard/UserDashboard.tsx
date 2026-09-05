@@ -4,6 +4,7 @@ import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "l
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
+import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
@@ -15,7 +16,12 @@ import {
   formatHoursLabel,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
-import { getAvatarTone, getHeroGradientCss, heroGradientTokens } from "@dubgrid/design-tokens";
+import {
+  getAvatarTone,
+  getHeroGradientCss,
+  heroGradientTokens,
+  resolveAvatarSeed,
+} from "@dubgrid/design-tokens";
 import { isEmployeeEligibleForOpenShift } from "@/app/(app)/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
@@ -57,6 +63,9 @@ type DashboardScheduleSegment = {
 };
 
 type DashboardScheduleItem = {
+  /** Resolved where the employee record is in hand, so a shiftmate with an
+   *  account matches the color presence gives them. */
+  avatarSeed: string;
   date: Date;
   dateKey: string;
   employeeId: string;
@@ -592,12 +601,14 @@ function buildScheduleItemsFromShiftMap(input: {
 
     const employee = input.employeeById.get(parsedKey.employeeId);
     const employeeName = employee ? formatEmployeeName(employee) : "Staff";
+    const avatarSeed = employee ? resolveAvatarSeed(employee) : parsedKey.employeeId;
     const date = new Date(`${parsedKey.dateKey}T00:00:00`);
     const absenceTypeId = entry.absenceTypeId ?? null;
 
     if (absenceTypeId != null) {
       const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
       items.push({
+        avatarSeed,
         date,
         dateKey: parsedKey.dateKey,
         employeeId: parsedKey.employeeId,
@@ -630,6 +641,7 @@ function buildScheduleItemsFromShiftMap(input: {
       }
 
       items.push({
+        avatarSeed,
         date,
         dateKey: parsedKey.dateKey,
         employeeId: parsedKey.employeeId,
@@ -2084,44 +2096,44 @@ function ShiftmatesRow({
         }}
       >
         {visibleItems.map((item, index) => {
-          const avatarTone = getAvatarTone(item.employeeId, isDarkTheme);
+          const avatarTone = getAvatarTone(item.avatarSeed, isDarkTheme);
 
           return (
-            <span
-              key={item.employeeId}
-              data-testid="user-dashboard-shiftmate-avatar-frame"
-              title={item.employeeName}
-              style={{
-                background: collaboratorBackground,
-                borderRadius: 999,
-                display: "inline-flex",
-                flexShrink: 0,
-                height: 42,
-                marginLeft: index === 0 ? 0 : DASHBOARD_HERO_AVATAR_OVERLAP,
-                padding: 2,
-                width: 42,
-              }}
-            >
+            <MaybeHint key={item.employeeId} content={item.employeeName}>
               <span
-                data-testid="user-dashboard-shiftmate-avatar"
+                data-testid="user-dashboard-shiftmate-avatar-frame"
                 style={{
-                  alignItems: "center",
-                  background: avatarTone.backgroundColor,
-                  border: `1px solid ${avatarTone.borderColor}`,
-                  borderRadius: 19,
-                  color: avatarTone.textColor,
+                  background: collaboratorBackground,
+                  borderRadius: 999,
                   display: "inline-flex",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  height: 38,
-                  justifyContent: "center",
-                  lineHeight: "18px",
-                  width: 38,
+                  flexShrink: 0,
+                  height: 42,
+                  marginLeft: index === 0 ? 0 : DASHBOARD_HERO_AVATAR_OVERLAP,
+                  padding: 2,
+                  width: 42,
                 }}
               >
-                {getAvatarInitials(item.employeeName)}
+                <span
+                  data-testid="user-dashboard-shiftmate-avatar"
+                  style={{
+                    alignItems: "center",
+                    background: avatarTone.backgroundColor,
+                    border: `1px solid ${avatarTone.borderColor}`,
+                    borderRadius: 19,
+                    color: avatarTone.textColor,
+                    display: "inline-flex",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    height: 38,
+                    justifyContent: "center",
+                    lineHeight: "18px",
+                    width: 38,
+                  }}
+                >
+                  {getAvatarInitials(item.employeeName)}
+                </span>
               </span>
-            </span>
+            </MaybeHint>
           );
         })}
         {overflowCount > 0 ? (
@@ -2497,7 +2509,7 @@ function SummaryMetricPanel({
           alignItems: "center",
           background: "var(--dg-color-brand-bg)",
           border: "1px solid var(--dg-color-brand-border)",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-xl)",
           color: "var(--dg-color-brand)",
           display: "flex",
           flexShrink: 0,
@@ -2875,7 +2887,7 @@ function AsyncActionButton({
 
   return (
     <Button
-      className={variant === "primary" ? "dg-btn dg-btn-brand" : "dg-btn dg-btn-secondary"}
+      className={variant === "primary" ? "dg-btn dg-btn-primary" : "dg-btn dg-btn-secondary"}
       disabled={isDisabled}
       onClick={() => {
         if (isDisabled) {

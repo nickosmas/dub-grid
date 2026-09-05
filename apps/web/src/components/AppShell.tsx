@@ -49,6 +49,7 @@ function AppHeader() {
   const {
     org,
     setupStatus,
+    entryGate,
     loading: orgLoading,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
@@ -58,9 +59,14 @@ function AppHeader() {
     shouldLoadOrgHeader ? (perms.orgId ?? org?.id ?? null) : null,
   );
   const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
+  // The setup lock hides navigation for members OnboardingGate is holding
+  // behind the wizard or the pending screen. It must release on the same
+  // condition the gate does, or a member who has finished onboarding is left
+  // in the app with no header whenever the org config is mid-edit.
   const hideForSetupLock =
     !perms.isGridmaster &&
     !perms.isImpersonating &&
+    entryGate?.onboardingCompleted !== true &&
     (perms.isLoading || orgLoading || empLoading || !isOrgSetupComplete);
   const hideForBillingLock =
     !perms.isGridmaster &&

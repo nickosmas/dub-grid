@@ -36,6 +36,8 @@
     "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
     "db:reset:mobile": "npm run db:reset && node scripts/reset-mobile-android-storage.mjs",
     "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
+    "db:reset:staging": "npx tsx --env-file=.env.staging scripts/reset-remote-db.ts && npx tsx --env-file=.env.staging seed.ts",
+    "db:seed:branch": "npx tsx seed.ts",
     "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
     "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",
@@ -53,9 +55,6 @@
     "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core"
   },
   "overrides": {
-    "@expo/plist": {
-      "@xmldom/xmldom": "0.8.13"
-    },
     "@hono/node-server": "2.1.0",
     "@opentelemetry/otlp-transformer": {
       "protobufjs": "7.5.9"
@@ -64,7 +63,7 @@
       "next": "16.3.0"
     },
     "@sentry/nextjs": {
-      "fast-uri": "^3.1.5"
+      "fast-uri": "^3.1.6"
     },
     "@snaplet/copycat": {
       "uuid": "^14.0.0"
@@ -72,28 +71,25 @@
     "@snaplet/seed": {
       "uuid": "^14.0.0"
     },
-    "@xmldom/xmldom": "0.8.13",
     "ajv": {
-      "fast-uri": "^3.1.5"
+      "fast-uri": "^3.1.6"
     },
     "axios": "1.19.0",
     "dompurify": "3.4.13",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "^3.1.6",
     "follow-redirects": "1.16.0",
     "hono": "4.13.0",
     "ip-address": "^10.4.0",
     "next": "16.3.0",
-    "plist": {
-      "@xmldom/xmldom": "0.8.13"
-    },
     "postcss": "8.5.25",
     "posthog-js": {
       "dompurify": "3.4.13"
     },
     "protobufjs": "7.5.9",
+    "qs": "^6.16.0",
     "react-email": {
       "socket.io-parser": "^4.2.7",
-      "fast-uri": "^3.1.5"
+      "fast-uri": "^3.1.6"
     },
     "sharp": "^0.35.3",
     "socket.io-parser": "^4.2.7",
@@ -137,6 +133,6 @@
     "typescript": "^5",
     "vite": "^7.3.2",
     "vitest": "^3.2.7",
-    "zod": "^3.24.4"
+    "zod": "3.24.4"
   }
 }

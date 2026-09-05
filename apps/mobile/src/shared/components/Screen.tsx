@@ -19,9 +19,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileElevation,
   mobileRadii,
   mobileSpace,
@@ -29,6 +31,11 @@ import {
   mobileText,
   type MobileColors,
 } from "../theme/tokens";
+
+/**
+ * Breathing room left between a focused field and the top of the keyboard.
+ */
+const KEYBOARD_BOTTOM_OFFSET = 24;
 
 /** Card header icon frame. Also the min height of the title and accessory
  * columns beside it, so a one-line title centres against the icon. */
@@ -104,22 +111,26 @@ export function Screen({
    * Set false on a screen whose only input sits at the *top* — a search field
    * above a list. Keyboard insetting exists to lift fields off the keyboard,
    * and a field at the top never needed lifting, so all it does there is cost:
-   * see the note on `automaticallyAdjustKeyboardInsets` below.
+   * see the note on the scroll view's `enabled` below.
    */
   adjustsForKeyboard?: boolean;
   bottomPaddingMode?: ScreenBottomPaddingMode;
   /**
-   * Set false for content that is never taller than the screen and must
-   * never scroll — a full-page error or empty state. Swaps the `ScrollView`
-   * for a plain `flex: 1` `View`, so a `fillScreen` `StatusBanner` or
-   * `EmptyStateCard` inside it can center with a bare `flex: 1,
-   * justifyContent: "center"` and land exactly right, no viewport-height
-   * measuring required. `stickyHeader` still renders (in normal flow, not
-   * floating) so a screen that shows one above its data — a calendar strip,
-   * a search bar — keeps it above the error/empty state too. `onRefresh`,
-   * `onScroll`, and `scrollViewRef` do nothing in this mode — pull-to-refresh
-   * needs a real scroll gesture to hang off of, and a page that never
-   * scrolls has no scroll position to track or restore.
+   * Set false for a **skeleton**, and essentially nothing else.
+   *
+   * A placeholder standing in for content should not scroll, and there is
+   * nothing to pull-to-refresh while the thing is still loading. Full-page
+   * error and empty states deliberately do *not* use this: they keep the
+   * scroll view, because `contentContainerStyle`'s `flexGrow: 1` already gives
+   * a `fillScreen` child real space to claim, and leaving scroll mode costs an
+   * iOS `headerLargeTitle` the ability to collapse (it sits permanently
+   * expanded, pushing the page down) as well as pull-to-refresh itself.
+   *
+   * Swaps the `ScrollView` for a plain `flex: 1` `View`. `stickyHeader` still
+   * renders, in normal flow rather than floating. `onRefresh`, `onScroll` and
+   * `scrollViewRef` all do nothing here, and content taller than the viewport
+   * is clipped rather than reachable — which is the intended trade for a
+   * skeleton and the wrong one for anything else.
    */
   scrollEnabled?: boolean;
 }>) {
@@ -137,7 +148,14 @@ export function Screen({
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay;
-  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
+  // The floating shell is `position: absolute; top: 0`, so it spans the status
+  // bar and has to pad itself clear of it. The non-scrolling shell sits in
+  // normal flow, already below the system bars, where that same inset is pure
+  // dead space — a band above the sticky header the size of the notch. It only
+  // became visible once skeletons moved into the non-scrolling branch, which is
+  // where the schedule's calendar strip started floating away from its title.
+  const resolvedStickyHeaderTopPadding =
+    stickyHeaderTopPadding ?? (scrollEnabled ? Math.max(insets.top, 8) : mobileSpace.sm);
   // Android's RefreshControl has progressViewOffset to push the pull-to-
   // refresh spinner below the floating sticky header; iOS has no such prop.
   // A JS-level paddingTop doesn't move the ScrollView's own frame origin
@@ -183,26 +201,45 @@ export function Screen({
       (scrollViewRef as MutableRefObject<ScreenScrollHandle | null>).current = scrollHandle;
     }
   }, [scrollViewRef, scrollHandle]);
+  // `KeyboardAwareScrollView` wraps a real `ScrollView` and forwards every prop
+  // below, ref included, so this is the same scroll view it always was plus
+  // keyboard tracking. `enabled` turns that tracking off in place rather than
+  // swapping in a plain `ScrollView`, which would remount the list — and its
+  // scroll position with it — if the flag ever changed.
+  //
+  // This replaces `automaticallyAdjustKeyboardInsets`, which is iOS-only: on
+  // Android nothing but the manifest's `adjustResize` ever moved a form field
+  // off the keyboard, so a field low on a long screen simply sat behind it.
+  //
+  // It stays opt-out for the same reason that prop was. On a `headerLargeTitle`
+  // screen, insetting for the keyboard makes UIKit re-evaluate the large title,
+  // which collapses, and the whole page visibly jumps the instant the keyboard
+  // opens. A screen whose only field is a search bar at the top never needed
+  // lifting, so it turns this off and simply does not move on focus.
   const scrollView = (
-    <ScrollView
+    <KeyboardAwareScrollView
       ref={internalScrollViewRef}
+      enabled={adjustsForKeyboard}
+      // Breathing room between the focused field and the keyboard, so a field
+      // scrolled into view isn't flush against its top edge.
+      bottomOffset={KEYBOARD_BOTTOM_OFFSET}
       automaticallyAdjustContentInsets={useNativeContentInsets}
-      // iOS does not inset a ScrollView for the software keyboard on its own,
-      // so form fields and submit buttons near the bottom of a screen sat
-      // behind it. Android resizes the window instead (`adjustResize`), where
-      // this prop is ignored.
-      //
-      // It is opt-out because it is not free on a `headerLargeTitle` screen:
-      // the inset (and the offset RN writes alongside it) makes UIKit
-      // re-evaluate the large title, which collapses, and the whole page
-      // visibly jumps the instant the keyboard opens. UIScrollView does no
-      // first-responder scrolling of its own, so a screen that turns this off
-      // simply does not move on focus.
-      automaticallyAdjustKeyboardInsets={adjustsForKeyboard}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
         paddingBottom: resolvedBottomPadding,
+        // Makes the content container at least as tall as the viewport, so a
+        // `flex: 1` child (a `fillScreen` empty or error state) has real space
+        // to claim instead of collapsing to its own content height.
+        //
+        // Without this, centring a full-page state only worked by swapping the
+        // whole ScrollView out for a plain View — which cost two things that
+        // matter more than the swap saved: an iOS `headerLargeTitle` has
+        // nothing left to collapse against, so it sits permanently expanded and
+        // pushes the page down, and pull-to-refresh needs a scroll gesture to
+        // hang off, so it vanished on exactly the screens most likely to want
+        // a retry.
+        flexGrow: 1,
       }}
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
@@ -239,7 +276,7 @@ export function Screen({
       >
         {children}
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
   const overlayLayer = (
     <View pointerEvents="box-none" style={styles.overlayLayer}>
@@ -268,7 +305,13 @@ export function Screen({
         <View
           style={[
             styles.content,
-            styles.contentDefault,
+            // Same rule as the scrolling branch: content under a sticky header
+            // is held off it by one section gap. Hardcoding `contentDefault`
+            // here gave a skeleton no top padding at all, so it sat flush
+            // against the header where the real content it stands in for is
+            // inset — the placeholder has to occupy the same space, or the page
+            // visibly shifts the moment it resolves.
+            stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
             styles.nonScrollContent,
             { paddingBottom: resolvedBottomPadding },
           ]}
@@ -343,12 +386,18 @@ export function Card({
           a section heading over its content rather than inside it. */}
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderCopy}>
-          <Text style={styles.cardTitle}>{title}</Text>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardTitle}>
+            {title}
+          </Text>
         </View>
         {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
       </View>
       <View style={styles.card}>
-        {body ? <Text style={styles.cardBody}>{body}</Text> : null}
+        {body ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardBody}>
+            {body}
+          </Text>
+        ) : null}
         {detail}
       </View>
     </View>
@@ -395,18 +444,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: mobileColors.borderSubtle,
-      // The level named for exactly this ("hairline lift: sticky headers once
-      // the content scrolls under them"). The fill and the hairline do the
-      // separating; the shadow only keeps the bar from looking pasted on.
-      ...mobileElevation("raised", isDark),
-      // ...but not its `elevation: 1`. On Android that number is also the draw
-      // order, and the cards scrolling underneath sit at the `card` level's 2 —
-      // at 1 the header would render *behind* them. This shell is an earlier
-      // sibling than the scroll view, so it loses ties too, and has to clear
-      // both outright.
-      elevation: 4,
+      // No divider. The bar separates from the content scrolling under it by
+      // shadow alone, which is what the `header` level exists for, and why it
+      // is heavier than the `raised` lift it replaced, which only ever had to
+      // stop a bordered bar looking pasted on. Its `elevation` also clears the
+      // `card`-level tiles beneath it on Android, where that number doubles as
+      // draw order and this shell is the earlier sibling, so it loses ties.
+      ...mobileElevation("header", isDark),
     },
     nonScrollStickyHeaderShell: {
       // Overrides `stickyHeaderShell`'s absolute positioning: nothing scrolls

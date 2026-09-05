@@ -18,7 +18,8 @@ describe("calendar feed token migration", () => {
   const sql = readFileSync(migrationPath(), "utf8");
 
   it("stores one hashed token per user, organization, and employee scope", () => {
-    expect(sql).toContain("CREATE TABLE public.calendar_feed_tokens");
+    // Idempotent form: a retried push must converge rather than fail halfway.
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.calendar_feed_tokens");
     expect(sql).toContain("UNIQUE (user_id, org_id, employee_id)");
     expect(sql).toContain("UNIQUE (token_hash)");
     expect(sql).toContain("token_hash ~ '^[0-9a-f]{64}$'");

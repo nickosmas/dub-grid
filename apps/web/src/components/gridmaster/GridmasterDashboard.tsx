@@ -215,7 +215,7 @@ export default function GridmasterDashboard({
         >
           Dashboard
         </h2>
-        <Button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
+        <Button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>
           + New Organization
         </Button>
       </div>
@@ -722,7 +722,7 @@ export default function GridmasterDashboard({
                               color: "var(--dg-color-danger)",
                               background: "var(--dg-color-danger-bg)",
                               padding: "1px 6px",
-                              borderRadius: 4,
+                              borderRadius: "var(--dg-radius-xs)",
                               textTransform: "uppercase",
                             }}
                           >
@@ -735,7 +735,7 @@ export default function GridmasterDashboard({
                               color: "var(--dg-color-success)",
                               background: "var(--dg-color-success-bg)",
                               padding: "1px 6px",
-                              borderRadius: 4,
+                              borderRadius: "var(--dg-radius-xs)",
                               textTransform: "uppercase",
                             }}
                           >

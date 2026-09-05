@@ -171,7 +171,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "stretch",
       backgroundColor: mobileColors.controlNeutralBg,
       borderRadius: mobileRadii.pill,
-      borderWidth: 0,
+      // A hairline around the outer track. The neutral fill alone sits at
+      // 1.22:1 on a white page, which is only just perceivable, so the border
+      // is what actually draws the control's outer edge. `controlNeutralBorder`
+      // rather than `borderSubtle`: that one is tuned against white and
+      // disappears into this fill at 1.02:1.
+      borderWidth: 1,
+      borderColor: mobileColors.controlNeutralBorder,
       padding: TRACK_PADDING,
     },
     trackDisabled: {

@@ -1,3 +1,4 @@
+import { User } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
@@ -11,7 +12,6 @@ import {
 } from "@/features/organization/client";
 import { buildMembershipAccessChanges } from "@/lib/access-management";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { queueNotification } from "@/lib/notify";
 import { labelStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import {
   type AdminPermissions,
@@ -92,7 +92,9 @@ export function UsersTab({
       if (!target?.updatedAt) {
         throw new Error("User access data is out of date. Refresh and try again.");
       }
-      const oldRole = target?.orgRole ?? "user";
+      // The access endpoint dispatches role_changed itself; queueing one here
+      // too landed two identical "Your role changed" alerts in the target's
+      // inbox.
       await updateOrganizationMembershipGuarded({
         orgId,
         userId: target.id,
@@ -102,13 +104,6 @@ export function UsersTab({
       });
       toast.success("Role updated");
       setRoleChangeConfirm(null);
-      queueNotification({
-        action: "role_changed",
-        orgId,
-        targetUserId: target.id,
-        fromRole: oldRole,
-        toRole: newRole,
-      });
       onUsersChanged();
     } catch (err: unknown) {
       if (err instanceof OrganizationAccessConflictError) {
@@ -360,19 +355,7 @@ export function UsersTab({
                                     onImpersonate(u.id, orgId);
                                   }}
                                 >
-                                  <svg
-                                    width="13"
-                                    height="13"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  >
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                  </svg>
+                                  <User size={13} />
                                   Impersonate
                                 </Button>
                               )}
@@ -515,7 +498,7 @@ export function UsersTab({
         <ConfirmDialog
           title="Change Organization Role"
           message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
-          confirmLabel="Change Role"
+          confirmLabel="Change role"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
           onConfirm={handleConfirmRoleChange}
@@ -527,7 +510,7 @@ export function UsersTab({
         <ConfirmDialog
           title="Add Organization User"
           message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
-          confirmLabel="Add User"
+          confirmLabel="Add"
           variant="warning"
           isLoading={adding}
           onConfirm={handleConfirmAddUser}

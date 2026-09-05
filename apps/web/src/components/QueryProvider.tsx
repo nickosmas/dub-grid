@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { listenForInvalidations } from "@/lib/cache-broadcast";
+import { clientEnv } from "@/lib/env";
 
 function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -18,7 +19,7 @@ function makeQueryClient(): QueryClient {
 }
 
 const PERF_TIMING =
-  process.env.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
+  clientEnv?.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
 
 /**
  * Dev/perf-only logger: records each query's fetch duration and cache
@@ -40,7 +41,6 @@ function attachPerfLogger(client: QueryClient): () => void {
     } else if (query.state.fetchStatus === "idle" && starts.has(key)) {
       const dur = performance.now() - (starts.get(key) ?? 0);
       starts.delete(key);
-      // eslint-disable-next-line no-console
       console.debug(`%c[rq] ${query.queryKey[0]}`, "color:#0a84ff", `${dur.toFixed(0)}ms`, {
         key: query.queryKey,
         status: query.state.status,
@@ -59,7 +59,6 @@ function attachPerfLogger(client: QueryClient): () => void {
     ) {
       const dur = performance.now() - (starts.get(`mut:${m.mutationId}`) ?? 0);
       starts.delete(`mut:${m.mutationId}`);
-      // eslint-disable-next-line no-console
       console.debug(`%c[rq:mutation]`, "color:#ff9f0a", `${dur.toFixed(0)}ms`, {
         key: m.options.mutationKey,
         status: m.state.status,

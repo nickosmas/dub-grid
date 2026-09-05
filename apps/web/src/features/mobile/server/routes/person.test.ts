@@ -220,6 +220,10 @@ describe("mobile person route", () => {
       roleIds: [],
       statusNote: "",
       userId: null,
+      // Personal contact details, withheld here exactly as the people list
+      // already withholds them.
+      email: "",
+      phone: "",
     });
   });
 

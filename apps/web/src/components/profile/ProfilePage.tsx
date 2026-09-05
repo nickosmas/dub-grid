@@ -40,8 +40,17 @@ export function ProfilePage() {
     isGridmaster,
     isLoading: permsLoading,
   } = usePermissions();
-  const { org, focusAreas, assignments, shiftCategories, certifications, orgRoles, departments } =
-    useOrganizationData();
+  const {
+    org,
+    focusAreas,
+    assignments,
+    absenceTypes,
+    shiftCategories,
+    jobs,
+    certifications,
+    orgRoles,
+    departments,
+  } = useOrganizationData();
   const {
     user,
     profile,
@@ -54,7 +63,6 @@ export function ProfilePage() {
     refetch: refetchProfile,
     setProfile,
     setEmployee,
-    setManagementDepartmentIds,
   } = useSelfProfileData({ orgId });
 
   // Management-only employees have a row in `employees` but no focus
@@ -123,7 +131,7 @@ export function ProfilePage() {
           roleLabel={org?.roleLabel}
           setProfile={setProfile}
           setEmployee={setEmployee}
-          setManagementDepartmentIds={setManagementDepartmentIds}
+          refetchProfile={refetchProfile}
         />
       )}
 
@@ -148,7 +156,9 @@ export function ProfilePage() {
           focusAreas={focusAreas}
           focusAreaLabel={org?.focusAreaLabel}
           assignments={assignments}
+          absenceTypes={absenceTypes}
           shiftCategories={shiftCategories}
+          jobs={jobs}
           certifications={certifications}
           orgRoles={orgRoles}
           shifts={shifts}

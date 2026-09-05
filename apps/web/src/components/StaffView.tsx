@@ -179,9 +179,11 @@ export default function StaffView({
   const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
   const managementDepartmentLabel = "Management Departments";
   const canAccessPeopleAdminSurfaces = Boolean(canManageEmployees || isSuperAdmin || isGridmaster);
-  const canAccessPeopleRecurring = Boolean(
-    orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces,
-  );
+  // canViewRecurringShifts is what the recurring API itself requires
+  // (api/schedule/recurring canReadRecurring), and authz derives it from
+  // canManageRecurringShifts. Also demanding staff-management rights made the
+  // granted permission unreachable for anyone who held only it.
+  const canAccessPeopleRecurring = Boolean(orgId && canViewRecurringShifts);
 
   const allowedSections: StaffSection[] = [
     "directory",
@@ -385,7 +387,6 @@ export default function StaffView({
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}
                 defaultShiftEnabled={defaultShiftEnabled}
-                useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               />
             )}
           </div>
