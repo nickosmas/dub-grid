@@ -4070,6 +4070,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-align: center;
 }
 
+.dg-auth-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .dg-password-input {
   position: relative;
 }

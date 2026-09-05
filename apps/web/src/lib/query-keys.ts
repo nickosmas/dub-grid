@@ -20,6 +20,8 @@ export const queryKeys = {
     all: (orgId: string) => ["org", orgId] as const,
     detail: (orgId: string) => ["org", orgId, "detail"] as const,
     bySubdomain: () => ["org", "bySubdomain"] as const,
+    /** Org-level, not org-id keyed: the server resolves the org from the caller. */
+    accessStatus: () => ["org", "accessStatus"] as const,
     focusAreas: (orgId: string) => ["org", orgId, "focusAreas"] as const,
     assignments: (orgId: string) => ["org", orgId, "assignments"] as const,
     jobs: (orgId: string) => ["org", orgId, "jobs"] as const,
