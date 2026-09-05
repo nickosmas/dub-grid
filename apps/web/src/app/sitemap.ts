@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { clientEnv } from "@/lib/env";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com";
+  const baseUrl = clientEnv?.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com";
 
   return [
     { url: baseUrl, lastModified: new Date(), changeFrequency: "monthly", priority: 1 },

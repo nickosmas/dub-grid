@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { withTimeout } from "@/lib/with-timeout";
+import { serverEnv } from "@/lib/env.server";
 
 // ── TTL Constants ────────���─────────────────────���────────────────────────
 export const TTL = {
@@ -32,7 +33,7 @@ let redisChecked = false;
 
 function getRedis(): Redis | null {
   if (redisChecked) return redis;
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!serverEnv?.UPSTASH_REDIS_REST_URL || !serverEnv?.UPSTASH_REDIS_REST_TOKEN) {
     redisChecked = true;
     return null;
   }

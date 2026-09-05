@@ -13,6 +13,7 @@ import {
   loadReplayIntegration,
 } from "@/lib/sentry";
 import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
+import { clientEnv } from "@/lib/env";
 
 function beforeSend(event: Record<string, unknown>) {
   const exception = event.exception as
@@ -49,8 +50,8 @@ async function attachSessionReplay(): Promise<void> {
 }
 
 init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  dsn: clientEnv?.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: !!clientEnv?.NEXT_PUBLIC_SENTRY_DSN,
 
   // Never at boot. Error monitoring is what has to be up immediately; replay
   // is attached afterwards, and only for a consenting visitor.

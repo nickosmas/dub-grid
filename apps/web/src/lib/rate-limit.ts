@@ -31,11 +31,6 @@ function createSlidingWindowLimiter(limit: number, window: `${number} ${"s" | "m
   return redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) }) : null;
 }
 
-function positiveEnvNumber(name: string, fallback: number): number {
-  const parsed = Number(process.env[name]);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
 /**
  * Public API rate limiter — 10 requests per 10 seconds per key (IP).
  * Returns `{ success: true }` if Redis is not configured (local dev).
@@ -79,13 +74,13 @@ export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
  * so production load testing can adjust capacity without code changes.
  */
 export const loginIpLimiter = createSlidingWindowLimiter(
-  positiveEnvNumber("LOGIN_IP_LIMIT_PER_MINUTE", 120),
+  serverEnv?.LOGIN_IP_LIMIT_PER_MINUTE ?? 120,
   "1 m",
 );
 
 /** A global circuit breaker for auth-provider protection during sign-in spikes. */
 export const loginSurgeLimiter = createSlidingWindowLimiter(
-  positiveEnvNumber("LOGIN_GLOBAL_LIMIT_PER_10_SECONDS", 500),
+  serverEnv?.LOGIN_GLOBAL_LIMIT_PER_10_SECONDS ?? 500,
   "10 s",
 );
 
@@ -134,7 +129,7 @@ export async function checkRateLimit(
   // configured locally paid a full network hop on every rate-limited request —
   // most visibly on sign-in, where it was the single largest cost. Set
   // RATE_LIMIT_IN_DEV=1 to exercise the limiter locally.
-  if (!isProduction && process.env.RATE_LIMIT_IN_DEV !== "1") {
+  if (!isProduction && serverEnv?.RATE_LIMIT_IN_DEV !== "1") {
     return { limited: false };
   }
 

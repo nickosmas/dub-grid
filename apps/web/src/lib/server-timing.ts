@@ -1,3 +1,4 @@
+import { serverEnv } from "@/lib/env.server";
 /**
  * Lightweight, dependency-free server-side timing.
  *
@@ -12,7 +13,7 @@
  * call sites branch-free.
  */
 
-export const PERF_TIMING_ENABLED = process.env.PERF_TIMING === "1";
+export const PERF_TIMING_ENABLED = serverEnv?.PERF_TIMING === "1";
 
 type Span = { name: string; dur: number; desc?: string };
 

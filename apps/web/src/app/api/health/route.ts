@@ -1,6 +1,7 @@
 import { getServiceClient } from "@/lib/supabase-service";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
+import { serverEnv } from "@/lib/env.server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,8 @@ export async function GET() {
   const redisStart = Date.now();
   try {
     const rateLimitConfig = getRateLimitConfigStatus();
-    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const redisUrl = serverEnv?.UPSTASH_REDIS_REST_URL;
+    const redisToken = serverEnv?.UPSTASH_REDIS_REST_TOKEN;
     if (!redisUrl || !redisToken) {
       checks.redis = rateLimitConfig.productionReady
         ? { status: "unconfigured" }

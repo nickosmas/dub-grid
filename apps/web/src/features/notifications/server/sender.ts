@@ -11,6 +11,7 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
+import { serverEnv } from "@/lib/env.server";
 
 export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   // schedule
@@ -199,7 +200,7 @@ export async function sendNotification(
   if (!email) return;
 
   // 5. Send email via Resend
-  const resendKey = process.env.RESEND_API_KEY;
+  const resendKey = serverEnv?.RESEND_API_KEY;
   if (!resendKey) {
     logger.warn("RESEND_API_KEY not configured — skipping email notification");
     return;

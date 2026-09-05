@@ -28,6 +28,7 @@ import {
 import { getTimezoneForCoords } from "@/lib/timezone-from-coords";
 import { getTimezoneForUsState } from "@/lib/us-state-timezones";
 import TimezoneSelect from "./TimezoneSelect";
+import { clientEnv } from "@/lib/env";
 
 export interface OrganizationLocationFormValue extends StructuredOrganizationAddress {
   phone: string;
@@ -98,7 +99,7 @@ function AddressLine1Input({
   onChange: (value: string) => void;
   onAutofill: (patch: AddressAutofillPatch) => void;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = clientEnv?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimeoutRef = useRef<number | null>(null);
   const requestIdRef = useRef(0);

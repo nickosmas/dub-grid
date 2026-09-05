@@ -261,7 +261,7 @@ const eslintConfig = defineConfig([
         "warn",
         {
           selector:
-            'MemberExpression[object.object.name="process"][object.property.name="env"]:not([property.name="NODE_ENV"]):not([property.name="NEXT_RUNTIME"])',
+            'MemberExpression[object.object.name="process"][object.property.name="env"]:not([property.name="NODE_ENV"]):not([property.name="NEXT_RUNTIME"]):not([property.name="npm_package_version"])',
           message:
             'Import validated env vars instead of reading process.env directly: clientEnv from "@/lib/env", or serverEnv from "@/lib/env.server" (server-only — importing it from a client component ships the server schema to the browser).',
         },

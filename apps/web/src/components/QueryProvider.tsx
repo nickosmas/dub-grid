@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { listenForInvalidations } from "@/lib/cache-broadcast";
+import { clientEnv } from "@/lib/env";
 
 function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -18,7 +19,7 @@ function makeQueryClient(): QueryClient {
 }
 
 const PERF_TIMING =
-  process.env.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
+  clientEnv?.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
 
 /**
  * Dev/perf-only logger: records each query's fetch duration and cache

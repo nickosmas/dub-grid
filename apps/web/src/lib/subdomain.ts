@@ -1,3 +1,4 @@
+import { clientEnv } from "@/lib/env";
 /** Subdomains that cannot be used as org slugs. */
 export const RESERVED_SUBDOMAINS = new Set([
   "www",
@@ -56,7 +57,7 @@ export function parseHost(hostWithPort: string): ParsedHost {
   const labels = hostname.split(".").filter(Boolean);
 
   // 1. Anchor with NEXT_PUBLIC_BASE_DOMAIN if available
-  const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
+  const baseDomain = (clientEnv?.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
   if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
     const subdomainPart =
       hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));

@@ -8,6 +8,7 @@ import {
 import { fetchActiveMobilePushTokenRows, upsertMobilePushTokenRow } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
 import { getServiceClient } from "@/lib/supabase-service";
+import { serverEnv } from "@/lib/env.server";
 
 export async function upsertMobilePushToken(input: {
   userId: string;
@@ -29,8 +30,8 @@ export async function sendMobilePushNotifications(
     "Content-Type": "application/json",
   };
 
-  if (process.env.EXPO_ACCESS_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.EXPO_ACCESS_TOKEN}`;
+  if (serverEnv?.EXPO_ACCESS_TOKEN) {
+    headers.Authorization = `Bearer ${serverEnv?.EXPO_ACCESS_TOKEN}`;
   }
 
   try {

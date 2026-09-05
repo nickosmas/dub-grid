@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
+import { clientEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 
 type QueryClient = Pick<SupabaseClient, "from">;
 
@@ -61,9 +63,9 @@ function actorDisplayName(actor: BillingActorContext): string | null {
 
 export function isStripeBillingConfigured(): boolean {
   return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-    process.env.STRIPE_PRICE_ID_MONTHLY &&
-    process.env.STRIPE_WEBHOOK_SECRET,
+    serverEnv?.STRIPE_SECRET_KEY &&
+    serverEnv?.STRIPE_PRICE_ID_MONTHLY &&
+    serverEnv?.STRIPE_WEBHOOK_SECRET,
   );
 }
 
@@ -84,11 +86,9 @@ export function resolveBillingReturnUrl(
     const parsedReturnUrl = new URL(returnUrl);
     const trustedOrigins = new Set(
       [
-        getOrigin(process.env.NEXT_PUBLIC_SITE_URL),
+        getOrigin(clientEnv?.NEXT_PUBLIC_SITE_URL),
         getOrigin(
-          process.env.NEXT_PUBLIC_VERCEL_URL
-            ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-            : null,
+          clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv?.NEXT_PUBLIC_VERCEL_URL}` : null,
         ),
         ...allowedOrigins.map(getOrigin),
       ].filter((origin): origin is string => Boolean(origin)),
