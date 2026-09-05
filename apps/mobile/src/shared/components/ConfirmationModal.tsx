@@ -1,5 +1,13 @@
 import { useEffect, useMemo, type ReactNode } from "react";
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -79,7 +87,18 @@ export function ConfirmationModal({
   const isDestructive = confirmTone === "danger";
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  // A real pixel value, not `maxHeight: "80%"`: that string only resolves
+  // against a parent with a settled height, and `card`'s own parent
+  // (`avoider`) has none of its own - it shrinks to fit `card`, which is
+  // exactly what `card` is trying to bound. Yoga's percentage math against an
+  // indeterminate ancestor can't be relied on, and empirically collapsed the
+  // ScrollView below to a sliver, clipping the body text against the footer.
+  // `BottomSheetModal` sidesteps the same trap by measuring the window itself.
+  const { height: windowHeight } = useWindowDimensions();
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDark, windowHeight),
+    [mobileColors, isDark, windowHeight],
+  );
   const { spring, timing } = useMotionPreference();
 
   // The popup latches the confirm itself rather than leaving it to `Button`,
@@ -192,7 +211,7 @@ export function ConfirmationModal({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight: number) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -212,8 +231,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: "100%",
       // A cap, not a fixed height: most confirmations are two lines and a
       // button stack, and a popup that always ran to 80% of the screen would
-      // read as an oversized sheet wearing a different corner radius.
-      maxHeight: "80%",
+      // read as an oversized sheet wearing a different corner radius. A real
+      // pixel value, not the string "80%" - see the comment where
+      // `windowHeight` is read, above.
+      maxHeight: windowHeight * 0.8,
       // Load-bearing, not decorative: without it Yoga has no bounded height
       // to hand the ScrollView below, and the ScrollView can collapse
       // instead of sizing to its content, clipping the body text against the

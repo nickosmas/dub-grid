@@ -14,8 +14,15 @@ const useBootstrap = vi.fn();
 const updateMobilePerson = vi.fn();
 const updateProfileAccount = vi.fn();
 const pushToast = vi.fn();
+const routerBack = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("expo-router", () => ({
+  router: {
+    back: routerBack,
+  },
+}));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -130,6 +137,7 @@ describe("ProfileWorkScreen", () => {
     updateMobilePerson.mockReset();
     updateProfileAccount.mockReset();
     pushToast.mockReset();
+    routerBack.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useQuery.mockReturnValue({
@@ -192,8 +200,11 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "RN" })).toBeInTheDocument();
     expect(screen.getByLabelText("Contact notes")).toBeInTheDocument();
+    // No Edit/view toggle: the screen opens straight into the editor, with no
+    // separate "start editing" step. Its "Cancel" (asserted elsewhere) leaves
+    // the screen entirely, unlike PersonDetailScreen's, which exits back to a
+    // view mode this screen doesn't have.
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
   it("preserves a dirty draft when the same profile refetches in the background", async () => {
@@ -240,13 +251,17 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
   });
 
-  it("keeps Save disabled and hides Discard until a field changes, then saves", async () => {
+  it("keeps Save and Discard disabled (but visible) until a field changes, then saves", async () => {
     render(<ProfileWorkScreen />);
 
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+    // Always present, grayed out until there's something to discard — not
+    // removed from the layout, which is what made the footer's three buttons
+    // jump around as soon as the first field changed.
+    expect(screen.getByRole("button", { name: "Discard" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
@@ -270,6 +285,14 @@ describe("ProfileWorkScreen", () => {
         }),
       );
     });
+  });
+
+  it("leaves the screen when Cancel is pressed", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
   });
 
   it("hides an incompatible new role while keeping the selected role removable", () => {

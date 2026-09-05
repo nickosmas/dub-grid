@@ -245,7 +245,7 @@ describe("Screen", () => {
     expect(contentStyle.paddingBottom).toBe(16);
   });
 
-  it("gives the footer itself the full bottom-padding clearance", () => {
+  it("gives the footer its own, smaller bottom-padding clearance than trailing scroll content would carry", () => {
     render(
       <Screen bottomPaddingMode="tabbed" footer={<span>Footer content</span>}>
         <div>Content</div>
@@ -256,8 +256,14 @@ describe("Screen", () => {
     const footerNode = footerText.parentElement;
     const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
 
+    // 30 (14 safe area + 16 breathing room), not the 86 `getScreenBottomPadding`
+    // produces for the same mode: a footer is permanently visible, not
+    // invisible space past the end of a scroll, and on iOS the safe-area
+    // inset already accounts for the tab bar itself (see
+    // `getFooterBottomPadding`'s doc comment) — stacking the scroll-content
+    // number on top would read as a wall of dead space under the footer.
     expect(footerStyle).toEqual(
-      expect.arrayContaining([expect.objectContaining({ paddingBottom: 86 })]),
+      expect.arrayContaining([expect.objectContaining({ paddingBottom: 30 })]),
     );
   });
 

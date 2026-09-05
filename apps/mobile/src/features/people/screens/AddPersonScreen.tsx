@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -279,23 +279,27 @@ export default function AddPersonScreen() {
     <Screen
       bottomPaddingMode="tabbed"
       footer={
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Button
-            disabled={!canSubmit || createMutation.isPending}
-            label="Add person"
-            loading={createMutation.isPending}
-            onPress={() =>
-              new Promise<void>((resolve) => {
-                createMutation.mutate(undefined, { onSettled: () => resolve() });
-              })
-            }
-          />
-          <Button
-            disabled={createMutation.isPending}
-            label="Cancel"
-            onPress={() => router.back()}
-            tone="neutral"
-          />
+        <View style={styles.actionsRow}>
+          <View style={styles.actionButton}>
+            <Button
+              disabled={!canSubmit || createMutation.isPending}
+              label="Add person"
+              loading={createMutation.isPending}
+              onPress={() =>
+                new Promise<void>((resolve) => {
+                  createMutation.mutate(undefined, { onSettled: () => resolve() });
+                })
+              }
+            />
+          </View>
+          <View style={styles.actionButton}>
+            <Button
+              disabled={createMutation.isPending}
+              label="Cancel"
+              onPress={() => router.back()}
+              tone="neutral"
+            />
+          </View>
         </View>
       }
     >
@@ -397,3 +401,13 @@ export default function AddPersonScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+  },
+});

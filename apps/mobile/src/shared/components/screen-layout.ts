@@ -61,3 +61,32 @@ export function getScreenBottomPadding(
 
   return safeArea + SCREEN_BOTTOM_PADDING[mode];
 }
+
+/** Modest, fixed breathing room below a sticky footer — see `getFooterBottomPadding`. */
+const FOOTER_BOTTOM_BREATHING_ROOM = 16;
+
+/**
+ * Bottom padding for a *sticky* `Screen` footer, as opposed to
+ * `getScreenBottomPadding`'s padding on trailing scroll content.
+ *
+ * A footer is permanently visible, not invisible space past the end of a
+ * scroll, so it can't reuse `tabbed` mode's iOS number unchanged: on iOS the
+ * tab bar already inflates `safeAreaBottom` itself (the comment above
+ * explains why `tabbed` skips real clearance there), so stacking that mode's
+ * 72pt "breathing room" on top of an already tab-bar-sized inset reads as a
+ * wall of dead space under the footer, not a gap above a tab bar the footer
+ * was never behind in the first place. Android's floating tab bar still needs
+ * its real clearance, since nothing else keeps a footer out from behind it.
+ */
+export function getFooterBottomPadding(
+  mode: ScreenBottomPaddingMode,
+  safeAreaBottom: number,
+): number {
+  const safeArea = Math.max(safeAreaBottom, 0);
+
+  if (mode === "tabbed" && Platform.OS === "android") {
+    return getFloatingTabBarClearance(safeArea) + FLOATING_TAB_BAR_BREATHING_ROOM;
+  }
+
+  return safeArea + FOOTER_BOTTOM_BREATHING_ROOM;
+}

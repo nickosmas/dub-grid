@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import type {
   MobileFocusArea,
   MobileBootstrapRole,
@@ -414,22 +415,33 @@ export default function ProfileWorkScreen() {
   const footer =
     draft && profile ? (
       <View style={styles.actionsRow}>
-        <Button
-          compact
-          disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
-          label={isNameRequest ? "Send request" : "Save changes"}
-          loading={saveMutation.isPending}
-          onPress={handleSave}
-        />
-        {hasChanges ? (
+        <View style={styles.actionButton}>
           <Button
             compact
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
+            label={isNameRequest ? "Send request" : "Save changes"}
+            loading={saveMutation.isPending}
+            onPress={handleSave}
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={saveMutation.isPending || !hasChanges}
             label="Discard"
             onPress={discardChanges}
             tone="neutral"
           />
-        ) : null}
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={saveMutation.isPending}
+            label="Cancel"
+            onPress={() => router.back()}
+            tone="ghost"
+          />
+        </View>
       </View>
     ) : null;
 
@@ -793,7 +805,9 @@ function EditPanel({
 const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

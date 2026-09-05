@@ -69,6 +69,7 @@ export function getCardSurfaceStyle(mobileColors: MobileColors, isDark: boolean)
 export type CardIconTone = "brand" | "warning" | "danger" | "success";
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
+  getFooterBottomPadding,
   getScreenBottomPadding,
   getScreenGutter,
   type ScreenBottomPaddingMode,
@@ -147,6 +148,7 @@ export function Screen({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
+  const resolvedFooterBottomPadding = getFooterBottomPadding(bottomPaddingMode, insets.bottom);
   const internalScrollViewRef = useRef<ScrollView>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was
@@ -298,7 +300,7 @@ export function Screen({
   // this is a plain flex-column sibling of the `flex: 1` scroll view/content,
   // no absolute positioning needed, so it's pinned to the bottom for free.
   const footerBar = footer ? (
-    <View style={[styles.footer, { paddingBottom: resolvedBottomPadding }]}>{footer}</View>
+    <View style={[styles.footer, { paddingBottom: resolvedFooterBottomPadding }]}>{footer}</View>
   ) : null;
 
   if (!scrollEnabled) {

@@ -879,27 +879,33 @@ export default function PersonDetailScreen() {
     : false;
   const footer = editing ? (
     <View style={styles.actionsRow}>
-      <Button
-        compact
-        disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
-        label="Save changes"
-        loading={updateMutation.isPending}
-        onPress={handleSave}
-      />
-      <Button
-        compact
-        disabled={updateMutation.isPending || !hasChanges}
-        label="Discard"
-        onPress={guard.discard}
-        tone="neutral"
-      />
-      <Button
-        compact
-        disabled={updateMutation.isPending}
-        label="Cancel"
-        onPress={guard.requestClose}
-        tone="ghost"
-      />
+      <View style={styles.actionButton}>
+        <Button
+          compact
+          disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
+          label="Save changes"
+          loading={updateMutation.isPending}
+          onPress={handleSave}
+        />
+      </View>
+      <View style={styles.actionButton}>
+        <Button
+          compact
+          disabled={updateMutation.isPending || !hasChanges}
+          label="Discard"
+          onPress={guard.discard}
+          tone="neutral"
+        />
+      </View>
+      <View style={styles.actionButton}>
+        <Button
+          compact
+          disabled={updateMutation.isPending}
+          label="Cancel"
+          onPress={guard.requestClose}
+          tone="ghost"
+        />
+      </View>
     </View>
   ) : null;
 
@@ -1715,8 +1721,10 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: 10,
+    },
+    actionButton: {
+      flex: 1,
     },
     noteText: {
       ...mobileText.body,
