@@ -61,7 +61,7 @@ vi.mock("react-native", async () => {
   const React = await import("react");
   let layoutOffset = 0;
 
-  const View = ({ children, onLayout, ...props }: Record<string, any>) => {
+  const View = ({ children, onLayout, style, ...props }: Record<string, any>) => {
     const layoutYRef = React.useRef<number | null>(null);
 
     if (layoutYRef.current == null) {
@@ -82,7 +82,11 @@ vi.mock("react-native", async () => {
       });
     }, [onLayout]);
 
-    return React.createElement("div", pickDomProps(props), children as React.ReactNode);
+    return React.createElement(
+      "div",
+      { ...pickDomProps(props), "data-style": JSON.stringify(style ?? null) },
+      children as React.ReactNode,
+    );
   };
 
   const Text = ({ children, ...props }: Record<string, any>) =>
@@ -203,6 +207,58 @@ describe("Screen", () => {
     );
 
     expect(contentStyle.paddingBottom).toBe(86);
+  });
+
+  it("renders a footer as a sibling of the scroll view, not inside it", () => {
+    const { container } = render(
+      <Screen footer={<span>Footer content</span>}>
+        <div>Content</div>
+      </Screen>,
+    );
+
+    const scrollView = screen.getByTestId("screen-scroll-view");
+    const footerText = screen.getByText("Footer content");
+
+    expect(scrollView.contains(footerText)).toBe(false);
+    // Supplying only `footer` (no stickyHeader/renderOverlay) still has to
+    // force the wrapped-root path — a footer can't render as a sibling of a
+    // scroll view that is itself the top-level element.
+    expect(container.firstElementChild).not.toBe(scrollView);
+    expect(container.firstElementChild?.contains(footerText)).toBe(true);
+  });
+
+  it("gives scroll content a small gap instead of the full bottom-padding clearance once a footer takes over that job", () => {
+    render(
+      <Screen bottomPaddingMode="tabbed" footer={<span>Footer content</span>}>
+        <div>Content</div>
+      </Screen>,
+    );
+
+    const scrollView = screen.getByTestId("screen-scroll-view");
+    const contentStyle = JSON.parse(
+      scrollView.getAttribute("data-content-container-style") ?? "{}",
+    );
+
+    // 16 (mobileSpace.lg), not the 86 the same bottomPaddingMode produces with
+    // no footer (see "applies bottom padding modes..." above) — the footer
+    // now carries that clearance instead.
+    expect(contentStyle.paddingBottom).toBe(16);
+  });
+
+  it("gives the footer itself the full bottom-padding clearance", () => {
+    render(
+      <Screen bottomPaddingMode="tabbed" footer={<span>Footer content</span>}>
+        <div>Content</div>
+      </Screen>,
+    );
+
+    const footerText = screen.getByText("Footer content");
+    const footerNode = footerText.parentElement;
+    const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
+
+    expect(footerStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ paddingBottom: 86 })]),
+    );
   });
 
   it("forwards scroll events to callers", () => {

@@ -83,6 +83,25 @@ export function TermsGate({ children }: PropsWithChildren) {
       <BottomSheetModal
         accessibilityRole="alert"
         dismissDisabled
+        footer={
+          <SheetActions>
+            <Button
+              label="Accept and continue"
+              loading={saving}
+              onPress={() => accept()}
+              tone="primary"
+            />
+            {/* Declining has to be possible. The sheet covers the whole app, so
+                without this a user who won't accept has no way out of the app at
+                all — not even to reach the profile screen to sign out. */}
+            <Button
+              disabled={saving}
+              label="Sign out"
+              onPress={() => handleExpiredMobileSession()}
+              tone="ghost"
+            />
+          </SheetActions>
+        }
         header={<SheetHeader title="We've updated our Terms" />}
         onDismiss={() => {}}
         visible={needsAcceptance}
@@ -93,23 +112,6 @@ export function TermsGate({ children }: PropsWithChildren) {
           linkLabel="Read the Terms of Service"
           onLinkPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
         />
-        <SheetActions>
-          <Button
-            label="Accept and continue"
-            loading={saving}
-            onPress={() => accept()}
-            tone="primary"
-          />
-          {/* Declining has to be possible. The sheet covers the whole app, so
-              without this a user who won't accept has no way out of the app at
-              all — not even to reach the profile screen to sign out. */}
-          <Button
-            disabled={saving}
-            label="Sign out"
-            onPress={() => handleExpiredMobileSession()}
-            tone="ghost"
-          />
-        </SheetActions>
       </BottomSheetModal>
     </>
   );

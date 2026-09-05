@@ -146,6 +146,26 @@ export function ManagementUserInviteSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions>
+              <Button
+                disabled={isPending || managementDepartments.length === 0}
+                label="Send Invitation"
+                loading={isPending}
+                onPress={submit}
+                tone="primary"
+              />
+              <Button
+                disabled={isPending}
+                label="Cancel"
+                onPress={guard.requestClose}
+                tone="neutral"
+              />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle="They'll get an invitation to join management, with no schedule profile."
@@ -245,19 +265,6 @@ export function ManagementUserInviteSheet({
             </View>
           </View>
         )}
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button
-            disabled={isPending || managementDepartments.length === 0}
-            label="Send Invitation"
-            loading={isPending}
-            onPress={submit}
-            tone="primary"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />

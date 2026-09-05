@@ -276,7 +276,29 @@ export default function AddPersonScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed">
+    <Screen
+      bottomPaddingMode="tabbed"
+      footer={
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Button
+            disabled={!canSubmit || createMutation.isPending}
+            label="Add person"
+            loading={createMutation.isPending}
+            onPress={() =>
+              new Promise<void>((resolve) => {
+                createMutation.mutate(undefined, { onSettled: () => resolve() });
+              })
+            }
+          />
+          <Button
+            disabled={createMutation.isPending}
+            label="Cancel"
+            onPress={() => router.back()}
+            tone="neutral"
+          />
+        </View>
+      }
+    >
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput
@@ -370,25 +392,6 @@ export default function AddPersonScreen() {
           />
         </ProfilePanel>
       </ProfileSection>
-
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <Button
-          disabled={!canSubmit || createMutation.isPending}
-          label="Add person"
-          loading={createMutation.isPending}
-          onPress={() =>
-            new Promise<void>((resolve) => {
-              createMutation.mutate(undefined, { onSettled: () => resolve() });
-            })
-          }
-        />
-        <Button
-          disabled={createMutation.isPending}
-          label="Cancel"
-          onPress={() => router.back()}
-          tone="neutral"
-        />
-      </View>
 
       <ConfirmationModal {...guard.confirmationProps} />
     </Screen>

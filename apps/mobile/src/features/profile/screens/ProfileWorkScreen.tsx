@@ -133,6 +133,36 @@ function profileDraftHasChanges(
   );
 }
 
+/**
+ * Field-level validation for the edit form.
+ *
+ * Module scope, same reasoning as `profileDraftHasChanges` above: the footer
+ * Save button's `disabled` state and the panel's inline per-field errors both
+ * need this, and computing it twice by hand risks the two disagreeing about
+ * whether the draft is actually valid.
+ */
+function getProfileEditFieldErrors(
+  draft: ProfileDraft,
+  {
+    canEditProfileDirectly,
+    hasLinkedEmployee,
+    focusAreaLabel,
+  }: { canEditProfileDirectly: boolean; hasLinkedEmployee: boolean; focusAreaLabel: string },
+) {
+  return {
+    firstName: getStaffNameError(draft.firstName, "First name"),
+    lastName: getStaffNameError(draft.lastName, "Last name"),
+    email: getRequiredStaffEmailError(draft.email),
+    phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
+    contactNotes: getStaffNotesError(draft.contactNotes),
+    requestNote: getStaffNotesError(draft.requestNote),
+    focusAreaIds:
+      canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
+        : null,
+  };
+}
+
 export default function ProfileWorkScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
@@ -349,9 +379,64 @@ export default function ProfileWorkScreen() {
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
 
+  const editFieldErrors =
+    draft && profile
+      ? getProfileEditFieldErrors(draft, {
+          canEditProfileDirectly,
+          hasLinkedEmployee: Boolean(linkedEmployee),
+          focusAreaLabel: profile.currentOrg.labels.focusArea,
+        })
+      : null;
+  const hasValidationErrors = editFieldErrors
+    ? Object.values(editFieldErrors).some(Boolean)
+    : false;
+
+  function handleSave() {
+    if (!profile || !draft || !editFieldErrors) return;
+    const firstError =
+      editFieldErrors.firstName ??
+      editFieldErrors.lastName ??
+      editFieldErrors.email ??
+      editFieldErrors.phone ??
+      editFieldErrors.requestNote ??
+      editFieldErrors.focusAreaIds;
+    if (firstError) {
+      pushToast({
+        tone: "warning",
+        title: "Check profile",
+        message: firstError,
+      });
+      return;
+    }
+    setShowSaveConfirmation(true);
+  }
+
+  const footer =
+    draft && profile ? (
+      <View style={styles.actionsRow}>
+        <Button
+          compact
+          disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
+          label={isNameRequest ? "Send request" : "Save changes"}
+          loading={saveMutation.isPending}
+          onPress={handleSave}
+        />
+        {hasChanges ? (
+          <Button
+            compact
+            disabled={saveMutation.isPending}
+            label="Discard"
+            onPress={discardChanges}
+            tone="neutral"
+          />
+        ) : null}
+      </View>
+    ) : null;
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      footer={footer}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -435,39 +520,9 @@ export default function ProfileWorkScreen() {
                 focusAreas={focusAreas}
                 hasLinkedEmployee={Boolean(linkedEmployee)}
                 isNameRequest={isNameRequest}
-                hasChanges={hasChanges}
                 onChange={(nextDraft) => {
                   draftTouchedRef.current = true;
                   setDraft(nextDraft);
-                }}
-                onDiscard={discardChanges}
-                onSave={() => {
-                  if (!profile || !draft) return;
-                  const firstNameError = getStaffNameError(draft.firstName, "First name");
-                  const lastNameError = getStaffNameError(draft.lastName, "Last name");
-                  const emailError = getRequiredStaffEmailError(draft.email);
-                  const phoneError = linkedEmployee ? getOptionalUsPhoneError(draft.phone) : null;
-                  const requestNoteError = getStaffNotesError(draft.requestNote);
-                  const focusAreaError =
-                    canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
-                      ? `Select at least one ${singularLabelNoun(profile.currentOrg.labels.focusArea)}.`
-                      : null;
-                  const firstError =
-                    firstNameError ??
-                    lastNameError ??
-                    emailError ??
-                    phoneError ??
-                    requestNoteError ??
-                    focusAreaError;
-                  if (firstError) {
-                    pushToast({
-                      tone: "warning",
-                      title: "Check profile",
-                      message: firstError,
-                    });
-                    return;
-                  }
-                  setShowSaveConfirmation(true);
                 }}
                 roleLabel={profile.currentOrg.labels.role}
                 roles={roles}
@@ -510,12 +565,9 @@ function EditPanel({
   draft,
   focusAreaLabel,
   focusAreas,
-  hasChanges,
   hasLinkedEmployee,
   isNameRequest,
   onChange,
-  onDiscard,
-  onSave,
   roleLabel,
   roles,
   useCompactRoleCertificationLabels,
@@ -527,12 +579,9 @@ function EditPanel({
   draft: ProfileDraft;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
-  hasChanges: boolean;
   hasLinkedEmployee: boolean;
   isNameRequest: boolean;
   onChange: (draft: ProfileDraft) => void;
-  onDiscard: () => void;
-  onSave: () => void;
   roleLabel: string;
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
@@ -542,19 +591,11 @@ function EditPanel({
     "firstName" | "lastName" | "email" | "phone" | "contactNotes" | "requestNote" | null
   >(null);
 
-  const fieldErrors = {
-    firstName: getStaffNameError(draft.firstName, "First name"),
-    lastName: getStaffNameError(draft.lastName, "Last name"),
-    email: getRequiredStaffEmailError(draft.email),
-    phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
-    contactNotes: getStaffNotesError(draft.contactNotes),
-    requestNote: getStaffNotesError(draft.requestNote),
-    focusAreaIds:
-      canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
-        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
-        : null,
-  };
-  const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
+  const fieldErrors = getProfileEditFieldErrors(draft, {
+    canEditProfileDirectly,
+    hasLinkedEmployee,
+    focusAreaLabel,
+  });
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -745,19 +786,6 @@ function EditPanel({
           </ProfilePanel>
         </ProfileSection>
       ) : null}
-
-      <View style={styles.actionsRow}>
-        <Button
-          compact
-          disabled={saving || !hasChanges || hasValidationErrors}
-          label={isNameRequest ? "Send request" : "Save changes"}
-          loading={saving}
-          onPress={onSave}
-        />
-        {hasChanges ? (
-          <Button compact disabled={saving} label="Discard" onPress={onDiscard} tone="neutral" />
-        ) : null}
-      </View>
     </>
   );
 }

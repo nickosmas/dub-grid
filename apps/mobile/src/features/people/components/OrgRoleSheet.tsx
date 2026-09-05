@@ -79,6 +79,14 @@ export function OrgRoleSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions>
+              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
@@ -103,12 +111,6 @@ export function OrgRoleSheet({
             />
           ))}
         </SelectionSection>
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal

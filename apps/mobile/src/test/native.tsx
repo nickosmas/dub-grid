@@ -495,6 +495,7 @@ export function createScreenModule(React: ReactModule) {
       subtitle,
       stickyHeader,
       renderOverlay,
+      footer,
       scrollViewRef,
       onScroll,
       children,
@@ -503,6 +504,7 @@ export function createScreenModule(React: ReactModule) {
       subtitle?: string;
       stickyHeader?: ReactType.ReactNode;
       renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactType.ReactNode;
+      footer?: ReactType.ReactNode;
       scrollViewRef?: { current: unknown } | null;
       onScroll?: (event: unknown) => void;
       children: ReactType.ReactNode;
@@ -533,6 +535,7 @@ export function createScreenModule(React: ReactModule) {
           stickyHeaderHeight: 0,
         }) ?? null,
         children,
+        footer ?? null,
       );
     },
     // Skeletons import these from the real Screen module so their placeholder

@@ -1149,6 +1149,72 @@ export default function ShiftDetailScreen() {
         // A request in flight can't be dragged, tapped or backed away from —
         // the same rule the old close button enforced on its own.
         dismissDisabled={createRequestMutation.isPending}
+        footer={
+          <>
+            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
+              <SheetActions>
+                <Button
+                  disabled={!canSubmitRequest || createRequestMutation.isPending}
+                  label="Submit"
+                  loading={createRequestMutation.isPending}
+                  onPress={handleSubmitRequest}
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => {
+                    setSelectedSwapDate(selectedTargetEntry.date);
+                    setSelectedTargetShift(null);
+                  }}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "pickup" &&
+            selectedTargetedPickupEntry &&
+            shiftEntry ? (
+              <SheetActions>
+                <Button
+                  label="Submit"
+                  loading={createRequestMutation.isPending}
+                  onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "calloff" &&
+            selectedCalloffAbsenceType &&
+            shiftEntry ? (
+              <SheetActions>
+                <Button
+                  label="Submit"
+                  loading={createRequestMutation.isPending}
+                  onPress={() =>
+                    confirmCoverageRequest("calloff", {
+                      absenceTypeId: selectedCalloffAbsenceType.id,
+                      absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
+                    })
+                  }
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+          </>
+        }
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
         scrollable
         visible={requestMode != null}
@@ -1472,69 +1538,6 @@ export default function ShiftDetailScreen() {
                 <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
               )}
             </View>
-          ) : null}
-
-          {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
-            <SheetActions>
-              <Button
-                disabled={!canSubmitRequest || createRequestMutation.isPending}
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={handleSubmitRequest}
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => {
-                  setSelectedSwapDate(selectedTargetEntry.date);
-                  setSelectedTargetShift(null);
-                }}
-                tone="neutral"
-              />
-            </SheetActions>
-          ) : null}
-
-          {requestMode === "coverage" &&
-          coverageRequestType === "pickup" &&
-          selectedTargetedPickupEntry &&
-          shiftEntry ? (
-            <SheetActions>
-              <Button
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => setSelectedTargetedPickupEmployeeId(null)}
-                tone="neutral"
-              />
-            </SheetActions>
-          ) : null}
-
-          {requestMode === "coverage" &&
-          coverageRequestType === "calloff" &&
-          selectedCalloffAbsenceType &&
-          shiftEntry ? (
-            <SheetActions>
-              <Button
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={() =>
-                  confirmCoverageRequest("calloff", {
-                    absenceTypeId: selectedCalloffAbsenceType.id,
-                    absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
-                  })
-                }
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => setSelectedCalloffAbsenceTypeId(null)}
-                tone="neutral"
-              />
-            </SheetActions>
           ) : null}
         </View>
       </BottomSheetModal>

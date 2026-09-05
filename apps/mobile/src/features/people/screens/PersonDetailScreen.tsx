@@ -179,6 +179,37 @@ function personDraftHasChanges(draft: EditDraft, person: MobilePerson): boolean 
   );
 }
 
+/**
+ * Field-level validation for the edit form.
+ *
+ * Module scope, same reasoning as `personDraftHasChanges` above: the footer
+ * Save button's `disabled` state and the panel's inline per-field errors both
+ * need this, and computing it twice by hand risks the two disagreeing about
+ * whether the draft is actually valid.
+ *
+ * The format rule wins over the duplicate verdict where both apply: a
+ * malformed address was never checked for uniqueness, and saying it is taken
+ * would be describing something that wasn't asked.
+ */
+function getPersonEditFieldErrors(
+  draft: EditDraft,
+  serverFieldErrors: Partial<Record<MobileStaffField, string>>,
+  hasManagementAccess: boolean,
+  focusAreaLabel: string,
+) {
+  return {
+    firstName: getStaffNameError(draft.firstName, "First name") ?? serverFieldErrors.firstName,
+    lastName: getStaffNameError(draft.lastName, "Last name") ?? serverFieldErrors.lastName,
+    phone: getOptionalUsPhoneError(draft.phone) ?? serverFieldErrors.phone,
+    email: getOptionalStaffEmailError(draft.email) ?? serverFieldErrors.email,
+    contactNotes: getStaffNotesError(draft.contactNotes),
+    focusAreaIds:
+      draft.focusAreaIds.length === 0 && !hasManagementAccess
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
+        : null,
+  };
+}
+
 export default function PersonDetailScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -835,9 +866,47 @@ export default function PersonDetailScreen() {
         : "Revoke Invitation";
   const invitationPendingLabel = invitationConfirmAction === "revoke" ? "Revoking" : "Sending";
 
+  const editFieldErrors = editing
+    ? getPersonEditFieldErrors(
+        draft,
+        serverFieldErrors,
+        person.managementDepartmentIds.length > 0,
+        focusAreaLabel,
+      )
+    : null;
+  const hasEditValidationErrors = editFieldErrors
+    ? Object.values(editFieldErrors).some(Boolean)
+    : false;
+  const footer = editing ? (
+    <View style={styles.actionsRow}>
+      <Button
+        compact
+        disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
+        label="Save changes"
+        loading={updateMutation.isPending}
+        onPress={handleSave}
+      />
+      <Button
+        compact
+        disabled={updateMutation.isPending || !hasChanges}
+        label="Discard"
+        onPress={guard.discard}
+        tone="neutral"
+      />
+      <Button
+        compact
+        disabled={updateMutation.isPending}
+        label="Cancel"
+        onPress={guard.requestClose}
+        tone="ghost"
+      />
+    </View>
+  ) : null;
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      footer={footer}
       onRefresh={manualRefresh.refresh}
       onScroll={handlePersonScroll}
       refreshing={manualRefresh.isRefreshing}
@@ -960,10 +1029,8 @@ export default function PersonDetailScreen() {
           draft={draft}
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
-          hasChanges={hasChanges}
           hasManagementAccess={person.managementDepartmentIds.length > 0}
           serverFieldErrors={serverFieldErrors}
-          onCancel={guard.requestClose}
           onChange={(next) => {
             // A server verdict only holds for the value it was given. Editing
             // the field retires it and lets the debounced check speak again.
@@ -976,8 +1043,6 @@ export default function PersonDetailScreen() {
             });
             setDraft(next);
           }}
-          onDiscard={guard.discard}
-          onSave={handleSave}
           roleLabel={roleLabel}
           roles={bootstrapQuery.data?.roles ?? []}
           useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
@@ -1417,13 +1482,9 @@ function EditPanel({
   roleLabel,
   roles,
   useCompactRoleCertificationLabels,
-  hasChanges,
   hasManagementAccess,
   serverFieldErrors,
   onChange,
-  onCancel,
-  onDiscard,
-  onSave,
 }: {
   draft: EditDraft;
   saving: boolean;
@@ -1435,33 +1496,18 @@ function EditPanel({
   hasManagementAccess: boolean;
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
-  hasChanges: boolean;
   serverFieldErrors: Partial<Record<MobileStaffField, string>>;
   onChange: (draft: EditDraft) => void;
-  onCancel: () => void;
-  onDiscard: () => void;
-  onSave: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "phone" | "email" | "contactNotes" | null
   >(null);
-  // The format rule wins over the duplicate verdict where both apply: a
-  // malformed address was never checked for uniqueness, and saying it is taken
-  // would be describing something that wasn't asked.
-  const fieldErrors = {
-    firstName: getStaffNameError(draft.firstName, "First name") ?? serverFieldErrors.firstName,
-    lastName: getStaffNameError(draft.lastName, "Last name") ?? serverFieldErrors.lastName,
-    phone: getOptionalUsPhoneError(draft.phone) ?? serverFieldErrors.phone,
-    email: getOptionalStaffEmailError(draft.email) ?? serverFieldErrors.email,
-    contactNotes: getStaffNotesError(draft.contactNotes),
-    focusAreaIds:
-      draft.focusAreaIds.length === 0 && !hasManagementAccess
-        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
-        : null,
-  };
-  const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
+  const fieldErrors = getPersonEditFieldErrors(
+    draft,
+    serverFieldErrors,
+    hasManagementAccess,
+    focusAreaLabel,
+  );
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -1661,24 +1707,6 @@ function EditPanel({
           />
         </ProfilePanel>
       </ProfileSection>
-
-      <View style={styles.actionsRow}>
-        <Button
-          compact
-          disabled={saving || !hasChanges || hasValidationErrors}
-          label="Save changes"
-          loading={saving}
-          onPress={onSave}
-        />
-        <Button
-          compact
-          disabled={saving || !hasChanges}
-          label="Discard"
-          onPress={onDiscard}
-          tone="neutral"
-        />
-        <Button compact disabled={saving} label="Cancel" onPress={onCancel} tone="ghost" />
-      </View>
     </>
   );
 }

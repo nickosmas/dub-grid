@@ -83,6 +83,7 @@ export function Screen({
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
   renderOverlay,
+  footer,
   scrollViewRef,
   children,
   refreshing = false,
@@ -102,6 +103,13 @@ export function Screen({
   stickyHeaderShellStyle?: StyleProp<ViewStyle>;
   stickyHeaderTopPadding?: number;
   renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactNode;
+  /**
+   * A non-scrolling region pinned below the content, in normal flow rather
+   * than absolutely positioned — mirrors `BottomSheetModal`'s `footer`. Put a
+   * full-page form's primary action row here instead of as the last scrolled
+   * child, so Save/Cancel never requires scrolling to reach.
+   */
+  footer?: ReactNode;
   scrollViewRef?: RefObject<ScreenScrollHandle | null>;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -147,7 +155,7 @@ export function Screen({
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
-  const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay;
+  const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
   // The floating shell is `position: absolute; top: 0`, so it spans the status
   // bar and has to pad itself clear of it. The non-scrolling shell sits in
   // normal flow, already below the system bars, where that same inset is pure
@@ -227,7 +235,10 @@ export function Screen({
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
-        paddingBottom: resolvedBottomPadding,
+        // A footer takes over clearing whatever floats at the bottom (the
+        // floating tab bar, in `tabbed` mode) — content just needs a small
+        // gap above the footer's divider, not the full clearance any more.
+        paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
         // Makes the content container at least as tall as the viewport, so a
         // `flex: 1` child (a `fillScreen` empty or error state) has real space
         // to claim instead of collapsing to its own content height.
@@ -283,6 +294,12 @@ export function Screen({
       {overlay}
     </View>
   );
+  // The full clearance moves here from content once a footer is present —
+  // this is a plain flex-column sibling of the `flex: 1` scroll view/content,
+  // no absolute positioning needed, so it's pinned to the bottom for free.
+  const footerBar = footer ? (
+    <View style={[styles.footer, { paddingBottom: resolvedBottomPadding }]}>{footer}</View>
+  ) : null;
 
   if (!scrollEnabled) {
     return (
@@ -313,11 +330,12 @@ export function Screen({
             // visibly shifts the moment it resolves.
             stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
             styles.nonScrollContent,
-            { paddingBottom: resolvedBottomPadding },
+            { paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding },
           ]}
         >
           {children}
         </View>
+        {footerBar}
       </View>
     );
   }
@@ -360,6 +378,7 @@ export function Screen({
         </View>
       ) : null}
       {scrollView}
+      {footerBar}
       {overlay == null ? null : overlayLayer}
     </View>
   );
@@ -426,6 +445,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     nonScrollContent: {
       flex: 1,
+    },
+    footer: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.background,
+      paddingHorizontal: getScreenGutter(),
+      paddingTop: mobileSpace.md,
     },
     stickyHeaderShell: {
       position: "absolute",

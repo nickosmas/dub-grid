@@ -191,6 +191,45 @@ export function ManagementUserActionsSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error && !showAccessSheet ? <InlineError message={error} /> : null}
+            <SheetActions>
+              {isPendingInvite ? (
+                <Button
+                  disabled={isPending}
+                  label="Reinvite"
+                  loading={invitationMutation.isPending}
+                  onPress={() => setInvitationConfirmAction("resend")}
+                  tone="primary"
+                />
+              ) : null}
+              <Button
+                disabled={isPending}
+                label="Edit Management Access"
+                // Sequenced, not swapped: presenting the access sheet in the same
+                // commit that dismisses this one is the case iOS refuses, and the
+                // access sheet could come up unreachable behind a dead backdrop.
+                onPress={() => {
+                  setIsActionsHidden(true);
+                  handoff(() => setShowAccessSheet(true));
+                }}
+                tone="secondary"
+              />
+              <Button
+                disabled={isPending}
+                label={isPendingInvite ? "Revoke Invitation" : "Remove from Management"}
+                onPress={() =>
+                  isPendingInvite
+                    ? setInvitationConfirmAction("revoke")
+                    : setShowRemoveConfirmation(true)
+                }
+                tone="danger"
+              />
+              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={
@@ -212,43 +251,6 @@ export function ManagementUserActionsSheet({
           </AppText>
           <AppText tone="muted">{departmentNames.join(", ") || "None"}</AppText>
         </View>
-
-        {error && !showAccessSheet ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          {isPendingInvite ? (
-            <Button
-              disabled={isPending}
-              label="Reinvite"
-              loading={invitationMutation.isPending}
-              onPress={() => setInvitationConfirmAction("resend")}
-              tone="primary"
-            />
-          ) : null}
-          <Button
-            disabled={isPending}
-            label="Edit Management Access"
-            // Sequenced, not swapped: presenting the access sheet in the same
-            // commit that dismisses this one is the case iOS refuses, and the
-            // access sheet could come up unreachable behind a dead backdrop.
-            onPress={() => {
-              setIsActionsHidden(true);
-              handoff(() => setShowAccessSheet(true));
-            }}
-            tone="secondary"
-          />
-          <Button
-            disabled={isPending}
-            label={isPendingInvite ? "Revoke Invitation" : "Remove from Management"}
-            onPress={() =>
-              isPendingInvite
-                ? setInvitationConfirmAction("revoke")
-                : setShowRemoveConfirmation(true)
-            }
-            tone="danger"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ManagementUserAccessSheet

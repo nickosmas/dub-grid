@@ -135,6 +135,26 @@ export function ManagementUserAccessSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions>
+              <Button
+                disabled={!canSubmit}
+                label="Save Access"
+                loading={isPending}
+                onPress={submitDraft}
+                tone="primary"
+              />
+              <Button
+                disabled={isPending}
+                label="Cancel"
+                onPress={guard.requestClose}
+                tone="neutral"
+              />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={
@@ -192,19 +212,6 @@ export function ManagementUserAccessSheet({
             ) : null}
           </View>
         </View>
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button
-            disabled={!canSubmit}
-            label="Save Access"
-            loading={isPending}
-            onPress={submitDraft}
-            tone="primary"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />
