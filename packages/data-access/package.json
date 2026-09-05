@@ -19,6 +19,6 @@
     "@dubgrid/contracts": "0.1.0",
     "@dubgrid/db-types": "0.1.0",
     "@dubgrid/domain": "0.1.0",
-    "@supabase/supabase-js": "2.104.1"
+    "@supabase/supabase-js": "2.112.4"
   }
 }
