@@ -24,6 +24,7 @@ import logger from "@/lib/logger";
 import type {
   GridOpenShift,
   ScheduleCellInput,
+  ScheduleCellStateEntry,
   ScheduleNote,
   SeriesFrequency,
   ShiftSeries,
@@ -262,6 +263,33 @@ type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
 >["serviceClient"];
+
+/**
+ * Strips the unpublished half of a cell for a caller who may not see drafts.
+ *
+ * The mapper hands back both snapshots regardless of `isScheduler` (the editor
+ * client needs the pair to render a diff), so a viewer's response carried the
+ * draft even when `effective` correctly resolved to the published one. Rebuild
+ * the draft-derived fields from `published` alone rather than deleting keys, so
+ * the entry keeps the shape every consumer already expects.
+ */
+function redactDraftForViewer(entry: ScheduleCellStateEntry): ScheduleCellStateEntry {
+  const published = entry.published ?? null;
+  return {
+    ...entry,
+    draft: null,
+    draftKind: null,
+    isDraft: false,
+    isDelete: false,
+    // Both fall back through the draft in buildScheduleCellEntry, so a cell
+    // published outside a series but drafted into one would otherwise leak the
+    // pending series through these two fields alone.
+    seriesId: published?.seriesId ?? null,
+    fromRecurring: published?.fromRecurring ?? false,
+    createdBy: null,
+    updatedBy: null,
+  };
+}
 
 function assertDateRange(startDate?: string, endDate?: string): void {
   if (!startDate || !endDate) {
@@ -650,6 +678,10 @@ export async function POST(req: NextRequest) {
         }
 
         assertDateRange(data.startDate, data.endDate);
+        // Draft visibility is the session's to decide, not the request body's.
+        // `isScheduler` arrives from the client, so honouring it let any member
+        // of the org read the unpublished schedule just by asking for it.
+        const isScheduler = auth.permissions.canEditShifts;
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
         const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
         const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
@@ -680,13 +712,13 @@ export async function POST(req: NextRequest) {
         const shifts: Record<string, unknown> = {};
         for (const row of rows) {
           const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
-            isScheduler: data.isScheduler,
+            isScheduler,
             assignmentLabelMap,
             assignmentIdByPair,
             absenceTypeMap,
           });
           if (entry) {
-            shifts[`${row.emp_id}_${row.date}`] = entry;
+            shifts[`${row.emp_id}_${row.date}`] = isScheduler ? entry : redactDraftForViewer(entry);
           }
         }
 

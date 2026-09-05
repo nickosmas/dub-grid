@@ -41,6 +41,10 @@ export async function GET(req: NextRequest) {
     // Sign-in activity is admin telemetry: staff managers see it, view-only
     // directory callers don't.
     const canSeeActivity = canSeePermissions || orgAuth.permissions.canManageEmployees;
+    // Personal contact details follow the permission that names them. authz
+    // derives canViewEmployeeDetails from canManageEmployees, so every staff
+    // manager keeps them without a second grant.
+    const canSeeContactDetails = canSeePermissions || orgAuth.permissions.canViewEmployeeDetails;
     const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
     const offset = parsed.data.offset ?? 0;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
@@ -84,8 +88,8 @@ export async function GET(req: NextRequest) {
         userId: (row.user_id as string | null) ?? null,
         firstName: (row.first_name as string) ?? "",
         lastName: (row.last_name as string) ?? "",
-        email: (row.email as string) ?? "",
-        phone: (row.phone as string) ?? "",
+        email: canSeeContactDetails ? ((row.email as string) ?? "") : "",
+        phone: canSeeContactDetails ? ((row.phone as string) ?? "") : "",
         employeeStatus: (row.employee_status as EmployeeStatus | null) ?? null,
         orgRole: (row.org_role as OrganizationRole | null) ?? null,
         hasAppAccess,

@@ -229,6 +229,39 @@ describe("POST /api/employees/manage", () => {
         statusNote: "",
         deptAdminIds: [],
         userId: null,
+        // Personal contact details, withheld like the notes above them.
+        email: "",
+        phone: "",
+      });
+    });
+
+    it("keeps the caller's own contact details on their own row", async () => {
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ userId: VIEWER_USER_ID }));
+
+      const response = await POST(fetchEmployeeByIdRequest());
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      // Withholding your own address from you would break your own profile
+      // without protecting anyone.
+      expect(payload.employee).toMatchObject({
+        email: "mina@dubgrid.com",
+        phone: "555-0100",
+        userId: VIEWER_USER_ID,
+      });
+    });
+
+    it("hands contact details to a viewer granted canViewEmployeeDetails", async () => {
+      mockAuth({ canViewEmployeeDetails: true });
+
+      const response = await POST(fetchEmployeeByIdRequest());
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.employee).toMatchObject({
+        email: "mina@dubgrid.com",
+        phone: "555-0100",
       });
     });
   });

@@ -129,6 +129,82 @@ export function getDashboardRoleVariant(
   return "user";
 }
 
+export interface DashboardHeroMetric {
+  label: string;
+  value: string;
+  detail?: string;
+  href: string;
+}
+
+/**
+ * The hero stat tiles, in display order.
+ *
+ * Coverage and Open gaps render an em-dash placeholder when the period has no
+ * published data or no requirements configured, because a zero there would read
+ * as "fully staffed" rather than "nothing to measure". Draft shifts and Pending
+ * approvals are omitted outright instead, since a viewer without the matching
+ * permission cannot act on the number or see what it refers to.
+ */
+export function buildDashboardHeroMetrics(input: {
+  coveragePct: number;
+  hasCoverageRequirements: boolean;
+  isCoveragePartial: boolean;
+  isCoverageUnpublished: boolean;
+  openShiftSlotCount: number;
+  draftTotal: number;
+  pendingApprovalCount: number;
+  canEditShifts: boolean;
+  canApproveShiftRequests: boolean;
+}): DashboardHeroMetric[] {
+  // A caption is only worth the row when it says something the number cannot.
+  // These three qualify because they explain an em dash or a partial figure; a
+  // measured percentage gets none, since restating the label under the value
+  // just repeats the tile back to the reader.
+  const coverageCaveat = input.isCoverageUnpublished
+    ? "Not published yet"
+    : !input.hasCoverageRequirements
+      ? "Not configured"
+      : input.isCoveragePartial
+        ? "Published dates only"
+        : undefined;
+  const hideCoverageValue = input.isCoverageUnpublished || !input.hasCoverageRequirements;
+  const metrics: DashboardHeroMetric[] = [
+    {
+      label: "Coverage",
+      value: hideCoverageValue ? "\u2014" : `${input.coveragePct}%`,
+      detail: coverageCaveat,
+      href: "/schedule",
+    },
+    {
+      label: "Open gaps",
+      value: hideCoverageValue ? "\u2014" : `${input.openShiftSlotCount}`,
+      detail: coverageCaveat,
+      href: "/schedule",
+    },
+  ];
+
+  // The schedule API redacts drafts from anyone who can't edit shifts, so this
+  // tile would always read 0 for them. Drop it rather than report a zero they
+  // can neither act on nor verify.
+  if (input.canEditShifts) {
+    metrics.push({
+      label: "Draft shifts",
+      value: `${input.draftTotal}`,
+      href: "/schedule",
+    });
+  }
+
+  if (input.canApproveShiftRequests) {
+    metrics.splice(2, 0, {
+      label: "Pending approvals",
+      value: `${input.pendingApprovalCount}`,
+      href: "/schedule",
+    });
+  }
+
+  return metrics;
+}
+
 export function getDashboardPeriodLabel(viewMode: ViewMode): string {
   if (viewMode === "day") {
     return "today";
@@ -935,63 +1011,31 @@ export default function DashboardView({
     coveragePct,
   ]);
 
-  const heroMetrics = useMemo(() => {
-    const coverageDetail = isCoverageUnpublished
-      ? "Not published yet"
-      : !hasCoverageRequirements
-        ? "Not configured"
-        : isCoveragePartial
-          ? "Published dates only"
-          : "Current staffing coverage";
-    const openGapDetail = isCoverageUnpublished
-      ? "Not published yet"
-      : !hasCoverageRequirements
-        ? "Not configured"
-        : isCoveragePartial
-          ? "Published dates only"
-          : "Staffing gaps this period";
-    const hideCoverageValue = isCoverageUnpublished || !hasCoverageRequirements;
-    const metrics = [
-      {
-        label: "Coverage",
-        value: hideCoverageValue ? "\u2014" : `${coveragePct}%`,
-        detail: coverageDetail,
-        href: "/schedule",
-      },
-      {
-        label: "Open gaps",
-        value: hideCoverageValue ? "\u2014" : `${openShiftSlotCount}`,
-        detail: openGapDetail,
-        href: "/schedule",
-      },
-      {
-        label: "Draft shifts",
-        value: `${draftTotal}`,
-        detail: "Unpublished schedule changes",
-        href: "/schedule",
-      },
-    ];
-
-    if (permissions.canApproveShiftRequests) {
-      metrics.splice(2, 0, {
-        label: "Pending approvals",
-        value: `${shiftRequests.pendingApproval.length}`,
-        detail: "Requests waiting for review",
-        href: "/schedule",
-      });
-    }
-
-    return metrics;
-  }, [
-    coveragePct,
-    hasCoverageRequirements,
-    isCoveragePartial,
-    isCoverageUnpublished,
-    openShiftSlotCount,
-    draftTotal,
-    permissions.canApproveShiftRequests,
-    shiftRequests.pendingApproval.length,
-  ]);
+  const heroMetrics = useMemo(
+    () =>
+      buildDashboardHeroMetrics({
+        coveragePct,
+        hasCoverageRequirements,
+        isCoveragePartial,
+        isCoverageUnpublished,
+        openShiftSlotCount,
+        draftTotal,
+        pendingApprovalCount: shiftRequests.pendingApproval.length,
+        canEditShifts: permissions.canEditShifts,
+        canApproveShiftRequests: permissions.canApproveShiftRequests,
+      }),
+    [
+      coveragePct,
+      hasCoverageRequirements,
+      isCoveragePartial,
+      isCoverageUnpublished,
+      openShiftSlotCount,
+      draftTotal,
+      permissions.canEditShifts,
+      permissions.canApproveShiftRequests,
+      shiftRequests.pendingApproval.length,
+    ],
+  );
 
   // ─── Render ─────────────────────────────────────────────
   // On a wide enough viewport the user dashboard becomes a fixed two-pane

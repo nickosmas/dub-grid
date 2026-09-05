@@ -167,6 +167,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
           ...person,
           contactNotes: "",
           departmentIds: [],
+          // The people list already withholds these from a non-manager
+          // (packages/mobile-api-core/src/read.ts); the detail screen was
+          // handing back the same coworker's address and mobile anyway.
+          email: "",
+          phone: "",
           deptAdminIds: [],
           managementDepartmentIds: [],
           managementDeptAdminIds: [],

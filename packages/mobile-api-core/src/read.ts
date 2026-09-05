@@ -89,7 +89,10 @@ export type MobileOrgScheduleContext = MobileServiceContext & {
 };
 
 export type MobilePeopleContext = MobileServiceContext & {
-  permissions: Pick<MobilePermissionsLike, "canManageEmployees" | "canViewStaff">;
+  permissions: Pick<
+    MobilePermissionsLike,
+    "canManageEmployees" | "canViewStaff" | "canViewEmployeeDetails"
+  >;
   user: Pick<MobileUserLike, "id">;
 };
 
@@ -403,7 +406,11 @@ export async function loadMobilePeoplePayload(
     people: visiblePeople.map((person) => {
       const mobilePerson = deps.mapEmployeeToMobilePerson(person);
 
-      if (auth.permissions.canManageEmployees) {
+      // Contact details follow canViewEmployeeDetails, which authz derives from
+      // canManageEmployees, so every staff manager still qualifies. The looser
+      // gate also lets a view-only admin see on mobile what the web People table
+      // already shows them, instead of blanks.
+      if (auth.permissions.canViewEmployeeDetails) {
         return mobilePerson;
       }
 
