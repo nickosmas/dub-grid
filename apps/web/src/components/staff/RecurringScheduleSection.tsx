@@ -21,6 +21,7 @@ import {
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   toDarkPillColors,
+  visiblePillBorder,
 } from "@/lib/colors";
 import {
   deleteRecurringDraft,
@@ -214,7 +215,16 @@ function ShiftCellPopover({
               multiSelect={false}
               closeOnSelect={true}
             />
-            {(currentSegments.length > 0 || currentAbsenceTypeId) && (
+          </div>
+          {(currentSegments.length > 0 || currentAbsenceTypeId) && (
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "10px 16px",
+                borderTop: "1px solid var(--dg-color-border-light)",
+                background: "var(--dg-color-surface)",
+              }}
+            >
               <Button
                 onClick={() => {
                   onSelect(null);
@@ -222,17 +232,16 @@ function ShiftCellPopover({
                 }}
                 className="dg-btn dg-btn-ghost"
                 style={{
-                  marginTop: 12,
                   width: "100%",
                   color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
                 }}
               >
-                Clear Shift
+                Clear selection
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         <ScrollOverflowCue />
       </PopoverContent>
@@ -377,11 +386,14 @@ function RecurringShiftPill({
   const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
   const pillBackground = darkPill?.bg ?? rawPillBackground;
   const pillText = darkPill?.text ?? rawPillText;
-  const fallbackBorder = darkPill
-    ? `1px solid ${borderColor(pillText)}`
-    : absenceType
-      ? `1px solid ${absenceType.border}`
-      : `1px solid ${borderColor(pillText)}`;
+  // absence_types.border_color defaults to 'transparent', so a stored border is
+  // not necessarily a visible one — derive from the text colour when it isn't,
+  // the way every other pill surface does via resolveShiftPillColors.
+  const fallbackBorder = `1px solid ${
+    !darkPill && absenceType
+      ? visiblePillBorder(absenceType.border, pillText)
+      : borderColor(pillText)
+  }`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
