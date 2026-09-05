@@ -89,7 +89,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     certifications,
     orgRoles,
     departments,
+    jobs,
     assignmentLabelMap,
+    absenceTypes,
     absenceTypeMap,
     loading: orgLoading,
   } = useOrganizationData();
@@ -961,7 +963,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   timeZone={org?.timezone}
                   scheduleOverview={
                     perms.canViewRecurringShifts ? (
-                      <RecurringScheduleCard recurringShifts={recurringShifts} />
+                      <RecurringScheduleCard
+                        recurringShifts={recurringShifts}
+                        assignments={assignments}
+                        absenceTypes={absenceTypes}
+                        shiftCategories={shiftCategories}
+                        jobs={jobs}
+                      />
                     ) : undefined
                   }
                 />
