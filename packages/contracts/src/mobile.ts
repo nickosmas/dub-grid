@@ -928,6 +928,24 @@ export const mobileManagementAccessResponseSchema = z.object({
 });
 
 /**
+ * The org role on its own, with no departments attached. Management access is a
+ * separate fact about a person, so a role change must not be able to alter it:
+ * the body carries no department ids at all, and the server keeps whatever the
+ * membership or invitation already had.
+ */
+export const mobilePersonOrgRoleBodySchema = z.object({
+  orgRole: mobileRoleSchema,
+  expectedMembershipUpdatedAt: z.string().nullable().default(null),
+  expectedInvitationUpdatedAt: z.string().nullable().default(null),
+});
+
+export const mobilePersonOrgRoleResponseSchema = z.object({
+  success: z.literal(true),
+  result: z.enum(["membership_updated", "invitation_replaced", "unchanged"]),
+  person: mobilePersonSchema,
+});
+
+/**
  * Someone on the management roster. Deliberately not a `MobilePerson`: a
  * management user may have no staff profile at all (and a pending one has no
  * account either), so there is no employee UUID to key them by. `id` is a
@@ -1191,6 +1209,8 @@ export type MobileManagementAccessRemoveBody = z.infer<
   typeof mobileManagementAccessRemoveBodySchema
 >;
 export type MobileManagementAccessResponse = z.infer<typeof mobileManagementAccessResponseSchema>;
+export type MobilePersonOrgRoleBody = z.infer<typeof mobilePersonOrgRoleBodySchema>;
+export type MobilePersonOrgRoleResponse = z.infer<typeof mobilePersonOrgRoleResponseSchema>;
 export type MobileManagementUser = z.infer<typeof mobileManagementUserSchema>;
 export type MobileManagementUsersResponse = z.infer<typeof mobileManagementUsersResponseSchema>;
 export type MobileManagementUserUpdateBody = z.infer<typeof mobileManagementUserUpdateBodySchema>;
