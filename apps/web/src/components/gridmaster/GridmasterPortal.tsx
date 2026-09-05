@@ -14,6 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/Button";
 import { fetchAccountIdentity } from "@/features/account/client";
 import dynamic from "next/dynamic";
+import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
@@ -54,42 +55,51 @@ import {
 // 2,258 of those and is reached from one button.
 const GridmasterDashboard = dynamic(() => import("@/components/gridmaster/GridmasterDashboard"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 const OrganizationDetail = dynamic(() => import("@/components/gridmaster/OrganizationDetail"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 const OrganizationSetupWizard = dynamic(
   () => import("@/components/gridmaster/OrganizationSetupWizard"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
-const AllUsersView = dynamic(() => import("@/components/gridmaster/AllUsersView"), { ssr: false });
+const AllUsersView = dynamic(() => import("@/components/gridmaster/AllUsersView"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const GridmasterAccountsView = dynamic(
   () => import("@/components/gridmaster/GridmasterAccountsView"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
 const GridmasterBillingView = dynamic(
   () => import("@/components/gridmaster/GridmasterBillingView"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
 const GridmasterComplianceView = dynamic(
   () => import("@/components/gridmaster/GridmasterComplianceView"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
 const GridmasterSecurityView = dynamic(
   () => import("@/components/gridmaster/GridmasterSecurityView"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
 const PlatformFeatureFlagsView = dynamic(
   () => import("@/components/gridmaster/PlatformFeatureFlagsView"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
-const AuditLogView = dynamic(() => import("@/components/gridmaster/AuditLogView"), { ssr: false });
+const AuditLogView = dynamic(() => import("@/components/gridmaster/AuditLogView"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const EnhancedImpersonation = dynamic(
   () => import("@/components/gridmaster/EnhancedImpersonation"),
-  { ssr: false },
+  { ssr: false, loading: LazyProgressFallback },
 );
 const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/ImpersonationHistory"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 
 import NotificationBell from "@/components/NotificationBell";

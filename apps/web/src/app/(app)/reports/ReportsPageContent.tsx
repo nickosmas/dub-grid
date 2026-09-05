@@ -567,6 +567,10 @@ function ExportMenu({
         className="dg-btn dg-btn-primary"
         disabled={disabled}
         icon={<Upload size={16} />}
+        // Selecting a format closes the popover, so the spinner on the menu
+        // items below never gets to render. The trigger is what stays on
+        // screen for the export, so it carries the pending state.
+        loading={exportingFormat != null}
         onClick={() => setOpen((current) => !current)}
         type="button"
       >

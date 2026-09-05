@@ -1081,6 +1081,8 @@ export default function PrintScheduleView({
 
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Returns its promise so the shared Button latch spins for as long as the
+  // images the print window needs are still loading.
   function handlePrint() {
     const contentEl = contentRef.current;
     if (!contentEl) return;
@@ -1104,7 +1106,7 @@ export default function PrintScheduleView({
 </head><body>${contentEl.outerHTML}</body></html>`);
 
     printWindow.document.close();
-    void waitForImages(printWindow).then(() => {
+    return waitForImages(printWindow).then(() => {
       printWindow.focus();
       printWindow.print();
       printWindow.addEventListener("afterprint", () => printWindow.close());

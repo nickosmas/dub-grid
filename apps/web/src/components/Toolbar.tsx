@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, Fragment } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, Fragment } from "react";
 import {
   ArrowUpDown,
   Check,
@@ -67,10 +67,12 @@ interface ToolbarProps {
   onStaffSearchChange: (q: string) => void;
   onSortByChange: (sortBy: "seniority" | "name") => void;
   canApplyRecurringSchedule?: boolean;
-  onApplyRecurring?: () => void;
+  // Returns a promise so MenuItem can hand it to the shared latch: these open a
+  // confirm dialog only after a fetch, so the spinner has to cover that wait.
+  onApplyRecurring?: () => unknown;
   isApplyingRecurring?: boolean;
   canImportPrevious?: boolean;
-  onImportPrevious?: () => void;
+  onImportPrevious?: () => unknown;
   isImportingPrevious?: boolean;
   onPrintOpen?: () => void;
   onExportCSV?: () => void;
@@ -221,10 +223,12 @@ function ToolsMenu({
   onPrintOpen?: () => void;
   onExportCSV?: () => void;
   canApplyRecurringSchedule?: boolean;
-  onApplyRecurring?: () => void;
+  // Returns a promise so MenuItem can hand it to the shared latch: these open a
+  // confirm dialog only after a fetch, so the spinner has to cover that wait.
+  onApplyRecurring?: () => unknown;
   isApplyingRecurring?: boolean;
   canImportPrevious?: boolean;
-  onImportPrevious?: () => void;
+  onImportPrevious?: () => unknown;
   isImportingPrevious?: boolean;
   requestsBadgeCount?: number;
   onRequestsToggle?: () => void;
@@ -235,6 +239,15 @@ function ToolsMenu({
   scheduleTargetActionsDisabled?: boolean;
   bulkDeleteDisabled?: boolean;
 }) {
+  // Opening this menu is the earliest signal that a print is coming, and the
+  // options modal is a separate chunk. Warming it here usually means the click
+  // opens it from cache rather than paying a download the user has to wait
+  // through. `dynamic` resolves the same specifier, so it reuses this fetch.
+  useEffect(() => {
+    if (!onPrintOpen) return;
+    void import("@/components/PrintOptionsModal");
+  }, [onPrintOpen]);
+
   return (
     <Menu
       open
@@ -382,9 +395,7 @@ function ToolsMenu({
             <MenuItem
               data-tour="toolbar-autofill"
               disabled={scheduleTargetActionsDisabled || isApplyingRecurring}
-              onClick={() => {
-                onApplyRecurring();
-              }}
+              onClick={() => onApplyRecurring()}
             >
               <ButtonLoading
                 loading={Boolean(isApplyingRecurring)}
@@ -420,9 +431,7 @@ function ToolsMenu({
             <MenuItem
               data-tour="toolbar-import"
               disabled={scheduleTargetActionsDisabled || isImportingPrevious}
-              onClick={() => {
-                onImportPrevious();
-              }}
+              onClick={() => onImportPrevious()}
             >
               <ButtonLoading
                 loading={Boolean(isImportingPrevious)}

@@ -262,6 +262,8 @@ export default function NotificationBell({
     setOpen((prev) => !prev);
   }
 
+  const [optimisticallyRead, setOptimisticallyRead] = useState<Set<string>>(new Set());
+
   const invalidateAll = useCallback(() => {
     if (!userId) return;
     void queryClient.invalidateQueries({
@@ -269,11 +271,21 @@ export default function NotificationBell({
     });
   }, [queryClient, userId]);
 
+  // A row is a whole block of content, so it opts out of the button spinner.
+  // That left the unread tint as the only signal, and it waited on both the
+  // mutation and the refetch behind it. Clearing it here answers the click now
+  // and rolls back if the write fails.
   async function handleMarkRead(id: string) {
+    setOptimisticallyRead((prev) => new Set(prev).add(id));
     try {
       await markNotificationRead(id);
       invalidateAll();
     } catch (err) {
+      setOptimisticallyRead((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast.error(formatClientErrorMessage(err, "Couldn't update notification"));
     }
   }
@@ -461,7 +473,7 @@ export default function NotificationBell({
               </div>
             ) : (
               notifications.map((n) => {
-                const isUnread = !n.readAt;
+                const isUnread = !n.readAt && !optimisticallyRead.has(n.id);
                 return (
                   <Button
                     key={n.id}

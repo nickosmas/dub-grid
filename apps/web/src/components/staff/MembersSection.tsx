@@ -810,6 +810,7 @@ export function MembersSection({
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      toast.success("Staff data exported");
     } catch {
       toast.error("Export failed");
     }
@@ -2684,9 +2685,15 @@ export function MembersSection({
           message="Export the current staff directory data as a downloadable file?"
           confirmLabel="Export"
           variant="info"
-          onConfirm={() => {
-            setExportConfirm(false);
-            return handleExport();
+          // Closing first unmounted the dialog before the export started, so
+          // its confirm button never got to spin. Let the latch hold the
+          // dialog open for the request and close once it settles.
+          onConfirm={async () => {
+            try {
+              await handleExport();
+            } finally {
+              setExportConfirm(false);
+            }
           }}
           onCancel={() => setExportConfirm(false)}
         />

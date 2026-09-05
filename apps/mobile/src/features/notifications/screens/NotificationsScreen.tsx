@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -126,6 +126,7 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
   const facetsQuery = useNotificationFacets(accessToken);
@@ -216,6 +217,9 @@ export default function NotificationsScreen() {
     async (notification: MobileNotification) => {
       if (!accessToken) return;
       if (!notification.readAt) {
+        // Navigation deliberately waits on this write (a failure keeps the user
+        // here with the toast), so the row has to say it is working meanwhile.
+        setPendingRowId(notification.id);
         try {
           const response = await markNotificationRead(accessToken, notification.id);
           syncBootstrapUnread(response.unreadCount);
@@ -227,6 +231,8 @@ export default function NotificationsScreen() {
             fallbackMessage: "We couldn't mark that alert as read.",
           });
           return;
+        } finally {
+          setPendingRowId(null);
         }
       }
       router.push({
@@ -363,6 +369,7 @@ export default function NotificationsScreen() {
           {notifications.map((notification, index) => (
             <AnimatedListItem index={index} key={notification.id}>
               <NotificationCard
+                pending={pendingRowId === notification.id}
                 notification={notification}
                 onPress={() => handleRowPress(notification)}
                 onArchive={() => handleArchive(notification)}
@@ -401,11 +408,12 @@ export default function NotificationsScreen() {
 
 interface NotificationCardProps {
   notification: MobileNotification;
+  pending: boolean;
   onPress: () => void;
   onArchive: () => void;
 }
 
-function NotificationCard({ notification, onPress, onArchive }: NotificationCardProps) {
+function NotificationCard({ notification, pending, onPress, onArchive }: NotificationCardProps) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -424,11 +432,15 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
       <View style={styles.alertHeader}>
         <View style={styles.alertTitleRow}>
           <View style={[styles.alertIconFrame, !isUnread && styles.alertIconFrameMuted]}>
-            <Ionicons
-              color={isUnread ? mobileColors.brand : mobileColors.textMuted}
-              name={getNotificationIconName(notification.type)}
-              size={18}
-            />
+            {pending ? (
+              <ActivityIndicator color={mobileColors.brand} size="small" />
+            ) : (
+              <Ionicons
+                color={isUnread ? mobileColors.brand : mobileColors.textMuted}
+                name={getNotificationIconName(notification.type)}
+                size={18}
+              />
+            )}
           </View>
           <View style={styles.titleColumn}>
             <View style={styles.titleLine}>

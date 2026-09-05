@@ -114,11 +114,7 @@ export function CalendarSubscriptionCard() {
         ) : error ? (
           <div className="flex flex-col items-start gap-3">
             <p className="m-0 text-[14px] text-[var(--dg-color-danger)]">{error}</p>
-            <Button
-              type="button"
-              onClick={() => void loadStatus()}
-              className="dg-btn dg-btn-secondary"
-            >
+            <Button type="button" onClick={() => loadStatus()} className="dg-btn dg-btn-secondary">
               Retry
             </Button>
           </div>
@@ -130,7 +126,7 @@ export function CalendarSubscriptionCard() {
             </p>
             <Button
               type="button"
-              onClick={() => void createLink()}
+              onClick={() => createLink()}
               disabled={isWorking}
               className="dg-btn dg-btn-primary"
             >
@@ -173,7 +169,7 @@ export function CalendarSubscriptionCard() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() => void replaceLink()}
+                onClick={() => replaceLink()}
                 disabled={isWorking}
                 className="dg-btn dg-btn-secondary"
               >
@@ -181,7 +177,7 @@ export function CalendarSubscriptionCard() {
               </Button>
               <Button
                 type="button"
-                onClick={() => void disableSubscription()}
+                onClick={() => disableSubscription()}
                 disabled={isWorking}
                 className="dg-btn dg-btn-danger"
               >

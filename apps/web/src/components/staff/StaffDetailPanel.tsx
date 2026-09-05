@@ -173,9 +173,10 @@ export function StaffDetailPanel({
     }
   }, [canEditEmployee, hasUnsavedChanges, handleRequestClose]);
 
-  const handleFooterSave = useCallback(() => {
-    editorRef.current?.save();
-  }, []);
+  // Returns the save promise so the footer button latches on it. The editor's
+  // own inline Save passes its handler straight through and always spun; this
+  // one dropped the promise, so the same operation had two different buttons.
+  const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
 
   return (
     <Sheet

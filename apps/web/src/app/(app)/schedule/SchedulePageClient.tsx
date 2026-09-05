@@ -5,6 +5,11 @@ import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
+import {
+  LazyOverlayFallback,
+  LazyPrintFallback,
+  LazyProgressFallback,
+} from "@/components/ui/lazy-fallback";
 import Toolbar from "@/components/Toolbar";
 import TimeZoneClocks from "@/components/TimeZoneClocks";
 import ScheduleGrid, {
@@ -44,12 +49,23 @@ import { X } from "lucide-react";
 
 const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
   ssr: false,
+  loading: LazyOverlayFallback,
 });
-const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), { ssr: false });
-const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), { ssr: false });
-const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), { ssr: false });
+const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
+  ssr: false,
+  loading: LazyOverlayFallback,
+});
+const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), {
+  ssr: false,
+  loading: LazyPrintFallback,
+});
+const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 
 import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
@@ -4964,72 +4980,81 @@ function SchedulerContent() {
     if (!org) return;
     const { startDate, endDate } = getAutoFillRange();
 
-    // Fetch fresh recurring shifts to get an accurate count
-    const freshRecurringShifts = await fetchRecurringShifts(
-      org.id,
-      undefined,
-      assignmentLabelMapRef.current,
-      false,
-      absenceTypeMapRef.current,
-    );
-    setRecurringShifts(freshRecurringShifts);
+    // The counting pass below fetches every recurring template and then walks
+    // the whole span, so this runs long before the confirm dialog it ends in.
+    // The toolbar's spinner reads this same flag; without setting it here the
+    // menu item sat inert for the entire wait.
+    setIsApplyingRecurring(true);
+    try {
+      // Fetch fresh recurring shifts to get an accurate count
+      const freshRecurringShifts = await fetchRecurringShifts(
+        org.id,
+        undefined,
+        assignmentLabelMapRef.current,
+        false,
+        absenceTypeMapRef.current,
+      );
+      setRecurringShifts(freshRecurringShifts);
 
-    // Count empty slots that would be filled (matches server-side RPC logic)
-    const byEmp: Record<string, RecurringShift[]> = {};
-    for (const rs of freshRecurringShifts) {
-      if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
-      byEmp[rs.empId].push(rs);
-    }
+      // Count empty slots that would be filled (matches server-side RPC logic)
+      const byEmp: Record<string, RecurringShift[]> = {};
+      for (const rs of freshRecurringShifts) {
+        if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
+        byEmp[rs.empId].push(rs);
+      }
 
-    let count = 0;
-    const cellKeys: string[] = [];
-    // DST-safe iteration using UTC arithmetic
-    for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
-      for (const [empId, empShifts] of Object.entries(byEmp)) {
-        if (hasVisibleGridShiftEntry(shifts[`${empId}_${dateKey}`])) continue;
-        // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
-        const candidates = empShifts
-          .filter((rs) => rs.dayOfWeek === dayOfWeek)
-          .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
-        const match = candidates.find((rs) => {
-          const from = rs.effectiveFrom;
-          const until = rs.effectiveUntil;
-          return from <= dateKey && (!until || until >= dateKey);
-        });
-        // Verify the canonical recurring state still references active schedule definitions.
-        if (match) {
-          if (match.input.kind === "worked") {
-            const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
-            const activeJobIds = new Set(jobs.map((job) => job.id));
-            const isActive = match.input.segments.every(
-              (segment) =>
-                activeJobIds.has(segment.jobId) &&
-                (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
-            );
-            if (isActive) {
+      let count = 0;
+      const cellKeys: string[] = [];
+      // DST-safe iteration using UTC arithmetic
+      for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
+        for (const [empId, empShifts] of Object.entries(byEmp)) {
+          if (hasVisibleGridShiftEntry(shifts[`${empId}_${dateKey}`])) continue;
+          // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
+          const candidates = empShifts
+            .filter((rs) => rs.dayOfWeek === dayOfWeek)
+            .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+          const match = candidates.find((rs) => {
+            const from = rs.effectiveFrom;
+            const until = rs.effectiveUntil;
+            return from <= dateKey && (!until || until >= dateKey);
+          });
+          // Verify the canonical recurring state still references active schedule definitions.
+          if (match) {
+            if (match.input.kind === "worked") {
+              const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
+              const activeJobIds = new Set(jobs.map((job) => job.id));
+              const isActive = match.input.segments.every(
+                (segment) =>
+                  activeJobIds.has(segment.jobId) &&
+                  (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
+              );
+              if (isActive) {
+                count++;
+                cellKeys.push(`${empId}_${dateKey}`);
+              }
+            } else if (
+              match.input.kind === "absence" &&
+              match.input.absenceTypeId != null &&
+              absenceTypes.some((at) => at.id === match.input.absenceTypeId)
+            ) {
               count++;
               cellKeys.push(`${empId}_${dateKey}`);
             }
-          } else if (
-            match.input.kind === "absence" &&
-            match.input.absenceTypeId != null &&
-            absenceTypes.some((at) => at.id === match.input.absenceTypeId)
-          ) {
-            count++;
-            cellKeys.push(`${empId}_${dateKey}`);
           }
         }
       }
-    }
 
-    if (count === 0) {
-      toast.info("No empty schedule slots matched recurring templates for this date range");
-      return;
-    }
+      if (count === 0) {
+        toast.info("No empty schedule slots matched recurring templates for this date range");
+        return;
+      }
 
-    const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
-    setAutoFillPreview({ count, dateRange, cellKeys });
-    setShowAutoFillConfirm(true);
+      const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+      setAutoFillPreview({ count, dateRange, cellKeys });
+      setShowAutoFillConfirm(true);
+    } finally {
+      setIsApplyingRecurring(false);
+    }
   }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs]);
 
   // Actually apply recurring schedules (called after confirmation)
@@ -6551,7 +6576,7 @@ function SchedulerContent() {
                   <Button
                     type="button"
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => void refetchPublishedRanges()}
+                    onClick={() => refetchPublishedRanges()}
                   >
                     Try again
                   </Button>

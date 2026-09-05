@@ -142,7 +142,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
         dismissDisabled
         footer={
           <SheetActions>
-            <Button label="Unlock" loading={authenticating} onPress={() => void attemptUnlock()} />
+            <Button label="Unlock" loading={authenticating} onPress={() => attemptUnlock()} />
           </SheetActions>
         }
         header={<SheetHeader icon="lock-closed-outline" title="DubGrid is locked" />}

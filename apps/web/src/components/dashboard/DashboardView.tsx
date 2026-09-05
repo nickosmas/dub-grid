@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import dynamic from "next/dynamic";
+import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 
@@ -67,15 +68,27 @@ import DashboardLoading from "./DashboardLoading";
 import { useDashboardInvitations } from "./useDashboardInvitations";
 const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
-const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), { ssr: false });
-const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), { ssr: false });
-const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), { ssr: false });
+const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
+const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
+const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 
 type ExpandedPanel =
