@@ -20,7 +20,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { getSupabasePublishableKey } from "@/lib/supabase-keys";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Authenticate via Supabase ─────────────────────────────────────
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   const anonKey = getSupabasePublishableKey();
 
   if (!supabaseUrl || !anonKey) {

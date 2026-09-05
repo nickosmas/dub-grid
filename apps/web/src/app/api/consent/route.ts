@@ -7,7 +7,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
+import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { verifyAccessToken } from "@/lib/auth/verify-token";
 
 export const dynamic = "force-dynamic";
@@ -21,18 +21,14 @@ const consentSchema = z.object({
 });
 
 function getUserClient(req: NextRequest) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    requireSupabasePublishableKey(),
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {},
+  return createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
       },
+      setAll() {},
     },
-  );
+  });
 }
 
 /**

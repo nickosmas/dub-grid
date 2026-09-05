@@ -31,6 +31,14 @@ export function getSupabaseSecretKey(): string | undefined {
 }
 
 /** Throwing variants for call sites that cannot proceed without a key. */
+export function requireSupabaseUrl(): string {
+  const url = getSupabaseUrl();
+  if (!url) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set.");
+  }
+  return url;
+}
+
 export function requireSupabasePublishableKey(): string {
   const key = getSupabasePublishableKey();
   if (!key) {

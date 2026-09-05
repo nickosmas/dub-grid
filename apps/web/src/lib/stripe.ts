@@ -5,7 +5,7 @@ import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 
 let _stripe: Stripe | null | undefined;
 
@@ -382,7 +382,7 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = getSupabaseSecretKey();
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Supabase service role credentials not configured");

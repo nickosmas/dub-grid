@@ -10,7 +10,7 @@ import {
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 
 export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   // schedule
@@ -88,7 +88,7 @@ const DEFAULT_EMAIL_ENABLED: Record<string, boolean> = {
 const MAX_EMAILS_PER_HOUR = 10;
 
 function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getSupabaseUrl();
   const key = getSupabaseSecretKey();
   if (!url || !key) throw new Error("Supabase env vars not configured");
   return createClient(url, key, {

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
-import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
+import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { extractBearerToken, verifyAccessToken } from "@/lib/auth/verify-token";
 import type { VerifiedClaims, VerifiedToken } from "@/lib/auth/verify-token";
 import { isSessionRevoked } from "@/lib/auth/revocation";
@@ -35,21 +35,17 @@ type ClaimsAuthResult =
  */
 export function createRequestSupabaseClient(req: NextRequest) {
   const bearer = extractBearerToken(req);
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    requireSupabasePublishableKey(),
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll() {
-          // Route handlers use the request-bound response separately.
-        },
+  return createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return req.cookies.getAll();
       },
-      ...(bearer ? { global: { headers: { Authorization: `Bearer ${bearer}` } } } : {}),
+      setAll() {
+        // Route handlers use the request-bound response separately.
+      },
     },
-  );
+    ...(bearer ? { global: { headers: { Authorization: `Bearer ${bearer}` } } } : {}),
+  });
 }
 
 /**
@@ -60,7 +56,7 @@ export function createRequestSupabaseClient(req: NextRequest) {
  * client the same way they do with the cookie-based one.
  */
 export function createTokenScopedClient(accessToken: string) {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, requireSupabasePublishableKey(), {
+  return createClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
@@ -74,7 +70,7 @@ export function createTokenScopedClient(accessToken: string) {
  * service_role to the signed-in user's JWT for the rest of the process.
  */
 export function createAnonClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, requireSupabasePublishableKey(), {
+  return createClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }

@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
 import type { NextRequest } from "next/server";
+import { getSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
  * Local access-token verification, shared by middleware and API routes.
@@ -62,7 +63,7 @@ let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
  */
 export function getSupabaseJwks(): ReturnType<typeof createRemoteJWKSet> | null {
   if (cachedJwks) return cachedJwks;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   if (!supabaseUrl) return null;
   cachedJwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
   return cachedJwks;
@@ -74,7 +75,7 @@ export function resetSupabaseJwksCache(): void {
 }
 
 function supabaseIssuer(): string | null {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = getSupabaseUrl();
   return supabaseUrl ? `${supabaseUrl}/auth/v1` : null;
 }
 

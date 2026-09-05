@@ -1,6 +1,6 @@
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { getServiceClient } from "@/lib/supabase-service";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { isValidOrgSlug } from "@/lib/subdomain";
 import { withTimeoutOrThrow } from "@/lib/with-timeout";
 import logger from "@/lib/logger";
@@ -18,7 +18,7 @@ export async function lookupOrgBySlug(rawSlug: string): Promise<OrgLookupResult>
   const slug = rawSlug.trim().toLowerCase();
   if (!slug || !isValidOrgSlug(slug)) return { status: "not-found" };
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !getSupabaseSecretKey()) {
+  if (!getSupabaseUrl() || !getSupabaseSecretKey()) {
     return { status: "unconfigured" };
   }
 
