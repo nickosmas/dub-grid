@@ -214,6 +214,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // button stack, and a popup that always ran to 80% of the screen would
       // read as an oversized sheet wearing a different corner radius.
       maxHeight: "80%",
+      // Load-bearing, not decorative: without it Yoga has no bounded height
+      // to hand the ScrollView below, and the ScrollView can collapse
+      // instead of sizing to its content, clipping the body text against the
+      // footer's divider. `BottomSheetModal`'s own `sheet` carries the same
+      // `flexShrink: 1` for the same reason.
+      flexShrink: 1,
       borderRadius: mobileRadii.card,
       backgroundColor: mobileColors.surface,
       overflow: "hidden",
@@ -225,7 +231,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingBottom: mobileSpace.sm,
     },
     scrollArea: {
-      flexGrow: 0,
+      flexShrink: 1,
     },
     body: {
       paddingHorizontal: mobileSpace.xl,

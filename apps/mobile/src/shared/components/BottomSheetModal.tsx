@@ -370,7 +370,11 @@ const createStyles = (
       paddingBottom: mobileSpace.lg,
     },
     footer: {
-      flexDirection: "row",
+      // Column, not row: `SheetActions` (its usual, near-universal payload) is
+      // itself a stacked, full-width button group, and a row here reduces it
+      // to a single narrow row-item hugging its own content instead of
+      // stretching to the sheet's width — column lets each top-level child
+      // (an `InlineError` above the actions, say) stretch on its own.
       gap: 12,
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
