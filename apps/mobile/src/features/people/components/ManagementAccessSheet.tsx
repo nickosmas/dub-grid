@@ -200,6 +200,37 @@ export function ManagementAccessSheet({
     <>
       <BottomSheetModal
         debugName="Management access"
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions>
+              {/* One label for both branches, as on web. "Send Invitation" would
+                  also collide with the staff-invitation action on the page behind
+                  this sheet, which does something else entirely. */}
+              <Button
+                disabled={!canSubmit}
+                label="Save Access"
+                loading={mutation.isPending}
+                onPress={submit}
+                tone="primary"
+              />
+              {isEditing ? (
+                <Button
+                  disabled={mutation.isPending}
+                  label="Remove from Management"
+                  onPress={() => setShowRemoveConfirmation(true)}
+                  tone="danger"
+                />
+              ) : null}
+              <Button
+                disabled={mutation.isPending}
+                label="Cancel"
+                onPress={guard.requestClose}
+                tone="neutral"
+              />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
@@ -259,35 +290,6 @@ export function ManagementAccessSheet({
             ) : null}
           </View>
         )}
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          {/* One label for both branches, as on web. "Send Invitation" would
-              also collide with the staff-invitation action on the page behind
-              this sheet, which does something else entirely. */}
-          <Button
-            disabled={!canSubmit}
-            label="Save Access"
-            loading={mutation.isPending}
-            onPress={submit}
-            tone="primary"
-          />
-          {isEditing ? (
-            <Button
-              disabled={mutation.isPending}
-              label="Remove from Management"
-              onPress={() => setShowRemoveConfirmation(true)}
-              tone="danger"
-            />
-          ) : null}
-          <Button
-            disabled={mutation.isPending}
-            label="Cancel"
-            onPress={guard.requestClose}
-            tone="neutral"
-          />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />

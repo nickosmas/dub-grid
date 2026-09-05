@@ -41,9 +41,12 @@ const CONTROL_CLASS = "dg-btn dg-btn-secondary dg-btn-sm dg-btn-icon";
 // The numerals deliberately skip `.dg-btn`. At button size they read as a row
 // of chunky squares competing with Previous/Next; staying off the class also
 // keeps their sizing in the utility layer, where it actually applies.
+// `font-medium` is not decoration: the rendered-typography contract in
+// e2e/typography.spec.ts fails any enabled control whose text renders below
+// weight 500, and these numerals would otherwise inherit 400.
 const PAGE_CLASS =
   "inline-flex h-7 min-w-7 items-center justify-center rounded-[var(--dg-radius-sm)] px-1.5 " +
-  "text-[length:var(--dg-fs-label)] tabular-nums transition-colors";
+  "text-[length:var(--dg-fs-label)] font-medium tabular-nums transition-colors";
 const PAGE_IDLE =
   "cursor-pointer text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-border-light)] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dg-color-border-focus)]";

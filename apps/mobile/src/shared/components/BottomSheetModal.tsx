@@ -22,7 +22,13 @@ import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
  * used on both pages and sheets, so they read this rather than taking a prop —
  * a prop is something a call site can forget, and this cannot be.
  */
-const InsideSheetContext = createContext(false);
+/**
+ * Exported (not just the hook below) so `ConfirmationModal` can provide the
+ * same signal from its own popup card: that surface is elevated too, and a
+ * `ProfilePanel`/`ProfileList` nested in a confirmation's `children` needs the
+ * same "don't cast your own shadow" answer it would get inside a sheet.
+ */
+export const InsideSheetContext = createContext(false);
 
 /** True when the caller is somewhere beneath a `BottomSheetModal`. */
 export function useIsInsideSheet(): boolean {

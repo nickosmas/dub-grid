@@ -113,6 +113,26 @@ export function ConsentGate({ children }: PropsWithChildren) {
       <BottomSheetModal
         accessibilityRole="alert"
         dismissDisabled
+        footer={
+          <SheetActions>
+            {/* Returning the promise is what latches the button against a second
+                tap. `void`-ing it left `useAsyncAction` with nothing to await, so
+                the only guard was a state flag that lands a render too late. */}
+            <Button
+              disabled={saving}
+              label="Accept all"
+              loading={saving}
+              onPress={() => choose(true)}
+              tone="primary"
+            />
+            <Button
+              disabled={saving}
+              label="Essential only"
+              onPress={() => choose(false)}
+              tone="secondary"
+            />
+          </SheetActions>
+        }
         header={<SheetHeader title="Your privacy" />}
         onDismiss={() => {}}
         visible={needsDecision === true}
@@ -125,24 +145,6 @@ export function ConsentGate({ children }: PropsWithChildren) {
           // a sheet they still have to answer.
           onLinkPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
         />
-        <SheetActions>
-          {/* Returning the promise is what latches the button against a second
-              tap. `void`-ing it left `useAsyncAction` with nothing to await, so
-              the only guard was a state flag that lands a render too late. */}
-          <Button
-            disabled={saving}
-            label="Accept all"
-            loading={saving}
-            onPress={() => choose(true)}
-            tone="primary"
-          />
-          <Button
-            disabled={saving}
-            label="Essential only"
-            onPress={() => choose(false)}
-            tone="secondary"
-          />
-        </SheetActions>
       </BottomSheetModal>
     </>
   );
