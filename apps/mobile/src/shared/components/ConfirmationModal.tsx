@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,7 +16,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { AppText } from "./AppText";
-import { InsideSheetContext, SheetActions } from "./BottomSheetModal";
+import { InsideSheetContext } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
 import { InlineError } from "./InlineError";
 import { Pressable } from "./Pressable";
@@ -32,6 +33,58 @@ type ConfirmationTone = Extract<
 
 /** How far the card sits below full size while hidden, and settles from. */
 const CARD_ENTRANCE_SCALE = 0.92;
+
+/**
+ * The glyph for each tone's icon badge. Outline, not solid: this app's own
+ * convention (`StatusBanner`'s `centeredIconName`) reaches for the outline
+ * variant whenever an icon is the prominent, standalone focus rather than a
+ * small accent beside text - the same role this badge plays here.
+ */
+const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.glyphMap> = {
+  primary: "checkmark-circle-outline",
+  secondary: "checkmark-circle-outline",
+  neutral: "information-circle-outline",
+  danger: "trash-outline",
+  warning: "warning-outline",
+};
+
+/**
+ * Background/border/icon colour for the tone badge, mirroring
+ * `StatusBanner`'s tone-to-colour mapping (`dangerSoft`/`dangerBorder`/
+ * `dangerText`, etc.) rather than inventing a second one. `neutral` has no
+ * matching semantic-soft token in the palette, so it composes the same
+ * control-surface tokens `Button`'s own neutral tone already uses.
+ */
+function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileColors) {
+  switch (tone) {
+    case "danger":
+      return {
+        background: mobileColors.dangerSoft,
+        border: mobileColors.dangerBorder,
+        icon: mobileColors.dangerText,
+      };
+    case "warning":
+      return {
+        background: mobileColors.warningSoft,
+        border: mobileColors.warningBorder,
+        icon: mobileColors.warningText,
+      };
+    case "neutral":
+      return {
+        background: mobileColors.controlNeutralBg,
+        border: mobileColors.borderSubtle,
+        icon: mobileColors.textSecondary,
+      };
+    case "primary":
+    case "secondary":
+    default:
+      return {
+        background: mobileColors.brandSoft,
+        border: mobileColors.brandBorder,
+        icon: mobileColors.brand,
+      };
+  }
+}
 
 /**
  * The app's one confirmation surface: a centered popup over a scrim, not a
@@ -98,6 +151,10 @@ export function ConfirmationModal({
   const styles = useMemo(
     () => createStyles(mobileColors, isDark, windowHeight),
     [mobileColors, isDark, windowHeight],
+  );
+  const iconColors = useMemo(
+    () => getConfirmationIconColors(confirmTone, mobileColors),
+    [confirmTone, mobileColors],
   );
   const { spring, timing } = useMotionPreference();
 
@@ -171,7 +228,19 @@ export function ConfirmationModal({
           >
             <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
               <View style={styles.header}>
-                <AppText align="center" variant="cardTitle">
+                <View
+                  style={[
+                    styles.iconBadge,
+                    { backgroundColor: iconColors.background, borderColor: iconColors.border },
+                  ]}
+                >
+                  <Ionicons
+                    color={iconColors.icon}
+                    name={CONFIRMATION_ICON_NAME[confirmTone]}
+                    size={28}
+                  />
+                </View>
+                <AppText align="center" variant="sectionTitle">
                   {title}
                 </AppText>
               </View>
@@ -191,17 +260,23 @@ export function ConfirmationModal({
                 {error ? <InlineError message={error} /> : null}
               </ScrollView>
               {/* Outside the ScrollView so the confirm/cancel actions stay put
-                  regardless of how much the popup's body has to scroll. */}
+                  regardless of how much the popup's body has to scroll. Side
+                  by side, not stacked: a popup is a compact yes/no moment,
+                  not a sheet's list of ranked actions. */}
               <View style={styles.footer}>
-                <SheetActions>
-                  <Button
-                    label={confirmLabel}
-                    loading={isBusy}
-                    onPress={confirm.run}
-                    tone={confirmTone}
-                  />
-                  <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="neutral" />
-                </SheetActions>
+                <View style={styles.actionsRow}>
+                  <View style={styles.actionButton}>
+                    <Button
+                      label={confirmLabel}
+                      loading={isBusy}
+                      onPress={confirm.run}
+                      tone={confirmTone}
+                    />
+                  </View>
+                  <View style={styles.actionButton}>
+                    <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="plain" />
+                  </View>
+                </View>
               </View>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -247,9 +322,23 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       ...mobileElevation("overlay", isDark),
     },
     header: {
+      alignItems: "center",
       paddingHorizontal: mobileSpace.xl,
-      paddingTop: mobileSpace.xl,
+      paddingTop: mobileSpace["2xl"],
       paddingBottom: mobileSpace.sm,
+    },
+    // Sized and bordered like `EmptyStateCard`'s full-page icon frame - the
+    // established "big, standalone icon" badge elsewhere in the app. Flat
+    // fill plus a hairline border, no shadow: nothing in this app's existing
+    // icon badges reaches for a glow, so this doesn't invent one either.
+    iconBadge: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: mobileSpace.md,
     },
     scrollArea: {
       flexShrink: 1,
@@ -259,11 +348,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       paddingBottom: mobileSpace.lg,
       gap: mobileSpace.sm,
     },
+    // No top divider: unlike a sheet, this card has no scrollable body long
+    // enough to need a permanent "more below" cue, and the mockup this
+    // redesign matches separates the actions with space alone.
     footer: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
       paddingHorizontal: mobileSpace.xl,
-      paddingTop: 14,
+      paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.xl,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: mobileSpace.sm,
+    },
+    actionButton: {
+      flex: 1,
     },
   });

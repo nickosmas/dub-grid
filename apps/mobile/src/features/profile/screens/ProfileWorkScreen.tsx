@@ -439,7 +439,7 @@ export default function ProfileWorkScreen() {
             disabled={saveMutation.isPending}
             label="Cancel"
             onPress={() => router.back()}
-            tone="ghost"
+            tone="plain"
           />
         </View>
       </View>

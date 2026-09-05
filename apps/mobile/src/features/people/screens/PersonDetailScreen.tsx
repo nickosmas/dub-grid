@@ -903,7 +903,7 @@ export default function PersonDetailScreen() {
           disabled={updateMutation.isPending}
           label="Cancel"
           onPress={guard.requestClose}
-          tone="ghost"
+          tone="plain"
         />
       </View>
     </View>
