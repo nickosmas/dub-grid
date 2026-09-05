@@ -472,8 +472,10 @@ export default function DashboardView({
       //
       // Skipped on the user dashboard: the Activity Feed and the publish
       // banner it feeds are both admin-only, so staff were being handed an
-      // audit trail of who published what purely to discard it.
-      isUserDashboardMode
+      // audit trail of who published what purely to discard it. The permission
+      // check mirrors what the route now enforces, so a permissionless admin
+      // never fires a request it would only 403 and swallow.
+      isUserDashboardMode || !permissions.canViewDashboardAnalytics
         ? Promise.resolve([])
         : fetchPublishHistory(orgId, 100, 0, {
             startDate: periodStartKey,
@@ -507,6 +509,7 @@ export default function DashboardView({
     orgId,
     isScheduler,
     isUserDashboardMode,
+    permissions.canViewDashboardAnalytics,
     todayKey,
     periodEnd,
     periodEndKey,

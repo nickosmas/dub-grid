@@ -168,6 +168,35 @@ describe("GET /api/schedule/publish-history", () => {
     expect(body.entries[0].publishedByName).toBe("Unknown");
   });
 
+  it("admits management capabilities and refuses plain schedule viewers", async () => {
+    const serviceClient = createServiceClient();
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    await GET(makeRequest({ orgId: ORG_ID }));
+
+    // The gate itself is mocked, so evaluate the predicate the route handed it.
+    const isAllowed = requireOrgPermissions.mock.calls[0][2] as (
+      permissions: Record<string, boolean>,
+    ) => boolean;
+
+    // Regular staff: canViewSchedule is true for every authenticated member, so
+    // it can't be the gate here. Who published what is a management record.
+    expect(isAllowed({ canViewSchedule: true, canViewDashboardAnalytics: false })).toBe(false);
+
+    // authz derives canViewDashboardAnalytics from canEditShifts,
+    // canManageEmployees, canPublishSchedule and canApproveShiftRequests, so
+    // every scheduler, publisher, approver and staff manager still qualifies.
+    expect(isAllowed({ canViewSchedule: true, canViewDashboardAnalytics: true })).toBe(true);
+    expect(isAllowed({ isSuperAdmin: true })).toBe(true);
+    expect(isAllowed({ isGridmaster: true })).toBe(true);
+  });
+
   it("does not authorize invalid queries", async () => {
     const response = await GET(makeRequest({ orgId: "not-a-uuid" }));
     const body = await response.json();
