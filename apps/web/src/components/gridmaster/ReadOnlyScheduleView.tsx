@@ -221,7 +221,7 @@ export default function ReadOnlyScheduleView({
                                   style={{
                                     display: "inline-block",
                                     padding: "1px 6px",
-                                    borderRadius: 4,
+                                    borderRadius: "var(--dg-radius-xs)",
                                     fontSize: "var(--dg-fs-caption)",
                                     fontWeight: 700,
                                     border: "1px solid",
@@ -238,7 +238,7 @@ export default function ReadOnlyScheduleView({
                             style={{
                               display: "inline-block",
                               padding: "1px 6px",
-                              borderRadius: 4,
+                              borderRadius: "var(--dg-radius-xs)",
                               fontSize: "var(--dg-fs-caption)",
                               fontWeight: 700,
                               background: "var(--dg-color-warning-bg)",
@@ -273,7 +273,7 @@ export default function ReadOnlyScheduleView({
                                 color: "var(--dg-color-warning)",
                                 background: "var(--dg-color-warning-bg)",
                                 padding: "1px 6px",
-                                borderRadius: 4,
+                                borderRadius: "var(--dg-radius-xs)",
                               }}
                             >
                               Draft
@@ -286,7 +286,7 @@ export default function ReadOnlyScheduleView({
                                 color: "var(--dg-color-success)",
                                 background: "var(--dg-color-success-bg)",
                                 padding: "1px 6px",
-                                borderRadius: 4,
+                                borderRadius: "var(--dg-radius-xs)",
                               }}
                             >
                               Published
@@ -301,7 +301,7 @@ export default function ReadOnlyScheduleView({
                                   color: "var(--dg-color-today-text)",
                                   background: "var(--dg-color-today-bg)",
                                   padding: "1px 6px",
-                                  borderRadius: 4,
+                                  borderRadius: "var(--dg-radius-xs)",
                                 }}
                               >
                                 {formatShiftRequestTypeLabel(request.type)}
@@ -319,7 +319,7 @@ export default function ReadOnlyScheduleView({
                                 color: "var(--dg-color-danger)",
                                 background: "var(--dg-color-danger-bg)",
                                 padding: "1px 6px",
-                                borderRadius: 4,
+                                borderRadius: "var(--dg-radius-xs)",
                               }}
                             >
                               Coverage

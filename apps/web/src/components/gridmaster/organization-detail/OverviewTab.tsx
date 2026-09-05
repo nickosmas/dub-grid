@@ -414,7 +414,12 @@ export function OverviewTab({
                     <span
                       aria-hidden
                       className="dg-skeleton"
-                      style={{ display: "inline-block", width: 36, height: 12, borderRadius: 4 }}
+                      style={{
+                        display: "inline-block",
+                        width: 36,
+                        height: 12,
+                        borderRadius: "var(--dg-radius-xs)",
+                      }}
                     />
                   ) : (
                     employeeCount.toString()

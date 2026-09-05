@@ -367,7 +367,7 @@ function RecurringShiftPill({
           border: isDirty
             ? "2px dashed var(--dg-color-text-subtle)"
             : "1px dashed var(--dg-color-border-light)",
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -418,7 +418,7 @@ function RecurringShiftPill({
         left: 4,
         background: pillBackground,
         border: isDirty ? `2px dashed ${pillText}` : fallbackBorder,
-        borderRadius: 8,
+        borderRadius: "var(--dg-radius-md)",
         color: pillText,
         display: "flex",
         flexDirection: "column",
@@ -1245,7 +1245,7 @@ export function RecurringScheduleSection({
                             fontSize: "var(--dg-fs-micro)",
                             fontWeight: 700,
                             padding: "1px 5px",
-                            borderRadius: 10,
+                            borderRadius: "var(--dg-radius-lg)",
                             background: "var(--dg-color-brand-bg)",
                             color: "var(--dg-color-brand)",
                             whiteSpace: "nowrap",

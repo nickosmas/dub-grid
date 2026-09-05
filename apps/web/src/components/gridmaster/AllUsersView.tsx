@@ -40,7 +40,7 @@ function RoleBadge({ role }: { role: string }) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: c.bg,
         color: c.text,
         border: `1px solid ${c.border}`,
@@ -62,7 +62,7 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: "var(--dg-color-danger-bg)",
         color: "var(--dg-color-danger)",
         textTransform: "uppercase",
@@ -927,7 +927,11 @@ export default function AllUsersView({
                                 <td style={tdStyle}>
                                   <div
                                     className="dg-skeleton"
-                                    style={{ width: "70%", height: 12, borderRadius: 4 }}
+                                    style={{
+                                      width: "70%",
+                                      height: 12,
+                                      borderRadius: "var(--dg-radius-xs)",
+                                    }}
                                   />
                                 </td>
                                 <td style={tdStyle}>
@@ -939,7 +943,11 @@ export default function AllUsersView({
                                 <td style={tdStyle}>
                                   <div
                                     className="dg-skeleton"
-                                    style={{ width: 96, height: 12, borderRadius: 4 }}
+                                    style={{
+                                      width: 96,
+                                      height: 12,
+                                      borderRadius: "var(--dg-radius-xs)",
+                                    }}
                                   />
                                 </td>
                               </tr>

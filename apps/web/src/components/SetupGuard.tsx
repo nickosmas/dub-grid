@@ -110,7 +110,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             onClick={() => window.location.reload()}
             style={{
               padding: "10px 24px",
-              borderRadius: 10,
+              borderRadius: "var(--dg-radius-lg)",
               border: "none",
               background: "var(--dg-color-primary, #2563EB)",
               color: "white",
@@ -125,7 +125,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             onClick={() => signOut()}
             style={{
               padding: "10px 24px",
-              borderRadius: 10,
+              borderRadius: "var(--dg-radius-lg)",
               border: "1px solid var(--dg-color-border)",
               background: "var(--dg-color-surface)",
               color: "var(--dg-color-text-primary)",

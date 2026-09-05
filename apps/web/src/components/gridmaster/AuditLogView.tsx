@@ -40,7 +40,7 @@ function ActionBadge({ action }: { action: string }) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: colors.bg,
         border: `1px solid ${colors.border}`,
         color: colors.fg,

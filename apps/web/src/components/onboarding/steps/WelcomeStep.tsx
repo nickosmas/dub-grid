@@ -210,7 +210,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
           width: "100%",
           maxWidth: 320,
           padding: "14px 24px",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-xl)",
           border: "none",
           background: "var(--dg-color-brand)",
           color: "var(--dg-color-text-inverse)",

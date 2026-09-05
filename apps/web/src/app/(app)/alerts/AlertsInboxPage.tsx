@@ -1469,7 +1469,7 @@ function ListPlaceholder() {
                 width: "40%",
                 height: 12,
                 background: "var(--dg-color-bg-secondary)",
-                borderRadius: 4,
+                borderRadius: "var(--dg-radius-xs)",
               }}
             />
             <div
@@ -1477,7 +1477,7 @@ function ListPlaceholder() {
                 width: "70%",
                 height: 10,
                 background: "var(--dg-color-bg-secondary)",
-                borderRadius: 4,
+                borderRadius: "var(--dg-radius-xs)",
               }}
             />
           </div>

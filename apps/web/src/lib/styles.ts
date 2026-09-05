@@ -4,7 +4,7 @@ import { BOX_SHADOW_CARD } from "@/lib/constants";
 /** Card-like section container (white bg, border, shadow). */
 export const sectionStyle: CSSProperties = {
   background: "var(--dg-color-surface)",
-  borderRadius: 12,
+  borderRadius: "var(--dg-radius-xl)",
   border: "1px solid var(--dg-color-border)",
   overflow: "hidden",
   boxShadow: BOX_SHADOW_CARD,

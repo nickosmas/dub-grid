@@ -139,7 +139,7 @@ export function InvitationsTab({
                           style={{
                             display: "inline-block",
                             padding: "2px 8px",
-                            borderRadius: 4,
+                            borderRadius: "var(--dg-radius-xs)",
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
                             color: status.color,

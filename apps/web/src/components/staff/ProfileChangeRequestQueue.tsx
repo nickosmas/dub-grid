@@ -209,8 +209,14 @@ function RequestQueueSkeleton() {
         <div key={i} className="dg-card" aria-hidden>
           <div className="dg-card-header">
             <div className="flex flex-col gap-2">
-              <div className="dg-skeleton" style={{ width: 140, height: 14, borderRadius: 4 }} />
-              <div className="dg-skeleton" style={{ width: 200, height: 12, borderRadius: 4 }} />
+              <div
+                className="dg-skeleton"
+                style={{ width: 140, height: 14, borderRadius: "var(--dg-radius-xs)" }}
+              />
+              <div
+                className="dg-skeleton"
+                style={{ width: 200, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+              />
             </div>
             <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
           </div>
@@ -218,18 +224,30 @@ function RequestQueueSkeleton() {
             <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 sm:grid-cols-3">
               {Array.from({ length: 3 }).map((__, j) => (
                 <div key={j} className="flex flex-col gap-2">
-                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
                   <div
                     className="dg-skeleton"
-                    style={{ width: "80%", height: 12, borderRadius: 4 }}
+                    style={{ width: 90, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+                  />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: "80%", height: 12, borderRadius: "var(--dg-radius-xs)" }}
                   />
                 </div>
               ))}
             </div>
-            <div className="dg-skeleton" style={{ width: "100%", height: 96, borderRadius: 8 }} />
+            <div
+              className="dg-skeleton"
+              style={{ width: "100%", height: 96, borderRadius: "var(--dg-radius-md)" }}
+            />
             <div className="flex gap-2">
-              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
-              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
+              <div
+                className="dg-skeleton"
+                style={{ width: 96, height: 32, borderRadius: "var(--dg-radius-sm)" }}
+              />
+              <div
+                className="dg-skeleton"
+                style={{ width: 96, height: 32, borderRadius: "var(--dg-radius-sm)" }}
+              />
             </div>
           </div>
         </div>

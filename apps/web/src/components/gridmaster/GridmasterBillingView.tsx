@@ -124,8 +124,14 @@ function BillingOversightSkeleton() {
               gap: 8,
             }}
           >
-            <div className="dg-skeleton" style={{ width: 48, height: 22, borderRadius: 4 }} />
-            <div className="dg-skeleton" style={{ width: 96, height: 10, borderRadius: 4 }} />
+            <div
+              className="dg-skeleton"
+              style={{ width: 48, height: 22, borderRadius: "var(--dg-radius-xs)" }}
+            />
+            <div
+              className="dg-skeleton"
+              style={{ width: 96, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+            />
           </div>
         ))}
       </div>
@@ -135,12 +141,21 @@ function BillingOversightSkeleton() {
             <div key={i} style={{ display: "flex", gap: 16, alignItems: "center" }}>
               <div
                 className="dg-skeleton"
-                style={{ flex: "1 1 160px", height: 12, borderRadius: 4 }}
+                style={{ flex: "1 1 160px", height: 12, borderRadius: "var(--dg-radius-xs)" }}
               />
               <div className="dg-skeleton" style={{ width: 80, height: 18, borderRadius: 999 }} />
-              <div className="dg-skeleton" style={{ width: 90, height: 12, borderRadius: 4 }} />
-              <div className="dg-skeleton" style={{ width: 60, height: 12, borderRadius: 4 }} />
-              <div className="dg-skeleton" style={{ width: 120, height: 28, borderRadius: 6 }} />
+              <div
+                className="dg-skeleton"
+                style={{ width: 90, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+              />
+              <div
+                className="dg-skeleton"
+                style={{ width: 60, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+              />
+              <div
+                className="dg-skeleton"
+                style={{ width: 120, height: 28, borderRadius: "var(--dg-radius-sm)" }}
+              />
             </div>
           ))}
         </div>

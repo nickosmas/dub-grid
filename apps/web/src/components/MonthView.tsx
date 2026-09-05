@@ -182,7 +182,7 @@ function DayPopover({
                         fontWeight: 700,
                         color: wc.text,
                         background: wc.bg,
-                        borderRadius: 4,
+                        borderRadius: "var(--dg-radius-xs)",
                         padding: "3px 8px",
                         marginBottom: 5,
                       }}
@@ -204,7 +204,7 @@ function DayPopover({
                                 alignItems: "center",
                                 gap: 5,
                                 padding: "2px 4px",
-                                borderRadius: 6,
+                                borderRadius: "var(--dg-radius-sm)",
                                 background:
                                   hasHighlightedSearch && isHighlighted
                                     ? "var(--dg-color-brand-bg)"
@@ -224,7 +224,7 @@ function DayPopover({
                                   border: dk
                                     ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
                                     : `1px solid ${borderColor(s.text)}`,
-                                  borderRadius: 4,
+                                  borderRadius: "var(--dg-radius-xs)",
                                   padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
                                   fontSize: "var(--dg-fs-footnote)",
                                   fontWeight: 600,
@@ -527,7 +527,7 @@ export default function MonthView({
                 key={`empty-${i}`}
                 style={{
                   background: "transparent",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-radius-lg)",
                   minHeight: 64,
                 }}
               />
@@ -574,7 +574,7 @@ export default function MonthView({
                     : isToday
                       ? "2px solid var(--dg-color-today-text)"
                       : "1px solid var(--dg-color-border)",
-                borderRadius: 10,
+                borderRadius: "var(--dg-radius-lg)",
                 padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
                 minHeight: 64,
                 boxShadow: isOpen
@@ -648,7 +648,7 @@ export default function MonthView({
                             fontWeight: 700,
                             background: wc.bg,
                             color: wc.text,
-                            borderRadius: 4,
+                            borderRadius: "var(--dg-radius-xs)",
                             padding: "1px 5px",
                             flexShrink: 0,
                           }}

@@ -269,7 +269,7 @@ export default function OrganizationDetail({
               color: "var(--dg-color-text-muted)",
               background: "var(--dg-color-bg-secondary)",
               padding: "2px 8px",
-              borderRadius: 4,
+              borderRadius: "var(--dg-radius-xs)",
             }}
           >
             {organization.slug}
@@ -281,7 +281,7 @@ export default function OrganizationDetail({
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 600,
               padding: "2px 8px",
-              borderRadius: 4,
+              borderRadius: "var(--dg-radius-xs)",
               background: "var(--dg-color-danger-bg)",
               color: "var(--dg-color-danger)",
               textTransform: "uppercase",
@@ -296,7 +296,7 @@ export default function OrganizationDetail({
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 600,
               padding: "2px 8px",
-              borderRadius: 4,
+              borderRadius: "var(--dg-radius-xs)",
               background: "var(--dg-color-warning-bg)",
               color: "var(--dg-color-warning)",
               textTransform: "uppercase",

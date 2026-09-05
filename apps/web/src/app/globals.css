@@ -226,6 +226,10 @@
   --dg-grid-name-col-mobile: 160px;
   --dg-duration-fast: 150ms;
   --dg-duration-standard: 200ms;
+  /* 4px was the app's de-facto smallest radius long before it had a name:
+     76 call sites used the literal. Naming it is what lets them join the
+     scale rather than drift off it. */
+  --dg-radius-xs: 4px;
   --dg-radius-sm: 6px;
   --dg-radius-md: 8px;
   --dg-radius-lg: 10px;

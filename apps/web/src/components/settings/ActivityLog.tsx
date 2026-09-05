@@ -393,10 +393,22 @@ function SkeletonTable() {
             borderBottom: "1px solid var(--dg-color-border-light)",
           }}
         >
-          <div className="dg-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ flex: 1, height: 12, borderRadius: 4 }} />
-          <div className="dg-skeleton" style={{ width: 120, height: 12, borderRadius: 4 }} />
+          <div
+            className="dg-skeleton"
+            style={{ width: 80, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ width: 70, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ flex: 1, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
+          <div
+            className="dg-skeleton"
+            style={{ width: 120, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+          />
         </div>
       ))}
     </div>

@@ -58,8 +58,14 @@ function ComplianceSkeleton() {
               gap: 8,
             }}
           >
-            <div className="dg-skeleton" style={{ width: 48, height: 22, borderRadius: 4 }} />
-            <div className="dg-skeleton" style={{ width: 110, height: 10, borderRadius: 4 }} />
+            <div
+              className="dg-skeleton"
+              style={{ width: 48, height: 22, borderRadius: "var(--dg-radius-xs)" }}
+            />
+            <div
+              className="dg-skeleton"
+              style={{ width: 110, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+            />
           </div>
         ))}
       </div>
@@ -72,13 +78,22 @@ function ComplianceSkeleton() {
                 borderBottom: "1px solid var(--dg-color-border-light)",
               }}
             >
-              <div className="dg-skeleton" style={{ width: 140, height: 12, borderRadius: 4 }} />
+              <div
+                className="dg-skeleton"
+                style={{ width: 140, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+              />
             </div>
             <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {Array.from({ length: 4 }).map((__, j) => (
                 <div key={j} style={{ display: "flex", gap: 16 }}>
-                  <div className="dg-skeleton" style={{ flex: 1, height: 12, borderRadius: 4 }} />
-                  <div className="dg-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
+                  <div
+                    className="dg-skeleton"
+                    style={{ flex: 1, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+                  />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: 80, height: 12, borderRadius: "var(--dg-radius-xs)" }}
+                  />
                 </div>
               ))}
             </div>

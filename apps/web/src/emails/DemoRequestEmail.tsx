@@ -57,7 +57,7 @@ export function DemoRequestEmail({
       <Section
         style={{
           border: `1px solid ${emailTheme.border}`,
-          borderRadius: "8px",
+          borderRadius: "var(--dg-radius-md)",
           overflow: "hidden",
         }}
       >

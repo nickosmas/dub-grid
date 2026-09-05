@@ -239,7 +239,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
           style={{
             width: 40,
             height: 40,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

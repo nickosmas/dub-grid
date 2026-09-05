@@ -703,7 +703,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           style={{
             marginTop: 8,
             padding: "10px 12px",
-            borderRadius: 8,
+            borderRadius: "var(--dg-radius-md)",
             background:
               preview.overwrites > 0 ? "var(--dg-color-warning-bg)" : "var(--dg-color-success-bg)",
             border: `1px solid ${preview.overwrites > 0 ? "var(--dg-color-warning)" : "var(--dg-color-info-border)"}`,

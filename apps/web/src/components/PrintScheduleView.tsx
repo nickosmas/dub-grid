@@ -581,7 +581,7 @@ function PrintSection({
                                     left: "0.5em",
                                     background: isCross ? "#ffffff" : style.color,
                                     border: `1px solid ${borderColor(singleForegroundColor)}`,
-                                    borderRadius: 4,
+                                    borderRadius: "var(--dg-radius-xs)",
                                     color: singleForegroundColor,
                                     display: "flex",
                                     flexDirection: "column",
@@ -760,7 +760,7 @@ function PrintSection({
                                         flex: 1,
                                         background: isCross ? "#ffffff" : style.color,
                                         border: `1px solid ${borderColor(multiForegroundColor)}`,
-                                        borderRadius: 4,
+                                        borderRadius: "var(--dg-radius-xs)",
                                         color: multiForegroundColor,
                                         display: "flex",
                                         flexDirection: "column",
@@ -1232,7 +1232,7 @@ export default function PrintScheduleView({
             padding: "0.5in",
             maxWidth: "none",
             boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
           }}
         >
           {/* Print header */}
@@ -1356,7 +1356,7 @@ export default function PrintScheduleView({
                         background: s.color,
                         border: `1px solid ${borderColor(s.text)}`,
                         color: s.text,
-                        borderRadius: 4,
+                        borderRadius: "var(--dg-radius-xs)",
                         padding: "0.15em 0.5em",
                         fontSize: "0.9em",
                         fontWeight: 700,

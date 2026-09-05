@@ -337,7 +337,7 @@ export default function EnhancedImpersonation({
                         border: isSelected
                           ? "1px solid var(--dg-color-border)"
                           : "1px solid transparent",
-                        borderRadius: 8,
+                        borderRadius: "var(--dg-radius-md)",
                         cursor: "pointer",
                         fontFamily: "inherit",
                         textAlign: "left",
@@ -406,9 +406,18 @@ export default function EnhancedImpersonation({
                   gap: 10,
                 }}
               >
-                <div className="dg-skeleton" style={{ width: 180, height: 14, borderRadius: 4 }} />
-                <div className="dg-skeleton" style={{ width: 220, height: 10, borderRadius: 4 }} />
-                <div className="dg-skeleton" style={{ width: 120, height: 10, borderRadius: 4 }} />
+                <div
+                  className="dg-skeleton"
+                  style={{ width: 180, height: 14, borderRadius: "var(--dg-radius-xs)" }}
+                />
+                <div
+                  className="dg-skeleton"
+                  style={{ width: 220, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+                />
+                <div
+                  className="dg-skeleton"
+                  style={{ width: 120, height: 10, borderRadius: "var(--dg-radius-xs)" }}
+                />
               </div>
             ) : usersQuery.error instanceof Error ? (
               <div
@@ -640,7 +649,7 @@ export default function EnhancedImpersonation({
                           border: isSelected
                             ? "1px solid var(--dg-color-border)"
                             : "1px solid transparent",
-                          borderRadius: 8,
+                          borderRadius: "var(--dg-radius-md)",
                           cursor: "pointer",
                           fontFamily: "inherit",
                           textAlign: "left",

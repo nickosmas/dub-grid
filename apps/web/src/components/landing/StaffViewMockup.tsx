@@ -54,7 +54,7 @@ function StatusPill({
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        borderRadius: 6,
+        borderRadius: "var(--dg-radius-sm)",
         padding: "2px 8px",
         fontSize: 11,
         fontWeight: 500,
@@ -167,7 +167,7 @@ export default function StaffViewMockup() {
     <div
       style={{
         background: "var(--dg-color-surface)",
-        borderRadius: 12,
+        borderRadius: "var(--dg-radius-xl)",
         border: "1px solid var(--dg-color-border)",
         overflow: "hidden",
         boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06)",
@@ -213,7 +213,7 @@ export default function StaffViewMockup() {
                   fontWeight: 600,
                   height: 18,
                   minWidth: 18,
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-radius-lg)",
                   padding: "0 6px",
                   background: "var(--dg-color-bg-secondary)",
                   color: "var(--dg-color-text-muted)",
@@ -254,7 +254,7 @@ export default function StaffViewMockup() {
           <div
             style={{
               height: 32,
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               border: "1px solid var(--dg-color-border)",
               background: "var(--dg-color-surface)",
               paddingLeft: 32,

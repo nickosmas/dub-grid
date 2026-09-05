@@ -2509,7 +2509,7 @@ function SummaryMetricPanel({
           alignItems: "center",
           background: "var(--dg-color-brand-bg)",
           border: "1px solid var(--dg-color-brand-border)",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-xl)",
           color: "var(--dg-color-brand)",
           display: "flex",
           flexShrink: 0,

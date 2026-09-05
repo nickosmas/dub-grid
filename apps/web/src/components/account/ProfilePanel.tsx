@@ -975,7 +975,12 @@ export function ProfilePanel({
               <span
                 aria-hidden
                 className="dg-skeleton"
-                style={{ display: "inline-block", width: 180, height: 12, borderRadius: 4 }}
+                style={{
+                  display: "inline-block",
+                  width: 180,
+                  height: 12,
+                  borderRadius: "var(--dg-radius-xs)",
+                }}
               />
             ) : changeRequests.length > 0 ? (
               <p className="m-0 text-[13px] text-[var(--dg-color-text-muted)]">

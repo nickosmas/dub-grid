@@ -73,7 +73,7 @@ export function EmployeesTab({
                   fontWeight: 700,
                   background: isActive ? `${tab.color}15` : "var(--dg-color-border-light)",
                   color: isActive ? tab.color : "var(--dg-color-text-faint)",
-                  borderRadius: 10,
+                  borderRadius: "var(--dg-radius-lg)",
                   padding: "1px 7px",
                   minWidth: 20,
                   textAlign: "center",

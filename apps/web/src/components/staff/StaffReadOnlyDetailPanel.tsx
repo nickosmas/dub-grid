@@ -384,7 +384,7 @@ function ReadOnlyRow({
         style={{
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",

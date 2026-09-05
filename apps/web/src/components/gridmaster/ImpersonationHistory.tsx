@@ -53,7 +53,7 @@ function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: nu
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 600,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: config.bg,
         color: config.text,
         border: `1px solid ${config.border}`,

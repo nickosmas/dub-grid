@@ -30,7 +30,7 @@ export function Switch(props: SwitchProps) {
   const trackStyle: CSSProperties = {
     width: 44,
     height: 24,
-    borderRadius: 12,
+    borderRadius: "var(--dg-radius-xl)",
     border: "none",
     cursor: disabled ? "not-allowed" : "pointer",
     background: checked ? "var(--dg-color-brand)" : "var(--dg-color-switch-track-off)",

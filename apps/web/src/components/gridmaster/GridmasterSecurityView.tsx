@@ -138,7 +138,7 @@ function statusBadge(status: GridmasterUserSession["status"]) {
         fontSize: "var(--dg-fs-footnote)",
         fontWeight: 700,
         padding: "2px 8px",
-        borderRadius: 4,
+        borderRadius: "var(--dg-radius-xs)",
         background: colors.bg,
         color: colors.text,
         border: `1px solid ${colors.border}`,

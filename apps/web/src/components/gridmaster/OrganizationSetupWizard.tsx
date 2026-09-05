@@ -949,7 +949,7 @@ export default function OrganizationSetupWizard({
                     alignItems: "center",
                     gap: 8,
                     padding: "10px 16px",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     border: `2px solid ${shiftDisplayMode === value ? "var(--dg-color-primary)" : "var(--dg-color-border)"}`,
                     background:
                       shiftDisplayMode === value ? "var(--dg-color-primary-bg)" : "transparent",
@@ -1466,7 +1466,7 @@ export default function OrganizationSetupWizard({
                   key={job.id}
                   style={{
                     border: "1px solid var(--dg-color-border)",
-                    borderRadius: 8,
+                    borderRadius: "var(--dg-radius-md)",
                     padding: 12,
                     marginBottom: 10,
                     background: "var(--dg-color-bg-secondary)",
@@ -1494,7 +1494,7 @@ export default function OrganizationSetupWizard({
                         width: 36,
                         height: 36,
                         border: "1px solid var(--dg-color-border)",
-                        borderRadius: 6,
+                        borderRadius: "var(--dg-radius-sm)",
                         cursor: "pointer",
                         padding: 2,
                         flexShrink: 0,

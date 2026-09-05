@@ -34,7 +34,7 @@ export default function CookiePreferencesManager() {
     <div
       style={{
         padding: "16px 20px",
-        borderRadius: 10,
+        borderRadius: "var(--dg-radius-lg)",
         border: "1px solid var(--dg-color-border)",
         background: "var(--dg-color-surface-hover)",
         display: "flex",

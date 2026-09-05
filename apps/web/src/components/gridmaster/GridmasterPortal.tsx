@@ -167,7 +167,7 @@ function OrgSearchCombobox({
               fontWeight: 600,
               background: "var(--dg-color-bg-secondary)",
               border: "1px solid var(--dg-color-border)",
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               padding: "3px 10px",
               color: "var(--dg-color-text-primary)",
               whiteSpace: "nowrap",
@@ -319,7 +319,7 @@ function OrgSearchCombobox({
                             color: "var(--dg-color-text-subtle)",
                             background: "var(--dg-color-bg-secondary)",
                             padding: "1px 6px",
-                            borderRadius: 4,
+                            borderRadius: "var(--dg-radius-xs)",
                             textTransform: "uppercase",
                           }}
                         >
@@ -333,7 +333,7 @@ function OrgSearchCombobox({
                           color: "var(--dg-color-text-subtle)",
                           background: "var(--dg-color-bg-secondary)",
                           padding: "1px 8px",
-                          borderRadius: 4,
+                          borderRadius: "var(--dg-radius-xs)",
                         }}
                       >
                         {empCount}
@@ -790,7 +790,7 @@ export default function GridmasterPortal() {
                 gap: 8,
                 background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
                 border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 padding: "4px 8px 4px 4px",
                 minHeight: 44,
                 cursor: "pointer",

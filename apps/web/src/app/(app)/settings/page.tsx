@@ -27,10 +27,13 @@ function SettingsPageSkeleton() {
         gap: 20,
       }}
     >
-      <div className="dg-skeleton" style={{ width: 180, height: 28, borderRadius: 6 }} />
       <div
         className="dg-skeleton"
-        style={{ width: 360, maxWidth: "80%", height: 16, borderRadius: 4 }}
+        style={{ width: 180, height: 28, borderRadius: "var(--dg-radius-sm)" }}
+      />
+      <div
+        className="dg-skeleton"
+        style={{ width: 360, maxWidth: "80%", height: 16, borderRadius: "var(--dg-radius-xs)" }}
       />
       <div
         style={{
@@ -42,10 +45,22 @@ function SettingsPageSkeleton() {
           gap: 16,
         }}
       >
-        <div className="dg-skeleton" style={{ width: "38%", height: 14, borderRadius: 4 }} />
-        <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
-        <div className="dg-skeleton" style={{ width: "72%", height: 14, borderRadius: 4 }} />
-        <div className="dg-skeleton" style={{ width: "100%", height: 36, borderRadius: 6 }} />
+        <div
+          className="dg-skeleton"
+          style={{ width: "38%", height: 14, borderRadius: "var(--dg-radius-xs)" }}
+        />
+        <div
+          className="dg-skeleton"
+          style={{ width: "100%", height: 36, borderRadius: "var(--dg-radius-sm)" }}
+        />
+        <div
+          className="dg-skeleton"
+          style={{ width: "72%", height: 14, borderRadius: "var(--dg-radius-xs)" }}
+        />
+        <div
+          className="dg-skeleton"
+          style={{ width: "100%", height: 36, borderRadius: "var(--dg-radius-sm)" }}
+        />
       </div>
     </main>
   );

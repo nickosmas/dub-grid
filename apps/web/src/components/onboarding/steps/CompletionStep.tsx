@@ -110,7 +110,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           alignItems: "center",
           gap: 8,
           padding: "14px 32px",
-          borderRadius: 12,
+          borderRadius: "var(--dg-radius-xl)",
           border: "none",
           background: "var(--dg-color-brand)",
           color: "var(--dg-color-text-inverse)",

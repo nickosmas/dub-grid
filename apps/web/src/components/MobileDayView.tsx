@@ -311,7 +311,7 @@ export default function MobileDayView({
                       style={{
                         textAlign: "center",
                         padding: "2px 0",
-                        borderRadius: 8,
+                        borderRadius: "var(--dg-radius-md)",
                         background: isToday ? "var(--dg-color-today-bg)" : "transparent",
                       }}
                     >
@@ -693,7 +693,7 @@ export default function MobileDayView({
                             color: sc ? borderColor(sc.color) : "var(--dg-color-text-muted)",
                             background: sc ? `${sc.color}30` : "var(--dg-color-border-light)",
                             padding: "2px 8px",
-                            borderRadius: 8,
+                            borderRadius: "var(--dg-radius-md)",
                             maxWidth: isNameMode ? 140 : undefined,
                             overflow: "hidden",
                             textOverflow: "ellipsis",

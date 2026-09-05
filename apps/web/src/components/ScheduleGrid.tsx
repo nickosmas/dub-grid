@@ -1445,7 +1445,7 @@ const SectionBlock = memo(function SectionBlock({
                                 maxWidth: "100%",
                                 padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
                                 minWidth: 0,
-                                borderRadius: 6,
+                                borderRadius: "var(--dg-radius-sm)",
                                 border: `1.5px dashed ${scPill?.border ?? "var(--dg-color-warning-border, #F59E0B)"}`,
                                 background: scPill?.color ?? "var(--dg-color-surface)",
                                 color: scPill?.text ?? "var(--dg-color-warning-text, #92400E)",
@@ -3179,7 +3179,7 @@ const SectionBlock = memo(function SectionBlock({
                                       border: isDraftDelete
                                         ? "2px dashed var(--dg-color-danger-dark)"
                                         : "1px solid var(--dg-color-danger-border)",
-                                      borderRadius: 8,
+                                      borderRadius: "var(--dg-radius-md)",
                                       ...(isDraftDelete
                                         ? {}
                                         : {
@@ -4145,7 +4145,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
               background: activeDrag.pillColor,
               color: activeDrag.pillText,
               border: `1px solid ${activeDrag.pillText}20`,
-              borderRadius: 8,
+              borderRadius: "var(--dg-radius-md)",
               padding: "6px 16px",
               fontSize: "var(--dg-fs-title)",
               fontWeight: 600,

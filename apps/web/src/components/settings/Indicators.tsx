@@ -202,7 +202,7 @@ function IndicatorRow({
           alignItems: "center",
           gap: 10,
           padding: "10px 8px",
-          borderRadius: 8,
+          borderRadius: "var(--dg-radius-md)",
           cursor: "pointer",
           transition: "background 0.15s",
           width: "100%",

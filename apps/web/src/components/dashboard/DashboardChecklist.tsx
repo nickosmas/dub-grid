@@ -112,7 +112,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               style={{
                 width: 20,
                 height: 20,
-                borderRadius: 4,
+                borderRadius: "var(--dg-radius-xs)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

@@ -22,7 +22,7 @@ export function EmailButton({ href, children }: EmailButtonProps) {
           fontWeight: 700,
           textDecoration: "none",
           padding: "14px 40px",
-          borderRadius: "8px",
+          borderRadius: "var(--dg-radius-md)",
         }}
       >
         {children}

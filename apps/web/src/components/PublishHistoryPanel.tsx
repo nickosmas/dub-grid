@@ -71,7 +71,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-success-bg)",
             color: "var(--dg-color-success-text)",
             fontWeight: 600,
@@ -85,7 +85,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-info-bg)",
             color: "var(--dg-color-info-text)",
             fontWeight: 600,
@@ -99,7 +99,7 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           style={{
             fontSize: "var(--dg-fs-footnote)",
             padding: "2px 6px",
-            borderRadius: 4,
+            borderRadius: "var(--dg-radius-xs)",
             background: "var(--dg-color-danger-bg)",
             color: "var(--dg-color-danger-text)",
             fontWeight: 600,
@@ -510,7 +510,12 @@ export default function PublishHistoryPanel({
   const subtitle = loading ? (
     <span
       className="dg-skeleton"
-      style={{ display: "inline-block", width: 88, height: 10, borderRadius: 4 }}
+      style={{
+        display: "inline-block",
+        width: 88,
+        height: 10,
+        borderRadius: "var(--dg-radius-xs)",
+      }}
     />
   ) : (
     `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
@@ -552,7 +557,7 @@ export default function PublishHistoryPanel({
                 height: 36,
                 background: "transparent",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: "var(--dg-radius-md)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
@@ -625,11 +630,11 @@ export default function PublishHistoryPanel({
                 >
                   <div
                     className="dg-skeleton"
-                    style={{ width: 140, height: 12, borderRadius: 4 }}
+                    style={{ width: 140, height: 12, borderRadius: "var(--dg-radius-xs)" }}
                   />
                   <div
                     className="dg-skeleton"
-                    style={{ width: "60%", height: 10, borderRadius: 4 }}
+                    style={{ width: "60%", height: 10, borderRadius: "var(--dg-radius-xs)" }}
                   />
                   <div
                     className="dg-skeleton"

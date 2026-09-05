@@ -273,7 +273,7 @@ export default function PrivacyPolicyPage() {
               padding: "16px",
               background: "var(--dg-color-warning-bg)",
               borderLeft: "4px solid var(--dg-color-warning)",
-              borderRadius: "4px",
+              borderRadius: "var(--dg-radius-xs)",
             }}
           >
             <p

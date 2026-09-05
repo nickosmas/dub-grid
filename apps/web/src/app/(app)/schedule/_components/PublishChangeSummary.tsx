@@ -93,7 +93,7 @@ export function PublishChangeSummary({
         <p
           style={{
             margin: 0,
-            borderRadius: 10,
+            borderRadius: "var(--dg-radius-lg)",
             padding: "10px 12px",
             fontSize: "var(--dg-fs-footnote)",
             lineHeight: 1.5,

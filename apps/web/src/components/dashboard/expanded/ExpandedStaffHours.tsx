@@ -106,7 +106,7 @@ export default function ExpandedStaffHours({
                     fontSize: "var(--dg-type-control-size)",
                     fontWeight: 600,
                     padding: "5px 10px",
-                    borderRadius: 6,
+                    borderRadius: "var(--dg-radius-sm)",
                     border: "1px solid",
                     borderColor: active ? "var(--dg-color-brand)" : "var(--dg-color-border)",
                     background: active ? "var(--dg-color-brand)" : "transparent",

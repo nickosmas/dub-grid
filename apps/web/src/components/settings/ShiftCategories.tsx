@@ -683,7 +683,7 @@ function ShiftCategoriesSettings({
               color: "var(--dg-color-text-muted)",
               background: "var(--dg-color-surface)",
               border: "1px solid var(--dg-color-border-light)",
-              borderRadius: 6,
+              borderRadius: "var(--dg-radius-sm)",
               padding: "4px 10px",
               marginBottom: 12,
             }}
