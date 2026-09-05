@@ -24,7 +24,7 @@ import type {
   AssignmentDefinition,
 } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { History } from "lucide-react";
+import { ChevronLeft, History, User } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import {
@@ -389,20 +389,7 @@ export function ExpandedChangesGrouped({
                 gap: 4,
               }}
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.5 }}
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <User size={12} style={{ opacity: 0.5 }} />
               {empName}
               <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                 ({sorted.length} change{sorted.length !== 1 ? "s" : ""})
@@ -563,18 +550,7 @@ export default function PublishHistoryPanel({
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>

@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
@@ -1041,19 +1042,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeDepartmentRow(idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1139,19 +1128,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeFocusArea(idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1208,19 +1185,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeNamedItem(setCertifications, idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1273,19 +1238,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => removeNamedItem(setOrgRoles, idx)}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1392,19 +1345,7 @@ export default function OrganizationSetupWizard({
                     onClick={() => setShiftCategories((prev) => prev.filter((_, i) => i !== idx))}
                     style={{ padding: "6px 8px" }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <X size={14} />
                   </Button>
                 )}
               </div>
@@ -1535,19 +1476,7 @@ export default function OrganizationSetupWizard({
                         onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
                         style={{ padding: "6px 8px" }}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        <X size={14} />
                       </Button>
                     )}
                   </div>
@@ -1821,19 +1750,7 @@ export default function OrganizationSetupWizard({
                   }}
                   disabled={employeeRows.length <= 1}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X size={14} />
                 </Button>
               </div>
             ))}

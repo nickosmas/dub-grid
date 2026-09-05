@@ -1,4 +1,5 @@
 "use client";
+import { User } from "lucide-react";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -788,21 +789,7 @@ export default function GridmasterSecurityView({
               <div style={{ padding: 16 }}>
                 <EmptyState
                   size="compact"
-                  icon={
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  }
+                  icon={<User size={24} />}
                   title="No impersonation sessions"
                   description="Recent gridmaster impersonations appear here."
                 />

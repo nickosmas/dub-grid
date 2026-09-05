@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useState } from "react";
 import { useTheme } from "next-themes";
@@ -337,20 +338,7 @@ export default function ShiftRequestBoard({
             gap: 4,
           }}
         >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ flexShrink: 0 }}
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+          <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
           {timeRemainingLabel(req.expiresAt)}
         </div>
 
@@ -684,18 +672,7 @@ export default function ShiftRequestBoard({
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>

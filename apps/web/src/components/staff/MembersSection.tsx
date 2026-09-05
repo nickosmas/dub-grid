@@ -6,7 +6,16 @@ import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Import as ImportIcon, Plus, SlidersHorizontal, Upload } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Import as ImportIcon,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Upload,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -1462,21 +1471,12 @@ export function MembersSection({
                   maxWidth: isMobile ? undefined : 380,
                 }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <Search
+                  size={14}
+                  strokeWidth={2.5}
                   className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--dg-color-text-faint)]"
                   style={{ left: 12 }}
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
+                />
                 <input
                   className="dg-input w-full"
                   value={searchQuery}
@@ -2210,18 +2210,7 @@ export function MembersSection({
                                   : "var(--dg-color-text-faint)",
                               }}
                             >
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <polyline points="9 6 15 12 9 18" />
-                              </svg>
+                              <ChevronRight size={14} strokeWidth={2.5} />
                             </div>
                           </TableCell>
                         </UITableRow>
@@ -2232,21 +2221,7 @@ export function MembersSection({
               </div>
             ) : (
               <EmptyState
-                icon={
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                }
+                icon={<User size={28} strokeWidth={1.5} />}
                 title={
                   searchQuery || managementHasActiveFilters
                     ? "No results found"

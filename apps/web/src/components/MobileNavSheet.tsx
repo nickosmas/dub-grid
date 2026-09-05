@@ -1,4 +1,5 @@
 "use client";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -168,18 +169,7 @@ export default function MobileNavSheet({
                     <span className="dg-bottom-sheet-item-icon">{item.icon}</span>
                     <span className="dg-bottom-sheet-item-label">{item.label}</span>
                     <span className="dg-bottom-sheet-chevron">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <ChevronRight size={16} strokeWidth={2.5} />
                     </span>
                   </Button>
                 );
@@ -207,18 +197,7 @@ export default function MobileNavSheet({
                   </span>
                   <span className="dg-bottom-sheet-item-label">Gridmaster</span>
                   <span className="dg-bottom-sheet-chevron">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    <ChevronRight size={16} strokeWidth={2.5} />
                   </span>
                 </Button>
               )}
@@ -244,19 +223,7 @@ export default function MobileNavSheet({
               </div>
               <div className="dg-bottom-sheet-footer-actions">
                 <Button onClick={() => navigate("/profile")} className="dg-bottom-sheet-footer-btn">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <User size={16} />
                   Profile
                 </Button>
                 {actualLevel >= 2 && !isImpersonating && onToggleUserView && (
@@ -318,18 +285,7 @@ export default function MobileNavSheet({
                 onClick={() => setDrillSection(null)}
                 aria-label="Back to main navigation"
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
+                <ChevronLeft size={18} strokeWidth={2.5} />
               </Button>
               <span className="dg-bottom-sheet-drill-title">{drillSection.label}</span>
             </div>

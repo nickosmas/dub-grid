@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown, User } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -742,23 +743,16 @@ export default function Header({ orgName }: HeaderProps) {
                     {roleLabel}
                   </div>
                 </div>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--dg-color-text-muted)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <ChevronDown
+                  size={12}
+                  strokeWidth={2.5}
+                  color="var(--dg-color-text-muted)"
                   style={{
                     flexShrink: 0,
                     transition: "transform 150ms ease",
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                />
               </>
             )}
           </Button>
@@ -780,19 +774,7 @@ export default function Header({ orgName }: HeaderProps) {
                   router.push("/profile");
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+                <User size={13} />
                 Profile
               </Button>
               {canOpenSandbox && (

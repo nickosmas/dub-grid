@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 
@@ -49,22 +50,6 @@ const PAGE_IDLE =
 const PAGE_CURRENT =
   "bg-[var(--dg-color-brand)] font-semibold text-[var(--dg-color-on-brand-text)]";
 
-function Chevron({ direction }: { direction: "left" | "right" }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points={direction === "left" ? "15 6 9 12 15 18" : "9 6 15 12 9 18"} />
-    </svg>
-  );
-}
-
 interface PaginationProps {
   /** One-based. Sources that count from zero pass `page + 1`. */
   page: number;
@@ -108,7 +93,7 @@ export function Pagination({
           aria-label="Previous page"
           className={CONTROL_CLASS}
         >
-          <Chevron direction="left" />
+          <ChevronLeft aria-hidden="true" strokeWidth={2.5} />
         </Button>
 
         {totalPages != null ? (
@@ -153,7 +138,7 @@ export function Pagination({
           aria-label="Next page"
           className={CONTROL_CLASS}
         >
-          <Chevron direction="right" />
+          <ChevronRight aria-hidden="true" strokeWidth={2.5} />
         </Button>
       </div>
 

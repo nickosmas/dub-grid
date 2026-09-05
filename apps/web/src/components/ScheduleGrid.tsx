@@ -19,7 +19,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { Users, UserPen } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
@@ -1133,19 +1133,7 @@ const SectionBlock = memo(function SectionBlock({
             }}
           >
             More days
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
           </Button>
         )}
         {!fitToContainer && canScrollLeft && (
@@ -1172,19 +1160,7 @@ const SectionBlock = memo(function SectionBlock({
               cursor: "pointer",
             }}
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
             Earlier days
           </Button>
         )}

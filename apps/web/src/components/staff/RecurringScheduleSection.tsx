@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -1030,15 +1031,9 @@ export function RecurringScheduleSection({
         )}
         <div style={{ flex: 1, minWidth: isMobile ? "100%" : 0 }} />
         <div style={{ position: "relative", width: isMobile ? "100%" : undefined }}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-text-faint)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <Search
+            size={14}
+            color="var(--dg-color-text-faint)"
             style={{
               position: "absolute",
               left: 10,
@@ -1046,10 +1041,7 @@ export function RecurringScheduleSection({
               transform: "translateY(-50%)",
               pointerEvents: "none",
             }}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          />
           <input
             type="text"
             placeholder="Search"

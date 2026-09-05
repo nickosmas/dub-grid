@@ -1,4 +1,5 @@
 "use client";
+import { ChevronRight, Clock } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
@@ -592,18 +593,7 @@ export function ManagementStaffPanel({
                   }}
                 >
                   View full profile
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="9 6 15 12 9 18" />
-                  </svg>
+                  <ChevronRight size={10} strokeWidth={2.5} />
                 </Link>
               )}
             </div>
@@ -1015,23 +1005,13 @@ export function ManagementStaffPanel({
                             color: "var(--dg-color-text-secondary)",
                           }}
                         >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                          <Clock
+                            size={14}
                             style={{
                               color: "var(--dg-color-text-faint)",
                               flexShrink: 0,
                             }}
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
+                          />
                           <MaybeHint
                             content={
                               person.lastSignInAt

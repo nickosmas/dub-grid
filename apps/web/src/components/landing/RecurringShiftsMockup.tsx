@@ -1,3 +1,4 @@
+import { ChevronDown, Search } from "lucide-react";
 /* ── Recurring shifts mockup ──────────────────────────────────────────────
    Mirrors RecurringScheduleSection. Real component:
    apps/web/src/components/staff/RecurringScheduleSection.tsx — page-title
@@ -206,17 +207,7 @@ export default function RecurringShiftsMockup() {
           }}
         >
           <span>All Focus Areas</span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            style={{ color: "var(--dg-color-text-faint)" }}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <ChevronDown size={12} style={{ color: "var(--dg-color-text-faint)" }} />
         </div>
         <div style={{ flex: 1 }} />
         <div
@@ -225,25 +216,16 @@ export default function RecurringShiftsMockup() {
             width: 180,
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-text-faint)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <Search
+            size={14}
+            color="var(--dg-color-text-faint)"
             style={{
               position: "absolute",
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
             }}
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          />
           <div
             style={{
               height: 32,

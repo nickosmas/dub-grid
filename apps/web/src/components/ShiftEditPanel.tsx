@@ -40,7 +40,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
-import { Check, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -3005,20 +3005,7 @@ export default function ShiftEditPanel({
                       color: "var(--dg-color-text-subtle)",
                     }}
                   >
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+                    <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                     <span style={{ fontWeight: 500 }}>
                       {[
                         defaultStart ? fmt12h(defaultStart) : null,
@@ -3390,18 +3377,7 @@ export default function ShiftEditPanel({
                 flexShrink: 0,
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -3904,18 +3880,7 @@ export default function ShiftEditPanel({
                     border: "1px solid var(--dg-color-border)",
                   }}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
+                  <ChevronLeft size={12} strokeWidth={2.5} />
                   Back
                 </Button>
               )}

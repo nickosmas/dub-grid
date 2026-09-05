@@ -1,4 +1,5 @@
 "use client";
+import { Clock } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -338,24 +339,7 @@ export default function ImpersonationHistory() {
               </div>
             </div>
           ) : (
-            <EmptyState
-              icon={
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              }
-              title="No impersonation sessions yet"
-            />
+            <EmptyState icon={<Clock size={24} />} title="No impersonation sessions yet" />
           )}
 
           {/* Pagination */}

@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown, ChevronLeft, User } from "lucide-react";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -854,23 +855,16 @@ export default function GridmasterPortal() {
                   Gridmaster
                 </div>
               </div>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--dg-color-text-muted)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <ChevronDown
+                size={12}
+                strokeWidth={2.5}
+                color="var(--dg-color-text-muted)"
                 style={{
                   flexShrink: 0,
                   transition: "transform 150ms ease",
                   transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                 }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              />
             </Button>
 
             {menuOpen && (
@@ -885,19 +879,7 @@ export default function GridmasterPortal() {
                     window.location.href = "/profile";
                   }}
                 >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <User size={13} />
                   Profile
                 </Button>
                 <div className="dg-menu-divider" />
@@ -1144,18 +1126,7 @@ export default function GridmasterPortal() {
                   (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-muted)";
                 }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
+                <ChevronLeft size={14} />
                 All Organizations
               </Button>
               <OrganizationDetail

@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
-import { ArrowUpDown, Check, Import as ImportIcon, Trash2, Upload } from "lucide-react";
+import {
+  ArrowUpDown,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Import as ImportIcon,
+  Search,
+  Trash2,
+  Upload,
+  User,
+} from "lucide-react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
@@ -254,19 +265,7 @@ function ToolsMenu({
               disabled={scheduleEntryActionsDisabled}
               onClick={onAuditToggle}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              <User size={14} strokeWidth={2.5} />
               <span style={{ flex: 1 }}>Authors</span>
               <Switch checked={!!showAudit} presentationOnly />
             </MenuItem>
@@ -353,19 +352,7 @@ function ToolsMenu({
                 onPublishHistory();
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
+              <Clock size={14} strokeWidth={2.5} />
               Publish History
             </MenuItem>
           </Hint>
@@ -556,18 +543,7 @@ export default function Toolbar({
               }}
               aria-label="Go to previous period"
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={16} strokeWidth={2.5} />
             </Button>
           </Hint>
           <span
@@ -599,18 +575,7 @@ export default function Toolbar({
               }}
               aria-label="Go to next period"
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              <ChevronRight size={16} strokeWidth={2.5} />
             </Button>
           </Hint>
         </div>
@@ -642,15 +607,9 @@ export default function Toolbar({
           {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
             <div style={{ position: "relative", flex: "1 1 160px", minWidth: 0 }}>
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <Search
+                size={13}
+                strokeWidth={2.5}
                 style={{
                   position: "absolute",
                   left: 10,
@@ -659,10 +618,7 @@ export default function Toolbar({
                   color: "var(--dg-color-text-faint)",
                   pointerEvents: "none",
                 }}
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              />
               <input
                 type="text"
                 placeholder="Search staff…"
@@ -788,18 +744,7 @@ export default function Toolbar({
               }}
               aria-label="Go to previous period"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              <ChevronLeft size={14} strokeWidth={2.5} />
             </Button>
           </Hint>
           <span
@@ -833,18 +778,7 @@ export default function Toolbar({
               }}
               aria-label="Go to next period"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              <ChevronRight size={14} strokeWidth={2.5} />
             </Button>
           </Hint>
         </div>
@@ -939,15 +873,9 @@ export default function Toolbar({
               flex: isTablet ? "1 1 160px" : "1 1 220px",
             }}
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Search
+              size={13}
+              strokeWidth={2.5}
               style={{
                 position: "absolute",
                 left: 10,
@@ -956,10 +884,7 @@ export default function Toolbar({
                 color: "var(--dg-color-text-faint)",
                 pointerEvents: "none",
               }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            />
             <input
               type="text"
               placeholder="Search staff…"

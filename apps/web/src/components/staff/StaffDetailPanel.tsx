@@ -1,4 +1,5 @@
 "use client";
+import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
@@ -288,18 +289,7 @@ export function StaffDetailPanel({
                   }}
                 >
                   View full profile
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="9 6 15 12 9 18" />
-                  </svg>
+                  <ChevronRight size={10} strokeWidth={2.5} />
                 </Link>
               )}
             </div>

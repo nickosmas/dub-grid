@@ -1,4 +1,5 @@
 "use client";
+import { Search } from "lucide-react";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "next-themes";
@@ -386,15 +387,9 @@ export default function AllUsersView({
             Showing {filtered.length} of {users.length}
           </span>
           <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Search
+              size={13}
+              strokeWidth={2.5}
               style={{
                 position: "absolute",
                 left: 10,
@@ -402,10 +397,7 @@ export default function AllUsersView({
                 transform: "translateY(-50%)",
                 color: "var(--dg-color-text-faint)",
               }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            />
             <input
               className="dg-input"
               value={search}

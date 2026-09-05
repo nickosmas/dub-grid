@@ -1,4 +1,5 @@
 "use client";
+import { User } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -109,19 +110,7 @@ export default function ImpersonationBanner() {
       }}
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
+        <User size={16} strokeWidth={2.5} />
         Impersonating <strong>{imp.targetEmail}</strong>
         {imp.targetOrgName && <span>({imp.targetOrgName})</span>}
         {imp.justification && (

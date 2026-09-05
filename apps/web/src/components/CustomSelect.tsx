@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown } from "lucide-react";
 
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
@@ -124,24 +125,16 @@ export default function CustomSelect<T extends string | number>({
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
           {displayLabel}
         </span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <ChevronDown
+          size={12}
+          strokeWidth={2.5}
           style={{
             color: "var(--dg-color-text-faint)",
             flexShrink: 0,
             transition: "transform 150ms ease",
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
           }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        />
       </Button>
     </div>
   );
