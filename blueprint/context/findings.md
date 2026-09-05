@@ -75,15 +75,15 @@ test mock continues to spread the real hooks module without replacing
 **Found:** 2026-09-05 by /audit (scope: apps/web; lens: quality)
 **Why it matters:** `.dg-btn-brand` is a byte-for-byte duplicate of `.dg-btn-primary` (same background, color, border, hover, active), split 11 usages to 92 with no rule for choosing. Separately, `components/ui/button.tsx` is a full shadcn/cva variant system used by exactly two real files (`ui/sheet.tsx`, `ui/sidebar.tsx`) that redeclares every variant and size the `dg-btn` classes already provide. A contributor picks whichever they find first, which is how variant drift starts.
 **Suggested fix:** Delete `.dg-btn-brand` and fold its 11 call sites into `dg-btn-primary`. Then decide `ui/button.tsx` explicitly: adopt it app-wide, or reduce it to the minimum the two shadcn primitives need and document that `dg-btn` is the app's button system.
-**Resolution:** Fixed 2026-09-05. All 11 `dg-btn-brand` call sites moved to `dg-btn-primary` (zero visual change, the rules were byte-identical) and the dead `.dg-btn-brand` block was removed from `globals.css`. The user had declined the CSS deletion earlier in the session, then delegated the decision; it is trivially revertible if that was not the intent. `ui/button.tsx` is still undecided and stays open as the remaining half of this finding: it is a third button system with two real consumers, and adopting or shrinking it is a larger call than this cleanup.
+**Resolution:** Fixed 2026-09-05. All 11 `dg-btn-brand` call sites moved to `dg-btn-primary` (zero visual change, the rules were byte-identical) and the dead `.dg-btn-brand` block was removed from `globals.css`. The user had declined the CSS deletion earlier in the session, then delegated the decision; it is trivially revertible if that was not the intent. `ui/button.tsx` remains open, and this finding mischaracterised it: it is not abandoned scaffold. `__tests__/neutral-control-chrome.test.ts` asserts its `default`, `brand`, `secondary`, `outline`, `warningFilled` and `sm` variants resolve to the same design tokens as the `dg-btn` classes, so it is a deliberately token-aligned parallel system with a contract test, even though app code only reaches for `ghost`/`icon-sm` via `ui/sheet.tsx` and `ui/sidebar.tsx`. Adopting or removing it is an architecture call, not cleanup, and trimming it would break that contract test on purpose.
 
-### F-47 [P3] open - Radius values largely bypass the radius tokens
+### F-47 [P3] fixed - Radius values largely bypass the radius tokens
 
 **File:** apps/web/src (338 occurrences)
 **Found:** 2026-09-05 by /audit (scope: apps/web; lens: quality)
 **Why it matters:** `borderRadius` is written as a raw pixel number 338 times against 154 uses of `--dg-radius-*`, so most corners in the app are not on the scale and drift silently when the scale changes. This is independent of the inline-style question: an inline style can hold `var(--dg-radius-md)` just as easily as `8`. `fontSize` is much healthier by comparison, 200 raw against 1,117 tokenized.
 **Suggested fix:** Treat it as a rule for new code plus opportunistic conversion of files already being edited, rather than a sweep. A lint rule banning numeric `borderRadius` in JSX style objects would hold the line.
-**Resolution:**
+**Resolution:** Fixed 2026-09-05 in ec9c7a10. Measuring the literals showed the scale was missing a step rather than being ignored: the most common value was 4px at 76 sites with no token, so `--dg-radius-xs` was added to name what already existed. 239 literals now resolve through tokens (4/6/8/10/12 to xs/sm/md/lg/xl), values identical so visually a no-op. Left raw on purpose: `999`/`9999`/`50%` are shapes not scale steps, and the off-scale one-offs (3, 5, 7, 9, 14, 16, 20) are decisions a sweep should not silently normalize. A lint rule to hold the line is still worth adding.
 
 ### F-48 [P3] open - Icon sources are split between lucide and hand-rolled SVG
 
@@ -109,13 +109,15 @@ test mock continues to spread the real hooks module without replacing
 **Suggested fix:** Needs a product decision first: confirm which convention wins, update the copy tone guide to match, then normalize in one sweep. Do not normalize before the decision.
 **Resolution:** Fixed 2026-09-05. Decided on evidence rather than preference: multi-word UI text across the app ran 124 sentence case to 39 Title Case, so the code had already chosen, and several dialog trigger buttons were sentence case while only their confirms were Title Case. Normalized 22 label literals across 11 files to sentence case (which also resolved the `Change Role` / `Change role` duplicate), and corrected the copy tone guide, whose Title Case rule was the stale half. Four tests drove these buttons by accessible name and needed scoping to their dialog, because once a trigger and its confirm share a label `getByRole` matches both.
 
-### F-51 [P2] open - 95 direct `process.env` reads against the validated-env rule
+### F-51 [P2] partial - 95 direct `process.env` reads against the validated-env rule
 
 **File:** apps/web/src/app/(app)/auth/callback/route.ts:25; apps/web/src/app/(app)/auth/confirm/route.ts:25; apps/web/src/app/(app)/schedule/page.tsx:10 (95 total)
 **Found:** 2026-09-05 by /audit (scope: apps/web; lens: quality)
 **Why it matters:** ESLint's `no-restricted-properties` rule says "Import validated env vars instead of reading process.env directly", and 95 sites ignore it. Standing violations mean the rule no longer catches new ones, and unvalidated reads bypass whatever the env module guarantees.
 **Suggested fix:** Route the reads through the validated env module file by file, then promote the rule from warn to error so the count cannot grow.
-**Resolution:**
+**Resolution:** PARTIAL 2026-09-05 in 12dfc5e6, 95 to 52. Two parts were the rule catching itself: `lib/env.server.ts` and `lib/supabase-keys.ts` are the validators everything imports (now exempt, as `lib/env.ts` already was), and NODE_ENV/NEXT_RUNTIME are build discriminators the bundler inlines for dead-code elimination, so reading them off a validated object would ship dev-only code to production (the rule became a `no-restricted-syntax` selector to exempt those two names). The one real group closed was Supabase URL: `lib/supabase-keys.ts` already existed as the choke point and 20 sites bypassed it, so they now use `getSupabaseUrl()` and a new `requireSupabaseUrl()`.
+
+The remaining 52 are blocked on a contract decision, not effort. Neither `clientEnv` nor `serverEnv` is usable at these sites: `clientEnv` is null under NODE_ENV=test by design, and `validateServerEnv()` returns null whenever `window` is defined, which it is under jsdom. Wrapping each var in a new accessor module purely to satisfy the rule would add indirection without validation, which is not what the rule is for. Decide first whether the env modules should be made test-safe, then migrate.
 
 ### F-52 [P3] fixed - 33 dead `eslint-disable` directives
 
