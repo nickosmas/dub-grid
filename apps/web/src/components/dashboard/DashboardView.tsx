@@ -469,10 +469,16 @@ export default function DashboardView({
       // Period-scoped (overlap with the selected window) to match mobile's
       // Activity Feed, instead of "most recent 20 publishes regardless of
       // what period they cover."
-      fetchPublishHistory(orgId, 100, 0, {
-        startDate: periodStartKey,
-        endDate: periodEndKey,
-      }).catch(() => []),
+      //
+      // Skipped on the user dashboard: the Activity Feed and the publish
+      // banner it feeds are both admin-only, so staff were being handed an
+      // audit trail of who published what purely to discard it.
+      isUserDashboardMode
+        ? Promise.resolve([])
+        : fetchPublishHistory(orgId, 100, 0, {
+            startDate: periodStartKey,
+            endDate: periodEndKey,
+          }).catch(() => []),
       // Period-scoped for the Activity Feed, matching mobile's date-bounded
       // request fetch — separate from the `shiftRequests` hook above, which
       // is also now period-scoped but drives Pending Approvals, not the feed.
