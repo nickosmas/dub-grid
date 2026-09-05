@@ -85,13 +85,15 @@ test mock continues to spread the real hooks module without replacing
 **Suggested fix:** Treat it as a rule for new code plus opportunistic conversion of files already being edited, rather than a sweep. A lint rule banning numeric `borderRadius` in JSX style objects would hold the line.
 **Resolution:** Fixed 2026-09-05 in ec9c7a10. Measuring the literals showed the scale was missing a step rather than being ignored: the most common value was 4px at 76 sites with no token, so `--dg-radius-xs` was added to name what already existed. 239 literals now resolve through tokens (4/6/8/10/12 to xs/sm/md/lg/xl), values identical so visually a no-op. Left raw on purpose: `999`/`9999`/`50%` are shapes not scale steps, and the off-scale one-offs (3, 5, 7, 9, 14, 16, 20) are decisions a sweep should not silently normalize. A lint rule to hold the line is still worth adding.
 
-### F-48 [P3] open - Icon sources are split between lucide and hand-rolled SVG
+### F-48 [P3] fixed - Icon sources are split between lucide and hand-rolled SVG
 
 **File:** apps/web/src (176 inline `<svg>` across 68 files; lucide-react in 54 files)
 **Found:** 2026-09-05 by /audit (scope: apps/web; lens: quality)
 **Why it matters:** Some inline SVGs are legitimate (the logo, OG images, masked account-status icons, pagination chevrons), but most redraw an icon `lucide-react` already ships, each at whatever stroke width and viewBox its author chose. The result is visibly inconsistent icon weight between surfaces.
 **Suggested fix:** Replace hand-rolled SVGs with the lucide equivalent when touching a file, and keep inline SVG only where it does something lucide cannot (masks, brand marks, server-rendered images).
-**Resolution:**
+**Resolution:** Fixed 2026-09-05 in 07bac5fd. 62 of the 176 were hand-copied lucide paths and now use the components, preserving each site's size, stroke width and colour. 176 -> 113 inline SVGs.
+
+Worth recording: the `User` copies were a stale lucide revision (body x=4..20 against the current x=5..19), and `staff-detail/tabs/OverviewTab.tsx` already imported the real one, so the app was rendering two different user icons at once. That drift is exactly what the finding was about. The remaining 113 are masks, brand marks, OG images, and shapes lucide has no equivalent for; a first attempt at this also proved a regex transform is the wrong tool here (it inserted imports inside multi-line import blocks and truncated `style={{...}}`), so any future pass needs brace-aware parsing.
 
 ### F-49 [P3] fixed - Em dashes in user-visible copy, against the writing standard
 
@@ -109,7 +111,7 @@ test mock continues to spread the real hooks module without replacing
 **Suggested fix:** Needs a product decision first: confirm which convention wins, update the copy tone guide to match, then normalize in one sweep. Do not normalize before the decision.
 **Resolution:** Fixed 2026-09-05. Decided on evidence rather than preference: multi-word UI text across the app ran 124 sentence case to 39 Title Case, so the code had already chosen, and several dialog trigger buttons were sentence case while only their confirms were Title Case. Normalized 22 label literals across 11 files to sentence case (which also resolved the `Change Role` / `Change role` duplicate), and corrected the copy tone guide, whose Title Case rule was the stale half. Four tests drove these buttons by accessible name and needed scoping to their dialog, because once a trigger and its confirm share a label `getByRole` matches both.
 
-### F-51 [P2] partial - 95 direct `process.env` reads against the validated-env rule
+### F-51 [P2] fixed - 95 direct `process.env` reads against the validated-env rule
 
 **File:** apps/web/src/app/(app)/auth/callback/route.ts:25; apps/web/src/app/(app)/auth/confirm/route.ts:25; apps/web/src/app/(app)/schedule/page.tsx:10 (95 total)
 **Found:** 2026-09-05 by /audit (scope: apps/web; lens: quality)
@@ -118,6 +120,8 @@ test mock continues to spread the real hooks module without replacing
 **Resolution:** PARTIAL 2026-09-05 in 12dfc5e6, 95 to 52. Two parts were the rule catching itself: `lib/env.server.ts` and `lib/supabase-keys.ts` are the validators everything imports (now exempt, as `lib/env.ts` already was), and NODE_ENV/NEXT_RUNTIME are build discriminators the bundler inlines for dead-code elimination, so reading them off a validated object would ship dev-only code to production (the rule became a `no-restricted-syntax` selector to exempt those two names). The one real group closed was Supabase URL: `lib/supabase-keys.ts` already existed as the choke point and 20 sites bypassed it, so they now use `getSupabaseUrl()` and a new `requireSupabaseUrl()`.
 
 The remaining 52 are blocked on a contract decision, not effort. Neither `clientEnv` nor `serverEnv` is usable at these sites: `clientEnv` is null under NODE_ENV=test by design, and `validateServerEnv()` returns null whenever `window` is defined, which it is under jsdom. Wrapping each var in a new accessor module purely to satisfy the rule would add indirection without validation, which is not what the rule is for. Decide first whether the env modules should be made test-safe, then migrate.
+
+**Closed 2026-09-05 in 0b3946cd.** The decision was: make them test-safe. Both objects were module-level consts snapshotting process.env at import, so `vi.stubEnv` was invisible to them; 43 tests failed the moment call sites moved over. Both are now lazy, re-validated per access under test and memoised otherwise. 50 reads across 26 files migrated, rule at 0. Two latent bugs fell out: four NEXT_PUBLIC_* fields were declared in clientSchema but never passed to safeParse (so always undefined, and migrating Sentry or PostHog onto them would have silently disabled both), and `positiveEnvNumber` hand-rolled validation the schema already performed.
 
 ### F-52 [P3] fixed - 33 dead `eslint-disable` directives
 
