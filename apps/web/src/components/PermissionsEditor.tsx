@@ -542,6 +542,31 @@ export default function PermissionsEditor({
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 680 }}
+        footer={
+          <EditorActionRow
+            className="px-6"
+            secondaryAction={
+              <Button
+                className="dg-btn dg-btn-secondary"
+                onClick={handleRequestClose}
+                disabled={saving}
+              >
+                {EDITOR_ACTION_LABELS.close}
+              </Button>
+            }
+            primaryAction={
+              <Button
+                className="dg-btn dg-btn-primary"
+                onClick={handleSave}
+                disabled={saving || !hasChanges}
+              >
+                <ButtonLoading loading={saving} spinnerSize={16}>
+                  {EDITOR_ACTION_LABELS.save}
+                </ButtonLoading>
+              </Button>
+            }
+          />
+        }
       >
         <div className="flex flex-col flex-1 min-h-0">
           {/* ── Header ──────────────────────────────────────────────────── */}
@@ -596,31 +621,6 @@ export default function PermissionsEditor({
               </div>
             ))}
           </div>
-
-          {/* ── Footer ──────────────────────────────────────────────────── */}
-          <EditorActionRow
-            className="px-6 py-4 shrink-0 border-t border-[var(--dg-color-border-light)]"
-            secondaryAction={
-              <Button
-                className="dg-btn dg-btn-secondary"
-                onClick={handleRequestClose}
-                disabled={saving}
-              >
-                {EDITOR_ACTION_LABELS.close}
-              </Button>
-            }
-            primaryAction={
-              <Button
-                className="dg-btn dg-btn-primary"
-                onClick={handleSave}
-                disabled={saving || !hasChanges}
-              >
-                <ButtonLoading loading={saving} spinnerSize={16}>
-                  {EDITOR_ACTION_LABELS.save}
-                </ButtonLoading>
-              </Button>
-            }
-          />
         </div>
       </Modal>
       {unsavedChangesDialog}

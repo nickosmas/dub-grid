@@ -24,6 +24,8 @@ interface ModalProps {
    * nav remains visible and clickable. Use for non-blocking detail views.
    */
   headerSafe?: boolean;
+  /** Action row pinned below the scroll region, spaced evenly above and below. */
+  footer?: React.ReactNode;
   "aria-describedby"?: string;
 }
 
@@ -37,6 +39,7 @@ export default function Modal({
   showCloseButton = true,
   disableOverlayClose = false,
   headerSafe = false,
+  footer,
   "aria-describedby": ariaDescribedby,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -126,7 +129,7 @@ export default function Modal({
         aria-modal="true"
         aria-label={title}
         aria-describedby={ariaDescribedby}
-        className={`dg-modal${className ? ` ${className}` : ""}`}
+        className={`dg-modal${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
         style={style}
         onClick={(e) => e.stopPropagation()}
       >
@@ -137,6 +140,7 @@ export default function Modal({
           ) : null}
         </div>
         <div className="dg-modal-scroll-region">{children}</div>
+        {footer ? <div className="dg-modal-footer">{footer}</div> : null}
         <ScrollOverflowCue />
       </div>
     </div>,

@@ -48,6 +48,26 @@ describe("Modal — Rendering", () => {
       screen.getByText("Modal content"),
     );
   });
+
+  it("pins the footer outside the scroll region and marks the dialog", () => {
+    render(
+      <Modal title="With footer" onClose={vi.fn()} footer={<button type="button">Save</button>}>
+        <p>Modal content</p>
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(dialog.querySelector(".dg-modal-footer")).toContainElement(save);
+    expect(save.closest(".dg-modal-scroll-region")).toBeNull();
+    expect(dialog).toHaveClass("dg-modal--with-footer");
+  });
+
+  it("renders no footer band without a footer", () => {
+    renderModal();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector(".dg-modal-footer")).toBeNull();
+    expect(dialog).not.toHaveClass("dg-modal--with-footer");
+  });
 });
 
 describe("Modal — Focus", () => {

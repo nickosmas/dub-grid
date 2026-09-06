@@ -2359,6 +2359,18 @@ textarea {
   overscroll-behavior: contain;
 }
 
+/* A pinned action row keeps 16px on both sides of its buttons, so the modal's
+   own bottom padding tightens to match instead of stacking underneath. */
+.dg-modal-footer {
+  flex: 0 0 auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--dg-color-border-light);
+}
+
+.dg-modal.dg-modal--with-footer {
+  padding-bottom: 16px;
+}
+
 .dg-scroll-overflow-cue {
   position: absolute;
   left: 50%;
