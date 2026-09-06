@@ -91,6 +91,26 @@ describe("open shift presentation", () => {
         "Fallback",
       );
     });
+
+    it("suppresses focus areas for absence and general-shift cards", () => {
+      const generalShift = makeOpenShift({
+        presentation: {
+          segments: [
+            { shiftId: null, displayFocusAreaName: "Skilled Nursing" },
+          ] as MobileOpenShift["presentation"]["segments"],
+          displayFocusAreaName: "Skilled Nursing",
+        },
+        focusAreaName: "Skilled Nursing",
+      });
+      const absence = makeOpenShift({
+        presentation: { displayFocusAreaName: "Skilled Nursing" },
+        state: { kind: "absence", absenceTypeId: 4 } as never,
+        focusAreaName: "Skilled Nursing",
+      });
+
+      expect(getOpenShiftFocusAreaName(generalShift)).toBeNull();
+      expect(getOpenShiftFocusAreaName(absence)).toBeNull();
+    });
   });
 
   describe("getOpenShiftAbsenceTypeId", () => {

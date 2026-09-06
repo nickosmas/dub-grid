@@ -187,6 +187,88 @@ describe("MyScheduleRow", () => {
     expect(screen.getAllByText("—")).toHaveLength(weekDates.length - 2);
   });
 
+  it("shows the grid's draft indication on every affected schedule pill", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: true,
+        draftKind: "new",
+        publishedAssignmentDefinitionIds: [],
+        publishedLabel: "",
+      },
+      "emp-1_2026-05-12": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: true,
+        draftKind: "modified",
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+      "emp-1_2026-05-13": {
+        label: "OFF",
+        assignmentIds: [],
+        isDelete: true,
+        isDraft: true,
+        draftKind: "deleted",
+        publishedAssignmentDefinitionIds: [202],
+        publishedLabel: "N",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.queryByLabelText("New shift")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-draft-badge", "modified");
+    expect(screen.getByLabelText("Deleted shift")).toHaveAttribute("data-draft-badge", "deleted");
+    expect(screen.getByText("Night shift")).toBeInTheDocument();
+  });
+
+  it("shows a published edit with the same compact pill as the grid", () => {
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "D",
+            assignmentIds: [101],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [101],
+            publishedLabel: "D",
+          },
+        }}
+        recentPublishedChanges={
+          new Map([
+            [
+              "emp-1_2026-05-11",
+              {
+                empId: "emp-1",
+                date: "2026-05-11",
+                kind: "modified" as const,
+              },
+            ],
+          ])
+        }
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-draft-badge", "modified");
+  });
+
   it.each([
     ["Week", weekDates, 7],
     ["2 Weeks", twoWeekDates, 14],

@@ -12,6 +12,7 @@ export type ScheduleEntryLike = {
   date: string;
   state?: MobileScheduleEntry["state"];
   presentation?: MobileScheduleEntry["presentation"];
+  change?: MobileScheduleEntry["change"];
   shiftIds?: ReadonlyArray<number | null>;
   jobIds?: ReadonlyArray<number>;
   shiftLabel?: string | null;
@@ -31,6 +32,7 @@ export type ScheduleEntryLike = {
 };
 
 export const TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY = "all";
+export const TEAM_SCHEDULE_GENERAL_SHIFTS_KEY = "general";
 
 export type MobileScheduleRange = {
   startDate: string;
@@ -98,7 +100,7 @@ export type TeamScheduleFocusAreaTab = {
   key: string;
   label: string;
   count: number;
-  focusAreaId: number | null | "all";
+  focusAreaId: number | null | "all" | "general";
 };
 
 export type MobileScheduleTimeGroup = {

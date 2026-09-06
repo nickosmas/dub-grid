@@ -339,6 +339,9 @@ function SchedulerContent() {
   // tool, regardless of the org's openShiftVisibility setting or their own
   // personal eligibility for a given shift (see openShifts memo below).
   const canSeeAllOpenShifts = canEditShifts || canManageEmployees || isSuperAdmin || isGridmaster;
+  // Staff can inspect the current change chips, but only people who can publish
+  // schedules get the cross-publication history and acknowledgement workflow.
+  const canNavigatePublishHistory = canPublishSchedule || isSuperAdmin || isGridmaster;
   // Org-wide staffing shortfalls are a management view, not staff-facing. The
   // same flag gates /api/dashboard/analytics, and authz already derives it from
   // any scheduling capability, so regular staff (and benched accounts) lose the
@@ -1132,11 +1135,17 @@ function SchedulerContent() {
         lastViewedRef.current = lastViewed;
         setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
 
-        // Fetch publish history since user's last view; if there's no last
-        // view yet (brand-new user), the API returns no entries.
-        const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(
-          () => [] as PublishHistoryEntry[],
-        );
+        // Staff always need the current window's chips, including on a first
+        // visit when no last-viewed baseline exists. Publish-capable users keep
+        // the existing acknowledgement/history workflow instead.
+        const recentPublishes = await fetchRecentPublishHistory(
+          orgId,
+          lastViewed,
+          !canNavigatePublishHistory,
+          !canNavigatePublishHistory
+            ? { startDate: defaultShiftFetchStart, endDate: defaultShiftFetchEnd }
+            : undefined,
+        ).catch(() => [] as PublishHistoryEntry[]);
 
         const noteMap = buildScheduleNoteMap(noteRows);
         setShifts(shiftData);
@@ -1400,6 +1409,7 @@ function SchedulerContent() {
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
   const needsAuditNames =
     publishHistory.length > 0 ||
+    publishedDateRanges.some((range) => !!range.publishedBy) ||
     (canRenderAuthorNames &&
       (showAudit ||
         Object.values(shifts).some(
@@ -1422,6 +1432,11 @@ function SchedulerContent() {
       for (const change of entry.changes) {
         if (change.updatedBy && !profileNameCache.current.has(change.updatedBy))
           uncached.add(change.updatedBy);
+      }
+    }
+    for (const range of publishedDateRanges) {
+      if (range.publishedBy && !profileNameCache.current.has(range.publishedBy)) {
+        uncached.add(range.publishedBy);
       }
     }
     if (uncached.size === 0) {
@@ -1455,7 +1470,7 @@ function SchedulerContent() {
     return () => {
       cancelled = true;
     };
-  }, [needsAuditNames, org?.id, publishHistory, shifts]);
+  }, [needsAuditNames, org?.id, publishHistory, publishedDateRanges, shifts]);
 
   // Split publish history by overlap with the currently visible window so
   // the banner, toggle, and overlay only describe publishes that touch
@@ -1495,11 +1510,7 @@ function SchedulerContent() {
         .map((group) => `${formatDateKey(group.periodStart)}:${group.count}`)
         .join("|"),
     );
-  const {
-    isDismissed: publishBannerDismissed,
-    dismiss: dismissPublishBanner,
-    reset: resetPublishBanner,
-  } = useDismissibleBanner(
+  const { isDismissed: publishBannerDismissed, reset: resetPublishBanner } = useDismissibleBanner(
     "schedule-publish",
     inWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
   );
@@ -1535,7 +1546,10 @@ function SchedulerContent() {
     const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0 };
     if (!publishChangesMap) return counts;
     for (const change of publishChangesMap.values()) {
-      if (change.kind === "new") counts.newShifts += 1;
+      // A period's first publication has no prior published schedule for the
+      // viewer to compare against. Only later additions are meaningful "New"
+      // changes; the API marks initial-publication entries explicitly.
+      if (change.kind === "new" && change.isNewAddition !== false) counts.newShifts += 1;
       else if (change.kind === "deleted") counts.deletedShifts += 1;
       else counts.modifiedShifts += 1;
     }
@@ -3170,9 +3184,46 @@ function SchedulerContent() {
       date: Date,
     ): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
-      return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
+      const change = publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
+      // Initial publication is the baseline, not an addition. Keep its audit
+      // record, but do not turn every populated cell into a green "New" chip.
+      return change?.kind === "new" && change.isNewAddition === false ? null : change;
     },
     [showPublishDiff, publishChangesMap],
+  );
+
+  // Regular shift hover cards need publication context too. This deliberately
+  // reads the selected period's history directly instead of the change-overlay
+  // map, so turning Highlight changes off never hides the date or author.
+  const publishedMetadataForKey = useCallback(
+    (
+      _empId: string,
+      date: Date,
+    ): {
+      publishedAt: string;
+      publishedBy: string;
+      timeZone?: string | null;
+    } | null => {
+      const dateKey = formatDateKey(date);
+      const matchingRanges = publishedDateRanges.filter(
+        (candidate) => candidate.startDate <= dateKey && candidate.endDate >= dateKey,
+      );
+      const latest = matchingRanges.reduce<(typeof matchingRanges)[number] | null>(
+        (current, candidate) =>
+          !current || (candidate.publishedAt ?? "") > (current.publishedAt ?? "")
+            ? candidate
+            : current,
+        null,
+      );
+      return latest?.publishedAt && latest.publishedBy
+        ? {
+            publishedAt: latest.publishedAt,
+            publishedBy: latest.publishedBy,
+            timeZone: org?.timezone ?? null,
+          }
+        : null;
+    },
+    [org?.timezone, publishedDateRanges],
   );
 
   const getCustomShiftTimes = useCallback(
@@ -5637,6 +5688,7 @@ function SchedulerContent() {
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
+          publishedMetadataForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
           activeRequestForKey,
@@ -5686,6 +5738,7 @@ function SchedulerContent() {
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
       publishDiffKindForKey,
+      publishedMetadataForKey,
       canRenderAuthorNames,
       createdByNameForKey,
       absenceTypeIdForKey,
@@ -6395,7 +6448,15 @@ function SchedulerContent() {
                       </span>
                     )}
                     <div className="dg-draft-banner-actions">
-                      {isMobile ? (
+                      {!canNavigatePublishHistory ? (
+                        <Button
+                          onClick={() => setShowPublishDiff((visible) => !visible)}
+                          className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                        >
+                          {showPublishDiff ? "Hide changes" : "Show changes"}
+                        </Button>
+                      ) : isMobile ? (
                         // Publish History's "Show on Grid" reaches the overlay
                         // on a phone too, so the way back out has to live here
                         // rather than only on the wide layout.
@@ -6466,24 +6527,10 @@ function SchedulerContent() {
                               padding: "5px 12px",
                             }}
                           >
-                            Mark as Seen
+                            Close
                           </Button>
                         </>
                       )}
-                      <Hint content={hint("Hide this notice and any highlights")} side="bottom">
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            // The banner hosts the only toggle for the
-                            // overlay, so it has to take the overlay with it.
-                            setShowPublishDiff(false);
-                            dismissPublishBanner();
-                          }}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          Close
-                        </Button>
-                      </Hint>
                     </div>
                   </div>
                 );
@@ -7469,7 +7516,7 @@ function SchedulerContent() {
               onClose={closeImportResults}
             />
           )}
-          {showPublishHistory && canEditShifts && org && (
+          {showPublishHistory && canNavigatePublishHistory && org && (
             <PublishHistoryPanel
               orgId={org.id}
               open={showPublishHistory}

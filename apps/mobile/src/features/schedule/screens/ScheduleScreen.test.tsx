@@ -290,8 +290,8 @@ describe("ScheduleScreen", () => {
         shiftName: "Paid Time Off",
         absenceTypeId: 1,
         focusAreaId: null,
-        focusAreaName: null,
-        displayFocusAreaName: null,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
         startTime: null,
         endTime: null,
         segments: [],
@@ -580,7 +580,7 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
   });
 
-  it("uses a single no-schedule message in the Me hero", () => {
+  it("keeps the no-schedule hero while showing every unscheduled week day", () => {
     meScheduleEntries = [];
 
     render(<HomeScheduleScreen />);
@@ -600,7 +600,8 @@ describe("ScheduleScreen", () => {
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.getByText("Your Week")).toBeInTheDocument();
+    expect(screen.getAllByText("Unscheduled")).toHaveLength(7);
   });
 
   it("shows a success toast after a schedule request action completes", async () => {
@@ -653,7 +654,7 @@ describe("ScheduleScreen", () => {
             jobName: "Lead",
             startTime: "15:00:00",
             endTime: "23:00:00",
-            displayFocusAreaName: "Skilled Nursing",
+            displayFocusAreaName: "Visiting Nursing",
             isMentored: true,
           },
         ],
@@ -743,9 +744,13 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByLabelText("Shift 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Evening Shift").length).toBeGreaterThan(0);
+    expect(within(heroCard).getByLabelText("Job Lead mentored assignment")).toBeInTheDocument();
+    expect(within(heroCard).getByText("Skilled Nursing")).toBeInTheDocument();
+    expect(within(heroCard).getByText("Visiting Nursing")).toBeInTheDocument();
     const heroText = heroCard.textContent ?? "";
     expect(heroText.indexOf("Day Shift")).toBeLessThan(heroText.indexOf("Shift 1"));
     expect(heroText.indexOf("Shift 1")).toBeLessThan(heroText.indexOf("Nurse"));
+    expect(heroText.indexOf("Nurse")).toBeLessThan(heroText.indexOf("Skilled Nursing"));
     expect(heroText.indexOf("Evening Shift")).toBeLessThan(heroText.indexOf("Shift 2"));
     expect(heroText.indexOf("Shift 2")).toBeLessThan(heroText.indexOf("Lead"));
     expect(screen.getByText("Morning Shift")).toBeInTheDocument();
@@ -910,8 +915,8 @@ describe("ScheduleScreen", () => {
         assignmentLabel: "ADM",
         shiftName: "Admin",
         focusAreaId: null,
-        focusAreaName: null,
-        displayFocusAreaName: null,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
         startTime: "09:00:00",
         endTime: "17:00:00",
         segments: [
@@ -925,7 +930,7 @@ describe("ScheduleScreen", () => {
             shiftEndTime: null,
             startTime: "09:00:00",
             endTime: "17:00:00",
-            displayFocusAreaName: null,
+            displayFocusAreaName: "Skilled Nursing",
           },
         ],
       }),
@@ -940,8 +945,8 @@ describe("ScheduleScreen", () => {
         assignmentLabel: "ADM",
         shiftName: "Admin",
         focusAreaId: null,
-        focusAreaName: null,
-        displayFocusAreaName: null,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
         startTime: "09:00:00",
         endTime: "17:00:00",
         segments: [
@@ -955,7 +960,7 @@ describe("ScheduleScreen", () => {
             shiftEndTime: null,
             startTime: "09:00:00",
             endTime: "17:00:00",
-            displayFocusAreaName: null,
+            displayFocusAreaName: "Skilled Nursing",
           },
         ],
       }),
@@ -971,6 +976,491 @@ describe("ScheduleScreen", () => {
       "General shift",
     );
     expect(screen.queryByText("Working with")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("me-hero-card")).queryByText("Skilled Nursing"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("upcoming-today-row-2026-04-16")).queryByText("Skilled Nursing"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps prior values off the Home hero while retaining them in schedule cards", () => {
+    const change = {
+      kind: "modified",
+      previousPresentation: {
+        label: "D",
+        shiftName: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({
+        change,
+        shiftName: "Evening Shift",
+        startTime: "15:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 2,
+            jobId: 10,
+            shiftName: "Evening Shift",
+            jobName: "Nurse",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    ];
+    teamScheduleEntries = [createScheduleEntry({ employeeId: "emp-2", change })];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const heroCard = screen.getByTestId("me-hero-card");
+    expect(within(heroCard).getByLabelText("Shift edited")).toHaveTextContent("Edited");
+    expect(
+      within(screen.getByTestId("upcoming-today-row-2026-04-16")).getByLabelText("Shift edited"),
+    ).toHaveTextContent("Edited");
+    expect(within(heroCard).queryByLabelText(/Previous shift:/)).toBeNull();
+    expect(screen.getAllByLabelText("Shift edited").length).toBeGreaterThan(1);
+    expect(screen.getAllByLabelText(/Previous shift: Day Shift/)).toHaveLength(1);
+  });
+
+  it("combines the edited status with only the affected personal double-shift pill", () => {
+    const change = {
+      kind: "modified",
+      previousPresentation: {
+        label: "D / E",
+        shiftName: "Day Shift / Evening Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            jobName: "Mentor",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+          {
+            shiftId: 2,
+            jobId: 20,
+            shiftName: "Evening Shift",
+            jobName: "Supervisor",
+            startTime: "14:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      },
+    };
+    const doubleShift = createScheduleEntry({
+      shiftIds: [1, 2],
+      jobIds: [10, 20],
+      shiftLabel: "D / E",
+      assignmentLabel: "D / E",
+      shiftName: "Day Shift / Evening Shift",
+      startTime: "07:00:00",
+      endTime: "23:00:00",
+      change,
+      segments: [
+        {
+          shiftId: 1,
+          jobId: 10,
+          shiftName: "Day Shift",
+          jobName: "Mentor",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+        {
+          shiftId: 2,
+          jobId: 20,
+          shiftName: "Evening Shift",
+          jobName: "Supervisor",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+      ],
+    });
+    meScheduleEntries = [doubleShift];
+    teamScheduleEntries = [
+      {
+        ...doubleShift,
+        employeeId: "emp-2",
+        employeeName: "Bri Shaw",
+      },
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    const personal = render(<HomeScheduleScreen />);
+
+    const heroCard = within(screen.getByTestId("me-hero-card"));
+    const todayRow = within(screen.getByTestId("upcoming-today-row-2026-04-16"));
+
+    expect(heroCard.queryByLabelText("Shift edited")).toBeNull();
+    expect(heroCard.getByLabelText("Shift 1")).toBeInTheDocument();
+    expect(heroCard.getByLabelText("Shift 2 · Edited")).toBeInTheDocument();
+    expect(heroCard.queryByLabelText(/Previous shift:/)).toBeNull();
+    expect(todayRow.queryByLabelText("Shift edited")).toBeNull();
+    expect(todayRow.getByLabelText("Shift 1")).toBeInTheDocument();
+    expect(todayRow.getByLabelText("Shift 2 · Edited")).toBeInTheDocument();
+    expect(
+      todayRow.getByLabelText(
+        "Previous shift: Evening Shift · 2:00 PM - 11:00 PM · Skilled Nursing",
+      ),
+    ).toHaveTextContent("Was Evening Shift · 2:00 PM - 11:00 PM · Skilled Nursing");
+    expect(todayRow.queryByLabelText(/Previous shift: Day Shift/)).toBeNull();
+
+    personal.unmount();
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getAllByLabelText("Shift edited")).toHaveLength(1);
+  });
+
+  it("shows deleted general shifts in Your Week rows", () => {
+    const change = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "ADM",
+        shiftName: "Admin",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: "09:00:00",
+        endTime: "17:00:00",
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({
+        shiftIds: [null],
+        jobIds: [30],
+        shiftLabel: "ADM",
+        assignmentLabel: "ADM",
+        shiftName: "Admin",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: "09:00:00",
+        endTime: "17:00:00",
+        change,
+        segments: [
+          {
+            shiftId: null,
+            jobId: 30,
+            shiftName: "Admin",
+            jobName: "Admin",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+            displayFocusAreaName: null,
+          },
+        ],
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.queryByTestId("me-hero-card")).toBeNull();
+    expect(screen.getByTestId("me-empty-schedule-state")).toBeInTheDocument();
+    expect(screen.queryByText(/h this week/)).toBeNull();
+    const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
+    expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
+    expect(
+      within(screen.getByTestId("upcoming-today-row-2026-04-16")).getByLabelText(
+        "Previous shift: Admin · 9:00 AM - 5:00 PM",
+      ),
+    ).toHaveTextContent("Was Admin · 9:00 AM - 5:00 PM");
+  });
+
+  it("keeps a deleted shift visible when its day has no effective schedule", () => {
+    const change = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "D",
+        shiftName: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({
+        shiftIds: [],
+        jobIds: [],
+        shiftLabel: "",
+        assignmentLabel: null,
+        shiftName: "",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: null,
+        endTime: null,
+        segments: [],
+        change,
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
+    expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
+    expect(
+      within(todayRow).getByLabelText(
+        "Previous shift: Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing",
+      ),
+    ).toHaveTextContent("Was Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing");
+  });
+
+  it("renders a deleted entry as one quiet Was line beneath an active shift", () => {
+    const deletedChange = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "E",
+        shiftName: "Evening Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "15:00:00",
+        endTime: "23:00:00",
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry(),
+      createScheduleEntry({
+        shiftIds: [],
+        jobIds: [],
+        shiftLabel: "",
+        assignmentLabel: null,
+        shiftName: "",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: null,
+        endTime: null,
+        segments: [],
+        change: deletedChange,
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const todayRow = within(screen.getByTestId("upcoming-today-row-2026-04-16"));
+    expect(todayRow.getByText("Day Shift")).toBeInTheDocument();
+    expect(
+      todayRow.getByLabelText(
+        "Previous shift: Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+      ),
+    ).toHaveTextContent("Was Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing");
+    expect(todayRow.queryByLabelText("Shift deleted")).toBeNull();
+  });
+
+  it("shows Was details for a deleted absence on an otherwise unscheduled day", () => {
+    const change = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "PTO",
+        shiftName: "Paid Time Off",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: null,
+        endTime: null,
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({
+        shiftIds: [],
+        jobIds: [],
+        shiftLabel: "",
+        assignmentLabel: null,
+        shiftName: "",
+        absenceTypeId: null,
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: null,
+        endTime: null,
+        segments: [],
+        change,
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
+    expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
+    expect(within(todayRow).getByLabelText("Previous shift: Paid Time Off")).toHaveTextContent(
+      "Was Paid Time Off",
+    );
+  });
+
+  it("summarizes a deleted double shift once instead of repeating it per segment", () => {
+    const change = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "D / E",
+        shiftName: "Day Shift / Evening Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+          {
+            shiftId: 2,
+            jobId: 20,
+            shiftName: "Evening Shift",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({
+        shiftIds: [],
+        jobIds: [],
+        shiftLabel: "",
+        assignmentLabel: null,
+        shiftName: "",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: null,
+        endTime: null,
+        segments: [],
+        change,
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    const todayRow = within(screen.getByTestId("upcoming-today-row-2026-04-16"));
+    expect(todayRow.getAllByLabelText(/Previous shift:/)).toHaveLength(1);
+    expect(
+      todayRow.getByLabelText(
+        "Previous shift: Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing; Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+      ),
+    ).toHaveTextContent(
+      "Was Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing; Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+    );
+  });
+
+  it("keeps unscheduled dates and published edited or deleted shifts visible in Your Week", () => {
+    const editedChange = {
+      kind: "modified",
+      previousPresentation: {
+        label: "D",
+        shiftName: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
+    };
+    const deletedChange = {
+      kind: "deleted",
+      previousPresentation: {
+        label: "E",
+        shiftName: "Evening Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "15:00:00",
+        endTime: "23:00:00",
+        segments: [],
+      },
+    };
+    meScheduleEntries = [
+      createScheduleEntry({ change: editedChange }),
+      createScheduleEntry({
+        date: "2026-04-18",
+        change: deletedChange,
+        shiftIds: [2],
+        shiftLabel: "E",
+        assignmentLabel: "E",
+        shiftName: "Evening Shift",
+        startTime: "15:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 2,
+            jobId: 10,
+            shiftName: "Evening Shift",
+            jobName: "Mentor",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    ];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    ["2026-04-12", "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-17"].forEach((date) => {
+      expect(screen.getByTestId(`upcoming-unscheduled-row-${date}`)).toHaveTextContent(
+        "Unscheduled",
+      );
+    });
+    expect(screen.queryByText("No shift scheduled")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("upcoming-today-row-2026-04-16")).getByLabelText("Shift edited"),
+    ).toHaveTextContent("Edited");
+    const deletedDay = screen.getByTestId("upcoming-unscheduled-row-2026-04-18");
+    expect(within(deletedDay).getByText("Unscheduled")).toBeInTheDocument();
+    expect(within(deletedDay).queryByLabelText("Shift deleted")).toBeNull();
+    expect(
+      within(deletedDay).getByLabelText(
+        "Previous shift: Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+      ),
+    ).toHaveTextContent("Was Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing");
   });
 
   it("shows the first shift in the week on the top card after next-week navigation", () => {
@@ -1617,7 +2107,7 @@ describe("ScheduleScreen", () => {
     expect(headerControlLabels.indexOf("Select Sat, Apr 18")).toBeLessThan(
       headerControlLabels.indexOf("Emergency"),
     );
-    expect(screen.getByText("Me")).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
     const mentoredJobPill = screen.getByLabelText("Job Mentor mentored assignment");
@@ -1631,7 +2121,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("8:00 AM - 4:00 PM")).toBeInTheDocument();
     expect(screen.queryByText("6:15 AM - 3:00 PM")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Me"));
+    fireEvent.click(screen.getByText("You"));
 
     expect(routerPush).toHaveBeenCalledWith({
       pathname: "/shift/[employeeId]/[date]",
@@ -1758,12 +2248,12 @@ describe("ScheduleScreen", () => {
       changedTouches: [{ pageX: 250 }],
     });
 
-    expect(screen.getByText("Me")).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.queryByText("Next Week Nurse")).not.toBeInTheDocument();
 
     fireQuickWeekSwipe(0);
 
-    expect(screen.getByText("Me")).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.queryByText("Next Week Nurse")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select Thu, Apr 23" })).toHaveAttribute(
       "aria-selected",
@@ -1795,8 +2285,67 @@ describe("ScheduleScreen", () => {
     expect(screen.getByRole("tab", { name: "Emergency" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
-    expect(screen.queryByText("Me")).not.toBeInTheDocument();
+    expect(screen.queryByText("You")).not.toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
+  });
+
+  it("shows a General shifts tab that excludes focus-area and absence entries", () => {
+    teamScheduleEntries = [
+      createScheduleEntry({
+        employeeId: "emp-4",
+        employeeName: "Jordan Lee",
+        shiftIds: [null],
+        jobIds: [30],
+        shiftLabel: "ADM",
+        assignmentLabel: "ADM",
+        shiftName: "Admin",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        startTime: "09:00:00",
+        endTime: "17:00:00",
+        segments: [
+          {
+            shiftId: null,
+            jobId: 30,
+            label: "ADM",
+            shiftName: "Admin",
+            jobName: "Admin",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+            displayFocusAreaName: null,
+          },
+        ],
+      }),
+      createScheduleEntry({
+        employeeId: "emp-2",
+        employeeName: "Bri Shaw",
+      }),
+      createScheduleEntry({
+        employeeId: "emp-3",
+        employeeName: "Casey Reed",
+        absenceTypeId: 1,
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: null,
+        shiftIds: [],
+        jobIds: [],
+        shiftName: "Paid Time Off",
+        segments: [],
+        startTime: null,
+        endTime: null,
+      }),
+    ];
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByRole("tab", { name: "General shifts" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "General shifts" }));
+
+    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+    expect(screen.getAllByText("Admin")).toHaveLength(2);
+    expect(screen.queryByText("Bri Shaw")).not.toBeInTheDocument();
+    expect(screen.queryByText("Casey Reed")).not.toBeInTheDocument();
   });
 
   it("renders the month calendar drag handle collapsed by default", () => {

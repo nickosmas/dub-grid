@@ -107,6 +107,9 @@ export const mobilePermissionsSchema = z.object({
   canManageCoverageRequirements: z.boolean(),
   canApproveShiftRequests: z.boolean(),
   canViewDashboardAnalytics: z.boolean(),
+  // Reports are web-only, so mobile never reads this. It defaults so a newer
+  // client still parses a bootstrap from a server that predates the key.
+  canViewReports: z.boolean().default(false),
   /**
    * Grant/revoke management access and set org roles — web gates this on
    * super_admin or gridmaster rather than on an admin permission. Defaults to
@@ -487,6 +490,16 @@ export function normalizeMobileScheduleRange(input?: MobileScheduleQuery): {
 
 export const mobileScheduleEntrySegmentSchema = resolvedSchedulePresentationSegmentSchema;
 
+export const mobileScheduleEntryChangeKindSchema = z.enum(["new", "modified", "deleted"]);
+
+export const mobileScheduleEntryChangeSchema = z.object({
+  kind: mobileScheduleEntryChangeKindSchema,
+  // A raw `new` record is only user-facing when it was added after the date
+  // had already been published. Initial period publication stays quiet.
+  isNewAddition: z.boolean().optional(),
+  previousPresentation: resolvedSchedulePresentationSchema.nullable(),
+});
+
 export const mobileScheduleEntrySchema = z.object({
   employeeId: z.string().uuid(),
   employeeName: z.string(),
@@ -495,6 +508,7 @@ export const mobileScheduleEntrySchema = z.object({
   date: z.string().date(),
   state: scheduleCellStateSchema,
   presentation: resolvedSchedulePresentationSchema,
+  change: mobileScheduleEntryChangeSchema.nullable().default(null),
   publishedAt: z.string().nullable(),
   publishedByName: z.string().nullable(),
 });

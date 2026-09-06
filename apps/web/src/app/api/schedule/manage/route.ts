@@ -1229,7 +1229,7 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
@@ -1321,7 +1321,7 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
@@ -1372,7 +1372,7 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
@@ -1418,13 +1418,16 @@ export async function POST(req: NextRequest) {
       }
 
       case "applyRecurringSchedules": {
+        // Series and recurring applies write grid cells, so they need Schedule
+        // edit as well as their own key. The toolbar already requires both;
+        // without this the API alone let a recurring-only admin fill the grid.
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canApplyRecurringSchedule,
+            (permissions.canEditShifts && permissions.canApplyRecurringSchedule),
           { actor },
         );
         if ("response" in auth) {
@@ -1605,11 +1608,16 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertScheduleNote": {
+        // A schedule note is an indicator on a cell, so writing one needs the
+        // indicators key as well as notes. The cell editor gates the picker on
+        // indicators; this keeps the API in step with it.
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
           { actor },
         );
         if ("response" in auth) {
@@ -1662,7 +1670,9 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
           { actor },
         );
         if ("response" in auth) {

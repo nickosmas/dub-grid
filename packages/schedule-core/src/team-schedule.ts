@@ -5,6 +5,7 @@ import type {
 } from "@dubgrid/contracts";
 import {
   TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY,
+  TEAM_SCHEDULE_GENERAL_SHIFTS_KEY,
   type MobileScheduleSection,
   type MobileScheduleShiftGroup,
   type ScheduleEntryLike,
@@ -181,6 +182,19 @@ function countFocusAreaPeople(
   return employeeIds.size;
 }
 
+function isGeneralScheduleEntry(entry: ScheduleEntryLike): boolean {
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return false;
+  }
+
+  const segments = getScheduleEntrySegments(entry);
+  return segments.length > 0 && segments.every((segment) => segment.shiftId === null);
+}
+
+function countGeneralShiftPeople(entries: ReadonlyArray<ScheduleEntryLike>): number {
+  return new Set(entries.filter(isGeneralScheduleEntry).map((entry) => entry.employeeId)).size;
+}
+
 /**
  * @param entries Decides which tabs exist. Pass the whole loaded range so the
  *   tab set stays put as the user moves between days.
@@ -215,12 +229,23 @@ export function buildTeamScheduleFocusAreaTabs(
     }
   }
 
-  const tabs = Array.from(focusAreasById.values()).map((focusArea) => ({
+  const focusAreaTabs = Array.from(focusAreasById.values()).map((focusArea) => ({
     key: `focus-area:${focusArea.id}`,
     label: focusArea.name,
     count: countFocusAreaPeople(countEntries, focusArea.id),
     focusAreaId: focusArea.id,
   }));
+  const tabs = entries.some(isGeneralScheduleEntry)
+    ? [
+        ...focusAreaTabs,
+        {
+          key: TEAM_SCHEDULE_GENERAL_SHIFTS_KEY,
+          label: "General shifts",
+          count: countGeneralShiftPeople(countEntries),
+          focusAreaId: "general" as const,
+        },
+      ]
+    : focusAreaTabs;
 
   if (focusAreas.length > 0) {
     return tabs;
@@ -236,6 +261,10 @@ export function filterTeamScheduleEntriesByFocusArea(
   // If no key or 'all', return all entries unfiltered
   if (activeTabKey === TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY) {
     return [...entries] as MobileScheduleEntry[];
+  }
+
+  if (activeTabKey === TEAM_SCHEDULE_GENERAL_SHIFTS_KEY) {
+    return entries.filter(isGeneralScheduleEntry) as MobileScheduleEntry[];
   }
 
   const match = /^focus-area:(\d+)$/.exec(activeTabKey);

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireOrgPermissions = vi.fn();
 const organizationsSingle = vi.fn();
 const publishHistoryOrder = vi.fn();
+const publishHistoryLimit = vi.fn();
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
@@ -36,7 +37,8 @@ function createServiceClient() {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              gte: vi.fn(() => ({
+              gte: vi.fn(() => ({ order: publishHistoryOrder })),
+              lte: vi.fn(() => ({
                 gte: vi.fn(() => ({ order: publishHistoryOrder })),
               })),
             })),
@@ -48,7 +50,8 @@ function createServiceClient() {
   };
 
   organizationsSingle.mockResolvedValue({ data: { timezone: "UTC" } });
-  publishHistoryOrder.mockResolvedValue({
+  publishHistoryOrder.mockReturnValue({ limit: publishHistoryLimit });
+  publishHistoryLimit.mockResolvedValue({
     data: [
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -132,6 +135,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
             empId: "emp-1",
             date: "2026-05-04",
             kind: "new",
+            isNewAddition: false,
             fromState: null,
             toState: null,
             fromAbsenceTypeId: null,

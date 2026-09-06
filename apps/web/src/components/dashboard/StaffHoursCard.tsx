@@ -1,3 +1,4 @@
+import { getAvatarTypography } from "@dubgrid/design-tokens";
 import Link from "next/link";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { getAvatarInitials } from "@/lib/utils";
@@ -82,14 +83,13 @@ export default function StaffHoursCard({
                 {/* Avatar */}
                 <div
                   style={{
+                    ...getAvatarTypography(30),
                     width: 30,
                     height: 30,
                     borderRadius: 7,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "var(--dg-type-badge-size)",
-                    fontWeight: 600,
                     flexShrink: 0,
                     background: h.isOvertime
                       ? "var(--dg-color-danger-bg)"

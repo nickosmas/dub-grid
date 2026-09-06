@@ -254,6 +254,28 @@ describe("ShiftDetailScreen", () => {
                     displayFocusAreaName: "Emergency",
                   },
                 ],
+                change: {
+                  kind: "modified",
+                  previousPresentation: {
+                    label: "N",
+                    shiftName: "Night Shift",
+                    focusAreaId: 1,
+                    focusAreaName: "Emergency",
+                    displayFocusAreaName: "Emergency",
+                    startTime: "23:00:00",
+                    endTime: "07:00:00",
+                    segments: [
+                      {
+                        shiftId: 3,
+                        label: "N",
+                        shiftName: "Night Shift",
+                        startTime: "23:00:00",
+                        endTime: "07:00:00",
+                        displayFocusAreaName: "Emergency",
+                      },
+                    ],
+                  },
+                },
                 publishedAt: "2026-04-15T18:30:00.000Z",
                 publishedByName: "Mina Diaz",
               },
@@ -395,6 +417,28 @@ describe("ShiftDetailScreen", () => {
                 { id: 1, name: "Training" },
                 { id: 2, name: "Float" },
               ],
+              change: {
+                kind: "modified",
+                previousPresentation: {
+                  label: "E",
+                  shiftName: "Evening Shift",
+                  focusAreaId: 1,
+                  focusAreaName: "Emergency",
+                  displayFocusAreaName: "Emergency",
+                  startTime: "15:00:00",
+                  endTime: "23:00:00",
+                  segments: [
+                    {
+                      shiftId: 2,
+                      label: "E",
+                      shiftName: "Evening Shift",
+                      startTime: "15:00:00",
+                      endTime: "23:00:00",
+                      displayFocusAreaName: "Emergency",
+                    },
+                  ],
+                },
+              },
               publishedAt: "2026-04-15T18:30:00.000Z",
               publishedByName: "Mina Diaz",
             },
@@ -446,13 +490,27 @@ describe("ShiftDetailScreen", () => {
     expect(detailCardText).toBeDefined();
     expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(detailCardText!.indexOf("Mentor"));
     expect(detailCardText!.indexOf("Mentor")).toBeLessThan(detailCardText!.indexOf("ICU"));
-    expect(detailCardText!.indexOf("ICU")).toBeLessThan(
-      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
+    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
+      detailCardText!.indexOf("ICU"),
     );
+    expect(
+      within(screen.getByTestId("shift-detail-card")).queryByText("Focus area"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("shift-detail-card")).queryByText("Shift time"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Published by")).not.toBeInTheDocument();
     expect(screen.queryByText("Focus Areas")).not.toBeInTheDocument();
     expect(screen.queryByText("Employee")).not.toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
+
+    expect(screen.getByText("Previous shift")).toBeInTheDocument();
+    expect(screen.getByText("Evening Shift")).toBeInTheDocument();
+    expect(screen.getByLabelText("Shift time 3:00 PM - 11:00 PM")).toBeInTheDocument();
+    expect(screen.getByLabelText("Focus area Emergency")).toBeInTheDocument();
   });
 
   it("does not show Working with for general shifts", () => {
@@ -602,13 +660,30 @@ describe("ShiftDetailScreen", () => {
     );
     expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
     expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Emergency"));
-    expect(detailCardText!.indexOf("Emergency")).toBeLessThan(
-      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
+    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
+      detailCardText!.indexOf("Emergency"),
     );
     expect(detailCardText!.indexOf("Bri Shaw")).toBeGreaterThan(
       detailCardText!.indexOf("Day Shift"),
     );
     expect(screen.queryByText("Time")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
+  });
+
+  it("opens the complete publication information from the compact footer", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    render(<ShiftDetailScreen />);
+
+    expect(screen.queryByText("Publication details")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Published Apr 15, 2026, 11:30 AM by Mina Diaz",
+      }),
+    );
+    expect(screen.getByText("Publication details")).toBeInTheDocument();
+    expect(screen.getByText("Published Apr 15, 2026, 11:30 AM by Mina Diaz")).toBeInTheDocument();
   });
 
   it("shows me as a shiftmate on another employee's shift detail", () => {
@@ -759,7 +834,7 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
-    expect(screen.getByText("Me")).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
     expect(screen.getByText("Mentor")).toBeInTheDocument();
   });
@@ -799,6 +874,37 @@ describe("ShiftDetailScreen", () => {
           isMentored: true,
         },
       ],
+      change: {
+        kind: "modified",
+        previousPresentation: {
+          label: "ADM/D",
+          shiftName: "Admin / Day Shift",
+          focusAreaId: 1,
+          focusAreaName: "Emergency",
+          displayFocusAreaName: "Emergency",
+          startTime: "07:30:00",
+          endTime: "23:30:00",
+          segments: [
+            {
+              shiftId: null,
+              label: "ADM",
+              shiftName: "Admin",
+              startTime: "07:30:00",
+              endTime: "15:30:00",
+              // Cached general-shift focus data must not appear in the sheet.
+              displayFocusAreaName: "ICU",
+            },
+            {
+              shiftId: 1,
+              label: "D",
+              shiftName: "Day Shift",
+              startTime: "15:30:00",
+              endTime: "23:30:00",
+              displayFocusAreaName: "Emergency",
+            },
+          ],
+        },
+      },
       publishedAt: "2026-04-15T18:30:00.000Z",
       publishedByName: "Mina Diaz",
     };
@@ -898,10 +1004,10 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    expect(screen.getByText("Multiple Shifts")).toBeInTheDocument();
-    expect(screen.getByLabelText("Multiple Shifts, 2 shifts")).toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.queryByText("Shiftmates")).not.toBeInTheDocument();
+    expect(screen.getByText("Multiple Shifts")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Multiple Shifts, 2 shifts")).toBeNull();
     expect(screen.getByLabelText("Shift 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Shift 2")).toBeInTheDocument();
     expect(
@@ -911,8 +1017,8 @@ describe("ShiftDetailScreen", () => {
 
     expect(detailCard).toHaveTextContent("Day Shift");
     expect(detailCard).toHaveTextContent("Evening Shift");
-    expect(detailCard).not.toHaveTextContent("Shift 1");
-    expect(detailCard).not.toHaveTextContent("Shift 2");
+    expect(within(detailCard).getAllByLabelText("Edited")).toHaveLength(2);
+    expect(within(detailCard).queryByLabelText("Shift edited")).toBeNull();
     expect(screen.getAllByText("7:30 AM - 3:30 PM").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3:30 PM - 11:30 PM").length).toBeGreaterThan(0);
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
@@ -920,6 +1026,109 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent("Mentored");
     expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
     expect(screen.getAllByText("ICU").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
+    expect(screen.getByText("Previous shifts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Previous shift Admin")).toHaveTextContent("Admin");
+    expect(screen.getByLabelText("Previous shift Admin")).not.toHaveTextContent("ICU");
+    expect(screen.getByLabelText("Previous shift Day Shift")).toHaveTextContent("Emergency");
+  });
+
+  it("merges the edited status into only the affected double-shift detail segment", () => {
+    const selectedEntry = {
+      employeeId: "emp-1",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      assignmentIds: [1, 2],
+      shiftLabel: "D/E",
+      assignmentLabel: "D/E",
+      shiftName: "Day Shift / Evening Shift",
+      absenceTypeId: null,
+      focusAreaId: 2,
+      focusAreaName: "ICU",
+      displayFocusAreaName: "ICU",
+      startTime: "07:30:00",
+      endTime: "23:30:00",
+      segments: [
+        {
+          shiftId: 1,
+          jobId: 10,
+          shiftName: "Day Shift",
+          jobName: "Nurse",
+          startTime: "07:30:00",
+          endTime: "15:30:00",
+          displayFocusAreaName: "ICU",
+        },
+        {
+          shiftId: 2,
+          jobId: 20,
+          shiftName: "Evening Shift",
+          jobName: "Lead",
+          startTime: "15:30:00",
+          endTime: "23:30:00",
+          displayFocusAreaName: "Emergency",
+        },
+      ],
+      change: {
+        kind: "modified",
+        previousPresentation: {
+          label: "D/E",
+          shiftName: "Day Shift / Evening Shift",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "07:30:00",
+          endTime: "23:30:00",
+          segments: [
+            {
+              shiftId: 1,
+              jobId: 10,
+              shiftName: "Day Shift",
+              jobName: "Nurse",
+              startTime: "07:30:00",
+              endTime: "15:30:00",
+              displayFocusAreaName: "ICU",
+            },
+            {
+              shiftId: 2,
+              jobId: 20,
+              shiftName: "Evening Shift",
+              jobName: "Lead",
+              startTime: "14:30:00",
+              endTime: "23:30:00",
+              displayFocusAreaName: "Emergency",
+            },
+          ],
+        },
+      },
+      publishedAt: "2026-04-15T18:30:00.000Z",
+      publishedByName: "Mina Diaz",
+    };
+
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => ({
+      data:
+        queryKey[1] === "requests"
+          ? { requests: [], openShifts: [] }
+          : { entries: [selectedEntry] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    const detailCard = within(screen.getByTestId("shift-detail-card"));
+    expect(detailCard.getByLabelText("Edited")).toBeInTheDocument();
+    expect(detailCard.queryAllByLabelText("Edited")).toHaveLength(1);
+    expect(detailCard.queryByLabelText("Shift edited")).toBeNull();
+    expect(detailCard.getByLabelText("Job Lead")).toBeInTheDocument();
+    expect(detailCard.getByText("ICU")).toBeInTheDocument();
+    expect(detailCard.getByText("Emergency")).toBeInTheDocument();
   });
 
   it("does not show drop and swap split-shift guidance for another employee", () => {
@@ -1020,7 +1229,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
   });
 
-  it("names the absence type in the detail card pill under an Absence eyebrow", () => {
+  it("names the absence type in a compact pill under the Absence heading", () => {
     useQuery.mockImplementation(() => ({
       data: {
         entries: [
@@ -1039,6 +1248,10 @@ describe("ShiftDetailScreen", () => {
             endTime: null,
             customStartTime: null,
             customEndTime: null,
+            change: {
+              kind: "new",
+              previousPresentation: null,
+            },
             publishedAt: "2026-04-15T18:30:00.000Z",
             publishedByName: "Mina Diaz",
           },
@@ -1067,10 +1280,12 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Absence")).toBeInTheDocument();
     expect(screen.getByText("Off Day")).toBeInTheDocument();
     expect(screen.getByLabelText("Absence Off Day")).toBeInTheDocument();
-    // The pill names the absence type; "Absence" is the eyebrow above it, not
-    // the pill's own text. Matches the home card's MeTypePill.
+    expect(screen.queryByLabelText("Shift new")).not.toBeInTheDocument();
+    // The pill names the absence type; "Absence" is the main heading above it,
+    // not the pill's own text.
     expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Off Day");
     expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Absence");
+    expect(screen.queryByRole("button", { name: "View previous shift" })).not.toBeInTheDocument();
   });
 
   it("names the general shift in the detail card pill under a General shift eyebrow", () => {
@@ -1106,6 +1321,29 @@ describe("ShiftDetailScreen", () => {
                 displayFocusAreaName: null,
               },
             ],
+            change: {
+              kind: "modified",
+              previousPresentation: {
+                label: "ADM",
+                shiftName: "Admin",
+                focusAreaId: 2,
+                focusAreaName: "ICU",
+                displayFocusAreaName: "ICU",
+                startTime: "09:00:00",
+                endTime: "17:00:00",
+                segments: [
+                  {
+                    shiftId: null,
+                    label: "ADM",
+                    shiftName: "Admin",
+                    startTime: "09:00:00",
+                    endTime: "17:00:00",
+                    // Simulates a payload cached before the server-side fix.
+                    displayFocusAreaName: "ICU",
+                  },
+                ],
+              },
+            },
             publishedAt: "2026-04-15T18:30:00.000Z",
             publishedByName: "Mina Diaz",
           },
@@ -1130,6 +1368,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("General shift Admin")).toBeInTheDocument();
     expect(screen.getByLabelText("General shift Admin")).toHaveTextContent("Admin");
     expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("General shift");
+    fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
+    expect(screen.getAllByText("Admin").length).toBeGreaterThan(1);
+    expect(screen.queryByLabelText("Focus area ICU")).not.toBeInTheDocument();
   });
 
   it("filters swap options behind a horizontal date selector", () => {
@@ -1283,6 +1524,37 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.getByText("Drop shift")).toBeInTheDocument();
     expect(screen.getByText("Swap")).toBeInTheDocument();
+  });
+
+  it("shows deleted history without operational shift actions", () => {
+    useQuery.mockImplementation(() => ({
+      data: {
+        entries: [{
+          employeeId: "emp-1", employeeName: "Alex Kim", date: "2026-04-16",
+          assignmentIds: [], shiftLabel: "", assignmentLabel: null, shiftName: "",
+          absenceTypeId: null, focusAreaId: null, focusAreaName: null,
+          displayFocusAreaName: null, startTime: null, endTime: null,
+          customStartTime: null, customEndTime: null,
+          change: {
+            kind: "deleted",
+            previousPresentation: {
+              label: "D", shiftName: "Day Shift", focusAreaId: 2,
+              focusAreaName: "ICU", displayFocusAreaName: "ICU",
+              startTime: "07:00:00", endTime: "15:00:00", segments: [],
+            },
+          },
+          publishedAt: "2026-04-15T18:30:00.000Z", publishedByName: "Mina Diaz",
+        }],
+      },
+      error: null, isFetching: false, isLoading: false, refetch: vi.fn(),
+    }));
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
   });
 
   it("hides shift actions for an ongoing shift", () => {

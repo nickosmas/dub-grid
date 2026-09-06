@@ -24,7 +24,7 @@ describe("buildShiftDiffDescriptors — absence cells", () => {
     });
   });
 
-  it("flags a replaced absence as a cell-level 'Was <label>' modified badge with no pill diffs", () => {
+  it("flags a replaced absence as an Edited cell badge while retaining its prior value in detail", () => {
     const result = buildShiftDiffDescriptors({
       before: { assignmentIds: [], absenceTypeId: 11 },
       after: { assignmentIds: [], absenceTypeId: 10 },
@@ -34,10 +34,11 @@ describe("buildShiftDiffDescriptors — absence cells", () => {
 
     expect(result.pillDiffs).toEqual([]);
     expect(result.cellBadge?.kind).toBe("modified");
-    expect(result.cellBadge?.text).toBe("Was Vacation");
+    expect(result.cellBadge?.text).toBe("Edited");
+    expect(result.cellBadge?.detail).toBe("Was Vacation.");
   });
 
-  it("flags a shift replaced by an absence as a cell-level 'Was <shift>' modified badge with no pill diffs", () => {
+  it("flags a shift replaced by an absence as Edited while retaining its prior value in detail", () => {
     const result = buildShiftDiffDescriptors({
       before: { assignmentIds: [1], absenceTypeId: null },
       after: { assignmentIds: [], absenceTypeId: 10 },
@@ -47,7 +48,8 @@ describe("buildShiftDiffDescriptors — absence cells", () => {
 
     expect(result.pillDiffs).toEqual([]);
     expect(result.cellBadge?.kind).toBe("modified");
-    expect(result.cellBadge?.text).toBe("Was DAY");
+    expect(result.cellBadge?.text).toBe("Edited");
+    expect(result.cellBadge?.detail).toBe("Was DAY.");
   });
 
   it("returns null cellBadge when before and after are the same absence", () => {
@@ -89,7 +91,8 @@ describe("buildShiftDiffDescriptors — shift cells (sanity)", () => {
 
     expect(result.pillDiffs).toHaveLength(1);
     expect(result.pillDiffs[0]?.borderKind).toBe("modified");
-    expect(result.pillDiffs[0]?.badge?.text).toBe("Was DAY");
+    expect(result.pillDiffs[0]?.badge?.text).toBe("Edited");
+    expect(result.pillDiffs[0]?.badge?.detail).toBe("Was DAY.");
   });
 
   it("treats an absence replaced by a shift as a non-empty pill diff so the regular code path renders the ring", () => {
@@ -102,7 +105,23 @@ describe("buildShiftDiffDescriptors — shift cells (sanity)", () => {
 
     expect(result.pillDiffs).toHaveLength(1);
     expect(result.pillDiffs[0]?.borderKind).toBe("modified");
-    expect(result.pillDiffs[0]?.badge?.text).toBe("Was Sick");
+    expect(result.pillDiffs[0]?.badge?.text).toBe("Edited");
+    expect(result.pillDiffs[0]?.badge?.detail).toBe("Was Sick.");
+  });
+
+  it("never exposes an unresolved prior assignment as a question-mark label", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [99], absenceTypeId: null },
+      after: { assignmentIds: [1], absenceTypeId: null },
+      resolveAssignmentDefinitionLabel: () => "?",
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs[0]?.badge).toEqual({
+      kind: "modified",
+      text: "Edited",
+      detail: "Replaced a previous assignment.",
+    });
   });
 });
 
@@ -201,5 +220,25 @@ describe("buildShiftDiffDescriptors — custom time", () => {
     });
 
     expect(result.pillDiffs[0]?.badge?.text).toBe("+ Time");
+  });
+});
+
+describe("buildShiftDiffDescriptors — removed split-shift segments", () => {
+  it("marks a removed sibling as Edited without marking the surviving shift", () => {
+    const result = buildShiftDiffDescriptors({
+      before: { assignmentIds: [1, 2], absenceTypeId: null },
+      after: { assignmentIds: [1], absenceTypeId: null },
+      beforeShiftLabels: ["Day Shift · Mentor", "Evening Shift · Supervisor"],
+      afterShiftLabels: ["Day Shift · Mentor"],
+      resolveAssignmentDefinitionLabel,
+      resolveAbsenceLabel,
+    });
+
+    expect(result.pillDiffs).toEqual([{ borderKind: null, badge: null }]);
+    expect(result.cellBadge).toEqual({
+      kind: "modified",
+      text: "Changed",
+      detail: "Was Evening Shift · Supervisor.",
+    });
   });
 });

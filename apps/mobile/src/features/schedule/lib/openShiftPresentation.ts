@@ -1,5 +1,5 @@
 import type { MobileOpenShift } from "@dubgrid/contracts";
-import { formatScheduleTimeRange } from "./schedule";
+import { formatScheduleTimeRange, isGeneralScheduleEntrySegment } from "./schedule";
 
 /**
  * Presentation accessors for an open shift, shared by the Schedule and
@@ -21,9 +21,19 @@ export function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | 
 }
 
 export function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
+  if (getOpenShiftAbsenceTypeId(openShift) != null) {
+    return null;
+  }
+
+  const segments = openShift.presentation.segments;
+  if (segments.length > 0 && segments.every(isGeneralScheduleEntrySegment)) {
+    return null;
+  }
+
   return (
-    openShift.presentation.segments.find((segment) => segment.displayFocusAreaName)
-      ?.displayFocusAreaName ??
+    segments.find(
+      (segment) => !isGeneralScheduleEntrySegment(segment) && segment.displayFocusAreaName,
+    )?.displayFocusAreaName ??
     openShift.presentation.displayFocusAreaName ??
     openShift.focusAreaName
   );

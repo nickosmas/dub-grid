@@ -21,6 +21,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     focusAreas,
     currentEmpId,
     currentPeriodShifts,
+    recentPublishedChanges,
     allShifts,
     assignmentById,
     absenceTypeById,
@@ -44,6 +45,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
       <MyScheduleRow
         currentEmpId={currentEmpId}
         currentPeriodShifts={currentPeriodShifts}
+        recentPublishedChanges={recentPublishedChanges}
         allShifts={allShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}

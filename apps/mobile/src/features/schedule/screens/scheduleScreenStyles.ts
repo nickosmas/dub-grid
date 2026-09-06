@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 import {
+  mobileAvatarText,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -169,7 +170,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "rgba(255, 255, 255, 0.22)",
     },
     meHeroContent: {
-      gap: 11,
+      gap: 16,
     },
     meHeroHeader: {
       flexDirection: "row",
@@ -180,12 +181,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroHeaderCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 10,
+      gap: 6,
     },
     meHeroBadge: {
       alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
+      gap: 8,
+    },
+    meHeroBadgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
       gap: 8,
     },
     meHeroBadgeMuted: {
@@ -248,7 +255,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "center",
       flexWrap: "wrap",
-      gap: 8,
+      gap: 6,
     },
     meHeroHeading: {
       ...mobileText.rowTitle,
@@ -284,7 +291,64 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      marginTop: 2,
+    },
+    meHeroContextGroup: {
+      gap: 8,
+    },
+    shiftChangeBadge: {
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    shiftChangeBadgeNew: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+    },
+    shiftChangeBadgeModified: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    shiftChangeBadgeDeleted: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    shiftChangeBadgeCompactSegment: {
+      paddingVertical: 4,
+    },
+    shiftChangeBadgeInverse: {
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.26)",
+    },
+    shiftChangeBadgeText: {
+      ...mobileText.micro,
+      color: mobileColors.textSecondary,
+      fontWeight: "700",
+      textTransform: "uppercase",
+    },
+    shiftChangeBadgeTextInverse: {
+      color: mobileColors.textInverse,
+    },
+    shiftChangeBadgeTextCompactSegment: {
+      ...mobileText.badge,
+      color: mobileColors.brand,
+      textTransform: "none",
+    },
+    previousShiftRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minWidth: 0,
+    },
+    previousShiftText: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    previousShiftTextInverse: {
+      color: "rgba(255, 255, 255, 0.82)",
     },
     meHeroRoleRow: {
       flexDirection: "row",
@@ -316,7 +380,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "space-between",
       flexWrap: "wrap",
       gap: 10,
-      marginTop: 6,
     },
     meHeroTimeRow: {
       flexDirection: "row",
@@ -457,7 +520,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     meHeroCollaboratorAvatarText: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileAvatarText(38),
     },
     meHeroCollaboratorOverflow: {
       width: 38,
@@ -537,6 +600,24 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 18,
       paddingVertical: 18,
     },
+    upcomingUnscheduledRow: {
+      minHeight: 132,
+      justifyContent: "center",
+      gap: 4,
+      paddingVertical: 18,
+    },
+    upcomingDeletedHistoryRow: {
+      paddingVertical: 14,
+    },
+    upcomingUnscheduledTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 17,
+      color: mobileColors.textSecondary,
+    },
+    upcomingUnscheduledBody: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
     upcomingShiftRowBorder: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -609,10 +690,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
       alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: 8,
     },
     upcomingShiftTitle: {
+      flex: 1,
       flexShrink: 1,
       minWidth: 0,
       ...mobileText.sectionTitle,
@@ -636,11 +717,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       fontSize: 13,
       lineHeight: 18,
       color: mobileColors.textSubtle,
-    },
-    upcomingShiftAction: {
-      width: 24,
-      alignItems: "center",
-      justifyContent: "center",
     },
     meSectionHeader: {
       flexDirection: "row",
@@ -842,7 +918,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     requestAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(42),
     },
     requestHeaderText: {
       ...mobileText.rowTitle,
@@ -1270,7 +1346,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     teamMemberAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
     teamMemberMain: {

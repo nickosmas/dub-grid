@@ -23,6 +23,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
     shiftRequests,
     currentEmpId,
     currentPeriodShifts,
+    recentPublishedChanges,
     allShifts,
     assignmentById,
     assignmentNameMap,
@@ -95,6 +96,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
       <MyScheduleRow
         currentEmpId={currentEmpId}
         currentPeriodShifts={currentPeriodShifts}
+        recentPublishedChanges={recentPublishedChanges}
         allShifts={allShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}

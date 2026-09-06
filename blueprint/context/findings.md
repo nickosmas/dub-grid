@@ -153,3 +153,88 @@ The remaining 52 are blocked on a contract decision, not effort. Neither `client
 **Found:** 2026-09-05 by /audit (scope: full; lens: performance)
 **Why it matters:** `loadActiveScheduleCellDependencies` selects every `schedule_cells` row for the org with nested `schedule_cell_snapshots` and `schedule_cell_segments`, no date filter and no count-only projection, then filters in JS. It backs the delete-dependency checks in Jobs, AbsenceTypes, and ShiftCategories settings, so answering "is this job used anywhere?" pulls a multi-MB payload for an org with a year of history. Surfaced while auditing action feedback (see [[F-54]]); those call sites do spin correctly, so this is cost rather than a missing signal.
 **Suggested fix:** Replace the row fetch with a count-only query or an RPC that answers existence server-side.
+
+### F-56 [P2] fixed - Web confirmations allow alternate dismissal while their action is pending
+
+**File:** apps/web/src/components/ConfirmDialog.tsx:78-88; apps/web/src/components/Modal.tsx:75-95; apps/web/src/components/Header.tsx:395-403
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** ConfirmDialog disables the Cancel and confirm buttons while either action is pending, but passes onCancel directly to Modal without its onRequestClose veto. Escape, the backdrop, and the X therefore still close callers such as the sandbox exit confirmation during the request. Closing the surface does not cancel that request. Mobile ConfirmationModal already blocks its alternate dismissal paths while busy.
+**Suggested fix:** Route every confirmation dismissal through the same pending-state guard, using Modal's existing veto, and cover Escape, backdrop, close icon, and Cancel during both primary and secondary requests. Preserve visible pending/error feedback until the action settles.
+**Resolution:** Fixed by the user-approved confirmation-surfaces implementation: all web confirmation exits share the pending guard, the redundant X is removed, and both primary and secondary async latches remain effective even if an external loading flag is false. Regression tests cover Escape, backdrop, Cancel, and dismissal after settlement.
+
+### F-57 [P2] fixed - Management confirmation failures render their error behind the active popup
+
+**File:** apps/mobile/src/features/people/components/ManagementUserActionsSheet.tsx:132-173; apps/mobile/src/features/people/components/ManagementUserActionsSheet.tsx:323-355
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** Remove-access and invitation mutations retain their confirmation on failure and set the shared error state. That error is rendered in the underlying actions/access/role sheet, but neither active ConfirmationModal receives its error prop. The top native modal stops spinning without explaining the failure on its own surface.
+**Suggested fix:** Pass the relevant error into the active confirmation, clear it when starting or canceling that action, and exercise rejected remove/reissue/revoke requests while asserting the message inside the visible confirmation. Preserve the existing stale-update and access safeguards.
+**Resolution:** Fixed: remove-access and invitation errors render in the active ManagementUserActionsSheet confirmation and clear on cancellation/retry. Three rejected-action tests assert the error within the visible alert and its reset on reopening. PersonDetail invitation/account-link errors also remain on the active surface; handoff uses the existing transition helper. Native visual validation remains outstanding.
+
+### F-58 [P2] fixed - Shared web Modal does not restore focus after closing
+
+**File:** apps/web/src/components/Modal.tsx:50-73
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** Modal moves focus into itself on mount, but never captures or restores the previously focused element. Closing a confirmation over an editor removes the focused control without returning keyboard focus to the invoking action. Its tests assert initial focus only. This is inconsistent with the modal focus lifecycle described by the WAI-ARIA dialog pattern.
+**Suggested fix:** Restore focus to a still-connected invoker or an intentional fallback, respecting the active modal layer. Prefer sharing the existing Base UI dialog focus/presentation infrastructure with sheets when that migration is separately scoped. Verify keyboard cancel and nested editor/confirmation flows in a browser.
+**Resolution:** Fixed: Modal now uses the installed Base UI Dialog focus, modal-layer, and scroll infrastructure. An explicit returnFocus target handles disappearing menu invokers; Header uses its surviving account/menu trigger. Unit tests cover invoker restoration, fallback targets, focus trapping, and nested cancellation. Authenticated Chrome confirmed Cancel initial focus, Tab containment, Escape, menu return focus, nested editor restoration, and restoration to the page after discarding a temporary draft. No changes were saved during the browser check.
+
+### F-59 [P2] fixed - Mobile overlay instructions contradict the current confirmation primitive
+
+**File:** apps/mobile/AGENTS.md:195-197; apps/mobile/AGENTS.md:239-243; apps/mobile/src/shared/components/ConfirmationModal.tsx:89-100
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lens: quality)
+**Why it matters:** Instructions mandate one modal design, forbid centered alert cards, and describe confirmation actions as vertically stacked. The current primitive intentionally renders a centered popup with a horizontal action row. Following the instructions would undo the implemented design; following the component would violate the instructions. This leaves no dependable rule for new callers.
+**Suggested fix:** After the presentation policy is selected, document confirmations as brief consequence decisions, sheets as selections or bounded tasks, and pages as long workflows. Specify dismissal, pending/error ownership, action order, and explicit blocking-gate exceptions. Keep implementation and instructions aligned.
+**Resolution:** Fixed: both app guides now describe consequence confirmations, task sheets, and page workflows, including pending/error ownership, action order, focus return, and explicit gate exceptions. Mobile confirmation motion and icon treatment are quieter, action layout adapts to narrow/enlarged text, status choices/reasons moved to a sheet, and ordinary profile saves no longer add a redundant confirmation.
+
+### F-60 [P2] fixed - The modal depth guard no longer enforces its documented sheet-plus-confirmation limit
+
+**File:** apps/mobile/src/shared/lib/modal-presentation.ts:22-23; apps/mobile/src/shared/components/BottomSheetModal.tsx:160-165; apps/mobile/src/shared/components/ConfirmationModal.tsx:89-100; apps/mobile/src/shared/components/BottomSheetModal.presentation.test.tsx:45-50
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** The limit is documented as one sheet with one confirmation above it, but only BottomSheetModal registers. After confirmations became independent native modals, two task sheets plus one or more confirmations no longer violate the counter. The test named "allows a confirmation over the sheet it guards" renders two BottomSheetModal instances, so it does not cover the current composition. This confirms a guard gap, not a reproduced native stacking failure.
+**Suggested fix:** Track actual presented surfaces with their kind and owner, allow only the chosen task/confirmation composition, and test a real ConfirmationModal over a sheet. Keep handoff sequencing explicit and verify presentation/dismissal on iOS and Android; a fixed timer alone is not native transition evidence.
+**Resolution:** Fixed at the presentation-policy/test layer: both real primitives register typed presentations with identity-based cleanup. Duplicate task sheets and duplicate confirmations are diagnosed; explicit required gates are separate. Regression tests render the actual ConfirmationModal above a BottomSheetModal, reject invalid compositions, and cover cleanup/handoff. This remains a diagnostic guard, not a native modal coordinator; iOS/Android transition and gesture checks remain outstanding.
+
+### F-61 [P2] fixed - Confirmation dismissal test passes against a control name the component no longer uses
+
+**File:** apps/mobile/src/shared/components/ConfirmationModal.test.tsx:18-39; apps/mobile/src/shared/components/ConfirmationModal.tsx:196-223
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lens: tests)
+**Why it matters:** The test claims an explicit Cancel or Confirm is required and only checks that "Dismiss confirmation" is absent. The component actually renders a backdrop button labeled "Dismiss" and calls onCancel from it when idle. The passing assertion therefore proves neither the claimed policy nor the real backdrop/back-button behavior.
+**Suggested fix:** Set the intended policy explicitly, test the actual dismissal controls and Android onRequestClose while idle and pending, and assert that dismiss never invokes the consequential action. Keep the native presentation test separate from jsdom shims.
+**Resolution:** Fixed: tests use the real Dismiss control and capture React Native Modal onRequestClose. Idle dismissal calls Cancel without invoking the action; pending backdrop, Cancel, Android back, and duplicate confirmation are covered. These are component tests with native shims, not device evidence.
+
+Audit validation for F-56 through F-61: focused quality/tests review of current dev checkout, including pre-existing uncommitted UI changes. Source inventory found 28 mobile ConfirmationModal uses, 17 mobile BottomSheetModal uses, and 79 web ConfirmDialog uses; counts exclude comments and tests. Reviewed shared primitives, dismissal/drag/handoff guards, and representative People, profile/session, request, filter, navigation, and change-review consumers. Dependency/generated/build output and backend security/performance were outside scope. This was not an exhaustive runtime audit of every caller.
+
+Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tests__/ConfirmDialog.test.tsx apps/web/src/__tests__/Modal.test.tsx apps/web/src/__tests__/useUnsavedChangesPrompt.test.tsx` collected the two existing suites, 18 passed. `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/components/ConfirmationModal.test.tsx apps/mobile/src/shared/components/BottomSheetModal.presentation.test.tsx apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.tsx apps/mobile/src/shared/hooks/useModalHandoff.test.tsx apps/mobile/src/features/profile/screens/ProfileSessionsScreen.test.tsx` collected three existing suites, 15 passed. The guard test actually has a `.test.ts` extension and was then run with `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.ts apps/mobile/src/shared/hooks/useSheetDragToDismiss.test.ts`, 25 passed. Total: 58 passed. The mobile session suite emits DOM-shim warnings for overScrollMode and onContentSizeChange. No skipped/focused test declarations found in these seven suites. No full suite, build, typecheck, authenticated browser, VoiceOver/TalkBack, keyboard-layout, or native gesture/presentation validation was performed. No prior findings were closed.
+
+### F-62 [P1] closed - Web dashboard marks every segment of a changed multi-shift cell
+
+**File:** apps/web/src/components/dashboard/MyScheduleRow.tsx:282-288; apps/web/src/components/dashboard/UserDashboard.tsx:670-702
+**Found:** 2026-09-06 by /audit (scope: current; lenses: quality, tests)
+**Why it matters:** A publish change is attached to the employee/date cell and copied unchanged to every rendered segment. Editing only the second portion of a double shift therefore gives both the first and second portions an `Edited` tag, contradicting the required affected-shift-only behavior and creating a false alert on the unchanged shift.
+**Suggested fix:** Compare `fromState.segments` with the effective/to segments by stable segment identity or position, derive a per-segment change kind, and use it in both `MyScheduleRow` and `UserDashboard`. Add web regressions for an edit to one half of a regular/general mixed double shift.
+**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. `MyScheduleRow` now
+compares each effective segment with its corresponding published segment, and
+`UserDashboard` uses `getSegmentChangeKind` for every rendered segment. Focused
+dashboard regressions pass, including the changed-segment path.
+
+### F-63 [P1] closed - Web change history disappears when a user browses a completed period
+
+**File:** apps/web/src/app/api/schedule/publish-history/recent/route.ts:55-65; apps/web/src/components/dashboard/DashboardView.tsx:445-466
+**Found:** 2026-09-06 by /audit (scope: current; lenses: quality, tests)
+**Why it matters:** The dashboard's history request always filters `publish_history.end_date >= today`, regardless of the selected dashboard week or two-week period. Navigating to a completed period still loads its schedule cells, but never its published edit/deletion data, so badges and `Was ...` history vanish for those dates.
+**Suggested fix:** Send the selected period range to the recent-history endpoint and filter for overlap with that range. Keep a separate forward range only for the hero if it needs one. Add a route and dashboard regression for a prior completed week.
+**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. `DashboardView` now
+requests publish history for the selected period plus the hero look-ahead range,
+and the route filters records by interval overlap. The focused route and
+dashboard tests pass.
+
+### F-64 [P2] closed - Current-history dashboard request is unbounded
+
+**File:** apps/web/src/app/api/schedule/publish-history/recent/route.ts:55-65; apps/web/src/components/dashboard/DashboardView.tsx:445-466
+**Found:** 2026-09-06 by /audit (scope: current; lens: performance)
+**Why it matters:** `includeCurrent=true` loads every publish-history row whose period ends today or later, including embedded changes, with no selected range, limit, or pagination. Large or long-running organizations can pay an increasingly large payload and may hit the database client's row cap, silently omitting older still-relevant future changes.
+**Suggested fix:** Bound the query to the visible period plus the hero look-ahead window, select only the needed change fields, and add an explicit pagination/limit contract if one window can still exceed a safe response size.
+**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. The dashboard sends
+an explicit visible-period range, and the route caps results at 200 rows after
+ordering by publication time. Focused route tests confirm the bounded overlap
+query.

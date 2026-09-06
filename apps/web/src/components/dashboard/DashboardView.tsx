@@ -18,6 +18,7 @@ import type {
   Employee,
   AbsenceType,
   ShiftMap,
+  PublishChange,
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
@@ -27,6 +28,7 @@ import {
   fetchShifts,
   fetchPublishHistory,
   fetchPublishedDateRanges,
+  fetchRecentPublishHistory,
   fetchShiftRequests,
 } from "@/features/schedule/client";
 import {
@@ -434,11 +436,42 @@ export default function DashboardView({
   const [publishedDateRanges, setPublishedDateRanges] = useState<
     { startDate: string; endDate: string }[]
   >([]);
+  const [recentPublishedChanges, setRecentPublishedChanges] = useState<Map<string, PublishChange>>(
+    () => new Map(),
+  );
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
 
   const invitations = useDashboardInvitations(orgId, !isUserDashboardMode);
+
+  useEffect(() => {
+    let cancelled = false;
+    const today = new Date(`${todayKey}T00:00:00`);
+    const heroEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const historyStart = isUserDashboardMode && today < periodStart ? today : periodStart;
+    const historyEnd = isUserDashboardMode && heroEnd > periodEnd ? heroEnd : periodEnd;
+    fetchRecentPublishHistory(orgId, null, true, {
+      startDate: formatDateKey(historyStart),
+      endDate: formatDateKey(historyEnd),
+    })
+      .then((entries) => {
+        if (cancelled) return;
+        const changes = new Map<string, PublishChange>();
+        for (let entryIndex = entries.length - 1; entryIndex >= 0; entryIndex -= 1) {
+          for (const change of entries[entryIndex].changes) {
+            changes.set(`${change.empId}_${change.date}`, change);
+          }
+        }
+        setRecentPublishedChanges(changes);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentPublishedChanges(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isUserDashboardMode, orgId, periodEnd, periodStart, todayKey]);
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -1136,6 +1169,7 @@ export default function DashboardView({
     prevPeriodLabel,
     currentPeriodShifts,
     allShifts,
+    recentPublishedChanges,
     periodStats,
     sectionCoverage,
     openShifts,

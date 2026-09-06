@@ -267,10 +267,19 @@ export function fetchPublishHistory(
 export function fetchRecentPublishHistory(
   orgId: string,
   since?: string | null,
+  includeCurrent = false,
+  dateRange?: { startDate: string; endDate: string },
 ): Promise<PublishHistoryEntry[]> {
   const params = new URLSearchParams({ orgId });
   if (since) {
     params.set("since", since);
+  }
+  if (includeCurrent) {
+    params.set("includeCurrent", "true");
+  }
+  if (dateRange) {
+    params.set("startDate", dateRange.startDate);
+    params.set("endDate", dateRange.endDate);
   }
   return requestScheduleJson<{ entries: PublishHistoryEntry[] }>(
     `/api/schedule/publish-history/recent?${params}`,
@@ -281,10 +290,10 @@ export function fetchPublishedDateRanges(
   orgId: string,
   rangeStart: string,
   rangeEnd: string,
-): Promise<{ startDate: string; endDate: string }[]> {
+): Promise<{ startDate: string; endDate: string; publishedAt?: string; publishedBy?: string }[]> {
   const params = new URLSearchParams({ orgId, rangeStart, rangeEnd });
   return requestScheduleJson<{
-    ranges: { startDate: string; endDate: string }[];
+    ranges: { startDate: string; endDate: string; publishedAt?: string; publishedBy?: string }[];
   }>(`/api/schedule/published-ranges?${params}`).then((data) => data.ranges);
 }
 

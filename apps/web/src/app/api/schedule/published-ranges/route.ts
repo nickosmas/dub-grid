@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await auth.serviceClient
       .from("publish_history")
-      .select("start_date, end_date")
+      .select("start_date, end_date, published_at, published_by")
       .eq("org_id", auth.orgId)
       .lte("start_date", parsed.data.rangeEnd)
       .gte("end_date", parsed.data.rangeStart);
@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
       ranges: (data ?? []).map((row: Record<string, unknown>) => ({
         startDate: row.start_date as string,
         endDate: row.end_date as string,
+        publishedAt: row.published_at as string,
+        publishedBy: row.published_by as string,
       })),
     });
   } catch (error) {

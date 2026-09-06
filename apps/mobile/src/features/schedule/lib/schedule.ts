@@ -1,7 +1,9 @@
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import {
   getScheduleEntryAbsenceTypeId,
+  getScheduleEntryDisplayFocusAreaName,
   getScheduleEntryFocusAreaId,
+  getScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegments,
   type ScheduleEntryLike,
 } from "@dubgrid/schedule-core";
@@ -99,6 +101,40 @@ export function getScheduleEntrySegmentFocusAreaId(
   return getScheduleEntryFocusAreaId(entry);
 }
 
+export function isGeneralScheduleEntrySegment(
+  segment: Pick<MobileScheduleEntrySegment, "shiftId"> | null | undefined,
+): boolean {
+  return (
+    segment != null &&
+    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
+    segment.shiftId === null
+  );
+}
+
+export function getMobileScheduleEntryDisplayFocusAreaName(
+  entry: ScheduleEntryLike | MobileScheduleEntry,
+): string | null {
+  if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    return null;
+  }
+
+  const segments = getScheduleEntrySegments(entry);
+  return segments.some((segment) => !isGeneralScheduleEntrySegment(segment))
+    ? getScheduleEntryDisplayFocusAreaName(entry)
+    : null;
+}
+
+export function getMobileScheduleEntrySegmentFocusAreaName(
+  entry: ScheduleEntryLike | MobileScheduleEntry,
+  segment: MobileScheduleEntrySegment,
+): string | null {
+  if (getScheduleEntryAbsenceTypeId(entry) != null || isGeneralScheduleEntrySegment(segment)) {
+    return null;
+  }
+
+  return getScheduleEntrySegmentFocusAreaName(entry, segment);
+}
+
 export function doScheduleEntrySegmentsShareShiftAndFocusArea(
   sourceEntry: ScheduleEntryLike | MobileScheduleEntry,
   sourceSegment: MobileScheduleEntrySegment,
@@ -134,16 +170,6 @@ export function doScheduleEntrySegmentsShareShiftAndFocusArea(
     sourceTitle.length > 0 &&
     sourceTitle === candidateTitle &&
     getShiftmateSegmentTimeKey(sourceSegment) === getShiftmateSegmentTimeKey(candidateSegment)
-  );
-}
-
-function isGeneralScheduleEntrySegment(
-  segment: Pick<MobileScheduleEntrySegment, "shiftId"> | null | undefined,
-): boolean {
-  return (
-    segment != null &&
-    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
-    segment.shiftId === null
   );
 }
 

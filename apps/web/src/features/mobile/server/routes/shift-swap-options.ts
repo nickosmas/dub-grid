@@ -76,7 +76,9 @@ function canWorkRequiredFocusAreas(
 
 function isWorkedShiftEntry(entry: MobileScheduleEntry): boolean {
   return (
-    entry.state.kind === "worked" && entry.state.segments.some((segment) => segment.shiftId != null)
+    entry.change?.kind !== "deleted" &&
+    entry.state.kind === "worked" &&
+    entry.state.segments.some((segment) => segment.shiftId != null)
   );
 }
 
@@ -183,7 +185,10 @@ export async function GET(req: NextRequest) {
         entry.date === queryResult.data.requesterShiftDate,
     ) ?? null;
 
-  const options = requesterEntry ? getSwapOptions({ requesterEntry, entries }) : [];
+  const options =
+    requesterEntry && isWorkedShiftEntry(requesterEntry)
+      ? getSwapOptions({ requesterEntry, entries })
+      : [];
 
   return NextResponse.json(
     mobileShiftSwapOptionsResponseSchema.parse({

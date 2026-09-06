@@ -78,7 +78,12 @@ import {
   visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
-import { lightColorTokens, darkColorTokens, getAvatarTone } from "@dubgrid/design-tokens";
+import {
+  getAvatarTypography,
+  lightColorTokens,
+  darkColorTokens,
+  getAvatarTone,
+} from "@dubgrid/design-tokens";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import {
   buildShiftJobPairKey,
@@ -92,13 +97,10 @@ import {
   shouldUseShiftColorForDiffState,
   GridDiffBadge,
   MentoredShiftBadge,
-  MENTORED_CORNER_CLEARANCE,
   LOCK_CORNER_CLEARANCE,
-  REQUEST_FOLD_CLEARANCE,
   RequestCornerFold,
   NOTE_DOT_GAP,
   NOTE_DOT_SIZE,
-  noteDotsWidth,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
@@ -107,8 +109,7 @@ import {
   getCrossFocusBadgePalette,
   isOvernightTimes,
   getDraftBorder,
-  getPublishDiffBoxShadow,
-  getPublishDiffInsetRing,
+  getPublishDiffRing,
   joinBoxShadows,
   areGridCellIdsEqual,
   getGridCellKey,
@@ -117,6 +118,7 @@ import {
   cellShowsDraftDiffBadge,
   formatActiveRequestLabel,
   buildPublishTooltip,
+  formatPublishedMetadata,
   timeRangesFromCustomTimes,
   splitShiftLabelParts,
   assignmentIdsFromPublishState,
@@ -124,7 +126,6 @@ import {
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
   MULTI_SHIFT_PILL_RADIUS,
-  RAISED_DIFF_BADGE_TOP_INSET,
   SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
   MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
 } from "./schedule-grid/gridHelpers";
@@ -205,6 +206,10 @@ interface LegacyScheduleGridProps {
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  publishedMetadataForKey?: (
+    empId: string,
+    date: Date,
+  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
   /** Purely informational: who else currently has each cell open. Never blocks. */
   cellEditors?: Map<string, { userId: string; userName: string }>;
@@ -310,6 +315,10 @@ interface SectionBlockProps {
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  publishedMetadataForKey?: (
+    empId: string,
+    date: Date,
+  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   /** Purely informational: who else currently has each cell open. Never blocks. */
@@ -467,6 +476,8 @@ function ShiftDetailHoverCard({
   indicators,
   requestLabel,
   status,
+  changeDetails,
+  publicationLabel,
   children,
 }: {
   enabled: boolean;
@@ -476,6 +487,9 @@ function ShiftDetailHoverCard({
   indicators: string[];
   requestLabel: string | null;
   status: string | null;
+  /** Per-cell change explanations, already scoped to the affected segment(s). */
+  changeDetails: string[];
+  publicationLabel: string | null;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
   >;
@@ -612,7 +626,11 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
-              {(indicators.length > 0 || requestLabel || status) && (
+              {(indicators.length > 0 ||
+                requestLabel ||
+                status ||
+                changeDetails.length > 0 ||
+                publicationLabel) && (
                 <div
                   style={{
                     paddingTop: 10,
@@ -624,9 +642,21 @@ function ShiftDetailHoverCard({
                     color: "var(--dg-color-text-muted)",
                   }}
                 >
-                  {indicators.length > 0 ? <div>Indicators: {indicators.join(", ")}</div> : null}
-                  {requestLabel ? <div>Request: {requestLabel}</div> : null}
-                  {status ? <div>Status: {status}</div> : null}
+                  {changeDetails.length === 0 && indicators.length > 0 ? (
+                    <div>Indicators: {indicators.join(", ")}</div>
+                  ) : null}
+                  {changeDetails.length === 0 && requestLabel ? (
+                    <div>Request: {requestLabel}</div>
+                  ) : null}
+                  {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
+                  {changeDetails.map((detail) => (
+                    <div key={detail} style={{ whiteSpace: "pre-line" }}>
+                      {detail}
+                    </div>
+                  ))}
+                  {changeDetails.length === 0 && publicationLabel ? (
+                    <div>{publicationLabel}</div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -671,6 +701,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
+  publishedMetadataForKey,
   certifications,
   orgRoles,
   cellEditors,
@@ -838,6 +869,16 @@ const SectionBlock = memo(function SectionBlock({
   }, [historicalAssignments, assignments]);
   const assignmentIdByPair = useMemo(
     () => createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments]),
+    [historicalAssignments, assignments],
+  );
+  // A published snapshot may refer to an assignment that has since been
+  // archived. Current scheduling must ignore it, but history must still be
+  // able to name it in a `Was …` explanation.
+  const publishedAssignmentIdByPair = useMemo(
+    () =>
+      createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments], {
+        includeArchived: true,
+      }),
     [historicalAssignments, assignments],
   );
 
@@ -1104,7 +1145,10 @@ const SectionBlock = memo(function SectionBlock({
           background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
-          overflow: "hidden",
+          // Change chips intentionally cross the top edge of a shift pill.
+          // The card cannot clip that layer; horizontal clipping belongs only
+          // to the scrollable narrow-grid path below.
+          overflow: fitToContainer ? "visible" : "hidden",
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
@@ -1167,7 +1211,12 @@ const SectionBlock = memo(function SectionBlock({
         <div
           ref={scrollContainerRef}
           style={{
-            overflowX: fitToContainer ? "hidden" : "auto",
+            // `overflow-x: hidden` also creates a vertical clipping context in
+            // Chromium. At the fitted desktop width there is nothing to scroll,
+            // so leave both axes visible and let the edge-overlaid chips paint
+            // above the preceding row. The narrow scrollable grid still clips
+            // horizontally as before.
+            overflow: fitToContainer ? "visible" : "auto",
           }}
         >
           <div
@@ -1531,6 +1580,12 @@ const SectionBlock = memo(function SectionBlock({
                   data-search-highlight={hasHighlightedSearch && isHighlighted ? "true" : undefined}
                   style={{
                     ...rowGrid,
+                    // A chip deliberately hangs into the row above its shift
+                    // card. Give the whole staff row a layer above header and
+                    // open-shift cells; a child z-index cannot escape a lower
+                    // grid-item stacking context on its own.
+                    position: "relative",
+                    zIndex: 4,
                     background: rowBg,
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
@@ -1650,6 +1705,21 @@ const SectionBlock = memo(function SectionBlock({
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                       const fromRecurring = fromRecurringForKey?.(emp.id, date) ?? false;
                       const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
+                      const publishedMetadata =
+                        publishedMetadataForKey?.(emp.id, date) ??
+                        (publishDiff
+                          ? {
+                              publishedAt: publishDiff.publishedAt,
+                              publishedBy: publishDiff.publishedBy,
+                            }
+                          : null);
+                      const publicationLabel = publishedMetadata
+                        ? formatPublishedMetadata({
+                            ...publishedMetadata,
+                            resolvePublisherName,
+                          })
+                        : null;
+                      const publicationTimeZone = publishedMetadata?.timeZone ?? null;
                       const showsPublishDiff = !!(showPublishDiffOverlay && publishDiff);
                       const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                       const publishedCodeIds = publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
@@ -1959,21 +2029,45 @@ const SectionBlock = memo(function SectionBlock({
                                   const labels = cellAbsenceType
                                     ? [shiftLabel]
                                     : shiftLabel.split("/");
-                                  const isPubDiff = showsPublishDiff ? publishDiff : null;
+                                  // A first publication is the baseline. The
+                                  // page client normally filters it already,
+                                  // but keep the grid safe for direct callers
+                                  // and historical test fixtures as well.
+                                  const isMeaningfulPublishNew =
+                                    publishDiff?.kind !== "new" ||
+                                    publishDiff.isNewAddition !== false;
+                                  const isPubDiff =
+                                    showsPublishDiff && isMeaningfulPublishNew ? publishDiff : null;
                                   const publishFrom =
                                     publishDiff?.from ??
                                     assignmentIdsFromPublishState(
                                       publishDiff?.fromState,
-                                      assignmentIdByPair,
+                                      publishedAssignmentIdByPair,
                                     );
                                   const publishTo =
                                     publishDiff?.to ??
                                     assignmentIdsFromPublishState(
                                       publishDiff?.toState,
-                                      assignmentIdByPair,
+                                      publishedAssignmentIdByPair,
                                     );
                                   const currentShiftLabels = splitShiftLabelParts(shiftLabel);
                                   const publishedShiftLabels = splitShiftLabelParts(publishedLabel);
+                                  // Persisted segment snapshots carry stable IDs, not presentation
+                                  // labels. Treat an absent label as absent — passing `?` here masks
+                                  // the current/published label fallback and produced `Added ?`.
+                                  const snapshotLabels = (
+                                    segments: PublishChange["fromSegments"],
+                                  ): Array<string | null> | undefined => {
+                                    const labels = segments?.map((segment) => {
+                                      const label = (segment as { label?: unknown }).label;
+                                      return typeof label === "string" && label.trim()
+                                        ? label
+                                        : null;
+                                    });
+                                    return labels?.some((label) => label != null)
+                                      ? labels
+                                      : undefined;
+                                  };
                                   const resolveGridShiftLabel = (assignmentId: number) => {
                                     const assignmentEntry = assignmentById.get(assignmentId);
                                     if (!assignmentEntry) return "?";
@@ -1988,6 +2082,43 @@ const SectionBlock = memo(function SectionBlock({
                                       ? absenceType.name || absenceType.label
                                       : absenceType.label;
                                   };
+                                  // History is explanatory, not compact grid chrome. Always spell
+                                  // out both the shift and job so `Was …` remains meaningful when
+                                  // the grid is configured to show short codes.
+                                  const resolveHistoryShiftLabel = (assignmentId: number) => {
+                                    const assignmentEntry = assignmentById.get(assignmentId);
+                                    if (!assignmentEntry) return "?";
+                                    const category =
+                                      assignmentEntry.categoryId != null
+                                        ? categoryById.get(assignmentEntry.categoryId)
+                                        : null;
+                                    const job =
+                                      assignmentEntry.jobId != null
+                                        ? jobById.get(assignmentEntry.jobId)
+                                        : null;
+                                    const isGeneral =
+                                      assignmentEntry.isGeneral === true ||
+                                      (assignmentEntry.focusAreaId == null &&
+                                        assignmentEntry.shiftId == null &&
+                                        assignmentEntry.categoryId == null);
+                                    const shiftName = isGeneral
+                                      ? (job?.name ?? assignmentEntry.name ?? assignmentEntry.label)
+                                      : (assignmentEntry.name ??
+                                        category?.name ??
+                                        assignmentEntry.label);
+                                    const shiftNameAlreadyIncludesJob =
+                                      !!job?.name &&
+                                      shiftName
+                                        .toLocaleLowerCase()
+                                        .includes(job.name.toLocaleLowerCase());
+                                    return !isGeneral && job?.name && !shiftNameAlreadyIncludesJob
+                                      ? `${shiftName} · ${job.name}`
+                                      : shiftName;
+                                  };
+                                  const currentHistoryLabels =
+                                    cellCodeIds.map(resolveHistoryShiftLabel);
+                                  const publishedHistoryLabels =
+                                    publishFrom.map(resolveHistoryShiftLabel);
                                   const draftDiff = shouldComputeDraftDiff
                                     ? buildShiftDiffDescriptors({
                                         before: {
@@ -2044,20 +2175,26 @@ const SectionBlock = memo(function SectionBlock({
                                             publishTo.length,
                                           ),
                                         },
-                                        beforeShiftLabels: publishDiff?.fromSegments?.map(
-                                          (segment) => segment.label ?? "?",
-                                        ),
+                                        beforeShiftLabels:
+                                          snapshotLabels(publishDiff?.fromSegments) ??
+                                          publishedHistoryLabels ??
+                                          publishedShiftLabels,
                                         afterShiftLabels:
-                                          publishDiff?.toSegments?.map(
-                                            (segment) => segment.label ?? "?",
-                                          ) ?? currentShiftLabels,
-                                        resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
-                                        resolveAbsenceLabel: resolveGridAbsenceLabel,
+                                          snapshotLabels(publishDiff?.toSegments) ??
+                                          currentHistoryLabels ??
+                                          currentShiftLabels,
+                                        resolveAssignmentDefinitionLabel: resolveHistoryShiftLabel,
+                                        resolveAbsenceLabel: (absenceTypeId) =>
+                                          absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
                                       })
                                     : null;
 
                                   const publishCellBadge = isPubDiff
-                                    ? cellLevelDiffBadge(publishDiffSummary)
+                                    ? (cellLevelDiffBadge(publishDiffSummary) ??
+                                      (publishDiffSummary?.cellBadge?.kind === "new" &&
+                                      publishDiff?.isNewAddition !== false
+                                        ? publishDiffSummary.cellBadge
+                                        : null))
                                     : null;
                                   const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
                                     ? {
@@ -2068,6 +2205,7 @@ const SectionBlock = memo(function SectionBlock({
                                           publishDiff: publishDiff!,
                                           resolvePublisherName,
                                           detail: publishCellBadge.detail,
+                                          timeZone: publicationTimeZone,
                                         }),
                                       }
                                     : null;
@@ -2109,7 +2247,9 @@ const SectionBlock = memo(function SectionBlock({
                                     const { source, descriptor } = args;
                                     if (
                                       !descriptor ||
-                                      (descriptor.kind === "new" && descriptor.text === "New")
+                                      (descriptor.kind === "new" &&
+                                        (source === "draft" ||
+                                          publishDiff?.isNewAddition === false))
                                     ) {
                                       return null;
                                     }
@@ -2124,6 +2264,7 @@ const SectionBlock = memo(function SectionBlock({
                                               publishDiff,
                                               resolvePublisherName,
                                               detail: descriptor.detail,
+                                              timeZone: publicationTimeZone,
                                             })
                                           : descriptor.detail,
                                     };
@@ -2210,32 +2351,51 @@ const SectionBlock = memo(function SectionBlock({
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)
                                       : absenceBorder;
                                     const singlePillBadge =
-                                      (showsDraftBadge && draftBadge == null
+                                      (showsDraftBadge &&
+                                      (draftBadge == null || draftBadge.text === "Changed")
                                         ? buildPillBadge({
                                             source: "draft",
                                             descriptor: draftDiff?.pillDiffs[0]?.badge,
                                           })
                                         : null) ??
-                                      (publishBadge == null
+                                      (publishBadge == null || publishBadge.text === "Changed"
                                         ? buildPillBadge({
                                             source: "publish",
                                             descriptor: publishDiffSummary?.pillDiffs[0]?.badge,
                                           })
                                         : null);
-                                    const singleHasRaisedDiffBadge = !!(
+                                    // A cell-level badge is still rendered inside this card (for
+                                    // example, when the second segment of a former double shift
+                                    // was removed). It must be treated as a foreground overlay too;
+                                    // otherwise the card's own `overflow: hidden` cuts the chip in
+                                    // half at exactly the top edge it is meant to straddle.
+                                    const singleHasChangeBadge = !!(
                                       singlePillBadge ||
                                       draftBadge ||
                                       publishBadge
                                     );
-                                    const singleTopInset = singleHasRaisedDiffBadge
-                                      ? RAISED_DIFF_BADGE_TOP_INSET
-                                      : customTimes
-                                        ? 3
-                                        : 4;
+                                    const singleHoverChangeDetails = Array.from(
+                                      new Set(
+                                        [
+                                          singlePillBadge?.tooltip,
+                                          draftBadge?.tooltip,
+                                          publishBadge?.tooltip,
+                                        ].filter((detail): detail is string => !!detail),
+                                      ),
+                                    );
+                                    // A change chip is an overlay, never a
+                                    // layout reservation: active pills keep
+                                    // their normal height and vertical origin.
+                                    const singleTopInset = customTimes ? 3 : 4;
                                     const singleSideInset = 4;
                                     const singleBottomInset = customTimes ? 3 : 4;
                                     const singleCrossFocusPill =
                                       isCross && crossHomeFa ? crossHomeFa : null;
+                                    // The focus wing sits inside the pill's border, so its curve
+                                    // uses the inner radius. Matching the outer radius left a
+                                    // hairline wedge of the pill showing at each corner.
+                                    const singleCrossFocusWingRadius =
+                                      SINGLE_SHIFT_PILL_RADIUS - (singleDraftBorderKind ? 2 : 1);
                                     const singleCrossFocusPalette = getCrossFocusBadgePalette({
                                       color: effectiveColor,
                                       text: effectiveText,
@@ -2280,6 +2440,8 @@ const SectionBlock = memo(function SectionBlock({
                                           indicators={hoverIndicatorNames}
                                           requestLabel={activeRequestLabel}
                                           status={hoverStatus}
+                                          changeDetails={singleHoverChangeDetails}
+                                          publicationLabel={publicationLabel}
                                         >
                                           <div
                                             data-shift-pill="single"
@@ -2296,10 +2458,11 @@ const SectionBlock = memo(function SectionBlock({
                                               border: effectiveBorder,
                                               borderRadius: SINGLE_SHIFT_PILL_RADIUS,
                                               color: singleForegroundColor,
+                                              zIndex: singleHasChangeBadge ? 2 : 1,
                                               boxShadow:
                                                 singlePublishRingKind === "new" ||
                                                 singlePublishRingKind === "modified"
-                                                  ? getPublishDiffBoxShadow(
+                                                  ? getPublishDiffRing(
                                                       singlePublishRingKind,
                                                       borderColor(singleForegroundColor),
                                                     )
@@ -2317,7 +2480,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   ? 6
                                                   : 3,
                                               paddingRight: isNameMode ? 6 : 3,
-                                              overflow: singlePillBadge ? "visible" : "hidden",
+                                              overflow: singleHasChangeBadge ? "visible" : "hidden",
                                               textDecoration:
                                                 draftKind === "deleted" ? "line-through" : "none",
                                             }}
@@ -2332,10 +2495,13 @@ const SectionBlock = memo(function SectionBlock({
                                               <GridDiffBadge
                                                 badge={{
                                                   ...singlePillBadge,
-                                                  topOffset: -8,
-                                                  leftOffset: activeRequest
-                                                    ? REQUEST_FOLD_CLEARANCE
-                                                    : 4,
+                                                  // Every status chip overlaps the same top-left
+                                                  // pill edge. It is a paint-only overlay: the
+                                                  // active pill remains in its normal grid slot.
+                                                  topOffset: 0,
+                                                  leftOffset: 4,
+                                                  overlapPillEdge: true,
+                                                  showChangeTooltip: !showShiftDetailHoverCards,
                                                 }}
                                               />
                                             )}
@@ -2343,13 +2509,11 @@ const SectionBlock = memo(function SectionBlock({
                                               <span
                                                 style={{
                                                   position: "absolute",
-                                                  // Yields its top corner to a
-                                                  // left-anchored badge, which
-                                                  // hangs 8px into the pill. The
-                                                  // initials stay centred in what
-                                                  // is left, so the overlap reads
-                                                  // as layering, not clipping.
-                                                  top: singlePillBadge ? 8 : 0,
+                                                  // The focus wing is part of the
+                                                  // pill, not a smaller chip. It
+                                                  // keeps the parent corner curve
+                                                  // while a change badge overlaps it.
+                                                  top: 0,
                                                   bottom: 0,
                                                   left: 0,
                                                   display: "flex",
@@ -2359,9 +2523,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   lineHeight: 1,
                                                   background: singleCrossFocusPalette.background,
                                                   color: singleCrossFocusPalette.color,
-                                                  borderRadius: singlePillBadge
-                                                    ? "0 0 0 2px"
-                                                    : "2px 0 0 2px",
+                                                  borderRadius: `${singleCrossFocusWingRadius}px 0 0 ${singleCrossFocusWingRadius}px`,
                                                   padding: "0 3px",
                                                   letterSpacing: "0.02em",
                                                   pointerEvents: "none",
@@ -2373,6 +2535,7 @@ const SectionBlock = memo(function SectionBlock({
                                             {singleIsMentored && (
                                               <MentoredShiftBadge
                                                 rightInset={cornerLockClearance || undefined}
+                                                topInset={singlePillBadge ? 19 : undefined}
                                               />
                                             )}
                                             <div
@@ -2544,15 +2707,10 @@ const SectionBlock = memo(function SectionBlock({
                                               <GridDiffBadge
                                                 badge={{
                                                   ...(draftBadge ?? publishBadge!),
-                                                  topOffset: -8,
-                                                  // Past the lock avatar first,
-                                                  // then past the "M" that has
-                                                  // itself been pushed past it.
-                                                  rightOffset:
-                                                    cornerLockClearance +
-                                                    (singleIsMentored
-                                                      ? MENTORED_CORNER_CLEARANCE
-                                                      : 4),
+                                                  topOffset: 0,
+                                                  leftOffset: 4,
+                                                  overlapPillEdge: true,
+                                                  showChangeTooltip: !showShiftDetailHoverCards,
                                                 }}
                                               />
                                             )}
@@ -2576,13 +2734,14 @@ const SectionBlock = memo(function SectionBlock({
                                   // the cell, where neighbouring rows could cover it.
                                   const multiPillBadges = labels.map(
                                     (_, labelIndex) =>
-                                      (showsDraftBadge && draftBadge == null
+                                      (showsDraftBadge &&
+                                      (draftBadge == null || draftBadge.text === "Changed")
                                         ? buildPillBadge({
                                             source: "draft",
                                             descriptor: draftDiff?.pillDiffs[labelIndex]?.badge,
                                           })
                                         : null) ??
-                                      (publishBadge == null
+                                      (publishBadge == null || publishBadge.text === "Changed"
                                         ? buildPillBadge({
                                             source: "publish",
                                             descriptor:
@@ -2590,37 +2749,22 @@ const SectionBlock = memo(function SectionBlock({
                                           })
                                         : null),
                                   );
-                                  const multiHasRaisedDiffBadge =
-                                    multiPillBadges.some((badge) => badge != null) ||
-                                    draftBadge != null ||
-                                    publishBadge != null;
-                                  const multiTopInset = multiHasRaisedDiffBadge
-                                    ? RAISED_DIFF_BADGE_TOP_INSET
-                                    : 3;
+                                  const multiTopInset = 3;
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
-                                  // Four things anchor to this cell's top-right
-                                  // corner and each has to start past the one
-                                  // before it: the lock avatar, the last pill's
-                                  // mentored "M", the note dots, then the cell's
-                                  // diff badge. The offsets used to be constants
-                                  // written for one dot, no "M" and no lock, so
-                                  // a second indicator or a mentored last pill
-                                  // piled them into the same 16px square.
-                                  const lastPillIsMentored =
-                                    cellSegments[labels.length - 1]?.isMentored ?? false;
-                                  const multiMentoredRightOffset = lastPillIsMentored
-                                    ? cornerLockClearance + MENTORED_CORNER_CLEARANCE
-                                    : cornerLockClearance;
-                                  const multiNotesRightOffset = Math.max(
-                                    multiMentoredRightOffset,
-                                    2,
+                                  // Status chips own the top-right corner. Keep
+                                  // note dots on the bottom edge instead.
+                                  const multiNotesRightOffset = 2;
+                                  const multiHoverChangeDetails = Array.from(
+                                    new Set(
+                                      [
+                                        draftBadge?.tooltip,
+                                        publishBadge?.tooltip,
+                                        ...multiPillBadges.map((badge) => badge?.tooltip),
+                                      ].filter((detail): detail is string => !!detail),
+                                    ),
                                   );
-                                  const multiBadgeRightOffset =
-                                    noteTypes.length > 0
-                                      ? multiNotesRightOffset + noteDotsWidth(noteTypes.length) + 4
-                                      : Math.max(3, multiMentoredRightOffset);
                                   return (
                                     <>
                                       {isBulkSelected && (
@@ -2647,6 +2791,8 @@ const SectionBlock = memo(function SectionBlock({
                                         indicators={hoverIndicatorNames}
                                         requestLabel={activeRequestLabel}
                                         status={hoverStatus}
+                                        changeDetails={multiHoverChangeDetails}
+                                        publicationLabel={publicationLabel}
                                       >
                                         <div
                                           style={{
@@ -2763,6 +2909,9 @@ const SectionBlock = memo(function SectionBlock({
                                               );
                                               const multiCrossFocusPill =
                                                 isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                                              const multiCrossFocusWingRadius =
+                                                MULTI_SHIFT_PILL_RADIUS -
+                                                (draftPillBorderKind ? 2 : 1);
                                               const multiCrossFocusPalette =
                                                 getCrossFocusBadgePalette({
                                                   color: effectiveColorLi,
@@ -2795,7 +2944,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     boxShadow:
                                                       publishRingStatus === "new" ||
                                                       publishRingStatus === "modified"
-                                                        ? getPublishDiffInsetRing(
+                                                        ? getPublishDiffRing(
                                                             publishRingStatus,
                                                             borderColor(multiForegroundColor),
                                                           )
@@ -2810,6 +2959,9 @@ const SectionBlock = memo(function SectionBlock({
                                                       : "var(--dg-fs-caption)",
                                                     fontWeight: 600,
                                                     position: "relative",
+                                                    // A sibling pill otherwise paints over the
+                                                    // raised chip at their shared edge.
+                                                    zIndex: pillBadge ? 2 : 1,
                                                     cursor: "pointer",
                                                     textDecoration:
                                                       draftKind === "deleted"
@@ -2832,8 +2984,11 @@ const SectionBlock = memo(function SectionBlock({
                                                     <GridDiffBadge
                                                       badge={{
                                                         ...pillBadge,
-                                                        topOffset: -8,
+                                                        topOffset: 0,
                                                         leftOffset: 4,
+                                                        overlapPillEdge: true,
+                                                        showChangeTooltip:
+                                                          !showShiftDetailHoverCards,
                                                       }}
                                                     />
                                                   )}
@@ -2841,7 +2996,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     <span
                                                       style={{
                                                         position: "absolute",
-                                                        top: pillBadge ? 8 : 0,
+                                                        top: 0,
                                                         bottom: 0,
                                                         left: 0,
                                                         display: "flex",
@@ -2852,9 +3007,7 @@ const SectionBlock = memo(function SectionBlock({
                                                         background:
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
-                                                        borderRadius: pillBadge
-                                                          ? "0 0 0 2px"
-                                                          : "2px 0 0 2px",
+                                                        borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
                                                         padding: "0 2px",
                                                         letterSpacing: "0.02em",
                                                         pointerEvents: "none",
@@ -2876,6 +3029,7 @@ const SectionBlock = memo(function SectionBlock({
                                                           ? cornerLockClearance || undefined
                                                           : undefined
                                                       }
+                                                      topInset={pillBadge ? 19 : undefined}
                                                     />
                                                   )}
                                                   <div
@@ -3011,7 +3165,7 @@ const SectionBlock = memo(function SectionBlock({
                                             <div
                                               style={{
                                                 position: "absolute",
-                                                top: 2,
+                                                bottom: 2,
                                                 right: multiNotesRightOffset,
                                                 display: "flex",
                                                 gap: NOTE_DOT_GAP,
@@ -3044,8 +3198,10 @@ const SectionBlock = memo(function SectionBlock({
                                             <GridDiffBadge
                                               badge={{
                                                 ...(draftBadge ?? publishBadge!),
-                                                topOffset: -8,
-                                                rightOffset: multiBadgeRightOffset,
+                                                topOffset: 0,
+                                                leftOffset: 4,
+                                                overlapPillEdge: true,
+                                                showChangeTooltip: !showShiftDetailHoverCards,
                                               }}
                                             />
                                           )}
@@ -3076,7 +3232,7 @@ const SectionBlock = memo(function SectionBlock({
                                   publishDiff?.from ??
                                   assignmentIdsFromPublishState(
                                     publishDiff?.fromState,
-                                    assignmentIdByPair,
+                                    publishedAssignmentIdByPair,
                                   );
                                 const publishDeletedAbsenceTypeId =
                                   publishDiff?.fromAbsenceTypeId ??
@@ -3106,6 +3262,7 @@ const SectionBlock = memo(function SectionBlock({
                                         publishDiff,
                                         resolvePublisherName,
                                         detail: `Deleted ${deletedLabel}.`,
+                                        timeZone: publicationTimeZone,
                                       })
                                     : undefined;
                                 // A reviewer checking a delete before publishing
@@ -3141,13 +3298,15 @@ const SectionBlock = memo(function SectionBlock({
                                   color: "var(--dg-color-danger-bg)",
                                   text: "var(--dg-color-danger-dark)",
                                 });
+                                const deletedCrossFocusWingRadius =
+                                  SINGLE_SHIFT_PILL_RADIUS - (isDraftDelete ? 2 : 1);
                                 const deletedPill = (
                                   <div
                                     data-shift-pill="deleted"
                                     aria-label={deletedTooltip ?? "Deleted shift"}
                                     style={{
                                       position: "absolute",
-                                      top: insetFromVisibleCellTop(RAISED_DIFF_BADGE_TOP_INSET),
+                                      top: insetFromVisibleCellTop(4),
                                       right: "4px",
                                       bottom: "4px",
                                       left: insetFromVisibleCellLeft(4),
@@ -3159,8 +3318,10 @@ const SectionBlock = memo(function SectionBlock({
                                       ...(isDraftDelete
                                         ? {}
                                         : {
-                                            boxShadow:
-                                              "0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px var(--dg-color-danger-dark)",
+                                            boxShadow: getPublishDiffRing(
+                                              "deleted",
+                                              "var(--dg-color-danger-dark)",
+                                            ),
                                           }),
                                       display: "flex",
                                       flexDirection: "column",
@@ -3176,15 +3337,17 @@ const SectionBlock = memo(function SectionBlock({
                                         kind: "deleted",
                                         text: "Deleted",
                                         tooltip: deletedTooltip,
-                                        topOffset: -8,
+                                        topOffset: 0,
                                         leftOffset: 4,
+                                        overlapPillEdge: true,
+                                        showChangeTooltip: !showShiftDetailHoverCards,
                                       }}
                                     />
                                     {deletedCrossFocusArea && (
                                       <span
                                         style={{
                                           position: "absolute",
-                                          top: 8,
+                                          top: 0,
                                           bottom: 0,
                                           left: 0,
                                           display: "flex",
@@ -3194,7 +3357,7 @@ const SectionBlock = memo(function SectionBlock({
                                           lineHeight: 1,
                                           background: deletedCrossFocusPalette.background,
                                           color: deletedCrossFocusPalette.color,
-                                          borderRadius: "0 0 0 2px",
+                                          borderRadius: `${deletedCrossFocusWingRadius}px 0 0 ${deletedCrossFocusWingRadius}px`,
                                           padding: "0 3px",
                                           letterSpacing: "0.02em",
                                           pointerEvents: "none",
@@ -3206,6 +3369,7 @@ const SectionBlock = memo(function SectionBlock({
                                     {deletedWasMentored && (
                                       <MentoredShiftBadge
                                         rightInset={cornerLockClearance || undefined}
+                                        topInset={19}
                                       />
                                     )}
                                     <span
@@ -3219,9 +3383,34 @@ const SectionBlock = memo(function SectionBlock({
                                     </span>
                                   </div>
                                 );
+                                const deletedHoverEntries: ShiftDetailEntry[] = [
+                                  {
+                                    label: deletedLabel,
+                                    jobName: null,
+                                    focusAreaName: deletedCrossFocusArea?.name ?? null,
+                                    timeLabel: null,
+                                    isCustomTime: false,
+                                    isMentored: deletedWasMentored,
+                                  },
+                                ];
+                                const deletedShiftContent = (
+                                  <ShiftDetailHoverCard
+                                    enabled={showShiftDetailHoverCards}
+                                    employeeName={getEmployeeDisplayName(emp)}
+                                    date={date}
+                                    entries={deletedHoverEntries}
+                                    indicators={hoverIndicatorNames}
+                                    requestLabel={null}
+                                    status="Deleted"
+                                    changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                    publicationLabel={publicationLabel}
+                                  >
+                                    {deletedPill}
+                                  </ShiftDetailHoverCard>
+                                );
                                 return (
                                   <>
-                                    {deletedPill}
+                                    {deletedShiftContent}
                                     {/* Deleting the shift does not delete the
                                         cell's notes — they outlive the draft and
                                         come back the moment it publishes. This
@@ -3320,6 +3509,7 @@ const SectionBlock = memo(function SectionBlock({
                               >
                                 <span
                                   style={{
+                                    ...getAvatarTypography(20),
                                     position: "absolute",
                                     top: 2,
                                     right: 2,
@@ -3336,12 +3526,9 @@ const SectionBlock = memo(function SectionBlock({
                                     // Two initials at the badge size run wider
                                     // than this 20px circle, so the marker
                                     // sizes its own text off the ring instead.
-                                    fontSize: 9,
-                                    fontWeight: 700,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    lineHeight: 1,
                                     zIndex: 2,
                                     pointerEvents: "none",
                                   }}
@@ -3545,6 +3732,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
+  publishedMetadataForKey,
   cellEditors,
   showAudit,
   createdByNameForKey,
@@ -3868,6 +4056,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
                     publishDiffForKey={publishDiffForKey}
+                    publishedMetadataForKey={publishedMetadataForKey}
                     certifications={certifications}
                     orgRoles={orgRoles}
                     cellEditors={cellEditors}
@@ -4093,6 +4282,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
         publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
         publishDiffForKey={model.accessors.publishDiffForKey}
+        publishedMetadataForKey={model.accessors.publishedMetadataForKey}
         cellEditors={model.cellEditors}
         showAudit={model.options.showAudit}
         createdByNameForKey={model.accessors.createdByNameForKey}

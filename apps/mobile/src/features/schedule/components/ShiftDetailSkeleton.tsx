@@ -20,7 +20,7 @@ import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailS
  * schedule too, so there is one skeleton and one swap.
  */
 export function ShiftDetailSkeleton({
-  infoRows = 4,
+  infoRows = 2,
   shiftmates = 3,
 }: {
   infoRows?: number;
@@ -37,27 +37,41 @@ export function ShiftDetailSkeleton({
   return (
     <SkeletonGroup style={styles.page}>
       <View style={detailStyles.shiftDetailCard}>
-        <View style={detailStyles.detailHeroHeader}>
-          <View style={detailStyles.detailHeroCopy}>
-            <SkeletonLine variant="screenTitle" width="72%" />
-            <SkeletonLine variant="body" width="52%" />
-          </View>
-          <SkeletonBlock height={28} radius={10} width={84} />
-        </View>
-        <View style={detailStyles.detailInfoStack}>
-          {skeletonRows(infoRows, (index) => (
-            <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
-              <SkeletonBlock height={40} radius={12} width={40} />
-              <View style={styles.infoCopy}>
-                <SkeletonLine variant="caption" width="30%" />
-                <SkeletonLine variant="bodyStrong" width="58%" />
+        <View style={detailStyles.detailSummaryRow}>
+          <View style={detailStyles.detailSummaryContent}>
+            <View style={detailStyles.detailHeroHeader}>
+              <View style={detailStyles.detailHeroCopy}>
+                <SkeletonLine variant="heroMetric" width="72%" />
+                <SkeletonLine variant="body" width="52%" />
               </View>
             </View>
-          ))}
+            <View style={detailStyles.detailInfoStack}>
+              {skeletonRows(infoRows, (index) => (
+                <View key={`detail-info-${index}`} style={detailStyles.detailInfoRow}>
+                  <View style={detailStyles.detailInfoIcon}>
+                    <SkeletonBlock height={16} radius={4} width={16} />
+                  </View>
+                  <View style={styles.infoCopy}>
+                    <SkeletonLine variant={index === 0 ? "rowTitle" : "body"} width="58%" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View style={detailStyles.detailDateTile}>
+            <SkeletonLine variant="label" width={28} />
+            <SkeletonLine variant="heroMetric" width={24} />
+          </View>
         </View>
         <View style={detailStyles.detailActionsRow}>
-          <SkeletonPill height={56} style={styles.action} />
-          <SkeletonPill height={56} style={styles.action} />
+          <SkeletonPill height={48} style={styles.action} />
+          <SkeletonPill height={48} style={styles.action} />
+        </View>
+        <View style={detailStyles.detailPublishedFooter}>
+          <SkeletonCircle size={16} />
+          <View style={styles.infoCopy}>
+            <SkeletonLine variant="meta" width="92%" />
+          </View>
         </View>
       </View>
 

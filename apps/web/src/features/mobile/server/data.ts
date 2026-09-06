@@ -8,7 +8,11 @@ import {
   rowToShiftRequest,
 } from "@/lib/db/mappers";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
-import type { MobilePublishedScheduleRow, MobileShiftRequestQueryRow } from "@dubgrid/data-access";
+import type {
+  MobilePublishedScheduleRow,
+  MobileScheduleComparisonRow,
+  MobileShiftRequestQueryRow,
+} from "@dubgrid/data-access";
 import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
@@ -16,6 +20,7 @@ import {
   fetchMobileCertificationRows as fetchMobileCertificationRowsData,
   fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
   fetchMobileEffectiveScheduleRows,
+  fetchMobileEmployeeRowsByIds,
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
   fetchMobileJobNameRows,
   fetchMobileManagementMembershipRowsByUserIds,
@@ -26,11 +31,11 @@ import {
   fetchMobilePendingInvitationRows,
   fetchMobilePublishHistoryRows,
   fetchMobileRoleRows as fetchMobileRoleRowsData,
+  fetchMobileScheduleComparisonRows as fetchMobileScheduleComparisonRowsData,
   fetchMobileShiftRequestHistoryRows as fetchMobileShiftRequestHistoryRowsData,
   fetchMobileShiftRequestRows as fetchMobileShiftRequestRowsData,
   fetchMobileUnreadNotificationCount as fetchMobileUnreadNotificationCountData,
   fetchProfileNameRowsByIds as fetchProfileNameRowsByIdsData,
-  fetchPublishedMobileScheduleRows as fetchPublishedMobileScheduleRowsData,
 } from "@dubgrid/data-access";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import {
@@ -132,6 +137,13 @@ type MobilePublishHistoryEntry = {
   endDate: string;
   publishedAt: string;
   publishedByName: string | null;
+  changes: Array<{
+    empId: string;
+    date: string;
+    kind: "new" | "modified" | "deleted";
+    fromState: MobileScheduleComparisonRow["publishedState"];
+    toState: MobileScheduleComparisonRow["publishedState"];
+  }>;
 };
 
 function toMobileOrgRole(value: string | null | undefined): MobilePerson["orgRole"] {
@@ -425,6 +437,7 @@ async function fetchMobilePublishHistory(
     endDate: row.end_date,
     publishedAt: row.published_at,
     publishedByName: (row.published_by && publisherNameMap.get(row.published_by)) ?? null,
+    changes: row.changes,
   }));
 }
 
@@ -565,7 +578,10 @@ function buildMobileScheduleEntrySegments(input: {
       input.shiftIds[index] ?? null,
       jobId,
     );
-    const segmentFocusAreaId = input.rowFocusAreaId ?? assignmentDetails?.focusAreaId ?? null;
+    const isGeneralShift = (input.shiftIds[index] ?? null) === null;
+    const segmentFocusAreaId = isGeneralShift
+      ? null
+      : (assignmentDetails?.focusAreaId ?? input.rowFocusAreaId ?? null);
 
     return {
       shiftId: input.shiftIds[index] ?? null,
@@ -769,6 +785,64 @@ function findPublishHistoryEntryForDate(
   return history.find((entry) => entry.startDate <= date && entry.endDate >= date) ?? null;
 }
 
+function findPublishedChangeForCell(
+  history: MobilePublishHistoryEntry[],
+  employeeId: string,
+  date: string,
+):
+  | (MobilePublishHistoryEntry["changes"][number] & {
+      isNewAddition: boolean;
+      publishedAt: string;
+    })
+  | null {
+  for (let entryIndex = 0; entryIndex < history.length; entryIndex += 1) {
+    const entry = history[entryIndex]!;
+    const change = entry.changes.find(
+      (candidate) => candidate.empId === employeeId && candidate.date === date,
+    );
+    if (change) {
+      const isNewAddition =
+        change.kind === "new" &&
+        history
+          .slice(entryIndex + 1)
+          .some((olderEntry) => olderEntry.startDate <= date && olderEntry.endDate >= date);
+      return { ...change, isNewAddition, publishedAt: entry.publishedAt };
+    }
+  }
+
+  return null;
+}
+
+function getMissingDeletedPublishedChanges(
+  history: MobilePublishHistoryEntry[],
+  rows: MobileScheduleComparisonRow[],
+  input: { startDate: string; endDate: string; employeeId?: string },
+): Array<MobilePublishHistoryEntry["changes"][number]> {
+  const rowKeys = new Set(rows.map((row) => `${row.emp_id}:${row.date}`));
+  const latestChangesByCell = new Map<string, MobilePublishHistoryEntry["changes"][number]>();
+
+  for (const entry of history) {
+    for (const change of entry.changes) {
+      if (
+        change.date < input.startDate ||
+        change.date > input.endDate ||
+        (input.employeeId != null && change.empId !== input.employeeId)
+      ) {
+        continue;
+      }
+
+      const key = `${change.empId}:${change.date}`;
+      if (!latestChangesByCell.has(key)) {
+        latestChangesByCell.set(key, change);
+      }
+    }
+  }
+
+  return [...latestChangesByCell.entries()]
+    .filter(([key, change]) => !rowKeys.has(key) && change.kind === "deleted" && change.fromState)
+    .map(([, change]) => change);
+}
+
 export async function fetchMobileScheduleEntries(
   serviceClient: SupabaseClient,
   input: {
@@ -789,12 +863,147 @@ export async function fetchMobileScheduleEntries(
         endDate: input.endDate,
       }),
     ]);
-  const data = await fetchPublishedMobileScheduleRowsData(serviceClient, input);
+  const data = await fetchMobileScheduleComparisonRowsData(serviceClient, input);
+  const missingDeletedChanges = getMissingDeletedPublishedChanges(publishHistory, data, input);
+  const missingDeletedEmployees = await fetchMobileEmployeeRowsByIds(
+    serviceClient,
+    input.orgId,
+    missingDeletedChanges.map((change) => change.empId),
+  );
+  const missingDeletedEmployeesById = new Map(
+    missingDeletedEmployees.map((employee) => [employee.id, employee]),
+  );
+  const missingDeletedRows = missingDeletedChanges.map((change) => {
+    const employee = missingDeletedEmployeesById.get(change.empId);
+    if (!employee || !change.fromState) {
+      return null;
+    }
+
+    return {
+      emp_id: employee.id,
+      date: change.date,
+      focus_area_id: null,
+      draftState: null,
+      draftDeleted: true,
+      publishedState: change.fromState,
+      employees: {
+        id: employee.id,
+        first_name: employee.first_name,
+        last_name: employee.last_name,
+        org_id: employee.org_id,
+        seniority: employee.seniority ?? null,
+        focus_area_ids: employee.focus_area_ids ?? [],
+      },
+    } satisfies MobileScheduleComparisonRow;
+  });
+  const comparisonRows = [...data, ...missingDeletedRows.filter((row) => row != null)];
 
   const entries: MobileScheduleEntry[] = [];
 
-  for (const row of data ?? []) {
-    const state = row.state;
+  for (const row of comparisonRows) {
+    const publishedChange = findPublishedChangeForCell(publishHistory, row.emp_id, row.date);
+    const state =
+      row.publishedState ??
+      (publishedChange?.kind === "deleted" ? publishedChange.fromState : null);
+    if (!state) {
+      continue;
+    }
+
+    const buildPresentation = (candidateState: typeof state) => {
+      const hasRegularShift =
+        candidateState.kind === "worked" &&
+        candidateState.segments.some((segment) => segment.shiftId != null);
+      const shiftIds =
+        candidateState.kind === "worked"
+          ? candidateState.segments.map((segment) => segment.shiftId ?? null)
+          : [];
+      const jobIds =
+        candidateState.kind === "worked"
+          ? candidateState.segments.map((segment) => segment.jobId)
+          : [];
+      const absenceTypeId = candidateState.kind === "absence" ? candidateState.absenceTypeId : null;
+      const absence = absenceTypeId != null ? (absenceMap.get(absenceTypeId) ?? null) : null;
+      const primaryAssignmentDetails =
+        jobIds.length > 0
+          ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
+          : null;
+      const primaryRegularSegmentIndex =
+        candidateState.kind === "worked"
+          ? candidateState.segments.findIndex((segment) => segment.shiftId != null)
+          : -1;
+      const primaryRegularAssignmentDetails =
+        primaryRegularSegmentIndex >= 0
+          ? getAssignmentDetailsForPair(
+              assignmentDetailsByPair,
+              shiftIds[primaryRegularSegmentIndex] ?? null,
+              jobIds[primaryRegularSegmentIndex],
+            )
+          : null;
+      const assignmentLabel =
+        absenceTypeId != null
+          ? (absence?.label ?? "?")
+          : joinAssignmentText(shiftIds, jobIds, assignmentDetailsByPair, "label");
+      const shiftName =
+        absenceTypeId != null
+          ? (absence?.name ?? absence?.label ?? "Off")
+          : joinShiftNames(shiftIds, jobIds, assignmentDetailsByPair);
+      const startTime =
+        absenceTypeId != null
+          ? null
+          : (pickBoundaryPipeTime(candidateState.customStartTime, "start", jobIds.length) ??
+            getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "start"));
+      const endTime =
+        absenceTypeId != null
+          ? null
+          : (pickBoundaryPipeTime(candidateState.customEndTime, "end", jobIds.length) ??
+            getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "end"));
+      const rowFocusAreaId = (row.focus_area_id as number | null) ?? null;
+      const explicitFocusAreaId = hasRegularShift
+        ? (primaryRegularAssignmentDetails?.focusAreaId ?? rowFocusAreaId ?? null)
+        : null;
+      const focusAreaId = explicitFocusAreaId;
+      const focusAreaName =
+        focusAreaId != null ? (focusAreaNameMap.get(focusAreaId) ?? null) : null;
+      const displayFocusAreaName =
+        absenceTypeId != null || explicitFocusAreaId == null
+          ? null
+          : (focusAreaNameMap.get(explicitFocusAreaId) ?? null);
+      const segments = buildMobileScheduleEntrySegments({
+        absenceTypeId,
+        customStartTime: candidateState.customStartTime,
+        customEndTime: candidateState.customEndTime,
+        focusAreaNameMap,
+        jobNameMap,
+        rowFocusAreaId,
+        shiftIds,
+        jobIds,
+        stateSegments: candidateState.kind === "worked" ? candidateState.segments : [],
+        assignmentDetailsByPair,
+        shiftName,
+        startTime,
+        endTime,
+      });
+
+      return {
+        label: assignmentLabel || shiftName,
+        shiftName,
+        focusAreaId,
+        focusAreaName,
+        displayFocusAreaName,
+        startTime,
+        endTime,
+        shiftColor: absence?.color ?? primaryAssignmentDetails?.color ?? null,
+        shiftBorderColor:
+          absence?.borderColor ??
+          primaryAssignmentDetails?.borderColor ??
+          absence?.color ??
+          primaryAssignmentDetails?.color ??
+          null,
+        shiftTextColor: absence?.textColor ?? primaryAssignmentDetails?.textColor ?? null,
+        segments,
+      };
+    };
+
     const shiftIds =
       state.kind === "worked" ? state.segments.map((segment) => segment.shiftId ?? null) : [];
     const jobIds = state.kind === "worked" ? state.segments.map((segment) => segment.jobId) : [];
@@ -803,72 +1012,11 @@ export async function fetchMobileScheduleEntries(
       continue;
     }
 
-    const absence = absenceTypeId != null ? (absenceMap.get(absenceTypeId) ?? null) : null;
-    const primaryAssignmentDetails =
-      jobIds.length > 0
-        ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
-        : null;
-    const assignmentLabel =
-      absenceTypeId != null
-        ? (absence?.label ?? "?")
-        : joinAssignmentText(shiftIds, jobIds, assignmentDetailsByPair, "label");
-    const shiftName =
-      absenceTypeId != null
-        ? (absence?.name ?? absence?.label ?? "Off")
-        : joinShiftNames(shiftIds, jobIds, assignmentDetailsByPair);
-    const startTime =
-      absenceTypeId != null
-        ? null
-        : (pickBoundaryPipeTime(state.customStartTime, "start", jobIds.length) ??
-          getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "start"));
-    const endTime =
-      absenceTypeId != null
-        ? null
-        : (pickBoundaryPipeTime(state.customEndTime, "end", jobIds.length) ??
-          getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "end"));
-
-    const rowFocusAreaId = (row.focus_area_id as number | null) ?? null;
-    const explicitFocusAreaId = rowFocusAreaId ?? primaryAssignmentDetails?.focusAreaId ?? null;
-    const focusAreaId = explicitFocusAreaId;
-    const focusAreaName = focusAreaId != null ? (focusAreaNameMap.get(focusAreaId) ?? null) : null;
-    const displayFocusAreaName =
-      absenceTypeId != null || explicitFocusAreaId == null
-        ? null
-        : (focusAreaNameMap.get(explicitFocusAreaId) ?? null);
     const publishEntry = findPublishHistoryEntryForDate(publishHistory, row.date as string);
-    const segments = buildMobileScheduleEntrySegments({
-      absenceTypeId,
-      customStartTime: state.customStartTime,
-      customEndTime: state.customEndTime,
-      focusAreaNameMap,
-      jobNameMap,
-      rowFocusAreaId,
-      shiftIds,
-      jobIds,
-      stateSegments: state.kind === "worked" ? state.segments : [],
-      assignmentDetailsByPair,
-      shiftName,
-      startTime,
-      endTime,
-    });
-    const presentation = {
-      label: assignmentLabel || shiftName,
-      shiftName,
-      focusAreaId,
-      focusAreaName,
-      displayFocusAreaName,
-      startTime,
-      endTime,
-      shiftColor: absence?.color ?? primaryAssignmentDetails?.color ?? null,
-      shiftBorderColor:
-        absence?.borderColor ??
-        primaryAssignmentDetails?.borderColor ??
-        absence?.color ??
-        primaryAssignmentDetails?.color ??
-        null,
-      shiftTextColor: absence?.textColor ?? primaryAssignmentDetails?.textColor ?? null,
-      segments,
-    };
+    const presentation = buildPresentation(state);
+    const previousPresentation = publishedChange?.fromState
+      ? buildPresentation(publishedChange.fromState)
+      : null;
 
     entries.push({
       employeeId: row.employees.id,
@@ -878,6 +1026,13 @@ export async function fetchMobileScheduleEntries(
       date: row.date as string,
       state,
       presentation,
+      change: publishedChange
+        ? {
+            kind: publishedChange.kind,
+            isNewAddition: publishedChange.isNewAddition,
+            previousPresentation,
+          }
+        : null,
       publishedAt: publishEntry?.publishedAt ?? null,
       publishedByName: publishEntry?.publishedByName ?? null,
     });

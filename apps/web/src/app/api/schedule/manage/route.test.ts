@@ -628,3 +628,100 @@ describe("POST /api/schedule/manage", () => {
     });
   });
 });
+
+describe("POST /api/schedule/manage permission gates", () => {
+  const orgId = "11111111-1111-4111-8111-111111111111";
+  const employeeId = "22222222-2222-4222-8222-222222222222";
+
+  // Runs the route's own predicate against a fixed permission set, the way
+  // the real helper would, so a 403 here means the gate itself refused.
+  function grant(permissions: Record<string, boolean>) {
+    requireOrgPermissions.mockImplementation(
+      async (_req, requestedOrgId, isAllowed: (p: Record<string, boolean>) => boolean) =>
+        isAllowed(permissions)
+          ? {
+              userClient: { rpc: userRpc },
+              serviceClient: { from: serviceFrom },
+              actor: { id: "actor-user" },
+              orgId: requestedOrgId,
+              permissions,
+            }
+          : { response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }) },
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveEffectiveOrgId.mockImplementation((_req, _userId, requestedOrgId) =>
+      Promise.resolve(requestedOrgId),
+    );
+  });
+
+  it("refuses a recurring apply without schedule edit, even with the recurring key", async () => {
+    grant({ canApplyRecurringSchedule: true, canEditShifts: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "applyRecurringSchedules",
+        orgId,
+        startDate: "2026-08-03",
+        endDate: "2026-08-09",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("refuses a series change without schedule edit, even with the series key", async () => {
+    grant({ canManageShiftSeries: true, canEditShifts: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a schedule note without the indicators key, even with notes", async () => {
+    grant({ canEditNotes: true, canEditScheduleIndicators: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("still admits the schedule editor who holds both halves of each pair", async () => {
+    grant({ canEditShifts: true, canApplyRecurringSchedule: true });
+    serviceFrom.mockImplementation(() => {
+      throw new Error("reached the handler");
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "applyRecurringSchedules",
+        orgId,
+        startDate: "2026-08-03",
+        endDate: "2026-08-09",
+      }),
+    );
+
+    expect(response.status).not.toBe(403);
+    expect(serviceFrom).toHaveBeenCalled();
+  });
+});

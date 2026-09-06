@@ -60,6 +60,8 @@ export function SplitShiftBadge({
 export function SplitShiftSegmentList({
   dashedDividers = false,
   getSegmentTimingLabel,
+  getSegmentStatusLabel,
+  includeSegmentLabelInStatus = true,
   inverse = false,
   leadingDivider = false,
   renderSegmentChip,
@@ -74,6 +76,8 @@ export function SplitShiftSegmentList({
 }: {
   dashedDividers?: boolean;
   getSegmentTimingLabel?: (segment: MobileScheduleEntrySegment, index: number) => string | null;
+  getSegmentStatusLabel?: (segment: MobileScheduleEntrySegment, index: number) => string | null;
+  includeSegmentLabelInStatus?: boolean;
   inverse?: boolean;
   leadingDivider?: boolean;
   renderSegmentChip?: (segment: MobileScheduleEntrySegment, index: number) => ReactNode;
@@ -116,13 +120,22 @@ export function SplitShiftSegmentList({
         const title = segment.shiftName?.trim() || segment.label?.trim() || "Shift";
         const timeRange = getScheduleEntrySegmentTimeRange(segment);
         const timingLabel = getSegmentTimingLabel?.(segment, index) ?? null;
-        const chip = isHero ? null : (renderSegmentChip?.(segment, index) ?? null);
+        const statusLabel = getSegmentStatusLabel?.(segment, index) ?? null;
+        const chip = renderSegmentChip?.(segment, index) ?? null;
         const heroCaption = getHeroSegmentCaption(segment);
+        const focusAreaName =
+          segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
+        const metaIconColor = inverse ? "rgba(255, 255, 255, 0.82)" : mobileColors.textMuted;
         const hasDivider = index > 0;
         const segmentLabel = getSplitShiftSegmentLabel(
           segmentLabelIndices?.[index] ?? segmentLabelStartIndex + index,
           labelTotalCount,
         );
+        const combinedSegmentLabel = statusLabel
+          ? includeSegmentLabelInStatus
+            ? `${segmentLabel} · ${statusLabel}`
+            : statusLabel
+          : segmentLabel;
 
         return (
           <Fragment
@@ -142,98 +155,151 @@ export function SplitShiftSegmentList({
             >
               {isHero ? (
                 <View style={styles.segmentHeroBody}>
-                  <View style={styles.segmentHeroMainRow}>
-                    <View style={styles.segmentHeroCopy}>
-                      <View style={styles.segmentHeroTitleRow}>
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            styles.segmentHeroPrimaryText,
-                            styles.segmentHeroTitleText,
-                            inverse && styles.segmentHeroPrimaryTextInverse,
-                          ]}
-                        >
-                          {title}
-                        </Text>
-                        <SplitShiftBadge
-                          count={labelTotalCount}
-                          inverse={inverse}
-                          label={segmentLabel}
-                        />
-                      </View>
-                      {heroCaption ? (
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            styles.segmentHeroCaptionText,
-                            inverse && styles.segmentHeroCaptionTextInverse,
-                          ]}
-                        >
-                          {heroCaption}
-                        </Text>
-                      ) : null}
+                  <View style={styles.segmentHeroShiftGroup}>
+                    <View style={styles.segmentHeroTitleRow}>
+                      <Text
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                        style={[
+                          styles.segmentHeroPrimaryText,
+                          styles.segmentHeroTitleText,
+                          inverse && styles.segmentHeroPrimaryTextInverse,
+                        ]}
+                      >
+                        {title}
+                      </Text>
+                      <SplitShiftBadge
+                        count={labelTotalCount}
+                        inverse={inverse}
+                        label={combinedSegmentLabel}
+                      />
                     </View>
-                    {timeRange || timingLabel ? (
-                      <View style={styles.segmentHeroMetaStack}>
-                        {timeRange ? (
+                    {chip ? <View style={styles.segmentHeroChipRow}>{chip}</View> : null}
+                    {!chip && heroCaption ? (
+                      <Text
+                        numberOfLines={2}
+                        style={[
+                          styles.segmentHeroCaptionText,
+                          inverse && styles.segmentHeroCaptionTextInverse,
+                        ]}
+                      >
+                        {heroCaption}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {focusAreaName || timeRange || timingLabel ? (
+                    <View style={styles.segmentHeroContextGroup}>
+                      {focusAreaName ? (
+                        <View style={styles.segmentHeroFocusRow}>
+                          <Ionicons color={metaIconColor} name="location-outline" size={16} />
                           <Text
-                            numberOfLines={2}
-                            style={[
-                              styles.segmentHeroPrimaryText,
-                              styles.segmentHeroMetaText,
-                              inverse && styles.segmentHeroPrimaryTextInverse,
-                            ]}
-                          >
-                            {timeRange}
-                          </Text>
-                        ) : null}
-                        {timingLabel ? (
-                          <Text
-                            numberOfLines={2}
+                            numberOfLines={1}
                             style={[
                               styles.segmentHeroCaptionText,
-                              styles.segmentHeroMetaText,
                               inverse && styles.segmentHeroCaptionTextInverse,
                             ]}
                           >
-                            {timingLabel}
+                            {focusAreaName}
                           </Text>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
+                        </View>
+                      ) : null}
+                      {timeRange || timingLabel ? (
+                        <View style={styles.segmentHeroTimingRow}>
+                          {timeRange ? (
+                            <Ionicons color={metaIconColor} name="time-outline" size={16} />
+                          ) : null}
+                          {timeRange ? (
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.segmentHeroCaptionText,
+                                inverse && styles.segmentHeroCaptionTextInverse,
+                              ]}
+                            >
+                              {timeRange}
+                            </Text>
+                          ) : null}
+                          {timingLabel ? (
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.segmentHeroCaptionText,
+                                styles.segmentHeroTimingText,
+                                styles.segmentHeroTimingLabel,
+                                inverse && styles.segmentHeroCaptionTextInverse,
+                              ]}
+                            >
+                              {timingLabel}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
               ) : (
                 <>
-                  {showSegmentLabels ? (
+                  {showSegmentLabels && !statusLabel ? (
                     <Text style={styles.segmentEyebrow}>{segmentLabel}</Text>
                   ) : null}
-                  <Text
-                    style={[
-                      styles.segmentTitle,
-                      inverse && styles.segmentTitleInverse,
-                      isDetail && styles.segmentTitleDetail,
-                      isSupporting && styles.segmentTitleSupporting,
-                    ]}
-                  >
-                    {title}
-                  </Text>
-                  {timeRange ? (
-                    <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
-                      {timeRange}
-                    </Text>
+                  <View style={styles.segmentShiftGroup}>
+                    <View style={styles.segmentTitleRow}>
+                      <Text
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                        style={[
+                          styles.segmentTitle,
+                          styles.segmentTitleMain,
+                          inverse && styles.segmentTitleInverse,
+                          isDetail && styles.segmentTitleDetail,
+                          isSupporting && styles.segmentTitleSupporting,
+                        ]}
+                      >
+                        {title}
+                      </Text>
+                      {statusLabel ? (
+                        <SplitShiftBadge
+                          compact
+                          count={labelTotalCount}
+                          label={combinedSegmentLabel}
+                        />
+                      ) : null}
+                    </View>
+                    {chip ? <View style={styles.segmentChipRow}>{chip}</View> : null}
+                  </View>
+                  {focusAreaName || timeRange || timingLabel ? (
+                    <View style={styles.segmentContextGroup}>
+                      {focusAreaName ? (
+                        <View style={styles.segmentFocusRow}>
+                          <Ionicons color={metaIconColor} name="location-outline" size={16} />
+                          <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
+                            {focusAreaName}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {timeRange || timingLabel ? (
+                        <View style={styles.segmentTimingRow}>
+                          {timeRange ? (
+                            <>
+                              <Ionicons color={metaIconColor} name="time-outline" size={16} />
+                              <Text
+                                style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}
+                              >
+                                {timeRange}
+                              </Text>
+                            </>
+                          ) : null}
+                          {timingLabel ? (
+                            <Text
+                              style={[styles.segmentTiming, inverse && styles.segmentTimingInverse]}
+                            >
+                              {timingLabel}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
                   ) : null}
-                  {timingLabel ? (
-                    <Text style={[styles.segmentTiming, inverse && styles.segmentTimingInverse]}>
-                      {timingLabel}
-                    </Text>
-                  ) : null}
-                  {segment.displayFocusAreaName ? (
-                    <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
-                      {segment.displayFocusAreaName}
-                    </Text>
-                  ) : null}
-                  {chip ? <View style={styles.segmentChipRow}>{chip}</View> : null}
                 </>
               )}
             </View>
@@ -246,7 +312,7 @@ export function SplitShiftSegmentList({
 
 function getHeroSegmentCaption(segment: MobileScheduleEntrySegment): string | null {
   const role = segment.jobName?.trim();
-  const fallback = segment.displayFocusAreaName?.trim();
+  const fallback = segment.shiftId !== null ? segment.displayFocusAreaName?.trim() : null;
   const baseCaption = role || fallback;
 
   if (segment.isMentored) {
@@ -318,6 +384,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 12,
     },
     segmentListDetail: {
+      width: "100%",
       gap: 12,
     },
     segmentBlock: {
@@ -328,6 +395,8 @@ const createStyles = (mobileColors: MobileColors) =>
       width: "100%",
     },
     segmentBlockDetail: {
+      width: "100%",
+      gap: 12,
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.control,
@@ -363,37 +432,44 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     segmentHeroBody: {
       width: "100%",
-      gap: 6,
+      gap: 14,
     },
-    segmentHeroMainRow: {
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    segmentHeroCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 6,
-    },
-    segmentHeroTitleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    segmentHeroTitleText: {
-      flexShrink: 1,
-      minWidth: 0,
-    },
-    segmentHeroMetaStack: {
-      flexShrink: 1,
-      maxWidth: "44%",
-      alignItems: "flex-end",
+    segmentHeroShiftGroup: {
       gap: 4,
     },
-    segmentHeroMetaText: {
+    segmentHeroTitleRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    segmentHeroTitleText: {
+      flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    segmentHeroChipRow: {
+      alignItems: "flex-start",
+    },
+    segmentHeroFocusRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    segmentHeroContextGroup: {
+      gap: 8,
+    },
+    segmentHeroTimingRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    segmentHeroTimingText: {
+      ...mobileTextWeighted("meta", "bold"),
+    },
+    segmentHeroTimingLabel: {
+      marginLeft: "auto",
       textAlign: "right",
     },
     segmentHeroPrimaryText: {
@@ -417,6 +493,34 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentTitle: {
       ...mobileText.rowTitle,
       color: mobileColors.textPrimary,
+    },
+    segmentShiftGroup: {
+      gap: 4,
+    },
+    segmentTitleRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    segmentTitleMain: {
+      flex: 1,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    segmentTimingRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    segmentFocusRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    segmentContextGroup: {
+      gap: 8,
     },
     segmentTitleDetail: {
       ...mobileTextWeighted("sectionTitle", "bold"),

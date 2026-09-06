@@ -4,17 +4,20 @@ import { useTheme } from "next-themes";
 import { CalendarDays } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { filterShiftsByWeek, getDatesInRange } from "@/lib/dashboard-stats";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import type {
   AbsenceType,
   AssignmentDefinition,
   JobDefinition,
+  DraftKind,
   ScheduleCellStateEntry,
   ShiftCategory,
+  PublishChange,
   ShiftJobSegment,
   ShiftMap,
 } from "@/types";
@@ -44,6 +47,7 @@ type MyScheduleRowProps = Pick<
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
   isManagementOnly?: boolean;
+  recentPublishedChanges?: Map<string, PublishChange>;
 };
 
 type MyScheduleShift = {
@@ -53,6 +57,15 @@ type MyScheduleShift = {
   background: string;
   border: string;
   textColor: string;
+  draftKind: DraftKind;
+  isDraft: boolean;
+  isNewAddition: boolean;
+};
+
+const DRAFT_LABELS: Record<NonNullable<DraftKind>, string> = {
+  deleted: "Deleted",
+  modified: "Edited",
+  new: "New",
 };
 
 function normalizeLabel(value: string | null | undefined): string {
@@ -181,6 +194,9 @@ function buildWorkedShifts(input: {
       background: resolved?.color ?? "var(--dg-color-bg-secondary)",
       border: resolved?.border ?? "var(--dg-color-border)",
       textColor: resolved?.text ?? "var(--dg-color-text-primary)",
+      draftKind: entry.draftKind,
+      isDraft: entry.isDraft,
+      isNewAddition: false,
     });
   });
 
@@ -188,6 +204,7 @@ function buildWorkedShifts(input: {
 }
 
 function buildMyScheduleDay(input: {
+  currentEmpId: string;
   date: Date;
   entry: ShiftMap[string] | undefined;
   assignmentById: Map<number, AssignmentDefinition>;
@@ -195,16 +212,45 @@ function buildMyScheduleDay(input: {
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
   isDarkTheme: boolean;
+  recentPublishedChanges: Map<string, PublishChange>;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
 
-  if (!entry || entry.isDelete) {
+  const publishedChange = input.recentPublishedChanges.get(`${input.currentEmpId}_${dateKey}`);
+  if (!entry && !publishedChange) {
     return { key: dateKey, dateKey, date: input.date, shifts: [] };
   }
 
-  if (entry.absenceTypeId != null) {
-    const absence = input.absenceTypeById.get(entry.absenceTypeId) ?? null;
+  // A deleted draft is still a meaningful scheduled shift in the grid. Show
+  // its last published presentation here too, so its deleted indication has a
+  // pill to attach to rather than disappearing as an empty dashboard day.
+  const displayEntry: ScheduleCellStateEntry =
+    entry && entry.isDelete
+      ? {
+          ...entry,
+          assignmentIds: entry.publishedAssignmentDefinitionIds,
+          absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+          customStartTime: entry.publishedCustomStartTime ?? null,
+          customEndTime: entry.publishedCustomEndTime ?? null,
+          label: entry.publishedLabel,
+          segments: entry.publishedSegments ?? [],
+        }
+      : (entry ?? {
+          label: "",
+          assignmentIds: publishedChange?.from ?? [],
+          isDraft: false,
+          draftKind: null,
+          segments: publishedChange?.fromSegments ?? [],
+          absenceTypeId: publishedChange?.fromAbsenceTypeId ?? null,
+          customStartTime: publishedChange?.fromCustomStart ?? null,
+          customEndTime: publishedChange?.fromCustomEnd ?? null,
+          publishedAssignmentDefinitionIds: [],
+          publishedLabel: "",
+        });
+
+  if (displayEntry.absenceTypeId != null) {
+    const absence = input.absenceTypeById.get(displayEntry.absenceTypeId) ?? null;
     const resolved = absence
       ? resolveShiftPillColors(
           { color: absence.color, text: absence.text, border: absence.border },
@@ -217,12 +263,15 @@ function buildMyScheduleDay(input: {
       date: input.date,
       shifts: [
         {
-          label: absence?.name ?? entry.label ?? "Away",
+          label: absence?.name ?? displayEntry.label ?? "Away",
           jobName: null,
           timeRange: null,
           background: resolved?.color ?? "var(--dg-color-bg-secondary)",
           border: resolved?.border ?? "var(--dg-color-border)",
           textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
+          draftKind: publishedChange?.kind ?? entry?.draftKind ?? null,
+          isDraft: entry?.isDraft ?? false,
+          isNewAddition: publishedChange?.isNewAddition === true,
         },
       ],
     };
@@ -233,11 +282,26 @@ function buildMyScheduleDay(input: {
     dateKey,
     date: input.date,
     shifts: buildWorkedShifts({
-      entry,
+      entry: displayEntry,
       assignmentById: input.assignmentById,
       jobById: input.jobById,
       shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
+    }).map((shift, index) => {
+      const previous = publishedChange?.fromState?.segments[index];
+      const publishedKind =
+        publishedChange?.kind === "modified" &&
+        previous &&
+        previous.shiftId === displayEntry.segments?.[index]?.shiftId &&
+        previous.jobId === displayEntry.segments?.[index]?.jobId &&
+        Boolean(previous.isMentored) === Boolean(displayEntry.segments?.[index]?.isMentored)
+          ? null
+          : (publishedChange?.kind ?? shift.draftKind);
+      return {
+        ...shift,
+        draftKind: publishedKind,
+        isNewAddition: publishedChange?.isNewAddition === true,
+      };
     }),
   };
 }
@@ -251,9 +315,11 @@ function buildMyScheduleDays(input: {
   shiftById: Map<number, ShiftCategory>;
   periodDates: Date[];
   isDarkTheme: boolean;
+  recentPublishedChanges: Map<string, PublishChange>;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
+      currentEmpId: input.currentEmpId,
       date,
       entry: input.currentPeriodShifts[`${input.currentEmpId}_${formatDateKey(date)}`],
       assignmentById: input.assignmentById,
@@ -261,6 +327,7 @@ function buildMyScheduleDays(input: {
       jobById: input.jobById,
       shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
+      recentPublishedChanges: input.recentPublishedChanges,
     }),
   );
 }
@@ -340,6 +407,11 @@ function ScrollCue({
 }
 
 function ShiftPill({ shift }: { shift: MyScheduleShift }) {
+  const draftLabel =
+    shift.draftKind && (shift.draftKind !== "new" || shift.isNewAddition)
+      ? DRAFT_LABELS[shift.draftKind]
+      : null;
+
   return (
     <div
       style={{
@@ -350,11 +422,15 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
         justifyContent: "center",
         padding: "8px",
         borderRadius: "var(--dg-radius-sm, 6px)",
-        border: `1px solid ${shift.border}`,
+        border:
+          shift.isDraft && shift.draftKind
+            ? `2px dashed ${DRAFT_BORDER_COLORS[shift.draftKind]}`
+            : `1px solid ${shift.border}`,
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
         overflowWrap: "anywhere",
+        position: "relative",
       }}
     >
       <div
@@ -363,10 +439,22 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           fontWeight: 600,
           lineHeight: 1.25,
           overflowWrap: "anywhere",
+          paddingLeft: draftLabel ? 56 : 0,
+          paddingRight: draftLabel ? 56 : 0,
         }}
       >
         {shift.label}
       </div>
+      {shift.draftKind && draftLabel ? (
+        <PublishDiffPill
+          aria-label={`${draftLabel} shift`}
+          data-draft-badge={shift.draftKind}
+          kind={shift.draftKind}
+          style={{ position: "absolute", top: 6, right: 6, padding: "1px 4px" }}
+        >
+          {draftLabel}
+        </PublishDiffPill>
+      ) : null}
       <div
         aria-hidden={!shift.jobName}
         style={{
@@ -493,6 +581,7 @@ export default function MyScheduleRow({
   periodDates,
   periodLabel,
   isManagementOnly = false,
+  recentPublishedChanges = new Map(),
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -530,6 +619,7 @@ export default function MyScheduleRow({
             shiftById,
             periodDates: displayDates,
             isDarkTheme,
+            recentPublishedChanges,
           })
         : [],
     [
@@ -541,6 +631,7 @@ export default function MyScheduleRow({
       shiftById,
       displayDates,
       isDarkTheme,
+      recentPublishedChanges,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
