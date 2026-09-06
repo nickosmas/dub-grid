@@ -422,7 +422,9 @@ describe("EmployeeManagementAccessEditor", () => {
 
     await screen.findByRole("region", { name: /edit management access/i });
 
-    await user.click(screen.getByRole("button", { name: /remove from management/i }));
+    // Deselecting the last department is the removal path; there is no separate
+    // Remove button, and the note below is what says so before saving.
+    await user.click(screen.getByRole("button", { name: "Leadership" }));
     expect(screen.getByText(/revokes the pending invitation/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
     await act(async () => {
@@ -442,7 +444,7 @@ describe("EmployeeManagementAccessEditor", () => {
     });
   });
 
-  it("skips the redundant access-status summary and Remove action for someone with no existing management access", async () => {
+  it("skips the redundant access-status summary for someone with no existing management access", async () => {
     render(
       <EmployeeManagementAccessEditor
         employee={employee}
@@ -462,9 +464,6 @@ describe("EmployeeManagementAccessEditor", () => {
     // The "Management departments *" field below is already the empty-state
     // answer, so a second "No management access" summary above it is noise.
     expect(screen.queryByText("No management access")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /remove from management/i }),
-    ).not.toBeInTheDocument();
   });
 
   it("does not flash missing-email guidance while linked account data is loading", async () => {

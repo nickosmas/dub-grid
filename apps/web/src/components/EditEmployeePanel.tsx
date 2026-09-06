@@ -21,7 +21,7 @@ import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/edi
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { satisfiesCertificationRequirement } from "@/lib/credential-requirements";
 import { SelectableTag } from "@/components/ui/selectable-tag";
-import { AccessStatusRow } from "@/components/staff/AccessStatusRow";
+import { SectionNotice } from "@/components/ui/SectionNotice";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
@@ -397,6 +397,28 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       [],
     );
 
+    // What saving would do, gathered per section. Field-level validation is not
+    // in here: it stays as the coloured hint under its own input, and a filled
+    // box only ever means a consequence of the save.
+    const detailsNotices = useMemo(() => {
+      const notices: string[] = [];
+      if (employee.userId && form.email !== employee.email && !emailConflict) {
+        notices.push("Changing the contact email does not change their login email.");
+      }
+      return notices;
+    }, [employee.userId, employee.email, form.email, emailConflict]);
+
+    // Only someone with management access can come off the schedule. For anyone
+    // else the focus areas are the whole staff record, so an empty set is the
+    // required-field error on the field itself rather than a consequence.
+    const assignmentNotices = useMemo(() => {
+      const notices: string[] = [];
+      if (isManagementUser && form.focusAreaIds.length === 0) {
+        notices.push("Saving now removes them from the schedule. They'll keep management access.");
+      }
+      return notices;
+    }, [isManagementUser, form.focusAreaIds.length]);
+
     const fieldLabel: React.CSSProperties = {
       fontSize: "var(--dg-type-field-title-size)",
       fontWeight: "var(--dg-type-field-title-weight)",
@@ -434,43 +456,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               flexDirection: "column",
             }}
           >
-            {/* ── Access status ── */}
-            <div style={{ paddingTop: isMobile ? 0 : 20 }}>
-              <AccessStatusRow
-                label={focusAreaLabel}
-                statusText={
-                  form.focusAreaIds.length > 0
-                    ? `Scheduled: ${form.focusAreaIds.length} ${focusAreaLabel.toLowerCase()}`
-                    : "Not scheduled"
-                }
-                tone={form.focusAreaIds.length > 0 ? "active" : "neutral"}
-                note={
-                  isManagementUser && form.focusAreaIds.length === 0
-                    ? "Saving now removes them from the schedule. They'll keep management access."
-                    : undefined
-                }
-                actionLabel={
-                  isManagementUser && form.focusAreaIds.length > 0 && !readOnly
-                    ? "Remove from Schedule"
-                    : undefined
-                }
-                onAction={
-                  isManagementUser && form.focusAreaIds.length > 0 && !readOnly
-                    ? () => {
-                        setForm((p) => ({ ...p, focusAreaIds: [] }));
-                        markTouched("focusAreaIds");
-                      }
-                    : undefined
-                }
-              />
-            </div>
-
             {/* ── Details section ── */}
             <div style={{ paddingTop: 20, paddingBottom: 20 }}>
               <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
                 Details
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <SectionNotice messages={detailsNotices} tone="warning" />
                 {!hideIdentityFields && (
                   <div
                     style={{
@@ -617,18 +609,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
                         }
                       />
-                      {employee.userId && form.email !== employee.email && !emailConflict && (
-                        <p
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-warning)",
-                            margin: "4px 0 0",
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          Changing the contact email does not change their login email.
-                        </p>
-                      )}
                       {fieldErrors.email && (
                         <div
                           style={{
@@ -702,6 +682,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 Assignments
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <SectionNotice messages={assignmentNotices} />
                 <div>
                   <label style={fieldLabel}>{certificationLabel}</label>
                   <CustomSelect

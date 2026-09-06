@@ -2444,6 +2444,13 @@ textarea {
   margin-bottom: 18px;
 }
 
+/* For a body that opens on a filled notice: 24px under a 16px title leaves
+   the banner floating, so the header holds the same 12px the banner keeps
+   inside its own edge. */
+.dg-modal--tight-header .dg-modal-header {
+  margin-bottom: 12px;
+}
+
 .dg-activity-details-modal .dg-modal-title {
   color: var(--dg-type-content-group-heading-color);
   font-size: var(--dg-type-content-group-heading-size);

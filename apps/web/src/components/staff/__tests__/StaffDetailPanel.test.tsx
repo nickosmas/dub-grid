@@ -142,4 +142,18 @@ describe("StaffDetailPanel access controls", () => {
     const inviteButton = screen.getByRole("button", { name: /Send Invitation/ });
     expect(inviteButton.parentElement).toBe(manageButton.parentElement);
   });
+  // Permissions were only reachable from inside the management-access popup,
+  // which now edits departments and nothing else. The launcher lives on the
+  // panel instead, and this is the panel's only route to it.
+  it("offers Manage permissions on the panel for an admin the viewer can edit", () => {
+    renderPanel({ orgRole: "admin", onPermissionsChange: vi.fn() });
+
+    expect(screen.getByRole("button", { name: "Manage permissions" })).toBeInTheDocument();
+  });
+
+  it("withholds Manage permissions when the role carries no permission set", () => {
+    renderPanel({ orgRole: "user", onPermissionsChange: vi.fn() });
+
+    expect(screen.queryByRole("button", { name: "Manage permissions" })).not.toBeInTheDocument();
+  });
 });

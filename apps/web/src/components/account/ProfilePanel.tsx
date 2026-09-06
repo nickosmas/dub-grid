@@ -857,6 +857,7 @@ export function ProfilePanel({
           title={showManagementAccess ? "Edit management access" : "Add to management"}
           onClose={closeManagementAccessEditor}
           onRequestClose={requestManagementAccessClose}
+          className="dg-modal--tight-header"
           style={{ maxWidth: 560, width: "100%" }}
         >
           <EmployeeManagementAccessEditor

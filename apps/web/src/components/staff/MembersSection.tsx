@@ -73,7 +73,6 @@ import { BulkImportModal } from "./BulkImportModal";
 import { DirectoryCertificationCards } from "./DirectoryCertificationCards";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessEditor } from "./EmployeeManagementAccessModal";
-import { MemberAccessControls } from "./MemberAccessControls";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
@@ -1088,10 +1087,11 @@ export function MembersSection({
     selectedEmployeeDirectoryPerson.membershipUpdatedAt,
   );
 
-  // Access writes for whoever's detail panel is open, so the slide-over and the
-  // management-access modal share one handler instead of each carrying a copy.
-  // Someone with no login yet holds their access on the pending invitation, so
-  // that branch replaces the invite rather than patching a membership.
+  // Access writes for whoever's detail panel is open: the slide-over's header
+  // role select and its on-panel permissions launcher. The management-access
+  // popup gets neither, since it edits departments and nothing else. Someone
+  // with no login yet holds their access on the pending invitation, so that
+  // branch replaces the invite rather than patching a membership.
   const selectedEmployeeRoleChange = !canManageManagementAccess
     ? undefined
     : canWriteSelectedMembership
@@ -2343,6 +2343,8 @@ export function MembersSection({
           }
           orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           onRoleChange={selectedEmployeeRoleChange}
+          adminPermissions={selectedEmployeeDirectoryPerson?.adminPermissions}
+          onPermissionsChange={selectedEmployeePermissionsChange}
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={selectedEmployeeHasPendingManagementInvite}
@@ -2363,47 +2365,34 @@ export function MembersSection({
           }
           onClose={closeManagementAccessPopup}
           onRequestClose={requestManagementAccessClose}
+          className="dg-modal--tight-header"
           style={{ maxWidth: 560, width: "100%" }}
         >
-          <div className="flex flex-col gap-6">
-            {selectedEmployeeDirectoryPerson?.orgRole ? (
-              <MemberAccessControls
-                orgRole={selectedEmployeeDirectoryPerson.orgRole}
-                adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
-                isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
-                pendingInvitationEmail={
-                  pendingInviteByEmployeeId.get(managementAccessEmployee.id)?.email
-                }
-                onRoleChange={selectedEmployeeRoleChange}
-                onPermissionsChange={selectedEmployeePermissionsChange}
-              />
-            ) : null}
-            <EmployeeManagementAccessEditor
-              employee={managementAccessEmployee}
-              orgId={orgId}
-              orgName={orgName || "your organization"}
-              managementDepartments={managementDepts}
-              directoryPerson={selectedEmployeeDirectoryPerson}
-              pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
-              onDirtyChange={setManagementAccessDirty}
-              onClose={closeManagementAccessPopup}
-              onCompleted={async (updatedEmployee) => {
-                syncExistingEmployeeInCaches(updatedEmployee);
-                await refreshInvitations();
-                await Promise.all([
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.directory(orgId),
-                  }),
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.users(orgId),
-                  }),
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.employees.all(orgId),
-                  }),
-                ]);
-              }}
-            />
-          </div>
+          <EmployeeManagementAccessEditor
+            employee={managementAccessEmployee}
+            orgId={orgId}
+            orgName={orgName || "your organization"}
+            managementDepartments={managementDepts}
+            directoryPerson={selectedEmployeeDirectoryPerson}
+            pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+            onDirtyChange={setManagementAccessDirty}
+            onClose={closeManagementAccessPopup}
+            onCompleted={async (updatedEmployee) => {
+              syncExistingEmployeeInCaches(updatedEmployee);
+              await refreshInvitations();
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.org.directory(orgId),
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.org.users(orgId),
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.employees.all(orgId),
+                }),
+              ]);
+            }}
+          />
         </Modal>
       )}
       {managementAccessUnsavedChangesDialog}

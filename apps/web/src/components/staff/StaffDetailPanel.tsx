@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import type { OrganizationRole } from "@/types";
+import type { AdminPermissions, OrganizationRole } from "@/types";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
@@ -19,6 +19,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
@@ -53,6 +54,9 @@ interface StaffDetailPanelProps {
   /** Org access tier, matching the directory table's Access column. */
   orgRole?: OrganizationRole | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  /** The permission set behind an admin's `orgRole`, for the on-panel launcher. */
+  adminPermissions?: AdminPermissions | null;
+  onPermissionsChange?: (permissions: AdminPermissions) => Promise<void>;
   canManageManagementAccess?: boolean;
   hasManagementAccess?: boolean;
   hasPendingManagementInvite?: boolean;
@@ -82,6 +86,8 @@ export function StaffDetailPanel({
   onInvite,
   orgRole,
   onRoleChange,
+  adminPermissions,
+  onPermissionsChange,
   canManageManagementAccess,
   hasManagementAccess,
   hasPendingManagementInvite,
@@ -351,6 +357,17 @@ export function StaffDetailPanel({
                 isInSandbox={isInSandbox}
               />
             )}
+            {/* Permissions belong to the person, not to the management-access
+                popup: that popup edits departments and nothing else, on every
+                surface, so it is the same popup wherever it opens from. Role
+                already lives in the header's inline select, so this renders
+                only the permissions launcher. */}
+            <MemberAccessControls
+              orgRole={orgRole}
+              adminPermissions={adminPermissions}
+              onPermissionsChange={onPermissionsChange}
+              labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+            />
             {(showSendInviteAction ||
               showManagementAccessAction ||
               showEmploymentStatusActions) && (
