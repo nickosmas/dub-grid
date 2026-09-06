@@ -626,7 +626,7 @@ function ReportsContent() {
   });
   const hasReportsPermission =
     !permissions.isUserViewActive &&
-    (permissions.role === "admin" || permissions.isSuperAdmin === true);
+    (permissions.isSuperAdmin === true || permissions.canViewReports === true);
   const canAccessReports = hasReportsPermission && featureFlags.reports;
   const orgId = permissions.orgId ?? org?.id ?? null;
   const [report, setReport] = useState<OperationsReportType>("staff-hours");
@@ -685,7 +685,7 @@ function ReportsContent() {
   useEffect(() => {
     if (permissions.isLoading) return;
     if (!hasReportsPermission) {
-      toast.info("Reports are available to admins and super admins.");
+      toast.info("Reports aren't included in your permissions.");
       router.replace("/dashboard");
     } else if (!featureFlags.reports) {
       toast.info("Reports are unavailable right now. Try again in a moment.");

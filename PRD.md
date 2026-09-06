@@ -39,7 +39,7 @@ DubGrid is an **npm workspaces** monorepo orchestrated by **Turborepo** (Node 22
 | `packages/domain`          | `@dubgrid/domain`          | Platform-neutral domain types, enums, and pure logic (RBAC, billing, requests, self-action guards) |
 | `packages/contracts`       | `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts                                           |
 | `packages/db-types`        | `@dubgrid/db-types`        | Database-row TypeScript types                                                                      |
-| `packages/authz`           | `@dubgrid/authz`           | Permission logic — role levels, view implications, permission unions, JWT claim extraction         |
+| `packages/authz`           | `@dubgrid/authz`           | Permission logic — role levels, view implications, JWT claim extraction                            |
 | `packages/schedule-core`   | `@dubgrid/schedule-core`   | Schedule transformation and calculation logic                                                      |
 | `packages/data-access`     | `@dubgrid/data-access`     | Supabase query + data mapping; shared mobile data layer                                            |
 | `packages/mobile-api-core` | `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes           |
@@ -146,7 +146,7 @@ DubGrid implements a four-tier RBAC system with JWT-based claims enforced at bot
 
 ### 4.2 Admin Permissions (Granular, per-user)
 
-Admins receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. The `AdminPermissions` interface (defined in `@dubgrid/domain`) has **25 permissions**. All default to `false` except `canViewSchedule` and `canViewStaff`, which are **always true** for any authenticated user regardless of role. Every `canManage*` permission implies its matching `canView*` (view implications applied by `@dubgrid/authz`).
+Admins receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. The `AdminPermissions` interface (defined in `@dubgrid/domain`) has **26 permissions**. `canViewSchedule` and `canViewStaff` are **always true** for any authenticated user regardless of role. Everything else follows a role baseline that a stored set overrides key by key: users start from all `false`; admins start from the core scheduling set (edit and publish the schedule, notes and indicators, recurring shifts, reports) with no people management or administration, so an unconfigured admin can schedule but cannot manage people. Every `canManage*` permission implies its matching `canView*` (view implications applied by `@dubgrid/authz`).
 
 | #   | Category  | Permission                      | Delegatable | Description                                                                |
 | --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------------------- |
@@ -175,6 +175,7 @@ Admins receive a configurable set of permissions stored as JSONB in `organizatio
 | 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage minimum staffing requirements                                       |
 | 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                               |
 | 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View the organization dashboard and analytics                              |
+| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, categories) |
 
 Permissions are **per-person**, set on the People page, not granted by departments. A member's effective permissions are their `org_role` plus their own `admin_permissions`. (`departments.permissions` exists for management departments but is vestigial; an earlier department-template union model was reverted.)
 
@@ -530,8 +531,8 @@ Everything for the web app lives under `apps/web/`. UI features are organized in
 | `apps/web/src/lib/onboarding-telemetry.ts`                | PostHog onboarding telemetry wrappers                                                                                                                                                                                                                          |
 | `apps/web/src/lib/timezone-from-coords.ts`                | Offline timezone lookup from coordinates (`tz-lookup`)                                                                                                                                                                                                         |
 | `apps/web/src/lib/us-states.ts` / `us-state-timezones.ts` | US state list + default-timezone map                                                                                                                                                                                                                           |
-| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 25 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                     |
-| `packages/authz/src/`                                     | Permission logic — `ROLE_LEVEL`, view implications, permission unions, JWT claim extraction                                                                                                                                                                    |
+| `packages/domain/src/`                                    | Domain types + `permissions.ts` (`AdminPermissions`, 26 perms), role enums, billing types, `self-guard.ts`                                                                                                                                                     |
+| `packages/authz/src/`                                     | Permission logic — `ROLE_LEVEL`, view implications, JWT claim extraction                                                                                                                                                                                       |
 | `packages/contracts/src/`                                 | Zod API contract schemas (`schedule`, `mobile`, `staff`)                                                                                                                                                                                                       |
 | `packages/mobile-api-core/src/`                           | Mobile backend orchestration (`auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`)                                                                                                                                     |
 | `apps/mobile/app/`                                        | Expo Router routes (`index.tsx`, `(auth)/*`, `(tabs)/*`, `shift/[employeeId]/[date].tsx`)                                                                                                                                                                      |

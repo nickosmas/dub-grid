@@ -1537,7 +1537,7 @@ export function MembersSection({
                 </MaybeHint>
               )}
 
-              {!showManagement && canViewManagementUsers && orgId && !isMobile && (
+              {!showManagement && canViewEmployeeDetails && orgId && !isMobile && (
                 <MaybeHint
                   content={
                     !featureFlags.csvExport

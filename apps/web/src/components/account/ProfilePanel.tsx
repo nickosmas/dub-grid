@@ -795,6 +795,7 @@ export function ProfilePanel({
               onRoleChange={handleRoleChange}
               onPermissionsChange={handlePermissionsChange}
               isSelf
+              labels={{ focusAreaLabel, certificationLabel, roleLabel }}
             />
           ) : (
             <Field label="Role" value={ROLE_LABELS[role] ?? role} />

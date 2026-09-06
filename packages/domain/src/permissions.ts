@@ -30,4 +30,5 @@ export interface AdminPermissions {
   canManageCoverageRequirements: boolean;
   canApproveShiftRequests: boolean;
   canViewDashboardAnalytics: boolean;
+  canViewReports: boolean;
 }

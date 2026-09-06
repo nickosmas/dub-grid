@@ -1,8 +1,9 @@
 export {
+  ADMIN_DEFAULT_PERMS,
   applyViewImplications,
   buildPermissionContext,
   READ_ONLY_PERMS,
   ROLE_LEVEL,
-  unionPermissions,
+  VIEW_IMPLICATIONS,
 } from "@dubgrid/authz";
 export type { PermissionContext } from "@dubgrid/authz";

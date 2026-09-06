@@ -68,3 +68,45 @@ describe("GET /api/settings/config", () => {
     expect(captured.orgId).not.toBe(REAL_ORG);
   });
 });
+
+describe("department authorization", () => {
+  function forbid() {
+    requireOrgPermissions.mockResolvedValue({
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
+  }
+
+  it("lets label viewers read departments but only focus-area managers change them", async () => {
+    const { client } = buildServiceClient();
+    getServiceClient.mockReturnValue(client);
+    forbid();
+    const { GET, POST } = await import("./route");
+
+    await GET(
+      new NextRequest(
+        `https://app.test/api/settings/config?action=fetchDepartments&orgId=${REAL_ORG}`,
+      ),
+    );
+    const canRead = requireOrgPermissions.mock.calls[0][2];
+    expect(canRead({ canViewOrgLabels: true })).toBe(true);
+    expect(canRead({ canViewFocusAreas: true })).toBe(true);
+    expect(canRead({})).toBeFalsy();
+
+    await POST(
+      new NextRequest("https://app.test/api/settings/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "saveDepartments",
+          orgId: REAL_ORG,
+          items: [],
+          existing: [],
+        }),
+      }),
+    );
+    const canManage = requireOrgPermissions.mock.calls[1][2];
+    expect(canManage({ canManageFocusAreas: true })).toBe(true);
+    expect(canManage({ isSuperAdmin: true })).toBe(true);
+    expect(canManage({ canManageOrgLabels: true })).toBeFalsy();
+  });
+});

@@ -132,7 +132,7 @@ describe("reports operations API", () => {
     expect(requireOrgPermissions).not.toHaveBeenCalled();
   });
 
-  it("authorizes organization admins and super admins only", async () => {
+  it("authorizes the reports permission and super admins only", async () => {
     await GET_REPORT(makeReportRequest());
 
     expect(requireOrgPermissions).toHaveBeenCalledWith(
@@ -141,15 +141,25 @@ describe("reports operations API", () => {
       expect.any(Function),
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
-    expect(isAllowed({ role: "admin", isSuperAdmin: false })).toBe(true);
-    expect(isAllowed({ role: "user", isSuperAdmin: true })).toBe(true);
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: true })).toBe(true);
+    expect(isAllowed({ role: "user", isSuperAdmin: true, canViewReports: false })).toBe(true);
+    // Being an admin is no longer enough on its own, nor is any other view key.
     expect(
       isAllowed({
-        role: "user",
+        role: "admin",
         isSuperAdmin: false,
+        canViewReports: false,
         canViewDashboardAnalytics: true,
       }),
     ).toBe(false);
+  });
+
+  it("gates exports on the same permission as the report itself", async () => {
+    await GET_EXPORT(makeExportRequest());
+
+    const isAllowed = requireOrgPermissions.mock.calls[0][2];
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: true })).toBe(true);
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: false })).toBe(false);
   });
 
   it("returns the operations report as no-store JSON", async () => {

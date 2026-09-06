@@ -833,6 +833,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             directoryPerson?.userId ? handlePermissionsChange : undefined
                           }
                           isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                          labels={{
+                            focusAreaLabel: org?.focusAreaLabel,
+                            certificationLabel: org?.certificationLabel,
+                            roleLabel: org?.roleLabel,
+                          }}
                           pendingInvitationEmail={pendingInvite?.email}
                         />
                       </div>

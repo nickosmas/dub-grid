@@ -22,7 +22,6 @@ import type {
   Department,
   ShiftMap,
   Invitation,
-  AdminPermissions,
   EmployeeStatus,
   AuditLogEntry,
 } from "@/types";
@@ -134,22 +133,6 @@ export async function restoreDepartment(deptId: number, orgId: string): Promise<
   if (error) throw error;
   await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("department.restored", "department", String(deptId), {}, orgId);
-}
-
-/** Update the permission template for a management department. */
-export async function updateDepartmentPermissions(
-  departmentId: number,
-  permissions: AdminPermissions,
-  orgId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("departments")
-    .update({ permissions })
-    .eq("id", departmentId)
-    .eq("org_id", orgId);
-  if (error) throw error;
-  await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("department_permissions.updated", "department", String(departmentId), {}, orgId);
 }
 
 // ── Employees ────────────────────────────────────────────────────────────────

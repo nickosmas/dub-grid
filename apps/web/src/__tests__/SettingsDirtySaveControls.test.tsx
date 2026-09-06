@@ -1269,7 +1269,6 @@ describe("settings dirty save controls", () => {
         focusAreaLabel="Focus Areas"
         departmentLabel="Departments"
         canManageFocusAreas
-        canManageOrgLabels={false}
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,
@@ -1352,7 +1351,6 @@ describe("settings dirty save controls", () => {
         focusAreaLabel="Wings"
         departmentLabel="Scheduled Departments"
         canManageFocusAreas
-        canManageOrgLabels={false}
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,
@@ -1377,7 +1375,6 @@ describe("settings dirty save controls", () => {
         focusAreaLabel="Focus Areas"
         departmentLabel="Departments"
         canManageFocusAreas
-        canManageOrgLabels={false}
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,
@@ -1426,7 +1423,6 @@ describe("settings dirty save controls", () => {
         focusAreaLabel="Focus Areas"
         departmentLabel="Scheduled Departments"
         canManageFocusAreas
-        canManageOrgLabels={false}
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,
@@ -2973,7 +2969,6 @@ describe("settings dirty save controls", () => {
         focusAreaLabel="Focus Areas"
         departmentLabel="Departments"
         canManageFocusAreas
-        canManageOrgLabels={false}
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,

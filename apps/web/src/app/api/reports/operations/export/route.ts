@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const auth = await requireOrgPermissions(
       req,
       parsed.data.orgId,
-      (permissions) => permissions.role === "admin" || permissions.isSuperAdmin === true,
+      (permissions) => permissions.isSuperAdmin === true || permissions.canViewReports,
     );
     if ("response" in auth) {
       return auth.response;

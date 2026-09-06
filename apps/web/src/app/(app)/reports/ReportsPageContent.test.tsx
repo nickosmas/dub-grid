@@ -286,6 +286,7 @@ describe("ReportsPageContent", () => {
     usePermissions.mockReturnValue({
       isLoading: false,
       role: "admin",
+      canViewReports: true,
       orgId: "11111111-1111-4111-8111-111111111111",
       isUserViewActive: false,
     });
@@ -648,7 +649,7 @@ describe("ReportsPageContent", () => {
     renderReports();
 
     await waitFor(() => {
-      expect(toastInfo).toHaveBeenCalledWith("Reports are available to admins and super admins.");
+      expect(toastInfo).toHaveBeenCalledWith("Reports aren't included in your permissions.");
       expect(routerReplace).toHaveBeenCalledWith("/dashboard");
     });
     expect(fetchOperationsReport).not.toHaveBeenCalled();

@@ -494,7 +494,6 @@ export default function SettingsPage({
             focusAreaLabel={focusAreaLabel}
             departmentLabel={scheduledDepartmentLabel}
             canManageFocusAreas={canManageFocusAreas}
-            canManageOrgLabels={canManageOrgLabels}
             onDepartmentsChange={onDepartmentsChange}
             onFocusAreasChange={onFocusAreasChange}
           />

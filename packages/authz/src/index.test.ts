@@ -7,7 +7,7 @@ import {
   getPermissionsFromSession,
   READ_ONLY_PERMS,
   ROLE_LEVEL,
-  unionPermissions,
+  VIEW_IMPLICATIONS,
 } from "./index";
 
 function encodeBase64Url(value: string): string {
@@ -47,17 +47,29 @@ describe("applyViewImplications", () => {
     const result = applyViewImplications(READ_ONLY_PERMS);
     expect(result.canViewEmployeeDetails).toBe(false);
   });
-});
 
-describe("unionPermissions", () => {
-  it("grants a permission if any set in the union grants it", () => {
-    const result = unionPermissions([{ ...READ_ONLY_PERMS, canEditShifts: true }, READ_ONLY_PERMS]);
-    expect(result.canEditShifts).toBe(true);
+  it("derives dashboard analytics from any of the keys the map names", () => {
+    for (const key of VIEW_IMPLICATIONS.canViewDashboardAnalytics ?? []) {
+      const result = applyViewImplications({ ...READ_ONLY_PERMS, [key]: true });
+      expect(result.canViewDashboardAnalytics, key).toBe(true);
+    }
+    expect(applyViewImplications(READ_ONLY_PERMS).canViewDashboardAnalytics).toBe(false);
   });
 
-  it("always forces canManageOrgSettings to false regardless of input", () => {
-    const result = unionPermissions([{ ...READ_ONLY_PERMS, canManageOrgSettings: true }]);
-    expect(result.canManageOrgSettings).toBe(false);
+  it("never implies reports, which is granted on its own", () => {
+    const result = applyViewImplications({
+      ...READ_ONLY_PERMS,
+      canEditShifts: true,
+      canManageEmployees: true,
+    });
+    expect(result.canViewReports).toBe(false);
+  });
+
+  it("only ever lists view keys as targets and never a key as its own source", () => {
+    for (const [viewKey, sources] of Object.entries(VIEW_IMPLICATIONS)) {
+      expect(viewKey.startsWith("canView")).toBe(true);
+      expect(sources).not.toContain(viewKey);
+    }
   });
 });
 
@@ -69,9 +81,25 @@ describe("buildPerms", () => {
     expect(perms.isGridmaster).toBe(true);
   });
 
-  it("falls back admins with no admin_permissions grant to read-only", () => {
+  it("gives an unconfigured admin the core scheduling baseline and nothing else", () => {
     const perms = buildPerms("admin", "org-1", false, null);
+    expect(perms.canEditShifts).toBe(true);
+    expect(perms.canPublishSchedule).toBe(true);
+    expect(perms.canManageRecurringShifts).toBe(true);
+    expect(perms.canApplyRecurringSchedule).toBe(true);
+    expect(perms.canViewReports).toBe(true);
     expect(perms.canManageEmployees).toBe(false);
+    expect(perms.canViewEmployeeDetails).toBe(false);
+    expect(perms.canApproveShiftRequests).toBe(false);
+    expect(perms.canManageFocusAreas).toBe(false);
+    expect(perms.canManageCoverageRequirements).toBe(false);
+    expect(perms.canAccessSettings).toBe(false);
+  });
+
+  it("keeps an unconfigured user on the read-only baseline", () => {
+    const perms = buildPerms("user", "org-1", false, null);
+    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canViewReports).toBe(false);
     expect(perms.canViewSchedule).toBe(true);
   });
 
@@ -97,13 +125,17 @@ describe("buildPerms", () => {
 
   // admin_permissions is an unvalidated JSONB column, so the resolver has to
   // hold these guarantees itself rather than trust whatever wrote the row.
-  it("resolves a partial admin_permissions JSONB against the read-only base", () => {
+  it("resolves a partial admin_permissions JSONB against the admin baseline", () => {
     const perms = buildPerms("admin", "org-1", false, {
-      canEditShifts: true,
+      canEditShifts: false,
+      canManageEmployees: true,
     } as unknown as typeof READ_ONLY_PERMS);
-    expect(perms.canEditShifts).toBe(true);
+    // Explicit values win over the baseline in both directions.
+    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canManageEmployees).toBe(true);
+    // Keys the row never mentions take the baseline, not undefined.
+    expect(perms.canPublishSchedule).toBe(true);
     expect(perms.canApproveShiftRequests).toBe(false);
-    expect(perms.canManageEmployees).toBe(false);
   });
 
   it("keeps canViewStaff true for an admin, as it already was for a user", () => {
@@ -116,6 +148,18 @@ describe("buildPerms", () => {
     const stored = { ...READ_ONLY_PERMS, canManageOrgSettings: true };
     expect(buildPerms("admin", "org-1", false, stored).canManageOrgSettings).toBe(false);
     expect(buildPerms("user", "org-1", false, stored).canManageOrgSettings).toBe(false);
+  });
+
+  it("keeps reports on for an admin whose stored set predates the key", () => {
+    expect(buildPerms("admin", "org-1", false, null).canViewReports).toBe(true);
+    expect(
+      buildPerms("admin", "org-1", false, { canEditShifts: true } as never).canViewReports,
+    ).toBe(true);
+    expect(
+      buildPerms("admin", "org-1", false, { ...READ_ONLY_PERMS, canViewReports: false })
+        .canViewReports,
+    ).toBe(false);
+    expect(buildPerms("user", "org-1", false, null).canViewReports).toBe(false);
   });
 
   it("never lets a stored JSONB grant canManageUsers", () => {

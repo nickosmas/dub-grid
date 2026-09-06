@@ -33,6 +33,7 @@ export const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
   canManageCoverageRequirements: "Manage coverage requirements",
   canApproveShiftRequests: "Approve shift requests",
   canViewDashboardAnalytics: "View dashboard analytics",
+  canViewReports: "View reports",
 };
 
 export function permissionLabel(key: string): string {

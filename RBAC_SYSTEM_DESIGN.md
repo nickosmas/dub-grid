@@ -12,7 +12,7 @@ Version 2.2 | Updated 2026-05-25 | Confidential
 > (Expo SDK 54 / React Native, `apps/mobile`) — sit on top of 11 shared
 > `packages/*` libraries. All RBAC-relevant permission logic now lives in the
 > platform-neutral **`@dubgrid/authz`** package (`ROLE_LEVEL`, `ALL_PERMS` /
-> `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`,
+> `READ_ONLY_PERMS`, `VIEW_IMPLICATIONS` / `applyViewImplications`,
 > `buildPermissionContext` / `buildPerms`, `extractJwtClaims`,
 > `getPermissionsFromSession`), with domain types/enums and the self-action
 > guard (`assertNotSelf` / `isSelfAction` / `SelfActionForbiddenError` in
@@ -51,14 +51,15 @@ Security is enforced at three independent layers. Compromising one layer does no
 
 ### 1.3 Admin Permissions Model
 
-Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these **per-user** (on the People page, via the `PermissionsEditor` surfaced from `UserManagement`). The canonical `AdminPermissions` interface — **25 keys** — is defined in `packages/domain/src/permissions.ts` and consumed everywhere through `@dubgrid/authz`.
+Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these **per-user** (on the People page, via the `PermissionsEditor` surfaced from `UserManagement`). The canonical `AdminPermissions` interface — **26 keys** — is defined in `packages/domain/src/permissions.ts` and consumed everywhere through `@dubgrid/authz`.
 
-> **What "25" counts, and what is delegatable.** The `AdminPermissions` interface holds
-> exactly the 25 keys in the table below; these are the only keys ever written to the
+> **What "26" counts, and what is delegatable.** The `AdminPermissions` interface holds
+> exactly the 26 keys in the table below; these are the only keys ever written to the
 > `admin_permissions` JSONB. Of those, two (`canViewSchedule`, `canViewStaff`) are forced
-> true for everyone, and one (`canManageOrgSettings`) is treated as super_admin-only by
-> the editor (passed as `lockedFalse` for admins, see `UserManagement.SUPER_ADMIN_ONLY`),
-> so an admin can actually be granted at most 22 of them. Separately, two further
+> true for everyone, and one (`canManageOrgSettings`) is super_admin-only: `PermissionsEditor`
+> never renders it and always saves it `false`, and `buildPermissionContext` forces it off
+> for admins whatever is stored,
+> so an admin can actually be granted at most 23 of them. Separately, two further
 > capabilities — `canManageUsers` and `canConfigureAdminPermissions` — are **not** part of
 > `AdminPermissions`. They are computed on the resolved `PermissionContext`
 > (`packages/authz/src/index.ts`) as `isSuperAdmin || isGridmaster`, can never be granted
@@ -67,58 +68,59 @@ Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `or
 Permissions are **per-person**, not per-department. Departments do not grant any
 permission. `departments.permissions` exists on the schema (a JSONB column whose comment
 still describes a management-department template), but no permission-resolution path
-reads it: `@dubgrid/authz` exposes a `unionPermissions` helper, yet
-`buildPermissionContext` (the path that actually resolves a member's effective set) does
-**not** call it — it is exercised only in tests. A member's effective permissions =
+reads it. A member's effective permissions =
 role baseline + their own `admin_permissions` JSONB, with view-implications applied.
 
-All permissions default to `false` **except** `canViewSchedule` and `canViewStaff`, which are **always true** for any authenticated user (including Tier 0 `user`). The order below matches the interface definition.
+`canViewSchedule` and `canViewStaff` are **always true** for any authenticated user (including Tier 0 `user`). Every other key defaults per role baseline: a `user` resolves against `READ_ONLY_PERMS` (all `false`), and an `admin` resolves against `ADMIN_DEFAULT_PERMS`, the core scheduling set (`canEditShifts`, `canPublishSchedule`, `canEditNotes`, `canEditScheduleIndicators`, the four recurring-shift keys, and `canViewReports`) with nothing in people management or administration. A stored JSONB overrides the baseline key by key in both directions, so an unconfigured admin (or one whose row predates a key) can edit and publish the schedule and see Reports, but cannot manage people until a super admin switches that on. The order below matches the interface definition.
 
-| #   | Category  | Permission                      | Delegatable | Description                                                    |
-| --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------- |
-| 1   | Schedule  | `canViewSchedule`               | Always on   | View the schedule grid (always true for all authed users)      |
-| 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cells                            |
-| 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                          |
-| 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates onto the grid                  |
-| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                          |
-| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5) |
-| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                 |
-| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                            |
-| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                  |
-| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)           |
-| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                              |
-| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                          |
-| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                               |
-| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                               |
-| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)         |
-| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                    |
-| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                           |
-| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                         |
-| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)     |
-| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                 |
-| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                 |
-| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                             |
-| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                           |
-| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                   |
-| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                       |
+| #   | Category  | Permission                      | Delegatable | Description                                                                      |
+| --- | --------- | ------------------------------- | ----------- | -------------------------------------------------------------------------------- |
+| 1   | Schedule  | `canViewSchedule`               | Always on   | View the schedule grid (always true for all authed users)                        |
+| 2   | Schedule  | `canEditShifts`                 | Yes         | Create, edit, delete schedule cells                                              |
+| 3   | Schedule  | `canPublishSchedule`            | Yes         | Publish draft changes                                                            |
+| 4   | Schedule  | `canApplyRecurringSchedule`     | Yes         | Apply recurring shift templates onto the grid                                    |
+| 5   | Notes     | `canEditNotes`                  | Yes         | Manage schedule notes                                                            |
+| 6   | Notes     | `canEditScheduleIndicators`     | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5)                   |
+| 7   | Recurring | `canViewRecurringShifts`        | Yes         | View recurring shift templates                                                   |
+| 8   | Recurring | `canManageRecurringShifts`      | Yes         | Configure recurring shift templates                                              |
+| 9   | Recurring | `canManageShiftSeries`          | Yes         | Manage repeating shift series                                                    |
+| 10  | Staff     | `canViewStaff`                  | Always on   | View staff roster (always true for all authed users)                             |
+| 11  | Staff     | `canViewEmployeeDetails`        | Yes         | View full employee detail records                                                |
+| 12  | Staff     | `canManageEmployees`            | Yes         | Add, edit, bench, terminate employees                                            |
+| 13  | Config    | `canViewFocusAreas`             | Yes         | View focus areas                                                                 |
+| 14  | Config    | `canManageFocusAreas`           | Yes         | Manage focus areas / departments                                                 |
+| 15  | Config    | `canViewScheduleDefinitions`    | Yes         | View schedule definitions (shift codes, absence types)                           |
+| 16  | Config    | `canManageScheduleDefinitions`  | Yes         | Manage schedule definitions                                                      |
+| 17  | Config    | `canViewIndicatorTypes`         | Yes         | View note/indicator type definitions                                             |
+| 18  | Config    | `canManageIndicatorTypes`       | Yes         | Manage note/indicator type definitions                                           |
+| 19  | Config    | `canManageOrgSettings`          | No          | Edit org name, address, phone, timezone (super_admin only)                       |
+| 20  | Config    | `canViewOrgLabels`              | Yes         | View custom terminology labels                                                   |
+| 21  | Config    | `canManageOrgLabels`            | Yes         | Edit custom terminology labels                                                   |
+| 22  | Coverage  | `canViewCoverageRequirements`   | Yes         | View staffing minimum requirements                                               |
+| 23  | Coverage  | `canManageCoverageRequirements` | Yes         | Manage staffing minimum requirements                                             |
+| 24  | Requests  | `canApproveShiftRequests`       | Yes         | Approve or reject shift pickup/swap requests                                     |
+| 25  | Dashboard | `canViewDashboardAnalytics`     | Yes         | View dashboard analytics                                                         |
+| 26  | Reports   | `canViewReports`                | Yes         | View and export the operations reports (staff hours, activity, shift categories) |
 
-**View-implications.** `@dubgrid/authz`'s `applyViewImplications` guarantees that every `canManage*` permission implies its matching `canView*` permission. A membership row only needs to store the `canManage*` flag; the resolved permission set always exposes the corresponding `canView*` as `true`. The view-only baseline (`READ_ONLY_PERMS`) is what a Tier 0 `user` receives.
+**View-implications.** `@dubgrid/authz`'s `applyViewImplications` guarantees that every `canManage*` permission implies its matching `canView*` permission, and that `canViewDashboardAnalytics` follows from any of `canEditShifts`, `canManageEmployees`, `canPublishSchedule`, or `canApproveShiftRequests`. The map lives once, as the exported `VIEW_IMPLICATIONS`; the resolver applies it and `PermissionsEditor` reads it, so a view switch shows as "Included" rather than a live control whenever the resolver would grant it anyway. A membership row only needs to store the `canManage*` flag; the resolved permission set always exposes the corresponding `canView*` as `true`. `canViewReports` is never implied. The view-only baseline (`READ_ONLY_PERMS`) is what a Tier 0 `user` receives.
+
+**Keys that also need Schedule edit.** `canApplyRecurringSchedule` and `canManageShiftSeries` both write grid cells, so the API (`/api/schedule/manage`) requires `canEditShifts` alongside them, as the toolbar already did. `canEditScheduleIndicators` is likewise required alongside `canEditNotes` to write a schedule note, since every note carries an indicator type. The editor bundles each pair, so this only bites a JSONB written outside the editor.
 
 **Always-true permissions.** `canViewSchedule` and `canViewStaff` are forced to `true` for every authenticated user regardless of role or stored JSONB — Tier 0 users can always see the schedule grid and the staff roster.
 
 **Super admin-only (never delegatable to an admin).** `canManageUsers` and
 `canConfigureAdminPermissions` are computed (`isSuperAdmin || isGridmaster`) and live only
 on `PermissionContext`, never in the JSONB. `canManageOrgSettings` does live in the JSONB
-interface but the editor locks it off for admins (`UserManagement.SUPER_ADMIN_ONLY`), so
-in practice it too is reserved for `super_admin` (Tier 3). `canConfigureAdminPermissions`
+interface but `PermissionsEditor` never renders it and `buildPermissionContext` forces it
+off for admins, so it too is reserved for `super_admin` (Tier 3). `canConfigureAdminPermissions`
 is what gates the `PermissionsEditor` itself.
 
 **No department-template inheritance.** Earlier revisions of this document described a
 "department-template union" where management-type departments contributed permissions.
 That behavior was reverted: `buildPermissionContext` resolves a member's effective set
 from the role baseline and their own `admin_permissions` JSONB only, then applies
-view-implications. It does not read `departments.permissions` and does not call
-`unionPermissions`.
+view-implications. It does not read `departments.permissions`; the `unionPermissions`
+helper that model used has been removed from `@dubgrid/authz`.
 
 ---
 
@@ -225,7 +227,7 @@ CREATE TABLE public.organization_memberships (
 ```sql
 CREATE TABLE public.role_change_log (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  target_user_id     UUID NOT NULL,
+  target_user_id     UUID,          -- nullable since 014: SET NULL when the auth user is deleted
   changed_by_id      UUID,
   from_role          TEXT NOT NULL,
   to_role            TEXT NOT NULL,
@@ -994,7 +996,7 @@ export const config = {
 
 ## 7. React Frontend Architecture
 
-The React layer enforces role-aware rendering using a single source of truth: the parsed JWT claims combined with admin permissions fetched from the database. The actual permission math — claim extraction, view-implications, department-template unions, role levels — lives in the platform-neutral **`@dubgrid/authz`** package so that both `apps/web` and `apps/mobile`/`@dubgrid/mobile-api-core` resolve permissions identically. The web app's `apps/web/src/features/permissions/` directory (`core`, `client`, `shared`, `index`, `usePermissions.ts`) is a thin wrapper over `@dubgrid/authz`.
+The React layer enforces role-aware rendering using a single source of truth: the parsed JWT claims combined with admin permissions fetched from the database. The actual permission math — claim extraction, view-implications, role levels — lives in the platform-neutral **`@dubgrid/authz`** package so that both `apps/web` and `apps/mobile`/`@dubgrid/mobile-api-core` resolve permissions identically. The web app's `apps/web/src/features/permissions/` directory (`core`, `client`, `shared`, `index`, `usePermissions.ts`) is a thin wrapper over `@dubgrid/authz`.
 
 ### 7.1 Auth Context & Permission Hook
 

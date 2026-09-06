@@ -39,7 +39,6 @@ interface DepartmentsSettingsProps {
   focusAreaLabel: string;
   departmentLabel: string;
   canManageFocusAreas: boolean;
-  canManageOrgLabels: boolean;
   onDepartmentsChange: (departments: Department[]) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
 }
@@ -1335,11 +1334,10 @@ export default function DepartmentsSettings({
   focusAreaLabel,
   departmentLabel,
   canManageFocusAreas,
-  canManageOrgLabels,
   onDepartmentsChange,
   onFocusAreasChange,
 }: DepartmentsSettingsProps) {
-  const canEdit = canManageFocusAreas || canManageOrgLabels;
+  const canEdit = canManageFocusAreas;
   const scheduledDepartmentLabel = departmentLabel || "Scheduled Departments";
   const managementDepartmentLabel = "Management Departments";
 
