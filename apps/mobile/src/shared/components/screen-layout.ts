@@ -65,6 +65,9 @@ export function getScreenBottomPadding(
 /** Modest, fixed breathing room below a sticky footer — see `getFooterBottomPadding`. */
 const FOOTER_BOTTOM_BREATHING_ROOM = 16;
 
+/** The tallest bottom inset a screen with nothing below it can honestly have. */
+const HOME_INDICATOR_INSET = 34;
+
 /**
  * Bottom padding for a *sticky* `Screen` footer, as opposed to
  * `getScreenBottomPadding`'s padding on trailing scroll content.
@@ -88,5 +91,12 @@ export function getFooterBottomPadding(
     return getFloatingTabBarClearance(safeArea) + FLOATING_TAB_BAR_BREATHING_ROOM;
   }
 
-  return safeArea + FOOTER_BOTTOM_BREATHING_ROOM;
+  // Only a `tabbed` screen may spend the whole inset, because only there does
+  // it stand for a bar the footer has to sit above. Everywhere else the inset
+  // can only legitimately be the home indicator, so cap it: a screen pushed
+  // over the tab bar can still be handed the tab-inflated value, and spending
+  // that on a footer with no tab bar beneath it reads as a wall of dead space.
+  const clearance = mode === "tabbed" ? safeArea : Math.min(safeArea, HOME_INDICATOR_INSET);
+
+  return clearance + FOOTER_BOTTOM_BREATHING_ROOM;
 }

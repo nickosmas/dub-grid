@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getFloatingTabBarClearance } from "./floating-tab-bar-layout";
-import { getScreenBottomPadding, getScreenGutter } from "./screen-layout";
+import { getFooterBottomPadding, getScreenBottomPadding, getScreenGutter } from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
 // is enough — no re-import needed.
@@ -50,6 +50,32 @@ describe("getScreenBottomPadding", () => {
 
     expect(getScreenBottomPadding("stack", 24)).toBe(48);
     expect(getScreenBottomPadding("modal", 24)).toBe(40);
+  });
+});
+
+describe("getFooterBottomPadding", () => {
+  it("spends the whole inset only for a tabbed screen, which really sits above a bar", () => {
+    platform.OS = "ios";
+
+    expect(getFooterBottomPadding("tabbed", 83)).toBe(99);
+  });
+
+  it("caps a stack or modal footer at the home indicator", () => {
+    platform.OS = "ios";
+
+    // A screen pushed over the tab bar can still be handed the tab-inflated
+    // inset. Nothing sits below this footer but the home indicator, so paying
+    // out the full 83 put a tab bar's worth of dead space under the buttons.
+    expect(getFooterBottomPadding("stack", 83)).toBe(50);
+    expect(getFooterBottomPadding("modal", 83)).toBe(50);
+  });
+
+  it("passes an honest inset straight through, so the cap is a ceiling not a floor", () => {
+    platform.OS = "ios";
+
+    expect(getFooterBottomPadding("stack", 34)).toBe(50);
+    expect(getFooterBottomPadding("stack", 14)).toBe(30);
+    expect(getFooterBottomPadding("stack", 0)).toBe(16);
   });
 });
 
