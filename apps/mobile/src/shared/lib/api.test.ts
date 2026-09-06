@@ -253,7 +253,7 @@ describe("mobileApiRequest", () => {
     const { lookupOrganization } = await import("./api");
 
     await expect(lookupOrganization("calmhaven")).rejects.toThrow(
-      "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
+      "We couldn't connect right now. Check your internet connection and try again.",
     );
   });
 
@@ -279,7 +279,7 @@ describe("mobileApiRequest", () => {
       password: "super-secret",
     });
     const assertion = expect(loginPromise).rejects.toThrow(
-      "DubGrid took too long to respond. Check your internet connection and try again.",
+      "This is taking longer than expected. Check your internet connection and try again.",
     );
 
     await vi.advanceTimersByTimeAsync(15_000);
@@ -303,9 +303,7 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { lookupOrganization } = await import("./api");
 
-    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
-      "DubGrid isn't responding correctly right now. Try again in a moment.",
-    );
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow("Please try again in a moment.");
   });
 
   it("sends JSON content headers for body-based mobile requests", async () => {

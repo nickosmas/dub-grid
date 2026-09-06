@@ -5,7 +5,7 @@ import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import { Pressable } from "../../../shared/components/Pressable";
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { Button } from "../../../shared/components/Button";
 import { AuthField } from "../components/AuthField";
 import { InlineError } from "../../../shared/components/InlineError";
@@ -421,12 +421,23 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <Button
-              disabled={orgLoading || !orgSlug.trim()}
-              label="Continue"
-              loading={orgLoading}
-              onPress={() => handleOrganizationContinue()}
-            />
+            <ActionButtons
+              primaryAction={
+                <Button
+                  disabled={orgLoading || !orgSlug.trim()}
+                  label="Continue"
+                  loading={orgLoading}
+                  onPress={() => handleOrganizationContinue()}
+                />
+              }
+            >
+              <Button
+                expanded={showOrgHelp}
+                label="Need help with your subdomain?"
+                onPress={() => setShowOrgHelp((current) => !current)}
+                tone="link"
+              />
+            </ActionButtons>
             {orgLoading ? (
               <Text accessibilityLiveRegion="polite" style={styles.progressText}>
                 {slowSubmission
@@ -434,16 +445,6 @@ export default function LoginScreen() {
                   : "Checking your workspace…"}
               </Text>
             ) : null}
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showOrgHelp }}
-              android_ripple={{ color: mobileColors.rippleNeutral }}
-              style={styles.link}
-              onPress={() => setShowOrgHelp((current) => !current)}
-            >
-              <Text style={styles.linkText}>Need help with your subdomain?</Text>
-            </Pressable>
 
             {showOrgHelp ? (
               <Text style={styles.helperText}>
@@ -512,32 +513,20 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <Button
-              disabled={submitting || !isValidEmail(email) || !password}
-              label="Sign In"
-              loading={submitting}
-              onPress={() => handleLogin()}
-            />
-            {submitting && slowSubmission ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
-                Signing in is taking longer than usual. We’re still working in the background.
-              </Text>
-            ) : null}
-
-            <View style={styles.linkRow}>
-              <Pressable
-                accessibilityRole="button"
-                android_ripple={{ color: mobileColors.rippleNeutral }}
-                style={styles.link}
-                onPress={switchOrganization}
-              >
-                <Text style={styles.linkText}>Switch organization</Text>
-              </Pressable>
-              <Text style={styles.linkSeparator}>·</Text>
-              <Pressable
-                accessibilityRole="button"
-                android_ripple={{ color: mobileColors.rippleNeutral }}
-                style={styles.link}
+            <ActionButtons
+              primaryAction={
+                <Button
+                  disabled={submitting || !isValidEmail(email) || !password}
+                  label="Sign In"
+                  loading={submitting}
+                  onPress={() => handleLogin()}
+                />
+              }
+            >
+              <Button label="Switch organization" onPress={switchOrganization} tone="link" />
+              <Button
+                label="Forgot password?"
+                tone="link"
                 onPress={() => {
                   // Native now, rather than handing the user off to the
                   // web app in a browser sheet mid sign-in.
@@ -546,10 +535,13 @@ export default function LoginScreen() {
                     params: { email },
                   });
                 }}
-              >
-                <Text style={styles.linkText}>Forgot password?</Text>
-              </Pressable>
-            </View>
+              />
+            </ActionButtons>
+            {submitting && slowSubmission ? (
+              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+                Signing in is taking longer than usual. We’re still working in the background.
+              </Text>
+            ) : null}
           </View>
         </View>
       ) : (
@@ -585,31 +577,32 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <Button
-              disabled={submitting || mfaCode.length !== 6}
-              label="Verify and Sign In"
-              loading={submitting}
-              onPress={() => handleMfaVerify()}
-            />
+            <ActionButtons
+              primaryAction={
+                <Button
+                  disabled={submitting || mfaCode.length !== 6}
+                  label="Verify and Sign In"
+                  loading={submitting}
+                  onPress={() => handleMfaVerify()}
+                />
+              }
+            >
+              <Button
+                label="Back to sign in"
+                tone="link"
+                onPress={() => {
+                  setStage("credentials");
+                  setPendingMfaLogin(null);
+                  setMfaCode("");
+                  setError(null);
+                }}
+              />
+            </ActionButtons>
             {submitting && slowSubmission ? (
               <Text accessibilityLiveRegion="polite" style={styles.progressText}>
                 Verification is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}
-
-            <Pressable
-              accessibilityRole="button"
-              android_ripple={{ color: mobileColors.rippleNeutral }}
-              style={styles.link}
-              onPress={() => {
-                setStage("credentials");
-                setPendingMfaLogin(null);
-                setMfaCode("");
-                setError(null);
-              }}
-            >
-              <Text style={styles.linkText}>Back to sign in</Text>
-            </Pressable>
           </View>
         </View>
       )}
@@ -655,27 +648,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     actions: {
       gap: 16,
-    },
-    link: {
-      alignSelf: "center",
-      minHeight: 36,
-      paddingVertical: 6,
-      paddingHorizontal: 4,
-      justifyContent: "center",
-    },
-    linkText: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    linkRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-    },
-    linkSeparator: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
     },
     helperText: {
       ...mobileText.meta,

@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +35,7 @@ function getDetailLine(
   if (!status) return null;
 
   if (status.state === "suspended") {
-    return "This organization was suspended by DubGrid staff.";
+    return "This organization is currently unavailable. Contact support if you need help.";
   }
 
   if (status.state === "locked") {
@@ -91,15 +92,19 @@ export function OrganizationLockedScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.copy}>
-          <Text style={styles.eyebrow}>DubGrid</Text>
+          <Text style={styles.eyebrow}>Account access</Text>
           <Text style={styles.title}>Organization unavailable</Text>
           <Text style={styles.body}>{body}</Text>
           {detailLine ? <Text style={styles.detail}>{detailLine}</Text> : null}
           {graceDate ? <Text style={styles.detail}>Grace period ends {graceDate}.</Text> : null}
         </View>
 
-        <View style={styles.actions}>
-          <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
+        <ActionButtons
+          primaryAction={
+            <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
+          }
+          style={styles.actions}
+        >
           {isSuperAdmin ? (
             <Button
               label="Manage billing on web"
@@ -113,7 +118,7 @@ export function OrganizationLockedScreen({
             />
           ) : null}
           <Button label="Sign out" onPress={onSignOut} tone="neutral" />
-        </View>
+        </ActionButtons>
       </ScrollView>
     </SafeAreaView>
   );

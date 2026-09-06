@@ -200,7 +200,7 @@ export function Button({
         {!iconOnly && content ? (
           <Text
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}
+            style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}
           </Text>
@@ -325,7 +325,12 @@ const createStyles = (mobileColors: MobileColors) =>
     toneLink: {
       backgroundColor: "transparent",
     },
+    label: {
+      flexShrink: 1,
+      textAlign: "center",
+    },
     content: {
+      alignSelf: "stretch",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",

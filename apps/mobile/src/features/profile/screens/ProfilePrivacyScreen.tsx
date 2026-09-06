@@ -61,14 +61,14 @@ export default function ProfilePrivacyScreen() {
           still has a home below, under Policies, because it documents the site. */}
       <ProfileSection
         title="Analytics"
-        description="Essential data keeps DubGrid working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
+        description="Essential data keeps the app working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
       >
         <ProfilePanel>
           <View style={styles.toggleRow}>
             <View style={styles.toggleCopy}>
               <Text style={styles.toggleLabel}>Analytics</Text>
               <Text style={styles.toggleDescription}>
-                Share anonymous usage data to help us improve DubGrid.
+                Share anonymous usage data to help us improve the app.
               </Text>
             </View>
             <Switch

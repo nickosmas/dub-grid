@@ -243,6 +243,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               </div>
               {error && <p className="dg-form-error">{error}</p>}
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={hasPasswordChanges ? discardChanges : closeForm}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                >
+                  {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
+                </Button>
                 <button
                   type="submit"
                   disabled={saving || !canSubmitPassword}
@@ -256,13 +263,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                     Update Password
                   </ButtonLoading>
                 </button>
-                <Button
-                  type="button"
-                  onClick={hasPasswordChanges ? discardChanges : closeForm}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
-                </Button>
               </div>
             </Form>
           )}

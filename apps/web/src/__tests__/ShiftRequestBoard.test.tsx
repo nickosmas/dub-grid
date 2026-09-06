@@ -177,6 +177,12 @@ describe("ShiftRequestBoard", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /my requests/i }));
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter((label) => label === "Accept" || label === "Decline"),
+    ).toEqual(["Decline", "Accept"]);
     await user.click(screen.getByRole("button", { name: "Accept" }));
     await confirmDialogAction(user, "Accept");
     await user.click(screen.getByRole("button", { name: "Decline" }));
@@ -200,10 +206,22 @@ describe("ShiftRequestBoard", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter((label) => label === "Approve" || label === "Reject"),
+    ).toEqual(["Reject", "Approve"]);
     await user.click(screen.getByRole("button", { name: "Approve" }));
     await confirmDialogAction(user, "Approve");
     await user.click(screen.getByRole("button", { name: "Reject" }));
     await user.type(screen.getByPlaceholderText("Add a note (optional)"), "Need more coverage");
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter((label) => label === "Back" || label === "Confirm Reject"),
+    ).toEqual(["Back", "Confirm Reject"]);
     await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
     await confirmDialogAction(user, "Reject");
 

@@ -42,18 +42,18 @@ export default function SetupPendingScreen() {
         >
           <div className="dg-auth-gate-actions">
             <Button
-              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
-              onClick={() => window.location.reload()}
-              type="button"
-            >
-              Check again
-            </Button>
-            <Button
               className="dg-btn dg-btn-secondary dg-btn-lg dg-auth-state-primary"
               onClick={() => signOut()}
               type="button"
             >
               Sign out
+            </Button>
+            <Button
+              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
+              onClick={() => window.location.reload()}
+              type="button"
+            >
+              Check again
             </Button>
           </div>
         </AuthStateCard>

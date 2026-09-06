@@ -71,7 +71,9 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(
-      screen.getByText("This organization was suspended by DubGrid staff."),
+      screen.getByText(
+        "This organization is currently unavailable. Contact support if you need help.",
+      ),
     ).toBeInTheDocument();
   });
 

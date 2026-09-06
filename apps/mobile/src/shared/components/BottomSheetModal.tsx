@@ -1,3 +1,4 @@
+import { ActionButtons } from "./ActionButtons";
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -370,11 +371,7 @@ const createStyles = (
       paddingBottom: mobileSpace.lg,
     },
     footer: {
-      // Column, not row: `SheetActions` (its usual, near-universal payload) is
-      // itself a stacked, full-width button group, and a row here reduces it
-      // to a single narrow row-item hugging its own content instead of
-      // stretching to the sheet's width — column lets each top-level child
-      // (an `InlineError` above the actions, say) stretch on its own.
+      // Keep supporting errors and the action group at the full sheet width.
       gap: 12,
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -463,16 +460,16 @@ export function SheetCopy({
   );
 }
 
-/** Stacked full-width actions, primary first. */
-export function SheetActions({ children }: { children: ReactNode }) {
-  return <View style={sheetActionStyles.actions}>{children}</View>;
+/** Shared action layout for a sheet footer. */
+export function SheetActions({
+  children,
+  primaryAction,
+}: {
+  children?: ReactNode;
+  primaryAction?: ReactNode;
+}) {
+  return <ActionButtons primaryAction={primaryAction}>{children}</ActionButtons>;
 }
-
-const sheetActionStyles = StyleSheet.create({
-  actions: {
-    gap: mobileSpace.sm,
-  },
-});
 
 const createCopyStyles = (_mobileColors: MobileColors) =>
   StyleSheet.create({

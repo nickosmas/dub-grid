@@ -114,16 +114,6 @@ export default function ConfirmDialog({
         >
           {cancelLabel}
         </Button>
-        <Button
-          className={confirmClass}
-          style={confirmButtonStyle}
-          onClick={confirm.run}
-          disabled={actionDisabled || confirmDisabled}
-        >
-          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
-            {confirmLabel}
-          </ButtonLoading>
-        </Button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <Button
             className={confirmClass}
@@ -136,6 +126,16 @@ export default function ConfirmDialog({
             </ButtonLoading>
           </Button>
         )}
+        <Button
+          className={confirmClass}
+          style={confirmButtonStyle}
+          onClick={confirm.run}
+          disabled={actionDisabled || confirmDisabled}
+        >
+          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
+            {confirmLabel}
+          </ButtonLoading>
+        </Button>
       </div>
     </Modal>
   );

@@ -1133,6 +1133,12 @@ export function ManagementStaffPanel({
                     </span>
                     <div style={{ display: "flex", gap: 8 }}>
                       <Button
+                        onClick={() => setShowRevokeConfirm(false)}
+                        className="dg-btn dg-btn-secondary"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
                         onClick={handleRevoke}
                         disabled={revoking}
                         className="dg-btn dg-btn-danger-filled"
@@ -1140,12 +1146,6 @@ export function ManagementStaffPanel({
                         <ButtonLoading loading={revoking} spinnerSize={14}>
                           Confirm
                         </ButtonLoading>
-                      </Button>
-                      <Button
-                        onClick={() => setShowRevokeConfirm(false)}
-                        className="dg-btn dg-btn-secondary"
-                      >
-                        Cancel
                       </Button>
                     </div>
                   </div>

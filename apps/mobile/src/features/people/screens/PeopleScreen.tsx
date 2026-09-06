@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -833,7 +834,7 @@ export default function PeopleScreen() {
                     {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
                   </Text>
                 </View>
-                <View style={styles.requestActions}>
+                <ActionButtons style={styles.requestActions}>
                   <Button
                     compact
                     disabled={resolveRequestMutation.isPending}
@@ -857,7 +858,7 @@ export default function PeopleScreen() {
                     }}
                     tone="neutral"
                   />
-                </View>
+                </ActionButtons>
               </View>
             ))}
           </View>

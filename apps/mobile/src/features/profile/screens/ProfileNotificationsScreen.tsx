@@ -211,7 +211,7 @@ export default function ProfileNotificationsScreen() {
                     {push.isSupported
                       ? push.permissionState === "denied"
                         ? "Permission was denied. Enable it from your device settings."
-                        : "Receive critical updates instantly even when DubGrid isn't open."
+                        : "Receive critical updates instantly even when the app isn't open."
                       : "Push notifications are not supported on this device."}
                   </Text>
                 </View>

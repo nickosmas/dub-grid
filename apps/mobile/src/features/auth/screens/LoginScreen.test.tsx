@@ -592,7 +592,7 @@ describe("LoginScreen", () => {
 
     expect(
       await screen.findByText(
-        "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
+        "We couldn't connect right now. Check your internet connection and try again.",
       ),
     ).toBeInTheDocument();
     expect(pushToast).not.toHaveBeenCalled();

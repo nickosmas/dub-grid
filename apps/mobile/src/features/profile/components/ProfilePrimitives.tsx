@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Children,
@@ -604,16 +605,12 @@ export function ProfileQuickActions({ children }: { children: ReactNode }) {
   return <View style={personLayoutStyles.quickActions}>{children}</View>;
 }
 
-/** The column of management actions at the foot of a person page. */
+/** Management actions at the foot of a person page. */
 export function ProfileActionStack({ children }: { children: ReactNode }) {
-  return <View style={personLayoutStyles.actionStack}>{children}</View>;
+  return <ActionButtons style={personLayoutStyles.actionStack}>{children}</ActionButtons>;
 }
 
-/**
- * Two actions sharing a line inside a `ProfileActionStack`, each taking an
- * equal share of the width. Sized by their share rather than by their labels,
- * so a short verb beside a long one doesn't read as the lesser action.
- */
+/** Compatibility wrapper for existing two-action profile rows. */
 export function ProfileActionRow({ children }: { children: ReactNode }) {
   return (
     <View style={personLayoutStyles.actionRow}>

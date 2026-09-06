@@ -1,3 +1,4 @@
+import { ActionButtons } from "./ActionButtons";
 import {
   Children,
   cloneElement,
@@ -38,12 +39,12 @@ export function FilterSheet({
   clearDisabled?: boolean;
   children: ReactNode;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <BottomSheetModal
       footer={
-        <>
+        <ActionButtons
+          primaryAction={<Button compact label="Done" tone="primary" onPress={onDone} />}
+        >
           {onClearAll ? (
             <Button
               compact
@@ -53,9 +54,7 @@ export function FilterSheet({
               onPress={onClearAll}
             />
           ) : null}
-          <View style={styles.footerSpacer} />
-          <Button compact label="Done" tone="primary" onPress={onDone} />
-        </>
+        </ActionButtons>
       }
       // The title lives in the sheet's drag region rather than the scrolling
       // body, so dragging anywhere on the header closes the sheet.
@@ -185,9 +184,6 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.label,
       color: mobileColors.textSubtle,
       textTransform: "uppercase",
-    },
-    footerSpacer: {
-      flex: 1,
     },
     selectionList: {
       backgroundColor: mobileColors.surface,

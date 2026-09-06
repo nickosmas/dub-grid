@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import {
   Fragment,
   useCallback,
@@ -3198,7 +3199,7 @@ function ShiftCoverRequestsSection({
                 </View>
               ) : null}
 
-              <View style={styles.requestActions}>
+              <ActionButtons style={styles.requestActions}>
                 <Button
                   disabled={Boolean(pendingAction) || !linkedEmployeeId}
                   label="Accept"
@@ -3212,7 +3213,7 @@ function ShiftCoverRequestsSection({
                   onPress={() => onRespond(request.id, false)}
                   tone="neutral"
                 />
-              </View>
+              </ActionButtons>
             </View>
           );
         })}

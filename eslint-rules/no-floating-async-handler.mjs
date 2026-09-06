@@ -75,6 +75,7 @@ function callOf(statement) {
   return expr.type === "CallExpression" ? expr : null;
 }
 
+/** @type {import("eslint").Rule.RuleModule} */
 export const noFloatingAsyncHandler = {
   meta: {
     type: "problem",

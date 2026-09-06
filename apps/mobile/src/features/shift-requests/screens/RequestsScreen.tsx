@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
@@ -1164,7 +1165,7 @@ function RequestCard({
         </View>
       </View>
       {hasActions ? (
-        <View style={styles.cardActions}>
+        <ActionButtons style={styles.cardActions}>
           {canCancel
             ? (() => {
                 const body: RequestActionBody = {
@@ -1216,27 +1217,6 @@ function RequestCard({
                 const body: RequestActionBody = {
                   action: "respond",
                   empId: linkedEmployeeId!,
-                  accept: true,
-                };
-                const isLoading =
-                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-                return (
-                  <Button
-                    compact
-                    disabled={Boolean(pendingAction)}
-                    label="Accept"
-                    loading={isLoading}
-                    onPress={() => {
-                      onAction(body);
-                    }}
-                  />
-                );
-              })()}
-              {(() => {
-                const body: RequestActionBody = {
-                  action: "respond",
-                  empId: linkedEmployeeId!,
                   accept: false,
                 };
                 const isLoading =
@@ -1255,14 +1235,11 @@ function RequestCard({
                   />
                 );
               })()}
-            </>
-          ) : null}
-          {canResolve ? (
-            <>
               {(() => {
                 const body: RequestActionBody = {
-                  action: "resolve",
-                  approved: true,
+                  action: "respond",
+                  empId: linkedEmployeeId!,
+                  accept: true,
                 };
                 const isLoading =
                   pendingAction?.key === getMobileRequestActionKey(request.id, body);
@@ -1271,7 +1248,7 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label="Approve"
+                    label="Accept"
                     loading={isLoading}
                     onPress={() => {
                       onAction(body);
@@ -1279,6 +1256,10 @@ function RequestCard({
                   />
                 );
               })()}
+            </>
+          ) : null}
+          {canResolve ? (
+            <>
               {(() => {
                 const body: RequestActionBody = {
                   action: "resolve",
@@ -1300,9 +1281,29 @@ function RequestCard({
                   />
                 );
               })()}
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "resolve",
+                  approved: true,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label="Approve"
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()}
             </>
           ) : null}
-        </View>
+        </ActionButtons>
       ) : null}
     </View>
   );

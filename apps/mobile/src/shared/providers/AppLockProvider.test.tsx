@@ -73,7 +73,7 @@ describe("AppLockProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("app-content")).toBeInTheDocument();
     });
-    expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    expect(screen.queryByText("App locked")).not.toBeInTheDocument();
   });
 
   it("locks on mount when enabled and unlocks after successful authentication", async () => {
@@ -86,12 +86,12 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+      expect(screen.getByText("App locked")).toBeInTheDocument();
     });
 
     await waitFor(() => {
       expect(authenticateAsync).toHaveBeenCalled();
-      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
     });
   });
 
@@ -106,7 +106,7 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
     });
     expect(authenticateAsync).not.toHaveBeenCalled();
   });
@@ -135,7 +135,7 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    expect(screen.getByText("App locked")).toBeInTheDocument();
   });
 
   it("stays locked rather than crashing when the device check throws", async () => {
@@ -159,7 +159,7 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    expect(screen.getByText("App locked")).toBeInTheDocument();
   });
 
   it("locks again when the app returns from the background", async () => {
@@ -172,7 +172,7 @@ describe("AppLockProvider", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
     });
 
     authenticateAsync.mockClear();
@@ -182,12 +182,12 @@ describe("AppLockProvider", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+      expect(screen.getByText("App locked")).toBeInTheDocument();
     });
 
     await waitFor(() => {
       expect(authenticateAsync).toHaveBeenCalled();
-      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+      expect(screen.queryByText("App locked")).not.toBeInTheDocument();
     });
   });
 });

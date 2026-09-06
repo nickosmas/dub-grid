@@ -71,7 +71,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Unlock DubGrid",
+        promptMessage: "Unlock the app",
       });
       if (result.success) {
         setLocked(false);
@@ -145,7 +145,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
             <Button label="Unlock" loading={authenticating} onPress={() => attemptUnlock()} />
           </SheetActions>
         }
-        header={<SheetHeader icon="lock-closed-outline" title="DubGrid is locked" />}
+        header={<SheetHeader icon="lock-closed-outline" title="App locked" />}
         visible={showLock}
         onDismiss={() => {}}
       >

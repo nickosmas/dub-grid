@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import type { ReactNode } from "react";
 import { Image, Platform, StyleSheet, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -108,8 +109,14 @@ export function AuthFields({ children }: { children: ReactNode }) {
   return <View style={styles.fields}>{children}</View>;
 }
 
-export function AuthActions({ children }: { children: ReactNode }) {
-  return <View style={styles.actions}>{children}</View>;
+export function AuthActions({
+  children,
+  primaryAction,
+}: {
+  children?: ReactNode;
+  primaryAction?: ReactNode;
+}) {
+  return <ActionButtons primaryAction={primaryAction}>{children}</ActionButtons>;
 }
 
 const styles = StyleSheet.create({
@@ -161,8 +168,5 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: mobileSpace.md,
-  },
-  actions: {
-    gap: mobileSpace.lg,
   },
 });

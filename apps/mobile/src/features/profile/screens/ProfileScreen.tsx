@@ -167,7 +167,7 @@ export default function ProfileScreen() {
   const displayName =
     [profile?.user.firstName, profile?.user.lastName].filter(Boolean).join(" ").trim() ||
     profile?.user.email ||
-    "DubGrid user";
+    "App user";
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
   // The hero's own badge, shared with both person pages: `ProfileHero` draws

@@ -20,8 +20,12 @@ describe("ConfirmDialog", () => {
     );
 
     expect(screen.getByRole("dialog")).toHaveStyle({ maxWidth: "620px" });
-    expect(screen.getByRole("button", { name: "Discard my edits" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Discard all org edits" })).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter(Boolean),
+    ).toEqual(["Cancel", "Discard all org edits", "Discard my edits"]);
   });
 
   it("can disable destructive actions while keeping cancel available", async () => {

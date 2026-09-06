@@ -29,7 +29,7 @@ const CHANNELS: Array<{
   {
     id: "in_app",
     label: "In-app",
-    description: "Shows up in your DubGrid notification list.",
+    description: "Shows up in your in-app notification list.",
     icon: "phone-portrait-outline",
   },
   {

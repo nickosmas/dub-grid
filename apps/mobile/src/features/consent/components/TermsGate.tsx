@@ -84,13 +84,16 @@ export function TermsGate({ children }: PropsWithChildren) {
         accessibilityRole="alert"
         dismissDisabled
         footer={
-          <SheetActions>
-            <Button
-              label="Accept and continue"
-              loading={saving}
-              onPress={() => accept()}
-              tone="primary"
-            />
+          <SheetActions
+            primaryAction={
+              <Button
+                label="Accept and continue"
+                loading={saving}
+                onPress={() => accept()}
+                tone="primary"
+              />
+            }
+          >
             {/* Declining has to be possible. The sheet covers the whole app, so
                 without this a user who won't accept has no way out of the app at
                 all — not even to reach the profile screen to sign out. */}
@@ -107,7 +110,7 @@ export function TermsGate({ children }: PropsWithChildren) {
         visible={needsAcceptance}
       >
         <SheetCopy
-          body="Our Terms of Service have changed since you last accepted them. Please review and accept them to keep using DubGrid."
+          body="Our Terms of Service have changed since you last accepted them. Please review and accept them to keep using the app."
           error={error}
           linkLabel="Read the Terms of Service"
           onLinkPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}

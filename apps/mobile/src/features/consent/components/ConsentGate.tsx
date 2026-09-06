@@ -114,17 +114,20 @@ export function ConsentGate({ children }: PropsWithChildren) {
         accessibilityRole="alert"
         dismissDisabled
         footer={
-          <SheetActions>
+          <SheetActions
+            primaryAction={
+              <Button
+                disabled={saving}
+                label="Accept all"
+                loading={saving}
+                onPress={() => choose(true)}
+                tone="primary"
+              />
+            }
+          >
             {/* Returning the promise is what latches the button against a second
                 tap. `void`-ing it left `useAsyncAction` with nothing to await, so
                 the only guard was a state flag that lands a render too late. */}
-            <Button
-              disabled={saving}
-              label="Accept all"
-              loading={saving}
-              onPress={() => choose(true)}
-              tone="primary"
-            />
             <Button
               disabled={saving}
               label="Essential only"
@@ -138,7 +141,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
         visible={needsDecision === true}
       >
         <SheetCopy
-          body="We use essential data to keep DubGrid working, including error monitoring. With your consent we also collect analytics to help us improve the app. You can change this any time in Profile, Privacy & data."
+          body="We use essential data to keep the app working, including error monitoring. With your consent we also collect analytics to help us improve the app. You can change this any time in Profile, Privacy & data."
           error={error}
           linkLabel="Read our cookie policy"
           // In-app: leaving for Safari mid-decision would drop the user out of

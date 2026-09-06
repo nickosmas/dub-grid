@@ -112,18 +112,18 @@ export function OrganizationGateScreen() {
         >
           <div className="dg-auth-gate-actions">
             <Button
-              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
-              onClick={checkAgain}
-              type="button"
-            >
-              <ButtonLoading loading={status.isFetching}>Check again</ButtonLoading>
-            </Button>
-            <Button
               className="dg-btn dg-btn-secondary dg-btn-lg dg-auth-state-primary"
               onClick={() => signOut()}
               type="button"
             >
               Sign out
+            </Button>
+            <Button
+              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
+              onClick={checkAgain}
+              type="button"
+            >
+              <ButtonLoading loading={status.isFetching}>Check again</ButtonLoading>
             </Button>
           </div>
         </AuthStateCard>
