@@ -181,7 +181,7 @@ export default function OrganizationGeneral({
     isWizardMode,
   );
 
-  const handleCancel = useCallback(() => {
+  const handleDiscard = useCallback(() => {
     setReviewOpen(false);
     setForm(buildForm());
   }, [buildForm]);
@@ -232,7 +232,7 @@ export default function OrganizationGeneral({
             secondaryAction={
               isModified ? (
                 <Button
-                  onClick={handleCancel}
+                  onClick={handleDiscard}
                   disabled={saving}
                   className="dg-btn dg-btn-secondary"
                 >

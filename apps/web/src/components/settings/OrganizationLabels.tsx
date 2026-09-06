@@ -147,7 +147,7 @@ export default function OrganizationLabels({
     }
   }, [form, hasFieldErrors, organization, onSave]);
 
-  const handleCancel = useCallback(() => {
+  const handleDiscard = useCallback(() => {
     setForm(buildForm());
   }, [buildForm]);
 
@@ -282,7 +282,7 @@ export default function OrganizationLabels({
             style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
           >
             {isModified ? (
-              <Button onClick={handleCancel} disabled={saving} className="dg-btn dg-btn-secondary">
+              <Button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary">
                 {EDITOR_ACTION_LABELS.discard}
               </Button>
             ) : null}
