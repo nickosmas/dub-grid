@@ -150,11 +150,11 @@ describe("settings dirty save controls", () => {
     await user.clear(nameInput);
     await user.type(nameInput, "Acme North");
 
-    const cancelButton = screen.getByRole("button", { name: /^discard$/i });
+    const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(saveButton).toBeEnabled();
-    expect(cancelButton).toBeEnabled();
+    expect(discardButton).toBeEnabled();
 
-    await user.click(cancelButton);
+    await user.click(discardButton);
 
     expect(screen.getByDisplayValue("Acme Health")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
@@ -226,11 +226,11 @@ describe("settings dirty save controls", () => {
     await user.clear(labelInput);
     await user.type(labelInput, "Units");
 
-    const cancelButton = screen.getByRole("button", { name: /^discard$/i });
+    const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(saveButton).toBeEnabled();
-    expect(cancelButton).toBeEnabled();
+    expect(discardButton).toBeEnabled();
 
-    await user.click(cancelButton);
+    await user.click(discardButton);
 
     expect(screen.getByDisplayValue("Focus Areas")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
