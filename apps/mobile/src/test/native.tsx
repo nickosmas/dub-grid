@@ -65,8 +65,6 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderGrant" ||
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
-      key === "numberOfLines" ||
-      key === "adjustsFontSizeToFit" ||
       key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
@@ -111,6 +109,26 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "testID") {
       output["data-testid"] = value;
+      continue;
+    }
+
+    if (key === "numberOfLines") {
+      output["data-number-of-lines"] = String(value);
+      continue;
+    }
+
+    if (key === "adjustsFontSizeToFit") {
+      output["data-adjusts-font-size-to-fit"] = String(value);
+      continue;
+    }
+
+    if (key === "minimumFontScale") {
+      output["data-minimum-font-scale"] = String(value);
+      continue;
+    }
+
+    if (key === "ellipsizeMode") {
+      output["data-ellipsize-mode"] = String(value);
       continue;
     }
 

@@ -102,7 +102,7 @@ export function TermsGate({ children }: PropsWithChildren) {
               disabled={saving}
               label="Sign out"
               onPress={() => handleExpiredMobileSession()}
-              tone="ghost"
+              tone="neutral"
             />
           </SheetActions>
         }

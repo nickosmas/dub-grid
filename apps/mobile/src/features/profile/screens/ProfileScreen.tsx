@@ -397,7 +397,7 @@ export default function ProfileScreen() {
               onPress={() => {
                 setPendingConfirmation({ kind: "logout", force: true });
               }}
-              tone="danger"
+              tone="neutral"
             />
           ) : null}
         </>
@@ -583,7 +583,7 @@ export default function ProfileScreen() {
               onPress={() => {
                 setPendingConfirmation({ kind: "logout" });
               }}
-              tone="danger"
+              tone="neutral"
             />
           </ProfileSection>
 

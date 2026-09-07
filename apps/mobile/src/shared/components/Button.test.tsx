@@ -41,6 +41,16 @@ describe("Button", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps labels to one line, scaling before truncating", () => {
+    render(<Button label="Accept and continue" onPress={vi.fn()} />);
+
+    const label = screen.getByText("Accept and continue");
+    expect(label).toHaveAttribute("data-number-of-lines", "1");
+    expect(label).toHaveAttribute("data-adjusts-font-size-to-fit", "true");
+    expect(label).toHaveAttribute("data-minimum-font-scale", "0.75");
+    expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+  });
+
   it("uses the pill radius by default", () => {
     render(<Button label="Save changes" onPress={vi.fn()} />);
 

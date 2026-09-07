@@ -202,7 +202,11 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
+            adjustsFontSizeToFit
+            ellipsizeMode="tail"
             maxFontSizeMultiplier={MAX_FONT_SCALE}
+            minimumFontScale={0.75}
+            numberOfLines={1}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}

@@ -84,6 +84,9 @@
   the final action spans both columns (three is two above, one full-width below;
   five continues with two equal rows, then one full-width below). Do not let
   labels or variants make a peer larger within a row.
+- Button labels never wrap on either platform. Keep them to one line, scale
+  mobile labels down to a legible floor when space is tight, then truncate
+  rather than creating a second line.
 
 ## Database and data access
 

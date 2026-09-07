@@ -651,6 +651,10 @@ textarea {
 }
 
 /* ── Button System ──────────────────────────────────────── */
+button {
+  white-space: nowrap;
+}
+
 .dg-btn {
   display: inline-flex;
   align-items: center;
