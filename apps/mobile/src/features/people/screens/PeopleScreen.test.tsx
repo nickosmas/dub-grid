@@ -522,11 +522,10 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
-    fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
-    // The access sheet is presented only once the actions sheet has finished
+    fireEvent.click(screen.getByRole("button", { name: "Change Access Level" }));
+    // The role sheet is presented only once the actions sheet has finished
     // leaving: iOS refuses a present that overlaps a dismiss.
     fireEvent.click(await screen.findByText("Super Admin"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
 
     expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
     expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
