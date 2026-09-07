@@ -104,6 +104,38 @@ describe("AuthSessionProvider", () => {
     }
   });
 
+  it("does not apply a stale restore that resolves after startup has timed out", async () => {
+    vi.useFakeTimers();
+    let resolveRestore!: (value: { data: { session: { access_token: string } | null } }) => void;
+    getSession.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRestore = resolve;
+      }),
+    );
+
+    try {
+      render(
+        <AuthSessionProvider>
+          <SessionProbe />
+        </AuthSessionProvider>,
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SESSION_RESTORE_TIMEOUT_MS);
+      });
+      expect(screen.getByTestId("token")).toHaveTextContent("none");
+
+      await act(async () => {
+        resolveRestore({ data: { session: { access_token: "stale-token" } } });
+      });
+
+      expect(screen.getByTestId("token")).toHaveTextContent("none");
+      expect(registerMobileSessionPresence).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("clears local auth state when the stored refresh token is invalid", async () => {
     getSession.mockRejectedValueOnce(new Error("Invalid Refresh Token: Refresh Token Not Found"));
     signOut.mockResolvedValueOnce({ error: null });

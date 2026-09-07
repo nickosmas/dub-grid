@@ -132,6 +132,36 @@ describe("OrgLogin submit states", () => {
     expect(button).not.toBeDisabled();
   });
 
+  it("does not set a browser session when the server rejects a stale post-switch session", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/validate-domain")) {
+        return Promise.resolve(validateDomainResponse());
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            success: false,
+            code: "SESSION_REFRESH_FAILED",
+            error: "We couldn't verify your session. Sign in again.",
+          }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    });
+
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" seed={FOUND} />);
+    submitForm(container);
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "We couldn't verify your session. Sign in again.",
+      );
+    });
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /sign in/i })).not.toBeDisabled();
+  });
+
   it("directs gridmaster accounts to the portal without storing a tenant session", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();

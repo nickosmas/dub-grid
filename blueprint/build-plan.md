@@ -79,7 +79,7 @@
     - [x] 19b1. **Invitation and organization entry** - verify invitation
           acceptance, subdomain and organization selection, and signed-out and
           signed-in entry states on web and mobile.
-    - [ ] 19b2. **Sign-in, restoration, expiry, and revocation** - verify
+    - [x] 19b2. **Sign-in, restoration, expiry, and revocation** - verify
           web/mobile login, session restoration, expired-session recovery,
           logout, and forced or session-specific revocation.
     - [ ] 19b3. **Password recovery and reset** - verify web recovery links

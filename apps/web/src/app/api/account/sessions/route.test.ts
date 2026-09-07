@@ -124,4 +124,21 @@ describe("/api/account/sessions", () => {
     expect(response.status).toBe(200);
     expect(dispatchNotificationEvent).not.toHaveBeenCalled();
   });
+
+  it("returns a recoverable error when a session cannot be revoked", async () => {
+    revokeUserSessionForUser.mockRejectedValueOnce(new Error("database unavailable"));
+
+    const response = await DELETE(
+      new NextRequest("http://localhost/api/account/sessions", {
+        method: "DELETE",
+        body: JSON.stringify({ refreshTokenHash: "hash" }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "We couldn't sign out that device. Try again.",
+    });
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
 });

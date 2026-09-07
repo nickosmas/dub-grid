@@ -76,7 +76,10 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       .getSession()
       .then(({ data }) => {
         clearTimeout(sessionRestoreTimeout);
-        if (!isMounted) return;
+        // Once the timeout releases startup, this request is no longer an
+        // authority on session state. It may resolve after the user has signed
+        // in again, so writing its old result would resurrect stale auth.
+        if (!isMounted || startupReleased) return;
         writeSession(data.session ?? null);
       })
       .catch(async (error) => {

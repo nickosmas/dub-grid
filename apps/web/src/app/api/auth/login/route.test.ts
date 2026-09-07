@@ -378,6 +378,37 @@ describe("POST /api/auth/login", () => {
     expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
   });
 
+  it("does not return the pre-switch session when host organization refresh fails", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(ORG_ID);
+    refreshSession.mockResolvedValueOnce({
+      data: { session: null },
+      error: { message: "expired" },
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(body).toEqual({
+      success: false,
+      code: "SESSION_REFRESH_FAILED",
+      error: "We couldn't verify your session. Sign in again.",
+    });
+    expect(body).not.toHaveProperty("session");
+  });
+
   it("refuses login when the requested organization does not exist", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: {
