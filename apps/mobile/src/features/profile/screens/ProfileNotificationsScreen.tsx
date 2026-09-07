@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -215,12 +216,9 @@ export default function ProfileNotificationsScreen() {
                       : "Push notifications are not supported on this device."}
                   </Text>
                 </View>
-                <Switch
+                <AppSwitch
                   accessibilityLabel="Push notifications"
                   disabled={!pushSwitchEnabled || push.permissionState === "denied"}
-                  ios_backgroundColor={mobileColors.border}
-                  thumbColor={mobileColors.onBrandSurface}
-                  trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                   value={push.permissionState === "granted"}
                   onValueChange={() => {
                     void togglePush();

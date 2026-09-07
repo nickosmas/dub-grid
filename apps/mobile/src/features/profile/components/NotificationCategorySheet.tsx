@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, type ComponentProps } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -83,11 +84,8 @@ export function NotificationCategorySheet({
                 <Text style={styles.label}>{channel.label}</Text>
                 <Text style={styles.description}>{channel.description}</Text>
               </View>
-              <Switch
+              <AppSwitch
                 accessibilityLabel={`${channel.label} notifications`}
-                ios_backgroundColor={mobileColors.border}
-                thumbColor={mobileColors.onBrandSurface}
-                trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                 value={category.channels[channel.id]}
                 onValueChange={() => onToggle(category.key, channel.id)}
               />

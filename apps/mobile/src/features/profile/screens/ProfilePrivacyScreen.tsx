@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
@@ -71,14 +72,11 @@ export default function ProfilePrivacyScreen() {
                 Share anonymous usage data to help us improve the app.
               </Text>
             </View>
-            <Switch
+            <AppSwitch
               accessibilityLabel="Analytics consent"
               disabled={saving || analytics === null}
-              ios_backgroundColor={mobileColors.border}
-              onValueChange={(next) => void handleToggle(next)}
-              thumbColor={mobileColors.onBrandSurface}
-              trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
               value={analytics ?? false}
+              onValueChange={(next) => void handleToggle(next)}
             />
           </View>
         </ProfilePanel>
