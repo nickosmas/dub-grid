@@ -662,21 +662,37 @@ export const mobileDashboardStaffHoursEntrySchema = z.object({
 });
 
 // Simplified port of web's DashboardHero: a headline/description summary plus
-// a handful of top-line metrics. Coverage % is derived from coverage_requirements
-// vs. open-shift gaps (day-of-week matched, no coverage-rule-config credit
-// resolution) — a reasonable approximation, not the exact engine computation
-// web's schedule-logic.ts uses. There is no "draft shifts" metric yet: that
-// needs draft-vs-published schedule diffing, which mobile doesn't fetch.
+// a handful of top-line metrics. Coverage and open gaps use the shared
+// coverage-engine path; draft information stays separate because it is only
+// visible to members authorized to edit schedule drafts.
 export const mobileDashboardHeroSummarySchema = z.object({
   statusLabel: z.string(),
   title: z.string(),
   description: z.string(),
 });
 
+export const mobileDashboardDraftSummarySchema = z
+  .object({
+    newCount: z.number().int().nonnegative(),
+    modifiedCount: z.number().int().nonnegative(),
+    deletedCount: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+  })
+  .refine(
+    (summary) => summary.total === summary.newCount + summary.modifiedCount + summary.deletedCount,
+    {
+      message: "Draft summary total must equal the sum of its classifications",
+      path: ["total"],
+    },
+  );
+
 export const mobileDashboardMetricsSchema = z.object({
   coveragePct: z.number().int().nullable(),
   openGapCount: z.number().int(),
   pendingApprovalsCount: z.number().int(),
+  // Null is intentional redaction for members without schedule-edit access.
+  // A zero total is an authorized, observable absence of draft changes.
+  draftSummary: mobileDashboardDraftSummarySchema.nullable(),
 });
 
 export const mobileDashboardResponseSchema = z.object({

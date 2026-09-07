@@ -3,6 +3,7 @@ import type {
   MobileOpenShift,
   MobileScheduleRange,
   MobileShiftRequest,
+  ScheduleCellState,
 } from "@dubgrid/contracts";
 import {
   buildShiftJobPairKey,
@@ -28,11 +29,100 @@ const OVERTIME_THRESHOLD_HOURS = 40;
 // (apps/web/src/lib/dashboard-stats.ts).
 const MAX_ACTIVITY_ITEMS = 100;
 
+export type DashboardDraftChangeKind = "new" | "modified" | "deleted";
+
+export type DashboardDraftSummary = NonNullable<MobileDashboardResponse["metrics"]["draftSummary"]>;
+
+export type DashboardDraftComparisonRow = {
+  draftState: ScheduleCellState | null;
+  draftDeleted: boolean;
+  publishedState: ScheduleCellState | null;
+};
+
 export type MobileDashboardContext = {
   currentOrg: { id: string; timezone?: string | null };
   effectiveRole: string;
+  canEditSchedule?: boolean;
   serviceClient: SupabaseClient;
 };
+
+/**
+ * Counts the same draft classifications that web assigns after comparing a
+ * cell's draft and published snapshots. The caller classifies rows at the
+ * data boundary so this shared package remains database-agnostic.
+ */
+export function summarizeDashboardDraftChanges(
+  draftChangeKinds: readonly DashboardDraftChangeKind[],
+  canEditSchedule: boolean,
+): DashboardDraftSummary | null {
+  if (!canEditSchedule) return null;
+
+  let newCount = 0;
+  let modifiedCount = 0;
+  let deletedCount = 0;
+
+  for (const kind of draftChangeKinds) {
+    if (kind === "new") newCount += 1;
+    else if (kind === "modified") modifiedCount += 1;
+    else deletedCount += 1;
+  }
+
+  return {
+    newCount,
+    modifiedCount,
+    deletedCount,
+    total: newCount + modifiedCount + deletedCount,
+  };
+}
+
+function statesMatch(left: ScheduleCellState, right: ScheduleCellState): boolean {
+  if (
+    left.kind !== right.kind ||
+    left.absenceTypeId !== right.absenceTypeId ||
+    left.customStartTime !== right.customStartTime ||
+    left.customEndTime !== right.customEndTime ||
+    left.segments.length !== right.segments.length
+  ) {
+    return false;
+  }
+
+  return left.segments.every((segment, index) => {
+    const other = right.segments[index];
+    return (
+      other != null &&
+      segment.position === other.position &&
+      segment.shiftId === other.shiftId &&
+      segment.jobId === other.jobId &&
+      (segment.isMentored ?? false) === (other.isMentored ?? false)
+    );
+  });
+}
+
+export function classifyDashboardDraftChange(
+  row: DashboardDraftComparisonRow,
+): DashboardDraftChangeKind | null {
+  if (row.draftState == null && !row.draftDeleted) return null;
+  if (row.publishedState == null) return row.draftDeleted ? null : "new";
+  if (row.draftDeleted) return "deleted";
+  return row.draftState != null && statesMatch(row.draftState, row.publishedState)
+    ? null
+    : "modified";
+}
+
+export function summarizeDashboardDraftComparisons(
+  rows: readonly DashboardDraftComparisonRow[],
+  canEditSchedule: boolean,
+): DashboardDraftSummary | null {
+  if (!canEditSchedule) return null;
+
+  return summarizeDashboardDraftChanges(
+    rows.flatMap((row) => {
+      const kind = classifyDashboardDraftChange(row);
+      return kind == null ? [] : [kind];
+    }),
+    true,
+  );
+}
 
 // ── Dependency shapes ────────────────────────────────────────────────────
 // Structural types matching what @dubgrid/data-access + the web-local
@@ -76,6 +166,11 @@ type FetchMobileShiftRequests = (
     endDate: string;
   },
 ) => Promise<MobileShiftRequest[]>;
+
+type FetchMobileDashboardDraftComparisons = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; startDate: string; endDate: string },
+) => Promise<DashboardDraftComparisonRow[]>;
 
 // Mapped (camelCase) shapes matching @dubgrid/schedule-core's
 // HoursAssignmentLike/HoursShiftCategoryLike structurally, so the same
@@ -484,6 +579,7 @@ export async function loadMobileDashboardPayload(
   deps: {
     fetchMobileCoverageSummary: FetchMobileCoverageSummary;
     fetchMobileShiftRequests: FetchMobileShiftRequests;
+    fetchMobileDashboardDraftComparisons?: FetchMobileDashboardDraftComparisons;
     fetchMobileOpenShiftContext: FetchMobileOpenShiftContext;
     fetchMobilePublishHistoryRows: FetchMobilePublishHistoryRows;
     fetchMobileAcceptedInvitationRows: FetchMobileAcceptedInvitationRows;
@@ -505,6 +601,7 @@ export async function loadMobileDashboardPayload(
     openShiftContext,
     publishHistoryRows,
     acceptedInvitations,
+    draftComparisonRows,
   ] = await Promise.all([
     deps.fetchMobileCoverageSummary(auth.serviceClient, {
       orgId: auth.currentOrg.id,
@@ -535,6 +632,13 @@ export async function loadMobileDashboardPayload(
       startDate: range.startDate,
       endDate: range.endDate,
     }),
+    auth.canEditSchedule && deps.fetchMobileDashboardDraftComparisons
+      ? deps.fetchMobileDashboardDraftComparisons(auth.serviceClient, {
+          orgId: auth.currentOrg.id,
+          startDate: range.startDate,
+          endDate: range.endDate,
+        })
+      : Promise.resolve([]),
   ]);
 
   const legacyOpenShiftContext = openShiftContext as typeof openShiftContext & {
@@ -604,6 +708,9 @@ export async function loadMobileDashboardPayload(
       coveragePct,
       openGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
+      draftSummary: deps.fetchMobileDashboardDraftComparisons
+        ? summarizeDashboardDraftComparisons(draftComparisonRows, Boolean(auth.canEditSchedule))
+        : null,
     },
     coverageBySection: buildCoverageSectionsResponse(byFocusArea),
     openShifts: openShifts.slice().sort((a, b) => (a.date < b.date ? -1 : 1)),

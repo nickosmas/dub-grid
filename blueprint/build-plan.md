@@ -56,6 +56,12 @@
   - [ ] 18b. **Canonical mobile dashboard model** - make web and mobile consume
         one dashboard calculation model and extend the authenticated mobile
         payload with canonical metrics, coverage, drafts, and trends.
+    - [x] 18b1. **Canonical mobile dashboard metrics** - extend the authenticated
+          mobile payload with permission-safe, draft-aware canonical dashboard
+          metrics that use the same coverage and draft semantics as web.
+    - [ ] 18b2. **Canonical mobile dashboard trends** - deliver canonical
+          period-history coverage and staffing data through the authenticated
+          mobile API, ready for read-only native presentation.
   - [ ] 18c. **Canonical mobile dashboard experience** - present the canonical
         dashboard data in native mobile cards and read-only detail screens,
         without adding schedule editing or publishing.

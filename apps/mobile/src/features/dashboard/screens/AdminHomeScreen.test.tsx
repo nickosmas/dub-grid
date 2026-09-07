@@ -79,7 +79,7 @@ const EMPTY_DASHBOARD_DATA = {
     title: "Schedule health looks good",
     description: "No open gaps or pending requests right now.",
   },
-  metrics: { coveragePct: 96, openGapCount: 0, pendingApprovalsCount: 0 },
+  metrics: { coveragePct: 96, openGapCount: 0, pendingApprovalsCount: 0, draftSummary: null },
   coverageBySection: [],
   openShifts: [],
   activity: [],

@@ -13,6 +13,7 @@ const fetchMobileOpenShiftContext = vi.fn();
 const fetchMobilePublishHistoryRows = vi.fn();
 const fetchMobileAcceptedInvitationRows = vi.fn();
 const fetchProfileNameRowsByIds = vi.fn();
+const fetchMobileScheduleComparisonRows = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
@@ -26,12 +27,13 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobilePublishHistoryRows,
   fetchMobileAcceptedInvitationRows,
   fetchProfileNameRowsByIds,
+  fetchMobileScheduleComparisonRows,
 }));
 
-function mockAuth(overrides: { role: string }) {
+function mockAuth(overrides: { role: string; canEditShifts?: boolean }) {
   requireMobileAuth.mockResolvedValue({
     currentOrg: { id: "org-1", timezone: "America/Los_Angeles" },
-    permissions: { role: overrides.role },
+    permissions: { role: overrides.role, canEditShifts: overrides.canEditShifts ?? false },
     serviceClient: {},
   });
 }
@@ -60,6 +62,7 @@ describe("mobile dashboard route", () => {
     fetchMobilePublishHistoryRows.mockResolvedValue([]);
     fetchMobileAcceptedInvitationRows.mockResolvedValue([]);
     fetchProfileNameRowsByIds.mockResolvedValue([]);
+    fetchMobileScheduleComparisonRows.mockResolvedValue([]);
   });
 
   it("rejects a plain user", async () => {
@@ -77,7 +80,7 @@ describe("mobile dashboard route", () => {
   });
 
   it("returns a dashboard payload for an admin", async () => {
-    mockAuth({ role: "admin" });
+    mockAuth({ role: "admin", canEditShifts: true });
     fetchMobileCoverageSummary.mockResolvedValue({
       openShifts: [
         {
@@ -151,6 +154,30 @@ describe("mobile dashboard route", () => {
       },
     );
     expect(fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
+    expect(fetchMobileScheduleComparisonRows).toHaveBeenCalledWith(
+      {},
+      { orgId: "org-1", startDate: "2026-05-11", endDate: "2026-05-17" },
+    );
+    expect(payload.metrics.draftSummary).toEqual({
+      newCount: 0,
+      modifiedCount: 0,
+      deletedCount: 0,
+      total: 0,
+    });
+  });
+
+  it("does not load or expose draft metrics without schedule-edit permission", async () => {
+    mockAuth({ role: "admin", canEditShifts: false });
+
+    const { GET } = await import("./dashboard");
+    const response = await GET({
+      nextUrl: new URL("http://localhost/api/mobile/v1/dashboard"),
+    } as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMobileScheduleComparisonRows).not.toHaveBeenCalled();
+    expect(payload.metrics.draftSummary).toBeNull();
   });
 
   it("defaults to the current week (not resolveMobileDateRange's forward-looking window) when no query params are given", async () => {

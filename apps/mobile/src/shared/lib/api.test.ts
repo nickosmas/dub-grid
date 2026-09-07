@@ -98,6 +98,38 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  it("parses an authorized dashboard draft summary", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        overtimeThresholdHours: 40,
+        heroSummary: {
+          statusLabel: "Healthy",
+          title: "Schedule health looks good",
+          description: "No open gaps or pending requests right now.",
+        },
+        metrics: {
+          coveragePct: 100,
+          openGapCount: 0,
+          pendingApprovalsCount: 0,
+          draftSummary: { newCount: 1, modifiedCount: 2, deletedCount: 0, total: 3 },
+        },
+        coverageBySection: [],
+        openShifts: [],
+        activity: [],
+        staffHours: [],
+        actionQueue: [],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getDashboard } = await import("./api");
+
+    await expect(getDashboard("token-123")).resolves.toMatchObject({
+      metrics: { draftSummary: { total: 3 } },
+    });
+  });
+
   it("adds both cursor fields when loading another request-history page", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
