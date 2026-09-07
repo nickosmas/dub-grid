@@ -1,0 +1,15 @@
+Two files in this commit are unrelated to its subject:
+
+  apps/mobile/src/features/profile/screens/ProfileWorkScreen.tsx
+  apps/mobile/src/features/profile/screens/ProfileWorkScreen.test.tsx
+
+They belong to the work-screen action-button line, not to the
+management-access change described above. They were swept in when a
+concurrent session mutated the shared index between this commit's staging
+and its creation; the same race dropped five management-access files, which
+2601154b then restored.
+
+Nothing was lost and nothing needs reverting: that line of work continued
+correctly in c19a8ea9 and 0da93b07. This note exists because the commit
+cannot be rewritten - it is not the branch tip and other work is built on
+it - so the record is corrected here instead.
