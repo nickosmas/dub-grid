@@ -3,7 +3,7 @@
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   LazyOverlayFallback,
@@ -530,6 +530,8 @@ function SchedulerContent() {
   const [showPublishHistory, setShowPublishHistory] = useState(false);
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const stickyChromeRef = useRef<HTMLDivElement>(null);
   const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
   const operationDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -6101,6 +6103,36 @@ function SchedulerContent() {
   // loading screen once the roster is here too — otherwise the grid would paint
   // with no rows and read as broken.
   const canPaintFromSnapshot = paintedFromSnapshot && employees.length > 0;
+  const isChromeMounted = !isLoading || canPaintFromSnapshot;
+
+  // The banners above the toolbar are conditional, so this block's height is
+  // not a constant. Publish it the way AppShell publishes its own, so the grid's
+  // date row knows where the sticky chrome ends and it can pin.
+  useLayoutEffect(() => {
+    const chrome = stickyChromeRef.current;
+    const root = pageRootRef.current;
+    if (!chrome || !root) return;
+
+    const setChromeHeight = () => {
+      root.style.setProperty(
+        "--dg-schedule-chrome-height",
+        `${chrome.getBoundingClientRect().height}px`,
+      );
+    };
+
+    setChromeHeight();
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        root.style.removeProperty("--dg-schedule-chrome-height");
+      };
+    }
+    const observer = new ResizeObserver(setChromeHeight);
+    observer.observe(chrome);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--dg-schedule-chrome-height");
+    };
+  }, [isChromeMounted]);
 
   if (orgLoading || (scheduleLoading && !org)) {
     return <ScheduleLoadingScreen />;
@@ -6116,6 +6148,7 @@ function SchedulerContent() {
 
   return (
     <div
+      ref={pageRootRef}
       style={{
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         background: "var(--dg-color-bg)",
@@ -6128,6 +6161,7 @@ function SchedulerContent() {
       {(!isLoading || canPaintFromSnapshot) && (
         <>
           <div
+            ref={stickyChromeRef}
             className="no-print"
             style={{
               position: "sticky",

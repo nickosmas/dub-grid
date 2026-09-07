@@ -308,6 +308,16 @@ interface RenderGridOptions {
   onClaimOpenShift?: NonNullable<ScheduleGridHandlers["onClaimOpenShift"]>;
 }
 
+/** The rowgroup that holds a section's staff rows (the other holds the date row). */
+function getGridBody(name: string): HTMLElement {
+  const grid = screen.getByRole("grid", { name });
+  const body = within(grid)
+    .getAllByRole("rowgroup")
+    .find((group) => group.querySelector('[role="gridcell"]'));
+  if (!body) throw new Error(`No body rowgroup in ${name}`);
+  return body;
+}
+
 function renderGrid(options: RenderGridOptions = {}) {
   const resolvedAssignmentDefinitions = options.assignments ?? assignments;
   const model = buildScheduleGridModel({
@@ -396,11 +406,13 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    const grid = screen.getByRole("grid", { name: "North schedule grid" });
+    const body = getGridBody("North schedule grid");
     // The fitted grid does not scroll, so neither container may crop a chip
     // that deliberately crosses the shift pill's top edge.
-    expect((grid.parentElement as HTMLElement | null)?.style.overflow).toBe("visible");
-    expect((grid.parentElement?.parentElement as HTMLElement | null)?.style.overflow).toBe(
+    const scroller = body.parentElement as HTMLElement | null;
+    expect(scroller?.style.overflowX).toBe("visible");
+    expect(scroller?.style.overflowY).toBe("visible");
+    expect((body.parentElement?.parentElement as HTMLElement | null)?.style.overflow).toBe(
       "visible",
     );
   });
@@ -3963,5 +3975,79 @@ describe("ScheduleGrid", () => {
       (span) => span.textContent === "D",
     ) as HTMLElement;
     expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+  });
+
+  describe("pinned date row", () => {
+    const makeRoster = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        ...employees[0],
+        id: `emp-${index + 1}`,
+        firstName: `Staff${index + 1}`,
+        seniority: index + 1,
+      }));
+
+    it("marks the fifth-from-last staff row as the release anchor", () => {
+      const roster = makeRoster(7);
+      const { container } = renderGrid({
+        filteredEmployees: roster,
+        allEmployees: roster,
+      });
+
+      const anchors = container.querySelectorAll('[data-sticky-release="true"]');
+      expect(anchors).toHaveLength(1);
+      // Seven staff, five kept clear: the anchor is the third row.
+      expect(anchors[0].textContent).toContain("Staff3");
+    });
+
+    it("anchors a short section on its first row so the date row never pins", () => {
+      const roster = makeRoster(3);
+      const { container } = renderGrid({
+        filteredEmployees: roster,
+        allEmployees: roster,
+      });
+
+      const anchors = container.querySelectorAll('[data-sticky-release="true"]');
+      expect(anchors).toHaveLength(1);
+      expect(anchors[0].textContent).toContain("Staff1");
+    });
+
+    it("keeps the focus-area label and the date row in one native sticky group", () => {
+      const { container } = renderGrid();
+
+      const group = container.querySelector(".dg-grid-sticky-group") as HTMLElement;
+      const label = group.querySelector(".dg-grid-section-label") as HTMLElement;
+      const headerRow = group.querySelector(".dg-grid-header-row") as HTMLElement;
+      expect(label).not.toBeNull();
+      expect(headerRow).not.toBeNull();
+      expect(headerRow.querySelectorAll('[role="columnheader"]')).toHaveLength(15);
+      // Padding, not margin: rows would otherwise scroll through the gap
+      // between the label and the date row while the group is stuck.
+      expect(label).toHaveStyle({ padding: "2px 0 12px" });
+      expect(label.style.marginBottom).toBe("");
+      // Nothing is driven by scroll position; layering waits on `data-stuck`.
+      expect(group.style.transform).toBe("");
+      expect(group.dataset.stuck).toBeUndefined();
+    });
+
+    it("scrolls the date row in a mirror of the body scroller", () => {
+      const { container } = renderGrid();
+
+      const body = getGridBody("North schedule grid");
+      const headerRow = container.querySelector(".dg-grid-header-row") as HTMLElement;
+      // The header cannot live inside the body's horizontal scroller, which
+      // would become its scrollport and defeat the vertical stick.
+      expect(body.contains(headerRow)).toBe(false);
+      expect(body.querySelector('[role="columnheader"]')).toBeNull();
+    });
+
+    it("keeps the header and body rows under one grid for assistive tech", () => {
+      renderGrid();
+
+      const grid = screen.getByRole("grid", { name: "North schedule grid" });
+      const rowgroups = within(grid).getAllByRole("rowgroup");
+      expect(rowgroups).toHaveLength(2);
+      expect(within(rowgroups[0]).getAllByRole("columnheader").length).toBeGreaterThan(0);
+      expect(within(rowgroups[1]).getAllByRole("gridcell").length).toBeGreaterThan(0);
+    });
   });
 });

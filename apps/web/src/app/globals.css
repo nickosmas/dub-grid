@@ -3581,6 +3581,27 @@ table tbody > tr:last-child > th {
   left: 1px;
 }
 
+/* The focus-area label and the date row pin as one native sticky group beneath
+   the app header and the schedule toolbar. It only layers above the rows while
+   it is actually stuck: at rest the first staff row's change chip must keep
+   hanging over the header cap the way chips hang into the row above everywhere
+   else. The group is opaque so nothing scrolls through the label. */
+.dg-grid-sticky-group {
+  position: sticky;
+  top: calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px));
+  background: var(--dg-color-bg);
+}
+
+.dg-grid-sticky-group[data-stuck="true"] {
+  z-index: 11;
+}
+
+@media print {
+  .dg-grid-sticky-group {
+    position: static;
+  }
+}
+
 .dg-grid-active-outline {
   position: absolute;
   box-sizing: border-box;

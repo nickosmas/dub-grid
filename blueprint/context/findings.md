@@ -238,3 +238,19 @@ dashboard tests pass.
 an explicit visible-period range, and the route caps results at 200 rows after
 ordering by publication time. Focused route tests confirm the bounded overlap
 query.
+
+### F-65 [P2] fixed - Sticky date row's ARIA rows and column headers have no owning grid
+
+**File:** apps/web/src/components/ScheduleGrid.tsx:1336-1346; apps/web/src/components/ScheduleGrid.tsx:1495-1510
+**Found:** 2026-09-07 by /audit (scope: changed; lens: quality)
+**Why it matters:** Moving the date row out of the body's horizontal scroller (required for native `position: sticky`) left its `role="row"` and `role="columnheader"` cells under a `role="presentation"` wrapper with no `grid` ancestor, while the body `role="grid"` now contains rows but no column headers. Screen readers lose the day-to-column association the grid had before this change, and the ARIA ownership is invalid.
+**Suggested fix:** Make the section wrapper the `role="grid"` with the section's `aria-label`, and mark the header and body containers `role="rowgroup"` (generic wrappers between them are transparent to the accessibility tree). Update the two tests that resolve the body scroller from `getByRole("grid")`.
+**Resolution:** Repaired 2026-09-07 in the same session: the section wrapper is now the `role="grid"` with the section label, and the header and body containers are `role="rowgroup"`. A grid test asserts one grid owns both rowgroups.
+
+### F-66 [P3] fixed - Search scroll margin hard-codes the sticky group's height
+
+**File:** apps/web/src/components/ScheduleGrid.tsx (employee row `scrollMarginTop`, `+ 80px`)
+**Found:** 2026-09-07 by /audit (scope: changed; lens: quality)
+**Why it matters:** The `80px` stands in for the label plus date-row height. At larger font settings or if the cap gains chrome, a searched-to row lands partly under the sticky group; nothing fails loudly.
+**Suggested fix:** Publish the measured group height as a CSS custom property from the existing geometry effect (it already measures the grid) and use it in the calc, or accept the constant and name it beside `CHIP_OVERHANG_PX`.
+**Resolution:** Repaired 2026-09-07 in the same session: the geometry effect publishes `--dg-grid-sticky-height` on the section and the row scroll margin reads it, keeping `80px` only as the fallback.

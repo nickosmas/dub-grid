@@ -33,6 +33,11 @@ import {
 } from "@/lib/schedule-logic";
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
+  CHIP_OVERHANG_PX,
+  STICKY_RELEASE_ROWS,
+  computeStickyReleaseInset,
+} from "@/lib/schedule-grid-sticky";
+import {
   Employee,
   GridCellId,
   ShiftCategory,
@@ -733,6 +738,11 @@ const SectionBlock = memo(function SectionBlock({
   const themeSurface = isDarkTheme ? darkColorTokens.surface : lightColorTokens.surface;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
+  const stickyGroupRef = useRef<HTMLDivElement>(null);
+  const headerScrollerRef = useRef<HTMLDivElement>(null);
+  const cardBodyRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [activeOutlineRect, setActiveOutlineRect] = useState<ActiveOutlineRect | null>(null);
@@ -769,6 +779,99 @@ const SectionBlock = memo(function SectionBlock({
       ro.disconnect();
     };
   }, [fitToContainer, updateScrollButtons, weekDates.length, employees.length]);
+
+  // The date row sits in its own scroller above the card body so the sticky
+  // group can pin against the page; mirror the body's horizontal position.
+  useEffect(() => {
+    const body = scrollContainerRef.current;
+    const header = headerScrollerRef.current;
+    if (!body || !header || fitToContainer) return;
+    const sync = () => {
+      header.scrollLeft = body.scrollLeft;
+    };
+    sync();
+    body.addEventListener("scroll", sync, { passive: true });
+    return () => body.removeEventListener("scroll", sync);
+  }, [fitToContainer, weekDates.length]);
+
+  // Everything the sticky group needs beyond CSS is discrete state measured when
+  // layout changes, never per scroll frame: the header grid's width, the early
+  // release inset, and whether the group is currently stuck (it must layer above
+  // the rows only then, so the first row's chip can still hang over it at rest).
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const group = stickyGroupRef.current;
+    const sentinel = stickySentinelRef.current;
+    const cardBody = cardBodyRef.current;
+    const gridEl = gridRef.current;
+    if (!section || !group || !sentinel || !cardBody || !gridEl) return;
+    if (typeof ResizeObserver === "undefined" || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const readPx = (styles: CSSStyleDeclaration, name: string) => {
+      const value = Number.parseFloat(styles.getPropertyValue(name));
+      return Number.isFinite(value) ? value : 0;
+    };
+
+    const measure = () => {
+      group.style.setProperty("--dg-grid-body-width", `${gridEl.getBoundingClientRect().width}px`);
+      section.style.setProperty(
+        "--dg-grid-sticky-height",
+        `${group.getBoundingClientRect().height}px`,
+      );
+      const releaseRow = gridEl.querySelector<HTMLElement>('[data-sticky-release="true"]');
+      const inset = computeStickyReleaseInset({
+        cardBottom: cardBody.getBoundingClientRect().bottom,
+        releaseRowTop: releaseRow ? releaseRow.getBoundingClientRect().top : null,
+      });
+      section.style.setProperty("--dg-grid-release-inset", `${inset}px`);
+    };
+
+    let stickyTop = -1;
+    let stuckObserver: IntersectionObserver | null = null;
+    const watchStuck = () => {
+      const styles = window.getComputedStyle(group);
+      const next =
+        readPx(styles, "--dg-app-shell-header-height") +
+        readPx(styles, "--dg-schedule-chrome-height");
+      if (next === stickyTop) return;
+      stickyTop = next;
+      stuckObserver?.disconnect();
+      // The sentinel marks the group's resting position. The observed root
+      // runs from the sticky line down without limit, so the sentinel counts
+      // as intersecting anywhere below the line, including off-screen. That
+      // makes every crossing of the line a state change; with a viewport-sized
+      // root, a fast fling or a jump could carry the sentinel from below to
+      // above the root in one frame and never fire at all.
+      stuckObserver = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) delete group.dataset.stuck;
+          else group.dataset.stuck = "true";
+        },
+        { rootMargin: `-${stickyTop}px 0px 100000px 0px`, threshold: 0 },
+      );
+      stuckObserver.observe(sentinel);
+    };
+
+    measure();
+    watchStuck();
+    const gridObserver = new ResizeObserver(measure);
+    gridObserver.observe(gridEl);
+    // A banner opening above the grid changes the sticky line without touching
+    // the grid itself.
+    const chromeObserver = new ResizeObserver(watchStuck);
+    chromeObserver.observe(document.body);
+    return () => {
+      gridObserver.disconnect();
+      chromeObserver.disconnect();
+      stuckObserver?.disconnect();
+      group.style.removeProperty("--dg-grid-body-width");
+      section.style.removeProperty("--dg-grid-sticky-height");
+      section.style.removeProperty("--dg-grid-release-inset");
+      delete group.dataset.stuck;
+    };
+  }, [employees.length, weekDates.length, fitToContainer]);
 
   useLayoutEffect(() => {
     const gridEl = gridRef.current;
@@ -1124,90 +1227,238 @@ const SectionBlock = memo(function SectionBlock({
     gridTemplateColumns: "subgrid",
   };
 
+  // A section this short lands on row 0, so its date row never pins. That is
+  // the right outcome: there is nothing to scroll past.
+  const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
+
   return (
-    <div style={{ marginBottom: 24, marginTop: 8 }}>
-      {/* Section label */}
-      <div
-        style={{
-          fontSize: "var(--dg-fs-section-title)",
-          fontWeight: 600,
-          color: "var(--dg-color-text-primary)",
-          marginBottom: 10,
-          padding: "2px 0",
-        }}
-      >
-        {sectionName}
+    <div
+      ref={sectionRef}
+      // The grid role lives here so the sticky header rowgroup and the body
+      // rowgroup share one owner; the wrappers between are transparent.
+      role="grid"
+      aria-label={`${sectionName} schedule grid`}
+      style={{
+        marginBottom: 24,
+        marginTop: 8,
+        // The label and date row form a native sticky group whose containing
+        // block is this wrapper. A sticky element is confined to its containing
+        // block's content box, so padding the wrapper by the height of the last
+        // rows (and pulling the card body back up by the same amount, so
+        // nothing moves) releases the group that early.
+        paddingBottom: "var(--dg-grid-release-inset, 0px)",
+      }}
+    >
+      {/* Marks the group's resting position for the stuck-state observer. */}
+      <div ref={stickySentinelRef} aria-hidden="true" style={{ height: 1, marginBottom: -1 }} />
+      <div ref={stickyGroupRef} className="dg-grid-sticky-group">
+        {/* Section label. Its gap down to the card is padding, not margin, so
+            rows cannot scroll through the space while the group is stuck. */}
+        <div
+          className="dg-grid-section-label"
+          style={{
+            fontSize: "var(--dg-fs-section-title)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+            padding: "2px 0 12px",
+          }}
+        >
+          {sectionName}
+        </div>
+
+        {/* Header cap: the top of the card, carrying the date row. */}
+        <div
+          style={{
+            position: "relative",
+            background: "var(--dg-color-surface)",
+            borderRadius: "var(--dg-radius-md) var(--dg-radius-md) 0 0",
+            border: "1px solid var(--dg-color-border)",
+            borderBottom: 0,
+            overflow: "clip",
+            // A change chip hangs above its row. Overlap the body's matching
+            // top padding so the first row's chip has room to paint over this
+            // cap while the group is at rest.
+            marginBottom: -CHIP_OVERHANG_PX,
+          }}
+        >
+          {!fitToContainer && canScrollRight && (
+            <Button
+              type="button"
+              onClick={() => scrollDays("right")}
+              aria-label={`Scroll ${sectionName} schedule right`}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid var(--dg-color-brand)",
+                background: "var(--dg-color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              More days
+              <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
+            </Button>
+          )}
+          {!fitToContainer && canScrollLeft && (
+            <Button
+              type="button"
+              onClick={() => scrollDays("left")}
+              aria-label={`Scroll ${sectionName} schedule left`}
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                zIndex: 6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid var(--dg-color-brand)",
+                background: "var(--dg-color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
+              Earlier days
+            </Button>
+          )}
+          <div ref={headerScrollerRef} style={{ overflow: "hidden" }}>
+            <div
+              role="rowgroup"
+              style={{
+                display: "grid",
+                gridTemplateColumns: gridTemplate,
+                // Same total width as the body grid, so its equal fr tracks
+                // resolve to identical columns.
+                width: "var(--dg-grid-body-width, 100%)",
+              }}
+            >
+              <div role="row" className="dg-grid-header-row" style={rowGrid}>
+                <div
+                  role="columnheader"
+                  style={{
+                    position: "sticky",
+                    left: 0,
+                    // Frozen name column: above all scrolling day cells (max 8).
+                    zIndex: 10,
+                    background: "var(--dg-color-bg)",
+                    padding: "10px var(--dg-space-md)",
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--dg-color-text-subtle)",
+                    letterSpacing: "0.04em",
+                    // The bottom divider is a background-image, not a box-shadow
+                    // line, because Chromium clips box-shadow/border decorations
+                    // on position:sticky elements at sub-100% browser zoom (see
+                    // the same fix on the Open Shifts label cell below).
+                    backgroundImage:
+                      "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
+                    backgroundPosition: "0 100%",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: "100% 1px",
+                    boxShadow: joinBoxShadows(
+                      "1px 0 0 0 var(--dg-color-border-light)",
+                      "2px 0 4px rgba(0,0,0,0.02)",
+                    ),
+                  }}
+                >
+                  Staff
+                </div>
+                {weekDates.map((date, index) => {
+                  const key = formatDateKey(date);
+                  const isToday = key === todayKey;
+                  return (
+                    <div
+                      key={key}
+                      role="columnheader"
+                      className="dg-grid-slot dg-grid-slot--header"
+                      data-leading-divider={
+                        index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
+                      }
+                      data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
+                      data-today={isToday ? "true" : undefined}
+                      style={{
+                        position: "relative",
+                        zIndex: 2,
+                        textAlign: "center",
+                        padding: "8px 0",
+                        // background-image (not box-shadow) so this lines up
+                        // exactly with the Staff cell's bottom divider — a
+                        // "0 1px 0 0" box-shadow draws 1px below the box's own
+                        // edge, while this draws flush at it, so mixing the two
+                        // techniques put them a pixel apart vertically.
+                        backgroundImage:
+                          "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
+                        backgroundPosition: "0 100%",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "100% 1px",
+                      }}
+                    >
+                      <div className="dg-grid-slot__chrome" aria-hidden="true" />
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: isToday
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-subtle)",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {DAY_LABELS[date.getDay()]}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-title)",
+                          fontWeight: 700,
+                          color: isToday
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-secondary)",
+                          lineHeight: "var(--dg-lh-tight)",
+                          marginTop: 1,
+                        }}
+                      >
+                        {date.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div
+        ref={cardBodyRef}
         style={{
-          position: "relative",
           background: "var(--dg-color-surface)",
-          borderRadius: "var(--dg-radius-md)",
+          borderRadius: "0 0 var(--dg-radius-md) var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
+          borderTop: 0,
           // Change chips intentionally cross the top edge of a shift pill.
           // The card cannot clip that layer; horizontal clipping belongs only
           // to the scrollable narrow-grid path below.
-          overflow: fitToContainer ? "visible" : "hidden",
+          overflow: fitToContainer ? "visible" : "clip",
           boxShadow: BOX_SHADOW_CARD,
+          marginBottom: "calc(-1 * var(--dg-grid-release-inset, 0px))",
         }}
       >
-        {!fitToContainer && canScrollRight && (
-          <Button
-            type="button"
-            onClick={() => scrollDays("right")}
-            aria-label={`Scroll ${sectionName} schedule right`}
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              zIndex: 6,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 10px",
-              borderRadius: 999,
-              border: "1px solid var(--dg-color-brand)",
-              background: "var(--dg-color-brand)",
-              color: "var(--dg-color-text-inverse)",
-              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            More days
-            <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
-          </Button>
-        )}
-        {!fitToContainer && canScrollLeft && (
-          <Button
-            type="button"
-            onClick={() => scrollDays("left")}
-            aria-label={`Scroll ${sectionName} schedule left`}
-            style={{
-              position: "absolute",
-              top: 12,
-              left: 12,
-              zIndex: 6,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 10px",
-              borderRadius: 999,
-              border: "1px solid var(--dg-color-brand)",
-              background: "var(--dg-color-brand)",
-              color: "var(--dg-color-text-inverse)",
-              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
-            Earlier days
-          </Button>
-        )}
         <div
           ref={scrollContainerRef}
           style={{
@@ -1216,13 +1467,15 @@ const SectionBlock = memo(function SectionBlock({
             // so leave both axes visible and let the edge-overlaid chips paint
             // above the preceding row. The narrow scrollable grid still clips
             // horizontally as before.
-            overflow: fitToContainer ? "visible" : "auto",
+            overflowX: fitToContainer ? "visible" : "auto",
+            overflowY: fitToContainer ? "visible" : "hidden",
+            // Room for the first row's chip; the header cap overlaps it.
+            paddingTop: CHIP_OVERHANG_PX,
           }}
         >
           <div
             ref={gridRef}
-            role="grid"
-            aria-label={`${sectionName} schedule grid`}
+            role="rowgroup"
             style={{
               position: "relative",
               // Own stacking context so cell z-indexes (incl. diff tint) stay
@@ -1234,99 +1487,6 @@ const SectionBlock = memo(function SectionBlock({
               width: fitToContainer ? "100%" : undefined,
             }}
           >
-            {/* Header row */}
-            <div role="row" style={rowGrid}>
-              <div
-                role="columnheader"
-                style={{
-                  position: "sticky",
-                  left: 0,
-                  // Frozen name column: above all scrolling day cells (max 8).
-                  zIndex: 10,
-                  background: "var(--dg-color-bg)",
-                  padding: "10px var(--dg-space-md)",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-subtle)",
-                  letterSpacing: "0.04em",
-                  // The bottom divider is a background-image, not a box-shadow
-                  // line, because Chromium clips box-shadow/border decorations
-                  // on position:sticky elements at sub-100% browser zoom (see
-                  // the same fix on the Open Shifts label cell below).
-                  backgroundImage:
-                    "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
-                  backgroundPosition: "0 100%",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "100% 1px",
-                  boxShadow: joinBoxShadows(
-                    "1px 0 0 0 var(--dg-color-border-light)",
-                    "2px 0 4px rgba(0,0,0,0.02)",
-                  ),
-                }}
-              >
-                Staff
-              </div>
-              {weekDates.map((date, index) => {
-                const key = formatDateKey(date);
-                const isToday = key === todayKey;
-                return (
-                  <div
-                    key={key}
-                    role="columnheader"
-                    className="dg-grid-slot dg-grid-slot--header"
-                    data-leading-divider={
-                      index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
-                    }
-                    data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
-                    data-today={isToday ? "true" : undefined}
-                    style={{
-                      position: "relative",
-                      zIndex: 2,
-                      textAlign: "center",
-                      padding: "8px 0",
-                      // background-image (not box-shadow) so this lines up
-                      // exactly with the Staff cell's bottom divider — a
-                      // "0 1px 0 0" box-shadow draws 1px below the box's own
-                      // edge, while this draws flush at it, so mixing the two
-                      // techniques put them a pixel apart vertically.
-                      backgroundImage:
-                        "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
-                      backgroundPosition: "0 100%",
-                      backgroundRepeat: "no-repeat",
-                      backgroundSize: "100% 1px",
-                    }}
-                  >
-                    <div className="dg-grid-slot__chrome" aria-hidden="true" />
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        color: isToday
-                          ? "var(--dg-color-today-text)"
-                          : "var(--dg-color-text-subtle)",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      {DAY_LABELS[date.getDay()]}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-title)",
-                        fontWeight: 700,
-                        color: isToday
-                          ? "var(--dg-color-today-text)"
-                          : "var(--dg-color-text-secondary)",
-                        lineHeight: "var(--dg-lh-tight)",
-                        marginTop: 1,
-                      }}
-                    >
-                      {date.getDate()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
             {/* Open shifts row */}
             {openShifts && openShifts.length > 0 && (
               <div
@@ -1578,6 +1738,9 @@ const SectionBlock = memo(function SectionBlock({
                   role="row"
                   className="dg-row-enter"
                   data-search-highlight={hasHighlightedSearch && isHighlighted ? "true" : undefined}
+                  // Where the pinned date row starts sliding away, so the last
+                  // staff rows and the tallies below them are never covered.
+                  data-sticky-release={ri === releaseRowIndex ? "true" : undefined}
                   style={{
                     ...rowGrid,
                     // A chip deliberately hangs into the row above its shift
@@ -1590,6 +1753,9 @@ const SectionBlock = memo(function SectionBlock({
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
+                    // Keep a searched-to row clear of the sticky label and date row.
+                    scrollMarginTop:
+                      "calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px) + var(--dg-grid-sticky-height, 80px))",
                   }}
                 >
                   {/* Name cell */}
