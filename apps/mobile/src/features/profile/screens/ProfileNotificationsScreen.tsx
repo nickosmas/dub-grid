@@ -219,7 +219,7 @@ export default function ProfileNotificationsScreen() {
                   accessibilityLabel="Push notifications"
                   disabled={!pushSwitchEnabled || push.permissionState === "denied"}
                   ios_backgroundColor={mobileColors.border}
-                  thumbColor={mobileColors.surface}
+                  thumbColor={mobileColors.onBrandSurface}
                   trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                   value={push.permissionState === "granted"}
                   onValueChange={() => {

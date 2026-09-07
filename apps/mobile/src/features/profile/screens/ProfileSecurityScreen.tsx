@@ -197,7 +197,7 @@ export default function ProfileSecurityScreen() {
                     accessibilityLabel="App lock"
                     disabled={appLockToggling}
                     ios_backgroundColor={mobileColors.border}
-                    thumbColor={mobileColors.surface}
+                    thumbColor={mobileColors.onBrandSurface}
                     trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                     value={appLockEnabled}
                     onValueChange={(next) => void toggleAppLock(next)}

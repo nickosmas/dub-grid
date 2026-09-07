@@ -86,7 +86,7 @@ export function NotificationCategorySheet({
               <Switch
                 accessibilityLabel={`${channel.label} notifications`}
                 ios_backgroundColor={mobileColors.border}
-                thumbColor={mobileColors.surface}
+                thumbColor={mobileColors.onBrandSurface}
                 trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                 value={category.channels[channel.id]}
                 onValueChange={() => onToggle(category.key, channel.id)}

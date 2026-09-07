@@ -76,7 +76,7 @@ export default function ProfilePrivacyScreen() {
               disabled={saving || analytics === null}
               ios_backgroundColor={mobileColors.border}
               onValueChange={(next) => void handleToggle(next)}
-              thumbColor={mobileColors.surface}
+              thumbColor={mobileColors.onBrandSurface}
               trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
               value={analytics ?? false}
             />
