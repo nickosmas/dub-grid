@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
+import { createIconControlStyle, ICON_CONTROL_SIZE } from "./icon-control-style";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
@@ -79,12 +80,8 @@ const SHEET_TOP_GAP = mobileSpace.md;
  */
 const SHEET_CORNER_RADIUS = 40;
 
-/**
- * Tap target for the close button, and the box centred on the title's line.
- * 44 matches the week chevrons and the alerts bell, which is the size this
- * chrome reads at everywhere else.
- */
-const CLOSE_BUTTON_SIZE = 44;
+/** Tap target for the close button, and the box centred on the title's line. */
+const CLOSE_BUTTON_SIZE = ICON_CONTROL_SIZE;
 
 /** What `SheetHeader` renders its title at, which is what the close button lines up with. */
 const SHEET_TITLE_LINE_HEIGHT = mobileText.screenTitle.lineHeight ?? 28;
@@ -369,6 +366,9 @@ const createStyles = (
     // region, and so a header that wraps to two lines keeps it pinned to the
     // first line rather than drifting to the middle of the block.
     closeButton: {
+      // The same outlined chrome as the schedule header's week chevrons and
+      // alerts bell, shared so the two cannot drift.
+      ...createIconControlStyle(mobileColors, isDark),
       position: "absolute",
       // Centred on the title's first line. The grabber area is exactly
       // `SHEET_CONTENT_TOP_PADDING` tall and the header adds no padding of its
@@ -379,22 +379,6 @@ const createStyles = (
       // edge is the gap the title keeps from the left.
       right: mobileSpace.xl,
       zIndex: 1,
-      width: CLOSE_BUTTON_SIZE,
-      height: CLOSE_BUTTON_SIZE,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: mobileRadii.pill,
-      // The same outlined chrome as the week chevrons and the alerts bell: the
-      // button is the same `surface` as the sheet it sits on, so the edge is
-      // what makes it a control. `border` rather than `borderSubtle` for that
-      // reason - at 1.23:1 the subtle one leaves the icon looking unenclosed.
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: mobileColors.surface,
-      // `raised`, not `card`: a heavier blur under a white pill on a white
-      // sheet reads as a smudge, and with the outline there are already two
-      // separators doing one job.
-      ...mobileElevation("raised", isDark),
     },
     closeButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],

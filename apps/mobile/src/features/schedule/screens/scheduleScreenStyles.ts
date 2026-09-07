@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native";
+import { createIconControlStyle } from "../../../shared/components/icon-control-style";
 import {
   mobileAvatarText,
   mobileElevation,
@@ -1153,26 +1154,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 1,
       minWidth: 0,
     },
-    iconControlButton: {
-      width: HEADER_CONTROL_HEIGHT,
-      height: HEADER_CONTROL_HEIGHT,
-      borderRadius: mobileRadii.pill,
-      // Outlined chrome: the week chevrons and the alerts bell share this, and
-      // both sit *on* the header bar, which is now the same `surface` they are.
-      // So the edge is the control — `border` (1.49:1 on white, 1.39:1 on the
-      // dark bar), not `borderSubtle`, which at 1.23:1 leaves a 44pt target
-      // reading as a floating icon with no button around it.
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      // Down from `card`. A 12pt-blur shadow under a white pill on a white bar
-      // reads as a smudge, and with the outline above it there are two
-      // separators doing one job. `raised` keeps the control from looking
-      // printed on without competing with its own edge.
-      ...mobileElevation("raised", isDark),
-    },
+    // The week chevrons and the alerts bell. Shared with the sheet close
+    // button, which is the same chrome on a different surface.
+    iconControlButton: createIconControlStyle(mobileColors, isDark),
     iconControlButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
