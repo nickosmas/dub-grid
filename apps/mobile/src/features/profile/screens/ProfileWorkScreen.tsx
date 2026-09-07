@@ -19,6 +19,7 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -430,8 +431,11 @@ export default function ProfileWorkScreen() {
           <Button
             compact
             disabled={saveMutation.isPending}
-            label="Cancel"
-            onPress={() => router.back()}
+            // Same tri-state web uses. Discard resets the fields and stays on
+            // the screen; leaving with edits in hand is the back gesture, which
+            // `useNavigationDiscardGuard` already routes through a confirmation.
+            label={getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
+            onPress={hasChanges ? discardChanges : () => router.back()}
             tone="plain"
           />
         </View>

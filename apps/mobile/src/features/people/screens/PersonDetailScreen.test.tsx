@@ -755,13 +755,43 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Staffing")).toBeInTheDocument();
     expect(screen.getByText("Assignments")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
-    // Two buttons, not three: Cancel is the only way out, and it confirms when
-    // there is something to lose rather than sitting beside a separate Discard.
-    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    // Two buttons, and the dismiss one carries web's tri-state: nothing typed
+    // yet, so it reads Cancel. It becomes Discard once there is something to
+    // throw away, which the dedicated test below covers.
     expect(screen.getByText("Cancel")).toBeInTheDocument();
+    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
     expect(screen.getByText("Save changes")).toBeInTheDocument();
     expect(screen.queryByText("Call")).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
+  });
+
+  it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson() },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    const firstName = screen.getByDisplayValue("Mina");
+    fireEvent.change(firstName, { target: { value: "Minara" } });
+
+    expect(screen.getByText("Discard")).toBeInTheDocument();
+    expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Discard"));
+
+    // Reset in place: the field is back to its saved value, the panel is still
+    // open, and the button has gone back to Cancel. Leaving is the back
+    // gesture's job, which is guarded separately.
+    expect(screen.getByDisplayValue("Mina")).toBeInTheDocument();
+    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
+    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
   });
 
   it("hides an incompatible role while keeping a selected legacy role removable", () => {

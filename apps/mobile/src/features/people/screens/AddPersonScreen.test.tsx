@@ -302,6 +302,25 @@ describe("AddPersonScreen", () => {
     expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
   });
 
+  it("swaps Cancel for Discard once filled in, and Discard empties the form without leaving", () => {
+    renderWithMutation();
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+
+    expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    // Emptied in place. Leaving with details filled in is the back gesture's
+    // job, so Discard must not navigate.
+    expect(screen.getByLabelText("First name")).toHaveValue("");
+    expect(navigatedActions).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
   it("asks before a back press throws away a part-filled form", () => {
     renderWithMutation();
 

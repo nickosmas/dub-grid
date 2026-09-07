@@ -28,6 +28,7 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import {
   BottomSheetModal,
   SheetHeader,
@@ -898,8 +899,11 @@ export default function PersonDetailScreen() {
           <Button
             compact
             disabled={updateMutation.isPending}
-            label="Cancel"
-            onPress={guard.requestClose}
+            // Same tri-state web uses. Discard resets the fields and stays on
+            // the panel; leaving with edits in hand is the back gesture, which
+            // goes through this guard's confirmation.
+            label={getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
+            onPress={hasChanges ? guard.discard : guard.requestClose}
             tone="plain"
           />
         </View>

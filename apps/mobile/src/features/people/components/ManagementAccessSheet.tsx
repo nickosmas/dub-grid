@@ -12,6 +12,7 @@ import { Button } from "../../../shared/components/Button";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SectionNotice } from "./SectionNotice";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { InlineError } from "../../../shared/components/InlineError";
 import {
   SegmentedControl,
@@ -231,8 +232,11 @@ export function ManagementAccessSheet({
                   this sheet, which does something else entirely. */}
               <Button
                 disabled={mutation.isPending}
-                label="Cancel"
-                onPress={guard.requestClose}
+                // Same tri-state web uses. Discard resets the draft and leaves
+                // the sheet open; dismissing with edits in hand is the drag or
+                // the backdrop, which this guard already confirms.
+                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+                onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
                 tone="neutral"
               />
             </SheetActions>

@@ -261,6 +261,8 @@ describe("ProfileWorkScreen", () => {
     // moment the first field changes. Cancel is the only other button: it is
     // always live, because backing out is valid whether or not there is work.
     expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+    // Nothing typed yet, so the dismiss button reads Cancel; it becomes Discard
+    // once there is something to throw away.
     expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
@@ -299,12 +301,27 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
   });
 
-  it("leaves the screen when Cancel is pressed", () => {
+  it("leaves the screen when Cancel is pressed on a clean draft", () => {
     render(<ProfileWorkScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    // Reset in place. Leaving with edits in hand is the back gesture's job, so
+    // Discard must not navigate.
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("hides an incompatible new role while keeping the selected role removable", () => {
