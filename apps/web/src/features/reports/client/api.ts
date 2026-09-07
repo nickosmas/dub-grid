@@ -25,6 +25,7 @@ export const REPORT_OPTIONS: Array<{
   { value: "certification-role-matrix", label: "Certifications and roles" },
   { value: "account-access", label: "Account access" },
   { value: "schedule-matrix", label: "Schedule matrix" },
+  { value: "shift-notes", label: "Shift notes" },
 ];
 
 export type OperationsReportExportFormat = "csv" | "pdf";
@@ -58,6 +59,9 @@ function buildReportParams(input: {
   }
   if (input.filters?.jobIds?.length) {
     params.set("jobIds", input.filters.jobIds.join(","));
+  }
+  if (input.filters?.indicatorTypeIds?.length) {
+    params.set("indicatorTypeIds", input.filters.indicatorTypeIds.join(","));
   }
   if (input.filters?.dates?.length) {
     params.set("dates", input.filters.dates.join(","));

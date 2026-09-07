@@ -100,6 +100,7 @@ vi.mock("@/features/reports/client/api", () => ({
     { value: "certification-role-matrix", label: "Certifications and roles" },
     { value: "account-access", label: "Account access" },
     { value: "shift-requests", label: "Shift requests" },
+    { value: "shift-notes", label: "Shift notes" },
   ],
   fetchOperationsReport: (...args: unknown[]) => fetchOperationsReport(...args),
   exportOperationsReportCsv: (...args: unknown[]) => exportOperationsReportCsv(...args),
@@ -130,6 +131,10 @@ const payload = {
     ],
     shiftCategories: [{ id: "60", label: "Day" }],
     jobs: [{ id: "70", label: "Caregiver" }],
+    indicators: [
+      { id: "80", label: "Late" },
+      { id: "81", label: "Training" },
+    ],
     dates: [
       "2026-05-03",
       "2026-05-04",
@@ -251,6 +256,15 @@ const payload = {
       },
     ],
     scheduleMatrix: { dates: [], rows: [] },
+    shiftNotes: [
+      {
+        employeeId: EMPLOYEE_ID,
+        employeeName: "Avery Ng",
+        date: "2026-05-03",
+        indicator: "Late",
+        focusArea: "North",
+      },
+    ],
   },
 };
 
@@ -472,6 +486,34 @@ describe("ReportsPageContent", () => {
         },
       });
     });
+  });
+
+  it("scopes the shift notes report to selected indicators", async () => {
+    renderReports();
+
+    await chooseCustomSelect("Report", "Shift notes");
+
+    fireEvent.click(screen.getByRole("button", { name: /Indicators/ }));
+    fireEvent.click(await screen.findByLabelText("Late"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+
+    await waitFor(() => {
+      expect(fetchOperationsReport).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ indicatorTypeIds: [80] }),
+        }),
+      );
+    });
+  });
+
+  it("offers indicator filtering only for reports that surface shift notes", async () => {
+    renderReports();
+
+    await chooseCustomSelect("Report", "Staff hours");
+    expect(screen.getByRole("button", { name: /Indicators/ })).toBeInTheDocument();
+
+    await chooseCustomSelect("Report", "Coverage");
+    expect(screen.queryByRole("button", { name: /Indicators/ })).not.toBeInTheDocument();
   });
 
   it("hides range controls for employee directory reports", async () => {

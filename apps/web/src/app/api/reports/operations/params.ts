@@ -16,6 +16,7 @@ export const operationsQuerySchema = z.object({
   focusAreaIds: z.string().optional(),
   shiftCategoryIds: z.string().optional(),
   jobIds: z.string().optional(),
+  indicatorTypeIds: z.string().optional(),
   dates: z.string().optional(),
 });
 
@@ -81,6 +82,13 @@ export function parseOperationsFilters(
     return Number(value);
   });
 
+  const indicatorTypeIds = parseCsv(input.indicatorTypeIds).map((value) => {
+    if (!/^\d+$/.test(value)) {
+      throw new RangeError("Choose valid indicators before generating the report.");
+    }
+    return Number(value);
+  });
+
   const rangeDateSet = new Set(getDatesInReportRange(range));
   const dates = parseCsv(input.dates);
   for (const date of dates) {
@@ -94,6 +102,7 @@ export function parseOperationsFilters(
     focusAreaIds,
     shiftCategoryIds,
     jobIds,
+    indicatorTypeIds,
     dates,
   };
 }

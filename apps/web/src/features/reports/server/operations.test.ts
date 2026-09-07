@@ -101,6 +101,40 @@ function buildSource(
         expires_at: "2026-05-20T00:00:00.000Z",
       },
     ],
+    indicatorTypes: [
+      { id: 80, name: "Late" },
+      { id: 81, name: "Training" },
+    ],
+    scheduleNotes: [
+      {
+        emp_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        date: "2026-05-03",
+        indicator_type_id: 80,
+        focus_area_id: 10,
+        status: "published",
+      },
+      {
+        emp_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        date: "2026-05-03",
+        indicator_type_id: 81,
+        focus_area_id: 10,
+        status: "published",
+      },
+      {
+        emp_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        date: "2026-05-04",
+        indicator_type_id: 80,
+        focus_area_id: 10,
+        status: "draft_deleted",
+      },
+      {
+        emp_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        date: "2026-05-04",
+        indicator_type_id: 81,
+        focus_area_id: 10,
+        status: "draft",
+      },
+    ],
     publishedRows: [
       {
         emp_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -270,7 +304,9 @@ describe("operations reports", () => {
       employeeName: "Blake Diaz",
       accountAccessStatus: "Invitation pending",
     });
-    expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe("DAY Caregiver");
+    expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe(
+      "DAY Caregiver / Late / Training",
+    );
   });
 
   it("attributes removed employees in historical schedule reports without restoring them to the current roster", () => {
@@ -383,6 +419,7 @@ describe("operations reports", () => {
       focusAreaIds: [10],
       shiftCategoryIds: [],
       jobIds: [],
+      indicatorTypeIds: [],
       dates: ["2026-05-03"],
     });
     expect(payload.filterOptions.focusAreas).toEqual([
@@ -912,16 +949,17 @@ describe("operations reports", () => {
         "Days worked",
         "Shift breakdown",
         "Job breakdown",
+        "Shift notes",
         "Absence days",
         "Overtime hours",
       ],
       rows: [
-        ["Avery Ng", 8, 1, 1, "Day (1, 8h)", "Caregiver (1, 8h)", 0, 0],
-        ["Blake Diaz", 0, 0, 0, "No categorized shifts", "No jobs", 1, 0],
+        ["Avery Ng", 8, 1, 1, "Day (1, 8h)", "Caregiver (1, 8h)", "Late (1); Training (1)", 0, 0],
+        ["Blake Diaz", 0, 0, 0, "No categorized shifts", "No jobs", "Late (1)", 1, 0],
       ],
     });
     expect(buildOperationsReportCsv(payload, "staff-hours")).toContain(
-      'Employee,Scheduled hours,Shifts worked,Days worked,Shift breakdown,Job breakdown,Absence days,Overtime hours\r\nAvery Ng,8,1,1,"Day (1, 8h)","Caregiver (1, 8h)",0,0',
+      'Employee,Scheduled hours,Shifts worked,Days worked,Shift breakdown,Job breakdown,Shift notes,Absence days,Overtime hours\r\nAvery Ng,8,1,1,"Day (1, 8h)","Caregiver (1, 8h)",Late (1); Training (1),0,0',
     );
     const employeeDirectoryCsv = buildOperationsReportCsv(payload, "employee-directory");
     expect(employeeDirectoryCsv).toContain(
@@ -982,10 +1020,21 @@ describe("operations reports", () => {
           "Days worked",
           "Shift breakdown",
           "Job breakdown",
+          "Shift notes",
           "Absence days",
           "Overtime hours",
         ],
-        firstRow: ["Avery Ng", 8, 1, 1, "Day (1, 8h)", "Caregiver (1, 8h)", 0, 0],
+        firstRow: [
+          "Avery Ng",
+          8,
+          1,
+          1,
+          "Day (1, 8h)",
+          "Caregiver (1, 8h)",
+          "Late (1); Training (1)",
+          0,
+          0,
+        ],
       },
       {
         report: "staff-activity",
@@ -996,6 +1045,7 @@ describe("operations reports", () => {
           "Work days",
           "Shift breakdown",
           "Job breakdown",
+          "Shift notes",
           "Published off days",
           "Unscheduled days",
           "Approved impact",
@@ -1009,6 +1059,7 @@ describe("operations reports", () => {
           1,
           "Day (1, 8h)",
           "Caregiver (1, 8h)",
+          "Late (1); Training (1)",
           0,
           1,
           1,
@@ -1134,7 +1185,12 @@ describe("operations reports", () => {
       {
         report: "schedule-matrix",
         headers: ["Employee", "May 3, 2026", "May 4, 2026"],
-        firstRow: ["Avery Ng", "DAY Caregiver", ""],
+        firstRow: ["Avery Ng", "DAY Caregiver / Late / Training", ""],
+      },
+      {
+        report: "shift-notes",
+        headers: ["Date", "Employee", "Indicator", "Focus area"],
+        firstRow: ["May 3, 2026", "Avery Ng", "Late", "North"],
       },
     ];
 
@@ -1181,8 +1237,8 @@ describe("operations reports", () => {
     expect(text).not.toContain(pdfHex("Coverage:"));
     expect(text).not.toContain(pdfHex("Requests:"));
     expect(text).not.toContain(pdfHex("Avery ? Ng"));
-    expect(text).toContain(pdfHex("Avery · No Ellipsis Through"));
-    expect(text).toContain(pdfHex("Full Client Friendly Detail"));
+    expect(text).toContain(pdfHex("Avery · No Ellipsis Through December"));
+    expect(text).toContain(pdfHex("Friendly Detail"));
     expect(text).not.toContain(pdfHex("..."));
     expect(text).toContain("0.945 0.945 0.945 rg");
     expect(text).toContain("%%EOF");
@@ -1200,5 +1256,129 @@ describe("operations reports", () => {
     expect(text).toContain(pdfHex("Employee directory"));
     expect(text).toContain(pdfHex("Printed May 4, 2026"));
     expect(text).not.toContain(pdfHex("Employee directory - May 3, 2026 to May 4, 2026"));
+  });
+
+  it("reports published shift notes and leaves unpublished drafts out", () => {
+    const payload = buildOperationsReportPayload(buildSource(), {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(payload.reports.shiftNotes).toEqual([
+      {
+        employeeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        employeeName: "Avery Ng",
+        date: "2026-05-03",
+        indicator: "Late",
+        focusArea: "North",
+      },
+      {
+        employeeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        employeeName: "Avery Ng",
+        date: "2026-05-03",
+        indicator: "Training",
+        focusArea: "North",
+      },
+      {
+        employeeId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        employeeName: "Blake Diaz",
+        date: "2026-05-04",
+        indicator: "Late",
+        focusArea: "North",
+      },
+    ]);
+  });
+
+  it("narrows shift notes to the selected indicators", () => {
+    const payload = buildOperationsReportPayload(
+      buildSource(),
+      { startDate: "2026-05-03", endDate: "2026-05-04" },
+      { indicatorTypeIds: [81] },
+    );
+
+    expect(payload.reports.shiftNotes.map((row) => row.indicator)).toEqual(["Training"]);
+    expect(payload.filters.indicatorTypeIds).toEqual([81]);
+  });
+
+  it("summarizes shift notes per employee on staff hours and activity", () => {
+    const payload = buildOperationsReportPayload(buildSource(), {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    const avery = payload.reports.staffHours.find((row) => row.employeeName === "Avery Ng")!;
+    expect(avery.indicatorBreakdown).toBe("Late (1); Training (1)");
+
+    const averyActivity = payload.reports.staffActivity.summaries.find(
+      (row) => row.employeeName === "Avery Ng",
+    )!;
+    expect(averyActivity.indicatorBreakdown).toBe("Late (1); Training (1)");
+  });
+
+  it("keeps a note-only employee out of staff hours but in the shift notes report", () => {
+    // A note outlives the shift it was written against: schedule_notes has no
+    // foreign key to the cell, so deleting a shift leaves its notes behind.
+    // Staff hours stays a report about worked time; the orphan surfaces here.
+    const source = buildSource({
+      publishedRows: [],
+      scheduleNotes: [
+        {
+          emp_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          date: "2026-05-03",
+          indicator_type_id: 80,
+          focus_area_id: 10,
+          status: "published",
+        },
+      ],
+    });
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(buildOperationsReportTable(payload, "staff-hours").rows).toEqual([]);
+    expect(buildOperationsReportTable(payload, "shift-notes").rows).toEqual([
+      ["May 3, 2026", "Avery Ng", "Late", "North"],
+    ]);
+  });
+
+  it("adds shift notes to their schedule matrix cell after the shift label", () => {
+    const payload = buildOperationsReportPayload(buildSource(), {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    const avery = payload.reports.scheduleMatrix.rows.find(
+      (row) => row.employeeName === "Avery Ng",
+    )!;
+
+    expect(avery.cells["2026-05-03"]).toBe("DAY Caregiver / Late / Training");
+  });
+
+  it("exports the shift notes report as CSV", () => {
+    const payload = buildOperationsReportPayload(buildSource(), {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    const csv = buildOperationsReportCsv(payload, "shift-notes");
+
+    expect(csv.split("\r\n")[0]).toBe("Date,Employee,Indicator,Focus area");
+    expect(csv).toContain('"May 3, 2026",Avery Ng,Late,North');
+    expect(csv).toContain('"May 4, 2026",Blake Diaz,Late,North');
+    expect(csv.split("\r\n")).toHaveLength(4);
+  });
+
+  it("counts shift note metrics", () => {
+    const payload = buildOperationsReportPayload(buildSource(), {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(buildOperationsReportMetrics(payload, "shift-notes")).toEqual([
+      { label: "Shift notes", value: "3" },
+      { label: "Staff tagged", value: "2" },
+      { label: "Indicators used", value: "2" },
+    ]);
   });
 });
