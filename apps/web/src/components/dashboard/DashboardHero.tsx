@@ -209,11 +209,16 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
 
   const card = (
     <div
+      data-stat-card
       style={{
         background: "var(--dg-color-bg)",
         border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-radius-lg)",
         padding: "12px 14px",
+        // The Link wrapper below is the grid child and absorbs the row stretch,
+        // so without this a tile carrying no detail line renders short.
+        height: "100%",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -283,7 +288,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
   return (
     <Link
       href={metric.href}
-      style={{ display: "block", textDecoration: "none", color: "inherit" }}
+      style={{ display: "block", height: "100%", textDecoration: "none", color: "inherit" }}
       aria-label={`${metric.label}: ${metric.value}`}
     >
       {card}

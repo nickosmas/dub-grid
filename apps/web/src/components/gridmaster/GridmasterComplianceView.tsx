@@ -17,7 +17,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 170px" }}>
+    <div data-stat-card style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 170px" }}>
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",

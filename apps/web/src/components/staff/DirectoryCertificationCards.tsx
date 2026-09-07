@@ -23,11 +23,12 @@ function CountTile({
   return (
     <Card
       size="sm"
-      className={
+      data-stat-card
+      className={`h-full w-full ${
         selected
           ? "border-[var(--dg-color-brand-border)] bg-[var(--dg-color-brand-bg)]"
           : "border-[var(--dg-color-border-light)]"
-      }
+      }`}
     >
       <CardContent>
         <p className="dg-type-field-title truncate">{label}</p>
@@ -82,7 +83,7 @@ export function DirectoryCertificationCards({
         aria-label={`Certified staff count, ${certifiedCount}`}
         aria-pressed={certifiedSelected}
         onClick={() => onSelectCertification(certifiedSelected ? null : "any")}
-        className="text-left"
+        className="h-auto w-full items-stretch text-left"
       >
         <CountTile label="Certified staff" count={certifiedCount} selected={certifiedSelected} />
       </Button>
@@ -115,7 +116,7 @@ export function DirectoryCertificationCards({
                   onSelectCertification(isSelected ? null : (certificationId as number));
                 }
               }}
-              className="text-left disabled:cursor-default"
+              className="h-auto w-full items-stretch text-left disabled:cursor-default"
             >
               <CountTile label={label} count={count} selected={isSelected} />
             </Button>
@@ -131,7 +132,7 @@ export function DirectoryCertificationCards({
           aria-label={`Not certified count, ${uncertifiedCount}`}
           aria-pressed={uncertifiedSelected}
           onClick={() => onSelectCertification(uncertifiedSelected ? null : "none")}
-          className="text-left"
+          className="h-auto w-full items-stretch text-left"
         >
           <CountTile
             label="Not certified"

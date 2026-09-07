@@ -1202,7 +1202,7 @@ function ReportsContent() {
             }}
           >
             {metrics.map((metric) => (
-              <div key={metric.label} style={metricStyle}>
+              <div key={metric.label} data-stat-card style={metricStyle}>
                 <div style={metricLabelStyle}>{metric.label}</div>
                 <div style={metricValueStyle}>{metric.value}</div>
               </div>

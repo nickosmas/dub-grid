@@ -77,9 +77,10 @@ function StatBox({
   return (
     <Card
       size="sm"
-      className={
+      data-stat-card
+      className={`h-full ${
         isBrand ? "border-[var(--dg-color-brand-border)]" : "border-[var(--dg-color-border-light)]"
-      }
+      }`}
       aria-label={`${label}: ${value}, ${caption}`}
     >
       <CardContent className="flex items-center justify-between gap-3">
