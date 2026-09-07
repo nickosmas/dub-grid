@@ -28,8 +28,13 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
-import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
+import {
+  BottomSheetModal,
+  SheetHeader,
+  SheetActions,
+} from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
@@ -63,6 +68,7 @@ import {
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -238,12 +244,9 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
-  // Why the last write failed, shown inside the surface that failed. These
-  // confirmations and sheets all stay open on error, and they are `<Modal>`s —
-  // their own native windows — so the toasts these handlers used to push
-  // rendered in the root window behind them and were never seen. A failed save
-  // or deactivate simply stopped spinning and said nothing at all. Only one
-  // confirmation is ever open, so the two share one slot.
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+  const handoffInvitation = useModalHandoff();
+  // Shared by the active editor or status task; only the visible surface renders it.
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
@@ -421,6 +424,7 @@ export default function PersonDetailScreen() {
       );
     },
     onSuccess: async (result) => {
+      setShowSaveConfirmation(false);
       updateCachedPerson(result.person);
       setEditing(false);
       setServerFieldErrors({});
@@ -469,6 +473,7 @@ export default function PersonDetailScreen() {
     },
   });
   const invitationMutation = useMutation({
+    onMutate: () => setInvitationError(null),
     mutationFn: async (input: {
       action: "create" | "resend" | "revoke";
       linkExistingAccount?: boolean;
@@ -497,14 +502,12 @@ export default function PersonDetailScreen() {
       const challenge = parseMobileAccountLinkChallenge(error);
       if (challenge) {
         setInvitationConfirmAction(null);
-        setAccountLinkChallenge(challenge);
+        handoffInvitation(() => setAccountLinkChallenge(challenge));
         return;
       }
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update invitation",
-        fallbackMessage: "We couldn't update that invitation right now.",
-      });
+      setInvitationError(
+        getClientFriendlyErrorMessage(error, "We couldn't update that invitation right now."),
+      );
     },
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
@@ -577,6 +580,13 @@ export default function PersonDetailScreen() {
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
+  const statusGuard = useUnsavedChangesGuard({
+    isDirty:
+      (confirmAction === "deactivate" || confirmAction === "remove") &&
+      (Boolean(inactiveNote.trim()) || deactivateOutcome === "remove"),
+    disabled: statusMutation.isPending,
+    onClose: closeStatusConfirmation,
+  });
 
   function handleSave() {
     if (!person || !draft) return;
@@ -615,14 +625,19 @@ export default function PersonDetailScreen() {
       return;
     }
 
-    setShowSaveConfirmation(true);
+    const changesAccessEmail = normalizeOptionalStaffEmail(draft.email) !== person.email;
+    const leavesSchedule = person.focusAreaIds.length > 0 && draft.focusAreaIds.length === 0;
+    if (changesAccessEmail || leavesSchedule) {
+      setShowSaveConfirmation(true);
+      return;
+    }
+    return confirmSave();
   }
 
   function confirmSave() {
     if (!person || !draft) return;
 
-    setShowSaveConfirmation(false);
-    updateMutation.mutate({
+    return updateMutation.mutateAsync({
       expectedVersion: person.version,
       firstName: normalizeStaffName(draft.firstName),
       lastName: normalizeStaffName(draft.lastName),
@@ -834,18 +849,10 @@ export default function PersonDetailScreen() {
     confirmAction === "deactivate"
       ? deactivateRemoves
         ? "Remove"
-        : "Mark Inactive"
+        : "Mark inactive"
       : confirmAction === "activate"
         ? "Activate"
         : "Remove";
-  const statusPendingLabel =
-    confirmAction === "deactivate"
-      ? deactivateRemoves
-        ? "Removing"
-        : "Updating"
-      : confirmAction === "activate"
-        ? "Activating"
-        : "Removing";
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? "Send invitation?"
@@ -878,33 +885,38 @@ export default function PersonDetailScreen() {
     ? Object.values(editFieldErrors).some(Boolean)
     : false;
   const footer = editing ? (
-    <View style={styles.actionsRow}>
-      <View style={styles.actionButton}>
-        <Button
-          compact
-          disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
-          label="Save changes"
-          loading={updateMutation.isPending}
-          onPress={handleSave}
-        />
-      </View>
-      <View style={styles.actionButton}>
-        <Button
-          compact
-          disabled={updateMutation.isPending || !hasChanges}
-          label="Discard"
-          onPress={guard.discard}
-          tone="neutral"
-        />
-      </View>
-      <View style={styles.actionButton}>
-        <Button
-          compact
-          disabled={updateMutation.isPending}
-          label="Cancel"
-          onPress={guard.requestClose}
-          tone="plain"
-        />
+    <View>
+      {confirmationError && !showSaveConfirmation ? (
+        <InlineError message={confirmationError} />
+      ) : null}
+      <View style={styles.actionsRow}>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
+            label="Save changes"
+            loading={updateMutation.isPending}
+            onPress={handleSave}
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={updateMutation.isPending || !hasChanges}
+            label="Discard"
+            onPress={guard.discard}
+            tone="neutral"
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={updateMutation.isPending}
+            label="Cancel"
+            onPress={guard.requestClose}
+            tone="plain"
+          />
+        </View>
       </View>
     </View>
   ) : null;
@@ -933,8 +945,12 @@ export default function PersonDetailScreen() {
       />
       <AccountLinkChallengeModal
         challenge={accountLinkChallenge}
+        error={invitationError}
         isPending={invitationMutation.isPending}
-        onCancel={() => setAccountLinkChallenge(null)}
+        onCancel={() => {
+          setInvitationError(null);
+          setAccountLinkChallenge(null);
+        }}
         onConfirm={() =>
           invitationMutation.mutate({
             action: "create",
@@ -1249,6 +1265,8 @@ export default function PersonDetailScreen() {
                 disabled={statusMutation.isPending || isSelf}
                 label="Deactivate"
                 onPress={() => {
+                  setInactiveNote("");
+                  setConfirmationError(null);
                   setDeactivateOutcome("inactive");
                   setConfirmAction("deactivate");
                 }}
@@ -1262,7 +1280,11 @@ export default function PersonDetailScreen() {
                 compact
                 disabled={statusMutation.isPending || isSelf}
                 label="Remove"
-                onPress={() => setConfirmAction("remove")}
+                onPress={() => {
+                  setInactiveNote("");
+                  setConfirmationError(null);
+                  setConfirmAction("remove");
+                }}
                 tone="danger"
               />
             ) : null}
@@ -1270,7 +1292,16 @@ export default function PersonDetailScreen() {
         </ProfileSection>
       ) : null}
       <ConfirmationModal
-        body="The staff profile will be updated."
+        body={[
+          draft && normalizeOptionalStaffEmail(draft.email) !== person.email
+            ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
+            : null,
+          draft && person.focusAreaIds.length > 0 && draft.focusAreaIds.length === 0
+            ? "They will leave the schedule and keep their management access."
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         confirmLabel="Save"
         error={confirmationError}
         loading={updateMutation.isPending}
@@ -1279,28 +1310,49 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title="Save these changes?"
+        title="Save this access change?"
         visible={showSaveConfirmation}
       />
       <ConfirmationModal {...guard.confirmationProps} />
       <ConfirmationModal
         body={statusConfirmationBody}
-        confirmLabel={statusConfirmationLabel}
-        confirmTone={
-          confirmAction === "deactivate"
-            ? deactivateRemoves
-              ? "danger"
-              : "warning"
-            : confirmAction === "activate"
-              ? "primary"
-              : "danger"
-        }
+        confirmLabel="Activate"
         error={confirmationError}
         loading={statusMutation.isPending}
         onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
         title={statusConfirmationTitle}
-        visible={confirmAction != null}
+        visible={confirmAction === "activate"}
+      />
+      <BottomSheetModal
+        debugName="Change staff status"
+        dismissDisabled={statusMutation.isPending}
+        header={<SheetHeader title={statusConfirmationTitle} subtitle={statusConfirmationBody} />}
+        scrollable
+        visible={confirmAction === "deactivate" || confirmAction === "remove"}
+        onDismiss={statusGuard.requestClose}
+        footer={
+          <>
+            {confirmationError ? <InlineError message={confirmationError} /> : null}
+            <SheetActions
+              primaryAction={
+                <Button
+                  label={statusConfirmationLabel}
+                  loading={statusMutation.isPending}
+                  onPress={confirmStatusAction}
+                  tone={resolvedStatusAction === "remove" ? "danger" : "warning"}
+                />
+              }
+            >
+              <Button
+                label="Cancel"
+                disabled={statusMutation.isPending}
+                onPress={statusGuard.requestClose}
+                tone="plain"
+              />
+            </SheetActions>
+          </>
+        }
       >
         {confirmAction === "deactivate" ? (
           <SelectionSection label="What should happen">
@@ -1311,12 +1363,14 @@ export default function PersonDetailScreen() {
                   : "They'll temporarily lose management access. You can reactivate them anytime."
               }
               label="Mark inactive"
+              disabled={statusMutation.isPending}
               onPress={() => setDeactivateOutcome("inactive")}
               selected={!deactivateRemoves}
             />
             <SelectionRow
               detail="They'll lose access and won't appear in active staff. You can reactivate them later."
               label="Remove from staff"
+              disabled={statusMutation.isPending}
               onPress={() => setDeactivateOutcome("remove")}
               selected={deactivateRemoves}
             />
@@ -1324,6 +1378,7 @@ export default function PersonDetailScreen() {
         ) : null}
         {confirmAction === "deactivate" || confirmAction === "remove" ? (
           <ProfileTextInput
+            editable={!statusMutation.isPending}
             accessibilityLabel="Reason"
             autoCapitalize="sentences"
             label="Reason"
@@ -1336,7 +1391,8 @@ export default function PersonDetailScreen() {
             onChangeText={setInactiveNote}
           />
         ) : null}
-      </ConfirmationModal>
+      </BottomSheetModal>
+      <ConfirmationModal {...statusGuard.confirmationProps} />
       <ManagementAccessSheet
         managementDepartments={managementDepartments}
         onDismiss={() => setShowManagementAccess(false)}
@@ -1362,8 +1418,12 @@ export default function PersonDetailScreen() {
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
+        error={invitationError}
         loading={invitationMutation.isPending}
-        onCancel={() => setInvitationConfirmAction(null)}
+        onCancel={() => {
+          setInvitationError(null);
+          setInvitationConfirmAction(null);
+        }}
         onConfirm={confirmInvitationAction}
         title={invitationConfirmationTitle}
         visible={invitationConfirmAction != null}
@@ -1374,11 +1434,13 @@ export default function PersonDetailScreen() {
 
 function AccountLinkChallengeModal({
   challenge,
+  error,
   isPending,
   onCancel,
   onConfirm,
 }: {
   challenge: MobileAccountLinkChallenge | null;
+  error: string | null;
   isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -1429,14 +1491,20 @@ function AccountLinkChallengeModal({
       </ProfileList>
 
       <View style={styles.modalActionStack}>
-        <Button
-          disabled={isPending}
-          label={isMismatch ? "Use Account Name" : "Link Existing Account"}
-          loading={isPending}
-          onPress={onConfirm}
-          tone="secondary"
-        />
-        <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
+        {error ? <InlineError message={error} /> : null}
+        <SheetActions
+          primaryAction={
+            <Button
+              disabled={isPending}
+              label={isMismatch ? "Use Account Name" : "Link Existing Account"}
+              loading={isPending}
+              onPress={onConfirm}
+              tone="secondary"
+            />
+          }
+        >
+          <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
+        </SheetActions>
       </View>
     </BottomSheetModal>
   );

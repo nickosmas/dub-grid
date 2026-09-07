@@ -269,8 +269,7 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByRole("button", { name: "Discard" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(screen.getByText("Save these changes?")).toBeInTheDocument();
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
+    expect(screen.queryByRole("alert")).toBeNull();
 
     await waitFor(() => {
       expect(updateMobilePerson).toHaveBeenCalledWith(
@@ -285,6 +284,20 @@ describe("ProfileWorkScreen", () => {
         }),
       );
     });
+  });
+
+  it("explains an email-change request before submitting it", () => {
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const confirmation = screen.getByRole("alert");
+    expect(confirmation).toHaveTextContent("Change your sign-in email?");
+    expect(confirmation).toHaveTextContent("new@example.com");
+    expect(updateMobilePerson).not.toHaveBeenCalled();
+    expect(updateProfileAccount).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
   });
 
   it("leaves the screen when Cancel is pressed", () => {

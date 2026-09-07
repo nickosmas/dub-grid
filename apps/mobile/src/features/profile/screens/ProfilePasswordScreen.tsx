@@ -403,7 +403,8 @@ export default function ProfilePasswordScreen() {
       <ConfirmationModal
         body="You'll be signed out of every device after the password is updated."
         confirmLabel="Update and sign out"
-        confirmTone="danger"
+        confirmTone="warning"
+        iconName="key-outline"
         loading={passwordSaving}
         onCancel={() => {
           setIsConfirming(false);

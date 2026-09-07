@@ -118,6 +118,7 @@ export function SelectionRow({
   detail,
   selected,
   showDivider = true,
+  disabled = false,
   onPress,
 }: {
   label: string;
@@ -125,6 +126,7 @@ export function SelectionRow({
   selected: boolean;
   /** Injected by `SelectionSection`; call sites don't set this. */
   showDivider?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -138,6 +140,7 @@ export function SelectionRow({
   return (
     <View style={[styles.selectionSlot, showDivider && styles.selectionDivider]}>
       <PressableRow
+        disabled={disabled}
         onPress={onPress}
         selected={selected}
         style={[styles.selectionRow, selected && styles.selectionRowSelected]}

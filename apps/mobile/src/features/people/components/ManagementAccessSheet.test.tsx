@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -115,6 +115,7 @@ describe("ManagementAccessSheet", () => {
     renderSheet();
     expect(screen.getByText("Add to management")).toBeInTheDocument();
 
+    cleanup();
     renderSheet({ managementDepartmentIds: [9] });
     expect(screen.getByText("Edit management access")).toBeInTheDocument();
   });

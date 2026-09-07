@@ -111,6 +111,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
           the outside tap and the Android back gesture in one place, so the user
           has to answer with one of the two buttons. */}
       <BottomSheetModal
+        presentationKind="gate"
         accessibilityRole="alert"
         dismissDisabled
         footer={

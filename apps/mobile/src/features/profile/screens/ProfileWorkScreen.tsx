@@ -20,6 +20,7 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
+import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
@@ -39,7 +40,7 @@ import {
   getScheduledDepartmentNames,
   MANAGEMENT_DEPARTMENT_LABELS,
 } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -174,6 +175,7 @@ export default function ProfileWorkScreen() {
   // Only the save confirmation now: the discard half belongs to the guard,
   // which has to answer to back navigation as well as to the Cancel button.
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -190,6 +192,11 @@ export default function ProfileWorkScreen() {
     draft &&
     (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
       draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
+  );
+  const hasEmailChange = Boolean(
+    profile &&
+    draft &&
+    draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase(),
   );
   const hasOtherChanges = Boolean(
     profile &&
@@ -318,14 +325,14 @@ export default function ProfileWorkScreen() {
         requestedNameChange: !canEditProfileDirectly && nameChanged,
       };
     },
+    onMutate: () => setSaveError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not save profile",
-        fallbackMessage: "We couldn't save your profile right now.",
-      });
+      setSaveError(
+        getClientFriendlyErrorMessage(error, "We couldn't save your profile right now."),
+      );
     },
     onSuccess: async (result) => {
+      setShowSaveConfirmation(false);
       const [profileResult] = await Promise.all([
         profileQuery.refetch(),
         bootstrapQuery.refetch(),
@@ -409,7 +416,11 @@ export default function ProfileWorkScreen() {
       });
       return;
     }
-    setShowSaveConfirmation(true);
+    if (isNameRequest || hasEmailChange) {
+      setShowSaveConfirmation(true);
+      return;
+    }
+    return saveMutation.mutateAsync();
   }
 
   const footer =
@@ -490,6 +501,7 @@ export default function ProfileWorkScreen() {
               profile hub's job, and printing it again above the editable fields
               made the first thing on "Profile details" the one thing on it that
               isn't a profile detail. */}
+          {saveError && !showSaveConfirmation ? <InlineError message={saveError} /> : null}
           {draft ? (
             <>
               {linkedEmployee ? (
@@ -546,23 +558,27 @@ export default function ProfileWorkScreen() {
         </>
       )}
       <ConfirmationModal
-        body={
+        body={[
           isNameRequest
             ? hasOtherChanges
               ? "Your new name will be sent to an admin for review. Your other edits will be saved."
               : "Your new name will be sent to an admin for review."
-            : canEditProfileDirectly
-              ? "Your profile will be updated."
-              : "Your changes will be saved."
-        }
-        confirmLabel={isNameRequest ? "Send request" : "Save"}
+            : null,
+          hasEmailChange
+            ? `Request a sign-in email change to ${draft?.email.trim()}. Check your email to confirm the change.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        error={saveError}
+        confirmLabel={hasEmailChange ? "Request changes" : "Send request"}
         loading={saveMutation.isPending}
-        onCancel={() => setShowSaveConfirmation(false)}
-        onConfirm={() => {
+        onCancel={() => {
+          setSaveError(null);
           setShowSaveConfirmation(false);
-          return saveMutation.mutateAsync();
         }}
-        title={isNameRequest ? "Send name change request?" : "Save these changes?"}
+        onConfirm={() => saveMutation.mutateAsync()}
+        title={hasEmailChange ? "Change your sign-in email?" : "Send name change request?"}
         visible={showSaveConfirmation}
       />
       <ConfirmationModal {...guard.confirmationProps} />

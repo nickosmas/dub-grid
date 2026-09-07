@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { ActionButtons } from "./ActionButtons";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -9,17 +10,13 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AppText } from "./AppText";
 import { InsideSheetContext } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
 import { InlineError } from "./InlineError";
 import { Pressable } from "./Pressable";
+import { registerModalPresentation } from "../lib/modal-presentation";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMotionPreference } from "../motion/useMotionPreference";
@@ -32,7 +29,7 @@ type ConfirmationTone = Extract<
 >;
 
 /** How far the card sits below full size while hidden, and settles from. */
-const CARD_ENTRANCE_SCALE = 0.92;
+const CARD_ENTRANCE_SCALE = 0.98;
 
 /**
  * The glyph for each tone's icon badge. Outline, not solid: this app's own
@@ -44,7 +41,7 @@ const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.gly
   primary: "checkmark-circle-outline",
   secondary: "checkmark-circle-outline",
   neutral: "information-circle-outline",
-  danger: "trash-outline",
+  danger: "warning-outline",
   warning: "warning-outline",
 };
 
@@ -86,19 +83,7 @@ function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileC
   }
 }
 
-/**
- * The app's one confirmation surface: a centered popup over a scrim, not a
- * bottom sheet.
- *
- * It used to be built on `BottomSheetModal`, which meant every yes/no prompt
- * in the app - sign out, discard changes, remove a person - slid up as a full
- * sheet. That's the same surface a form or a picker opens, so a screen that
- * already had a sheet open answered its own "are you sure?" with a second
- * one, and the sheet stopped reading as a distinct, bigger interaction. A
- * popup is a smaller, unambiguous interruption, and it can sit on top of an
- * open sheet without tripping the sheet stacking guard, because it no longer
- * is one - it does not report itself to `trackSheetPresentation`.
- */
+/** A brief consequence decision. Editable tasks belong in a sheet or page. */
 export function ConfirmationModal({
   visible,
   title,
@@ -107,6 +92,7 @@ export function ConfirmationModal({
   confirmLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
+  iconName,
   error,
   loading,
   onCancel,
@@ -119,6 +105,7 @@ export function ConfirmationModal({
   confirmLabel: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
+  iconName?: keyof typeof Ionicons.glyphMap;
   /**
    * Why the last confirm failed, shown above the actions.
    *
@@ -129,7 +116,7 @@ export function ConfirmationModal({
    */
   error?: string | null;
   /**
-   * Overrides the busy state `Button` works out for itself. Only needed when
+   * Adds the caller's pending state to the popup's async latch. Only needed when
    * the pending flag lives outside this popup; an async `onConfirm` already
    * spins on its own.
    */
@@ -148,6 +135,10 @@ export function ConfirmationModal({
   // ScrollView below to a sliver, clipping the body text against the footer.
   // `BottomSheetModal` sidesteps the same trap by measuring the window itself.
   const { height: windowHeight } = useWindowDimensions();
+  const presentationName = useRef(title);
+  useEffect(() => {
+    if (visible) return registerModalPresentation("confirmation", presentationName.current);
+  }, [visible]);
   const styles = useMemo(
     () => createStyles(mobileColors, isDark, windowHeight),
     [mobileColors, isDark, windowHeight],
@@ -156,7 +147,7 @@ export function ConfirmationModal({
     () => getConfirmationIconColors(confirmTone, mobileColors),
     [confirmTone, mobileColors],
   );
-  const { spring, timing } = useMotionPreference();
+  const { timing } = useMotionPreference();
 
   // The popup latches the confirm itself rather than leaving it to `Button`,
   // because the busy state has a second job here: a pending confirmation must
@@ -168,25 +159,22 @@ export function ConfirmationModal({
     }
     return onConfirm();
   });
-  const isBusy = loading ?? confirm.isRunning;
+  const isBusy = Boolean(loading || confirm.isRunning);
 
   const cardScale = useSharedValue(CARD_ENTRANCE_SCALE);
   const cardOpacity = useSharedValue(0);
-  // Resolved once per config change on the JS thread, not inside the worklet
-  // below - a worklet that calls `spring`/`timing` itself throws, since both
-  // are plain functions Reanimated can't run on the UI thread.
-  const enterSpring = useMemo(() => spring("bouncy"), [spring]);
+  // Resolve the motion configuration outside the UI-thread worklet.
   const fade = useMemo(() => timing("standard", 180), [timing]);
 
   useEffect(() => {
     if (visible) {
-      cardScale.value = withSpring(1, enterSpring);
+      cardScale.value = withTiming(1, fade);
       cardOpacity.value = withTiming(1, fade);
     } else {
       cardScale.value = withTiming(CARD_ENTRANCE_SCALE, fade);
       cardOpacity.value = withTiming(0, fade);
     }
-  }, [visible, enterSpring, fade, cardScale, cardOpacity]);
+  }, [visible, fade, cardScale, cardOpacity]);
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
@@ -236,8 +224,8 @@ export function ConfirmationModal({
                 >
                   <Ionicons
                     color={iconColors.icon}
-                    name={CONFIRMATION_ICON_NAME[confirmTone]}
-                    size={28}
+                    name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
+                    size={24}
                   />
                 </View>
                 <AppText align="center" variant="sectionTitle">
@@ -259,24 +247,25 @@ export function ConfirmationModal({
                 {children}
                 {error ? <InlineError message={error} /> : null}
               </ScrollView>
-              {/* Outside the ScrollView so the confirm/cancel actions stay put
-                  regardless of how much the popup's body has to scroll. Side
-                  by side, not stacked: a popup is a compact yes/no moment,
-                  not a sheet's list of ranked actions. */}
+              {/* Keep actions visible while the body scrolls. */}
               <View style={styles.footer}>
-                <View style={styles.actionsRow}>
-                  <View style={styles.actionButton}>
+                <ActionButtons
+                  primaryAction={
                     <Button
                       label={confirmLabel}
                       loading={isBusy}
                       onPress={confirm.run}
                       tone={confirmTone}
                     />
-                  </View>
-                  <View style={styles.actionButton}>
-                    <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="plain" />
-                  </View>
-                </View>
+                  }
+                >
+                  <Button
+                    disabled={isBusy}
+                    label={cancelLabel}
+                    onPress={handleDismiss}
+                    tone="plain"
+                  />
+                </ActionButtons>
               </View>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -327,14 +316,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       paddingTop: mobileSpace["2xl"],
       paddingBottom: mobileSpace.sm,
     },
-    // Sized and bordered like `EmptyStateCard`'s full-page icon frame - the
-    // established "big, standalone icon" badge elsewhere in the app. Flat
-    // fill plus a hairline border, no shadow: nothing in this app's existing
-    // icon badges reaches for a glow, so this doesn't invent one either.
     iconBadge: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
@@ -355,12 +340,5 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       paddingHorizontal: mobileSpace.xl,
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.xl,
-    },
-    actionsRow: {
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-    },
-    actionButton: {
-      flex: 1,
     },
   });

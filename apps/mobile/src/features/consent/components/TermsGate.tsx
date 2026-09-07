@@ -81,6 +81,7 @@ export function TermsGate({ children }: PropsWithChildren) {
           the outside tap and the Android back gesture in one place, so the only
           ways out are the two buttons below. */}
       <BottomSheetModal
+        presentationKind="gate"
         accessibilityRole="alert"
         dismissDisabled
         footer={

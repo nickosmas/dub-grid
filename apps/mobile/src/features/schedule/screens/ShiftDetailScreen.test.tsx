@@ -1529,24 +1529,45 @@ describe("ShiftDetailScreen", () => {
   it("shows deleted history without operational shift actions", () => {
     useQuery.mockImplementation(() => ({
       data: {
-        entries: [{
-          employeeId: "emp-1", employeeName: "Alex Kim", date: "2026-04-16",
-          assignmentIds: [], shiftLabel: "", assignmentLabel: null, shiftName: "",
-          absenceTypeId: null, focusAreaId: null, focusAreaName: null,
-          displayFocusAreaName: null, startTime: null, endTime: null,
-          customStartTime: null, customEndTime: null,
-          change: {
-            kind: "deleted",
-            previousPresentation: {
-              label: "D", shiftName: "Day Shift", focusAreaId: 2,
-              focusAreaName: "ICU", displayFocusAreaName: "ICU",
-              startTime: "07:00:00", endTime: "15:00:00", segments: [],
+        entries: [
+          {
+            employeeId: "emp-1",
+            employeeName: "Alex Kim",
+            date: "2026-04-16",
+            assignmentIds: [],
+            shiftLabel: "",
+            assignmentLabel: null,
+            shiftName: "",
+            absenceTypeId: null,
+            focusAreaId: null,
+            focusAreaName: null,
+            displayFocusAreaName: null,
+            startTime: null,
+            endTime: null,
+            customStartTime: null,
+            customEndTime: null,
+            change: {
+              kind: "deleted",
+              previousPresentation: {
+                label: "D",
+                shiftName: "Day Shift",
+                focusAreaId: 2,
+                focusAreaName: "ICU",
+                displayFocusAreaName: "ICU",
+                startTime: "07:00:00",
+                endTime: "15:00:00",
+                segments: [],
+              },
             },
+            publishedAt: "2026-04-15T18:30:00.000Z",
+            publishedByName: "Mina Diaz",
           },
-          publishedAt: "2026-04-15T18:30:00.000Z", publishedByName: "Mina Diaz",
-        }],
+        ],
       },
-      error: null, isFetching: false, isLoading: false, refetch: vi.fn(),
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
     }));
     useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
 

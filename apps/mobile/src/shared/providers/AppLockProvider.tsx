@@ -137,6 +137,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
           would defeat it. `dismissDisabled` is what makes the sheet blocking —
           the only way past it is the device check. */}
       <BottomSheetModal
+        presentationKind="gate"
         accessibilityRole="alert"
         backdrop="cover"
         dismissDisabled

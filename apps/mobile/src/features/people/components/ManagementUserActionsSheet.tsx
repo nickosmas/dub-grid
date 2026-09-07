@@ -274,10 +274,14 @@ export function ManagementUserActionsSheet({
 
       <ConfirmationModal
         body="They'll come off the management roster."
-        confirmLabel="Remove Access"
+        confirmLabel="Remove access"
+        error={error}
         confirmTone="danger"
         loading={accessMutation.isPending}
-        onCancel={() => setShowRemoveConfirmation(false)}
+        onCancel={() => {
+          setError(null);
+          setShowRemoveConfirmation(false);
+        }}
         onConfirm={() =>
           new Promise<void>((resolve) => {
             accessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
@@ -297,8 +301,12 @@ export function ManagementUserActionsSheet({
           invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
         }
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
+        error={error}
         loading={invitationMutation.isPending}
-        onCancel={() => setInvitationConfirmAction(null)}
+        onCancel={() => {
+          setError(null);
+          setInvitationConfirmAction(null);
+        }}
         onConfirm={() => {
           if (invitationConfirmAction)
             return invitationMutation.mutateAsync(invitationConfirmAction);

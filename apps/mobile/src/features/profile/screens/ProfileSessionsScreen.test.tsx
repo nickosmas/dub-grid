@@ -171,7 +171,7 @@ describe("ProfileSessionsScreen", () => {
     expect(screen.getByText("Pixel 8 will lose access immediately.")).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     expect(mutateAsync).toHaveBeenCalledWith("hash-other");
@@ -198,7 +198,7 @@ describe("ProfileSessionsScreen", () => {
     expect(screen.getByText("Sign out all devices?")).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     await waitFor(() => {
@@ -219,7 +219,7 @@ describe("ProfileSessionsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     await waitFor(() => {

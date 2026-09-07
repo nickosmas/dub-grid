@@ -890,7 +890,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
-    expect(screen.getByText("Account found")).toBeInTheDocument();
+    expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/)).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
@@ -919,7 +919,7 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  it("confirms before linking an exact existing account match", () => {
+  it("confirms before linking an exact existing account match", async () => {
     const mutationCalls: Array<{
       mutate: ReturnType<typeof vi.fn>;
       options: {
@@ -991,7 +991,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
-    expect(screen.getByText("Account found")).toBeInTheDocument();
+    expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
@@ -1031,7 +1031,7 @@ describe("PersonDetailScreen", () => {
       renderWithStatusMutation();
 
       expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     });
 
@@ -1040,7 +1040,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
       expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
-      confirmDialog("Mark Inactive");
+      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
@@ -1053,13 +1053,14 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation();
 
       fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      const sheet = within(screen.getByRole("alert"));
+      expect(screen.queryByRole("alert")).toBeNull();
+      const sheet = screen;
       fireEvent.click(sheet.getByRole("button", { name: /Remove from staff/ }));
 
       // The primary action's verb follows the outcome, so the confirm always
       // says what it is about to do.
-      expect(sheet.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
-      confirmDialog("Remove");
+      expect(sheet.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "remove",
@@ -1075,7 +1076,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.change(screen.getByPlaceholderText(/Reason \(optional\)/), {
         target: { value: "  On leave until June  " },
       });
-      confirmDialog("Mark Inactive");
+      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",

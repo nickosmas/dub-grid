@@ -44,7 +44,7 @@ apps/web/
       CustomSelect.tsx              # Always use instead of native <select>
       PageContainer.tsx             # Canonical authed-page wrapper
       CookieConsent.tsx             # CONSENT_VERSION must be bumped on cookie/policy changes
-      Modal.tsx                     # Info dialogs only
+      Modal.tsx                     # Task/info dialogs; shared Base UI focus lifecycle
       settings/shared.tsx           # SectionCard
       ui/editor-action-row.tsx      # EditorActionRow
       ui/switch.tsx                 # Switch (replaces hand-rolled toggles)
@@ -134,6 +134,22 @@ Shared primitives — use before creating alternatives:
 `<NotFoundBoundary>`, `<CustomSelect>`.
 
 Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
+
+## Dialogs and sheets
+
+Use `ConfirmDialog` for a brief consequential decision, including unsaved
+changes. Use `Modal` or the existing side panel for bounded editing/review,
+a popover for desktop choices, and a bottom sheet for compact touch layouts.
+Use a page for substantial workflows. Ordinary saves run directly; significant
+side effects still receive a specific confirmation.
+
+`Modal` and `ui/sheet` share Base UI's dialog accessibility foundation. Preserve
+focus containment and restoration, including a surviving return target when
+an initiating menu item disappears. `headerSafe` is deliberately non-modal so
+its header remains interactive. Confirmation actions put Cancel left and the
+explicit action right, omit the redundant X, and block every dismissal while
+pending. Render failures in the active surface. Keep one task with at most one
+brief confirmation above it; never stack unrelated editors.
 
 ## Double-Press
 

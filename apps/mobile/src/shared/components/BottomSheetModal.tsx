@@ -7,7 +7,7 @@ import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-ha
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { trackSheetPresentation } from "../lib/modal-presentation";
+import { registerModalPresentation } from "../lib/modal-presentation";
 import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
@@ -81,6 +81,7 @@ export function BottomSheetModal({
   accessibilityLabel = "Dismiss",
   accessibilityRole,
   debugName,
+  presentationKind = "sheet",
   header,
   footer,
   children,
@@ -111,6 +112,8 @@ export function BottomSheetModal({
    * report can only say "Dismiss", which is every sheet's backdrop label.
    */
   debugName?: string;
+  /** Only required consent and app-lock gates may interrupt another task. */
+  presentationKind?: "sheet" | "gate";
   /**
    * Rendered in the sheet's non-scrolling top region, which is also the drag
    * region. Put a sheet's title here rather than in `children` so the whole
@@ -161,9 +164,8 @@ export function BottomSheetModal({
   useEffect(() => {
     if (!visible) return;
     const name = presentationName.current;
-    trackSheetPresentation("show", name);
-    return () => trackSheetPresentation("hide", name);
-  }, [visible]);
+    return registerModalPresentation(presentationKind, name);
+  }, [visible, presentationKind]);
 
   const handleDismiss = () => {
     if (dismissDisabled) return;

@@ -1,13 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { Dialog } from "@base-ui/react/dialog";
 import React from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface ModalProps {
   title: string;
@@ -26,6 +23,7 @@ interface ModalProps {
   headerSafe?: boolean;
   /** Action row pinned below the scroll region, spaced evenly above and below. */
   footer?: React.ReactNode;
+  returnFocus?: React.RefObject<HTMLElement | null>;
   "aria-describedby"?: string;
 }
 
@@ -40,30 +38,12 @@ export default function Modal({
   disableOverlayClose = false,
   headerSafe = false,
   footer,
+  returnFocus,
   "aria-describedby": ariaDescribedby,
 }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [closing, setClosing] = useState(false);
-
-  // Auto-focus first interactive child, fall back to dialog container
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const first = dialog.querySelector<HTMLElement>(FOCUSABLE);
-    if (first) first.focus();
-    else dialog.focus();
-  }, []);
-
-  // Lock body scroll while modal is open
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
 
   // Clear timeout on unmount to prevent stale onClose calls
   useEffect(() => {
@@ -81,69 +61,43 @@ export default function Modal({
     timeoutRef.current = setTimeout(() => onClose(), 150);
   }, [onClose, onRequestClose]);
 
-  // Keyboard: Escape to close + focus trap
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        handleClose();
-        return;
-      }
-
-      if (e.key === "Tab") {
-        const dialog = dialogRef.current;
-        if (!dialog) return;
-        const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-        if (focusable.length === 0) return;
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    },
-    [handleClose],
-  );
-
-  return createPortal(
-    <div
-      className={`dg-modal-overlay${closing ? " closing" : ""}${headerSafe ? " is-header-safe" : ""}`}
-      onClick={disableOverlayClose ? undefined : handleClose}
-      onKeyDown={handleKeyDown}
-      role="presentation"
+  return (
+    <Dialog.Root
+      open
+      modal={!headerSafe}
+      disablePointerDismissal
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        aria-describedby={ariaDescribedby}
-        className={`dg-modal${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
-        style={style}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dg-modal-header">
-          <span className="dg-modal-title">{title}</span>
-          {showCloseButton ? (
-            <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
-          ) : null}
+      <Dialog.Portal>
+        <div
+          className={`dg-modal-overlay${closing ? " closing" : ""}${headerSafe ? " is-header-safe" : ""}`}
+          onClick={disableOverlayClose ? undefined : handleClose}
+          role="presentation"
+        >
+          <Dialog.Popup
+            aria-modal={headerSafe ? undefined : true}
+            initialFocus
+            finalFocus={returnFocus ?? true}
+            aria-label={title}
+            aria-describedby={ariaDescribedby}
+            className={`dg-modal${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
+            style={style}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dg-modal-header">
+              <span className="dg-modal-title">{title}</span>
+              {showCloseButton ? (
+                <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
+              ) : null}
+            </div>
+            <div className="dg-modal-scroll-region">{children}</div>
+            {footer ? <div className="dg-modal-footer">{footer}</div> : null}
+            <ScrollOverflowCue />
+          </Dialog.Popup>
         </div>
-        <div className="dg-modal-scroll-region">{children}</div>
-        {footer ? <div className="dg-modal-footer">{footer}</div> : null}
-        <ScrollOverflowCue />
-      </div>
-    </div>,
-    document.body,
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
