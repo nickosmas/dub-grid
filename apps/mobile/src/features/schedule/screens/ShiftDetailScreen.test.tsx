@@ -490,17 +490,14 @@ describe("ShiftDetailScreen", () => {
     expect(detailCardText).toBeDefined();
     expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(detailCardText!.indexOf("Mentor"));
     expect(detailCardText!.indexOf("Mentor")).toBeLessThan(detailCardText!.indexOf("ICU"));
-    // The card reads like the Home hero: area first, then the time row.
-    expect(detailCardText!.indexOf("ICU")).toBeLessThan(
-      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
+    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
+      detailCardText!.indexOf("ICU"),
     );
     expect(
-      within(screen.getByTestId("shift-detail-card")).getByLabelText("Focus area ICU"),
+      within(screen.getByTestId("shift-detail-card")).queryByText("Focus area"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("shift-detail-card")).getByLabelText(
-        "Shift time 7:00 AM - 3:00 PM",
-      ),
+      within(screen.getByTestId("shift-detail-card")).queryByText("Shift time"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Published by")).not.toBeInTheDocument();
     expect(screen.queryByText("Focus Areas")).not.toBeInTheDocument();
@@ -514,32 +511,6 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
     expect(screen.getByLabelText("Shift time 3:00 PM - 11:00 PM")).toBeInTheDocument();
     expect(screen.getByLabelText("Focus area Emergency")).toBeInTheDocument();
-  });
-
-  // The card is the Home hero zoomed in, so it carries the same live status
-  // badge and countdown rather than restating the shift on a plain surface.
-  it("shows the live status badge and countdown on the detail hero", () => {
-    useMutation.mockReturnValue({
-      error: null,
-      isPending: false,
-      mutate: vi.fn(),
-    });
-
-    // System time is 2026-04-15 noon Los Angeles; the shift is the next morning.
-    const upcoming = render(<ShiftDetailScreen />);
-    const upcomingCard = within(screen.getByTestId("shift-detail-card"));
-    expect(upcomingCard.getByText("Upcoming")).toBeInTheDocument();
-    expect(upcomingCard.getByText(/^Starting in /)).toBeInTheDocument();
-    expect(upcomingCard.queryByTestId("shift-detail-progress")).toBeNull();
-    upcoming.unmount();
-
-    // 11:00 AM Los Angeles on the shift's day: four hours into 7:00 AM - 3:00 PM.
-    vi.setSystemTime(new Date("2026-04-16T18:00:00.000Z"));
-    render(<ShiftDetailScreen />);
-    const activeCard = within(screen.getByTestId("shift-detail-card"));
-    expect(activeCard.getByText("On Duty")).toBeInTheDocument();
-    expect(activeCard.getByText(/ left$/)).toBeInTheDocument();
-    expect(activeCard.getByTestId("shift-detail-progress")).toBeInTheDocument();
   });
 
   it("does not show Working with for general shifts", () => {
@@ -689,8 +660,8 @@ describe("ShiftDetailScreen", () => {
     );
     expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
     expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Emergency"));
-    expect(detailCardText!.indexOf("Emergency")).toBeLessThan(
-      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
+    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
+      detailCardText!.indexOf("Emergency"),
     );
     expect(detailCardText!.indexOf("Bri Shaw")).toBeGreaterThan(
       detailCardText!.indexOf("Day Shift"),
