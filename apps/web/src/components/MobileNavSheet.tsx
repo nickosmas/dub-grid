@@ -1,4 +1,6 @@
 "use client";
+
+import { getAvatarTypography } from "@dubgrid/design-tokens";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 
 import React, { useEffect, useCallback, useRef, useState } from "react";
@@ -209,6 +211,7 @@ export default function MobileNavSheet({
                 <div
                   className="dg-bottom-sheet-avatar"
                   style={{
+                    ...getAvatarTypography(32),
                     background: avatarTone.backgroundColor,
                     border: `1px solid ${avatarTone.borderColor}`,
                     color: avatarTone.textColor,

@@ -26,7 +26,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -475,6 +475,7 @@ export function ManagementStaffPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(44),
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
@@ -483,8 +484,6 @@ export function ManagementStaffPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--dg-color-border-light)"

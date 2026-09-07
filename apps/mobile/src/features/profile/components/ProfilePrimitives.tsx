@@ -26,6 +26,7 @@ import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
   mobileRadii,
@@ -181,6 +182,8 @@ export function ProfileHero({
             {initials ? (
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   maxFontSizeMultiplier={MAX_FONT_SCALE}
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >
@@ -672,15 +675,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 96,
     },
     avatarText: {
-      ...mobileText.heroMetric,
+      ...mobileAvatarText(64),
       color: mobileColors.textInverse,
     },
-    // Size only: the weight rides on `heroMetric`'s family, and naming a
-    // fontWeight next to it would send Android hunting for a bold face this
-    // single-weight family hasn't got.
     avatarTextLarge: {
-      fontSize: 32,
-      lineHeight: 40,
+      ...mobileAvatarText(96),
     },
     heroCopy: {
       flex: 1,

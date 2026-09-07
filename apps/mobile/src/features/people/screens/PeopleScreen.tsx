@@ -56,6 +56,7 @@ import {
 } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
@@ -1177,6 +1178,8 @@ function PersonRow({
         ]}
       >
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.personAvatarText, { color: avatarTone.textColor }]}
         >
@@ -1286,7 +1289,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 44,
     },
     personAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(44),
     },
     personCopy: {
       flex: 1,

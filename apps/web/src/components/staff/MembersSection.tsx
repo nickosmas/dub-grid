@@ -32,7 +32,7 @@ import {
   isSelfAction,
   summarizeStaffByCredential,
 } from "@dubgrid/domain";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -2083,8 +2083,9 @@ export function MembersSection({
                           <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-1.5">
                               <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--dg-type-badge-size)] font-semibold"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                                 style={{
+                                  ...getAvatarTypography(32),
                                   background: isPending
                                     ? "var(--dg-color-surface)"
                                     : avatarTone.backgroundColor,

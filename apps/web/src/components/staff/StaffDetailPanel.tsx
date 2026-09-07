@@ -23,7 +23,7 @@ import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
-import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
 
 interface StaffDetailPanelProps {
@@ -211,6 +211,7 @@ export function StaffDetailPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(44),
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
@@ -218,8 +219,6 @@ export function StaffDetailPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `1px solid ${avatarTone.borderColor}`,

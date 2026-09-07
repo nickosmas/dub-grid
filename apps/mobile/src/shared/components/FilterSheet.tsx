@@ -13,7 +13,13 @@ import { Button } from "./Button";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../theme/tokens";
 
 /** How far a row's surface is inset inside its slot. Matches the org picker. */
 const SELECTION_ROW_INSET = 6;
@@ -159,13 +165,32 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Button
-      accessibilityLabel={accessibilityLabel}
+      // Recreate the native button when its tone changes: Android can retain
+      // the old background while updating the label, making it look disabled.
+      key={activeCount > 0 ? "active" : "inactive"}
+      accessibilityLabel={
+        activeCount > 0
+          ? `${accessibilityLabel}, ${activeCount} active ${activeCount === 1 ? "filter" : "filters"}`
+          : accessibilityLabel
+      }
       expanded={expanded}
       fullWidth
       icon="options-outline"
       label="Filter"
+      trailingAccessory={
+        activeCount > 0 ? (
+          <View style={styles.filterCountBadge}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.filterCountText}>
+              {activeCount}
+            </Text>
+          </View>
+        ) : null
+      }
       onPress={onPress}
       size="sm"
       // Promotes to a solid brand fill once any filter is on, so an active
@@ -177,6 +202,21 @@ export function FilterButton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    filterCountBadge: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      flexShrink: 0,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    filterCountText: {
+      ...mobileText.badge,
+      color: mobileColors.onBrandText,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
     section: {
       gap: 10,
     },

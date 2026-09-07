@@ -384,7 +384,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
 
@@ -450,7 +450,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
@@ -518,7 +518,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
@@ -670,7 +670,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Alphabetical"));
 
     const minaRow = screen.getByText("Mina Diaz");
@@ -788,7 +788,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
     expect(screen.queryByText("FT")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status")).not.toBeInTheDocument();
@@ -981,7 +981,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     const memoryCareOptions = screen.getAllByText("Memory Care");
     fireEvent.click(memoryCareOptions[0]);
 
@@ -1029,7 +1029,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("RN"));
 
     expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
@@ -1052,7 +1052,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("No app access"));
 
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
@@ -1081,7 +1081,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("User"));
 
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
@@ -1118,7 +1118,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     // Twice on this tab too: the section of access-level filters, then the
     // sort by it.
     fireEvent.click(screen.getAllByText("Access level")[1]);
@@ -1137,7 +1137,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     expect(screen.getByText("Focus area")).toBeInTheDocument();
     // Access level is the one control both halves share, so the roster-only
     // sections are what prove the staff sheet is showing.
@@ -1159,7 +1159,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     // Also a badge on the row behind the sheet; the sheet's row comes first.
     fireEvent.click(screen.getAllByText("Super Admin")[0]);
@@ -1173,7 +1173,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
 
@@ -1188,11 +1188,11 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
     fireEvent.click(screen.getByText("Done"));
-    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     fireEvent.click(screen.getByText("Schedule"));
 
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();

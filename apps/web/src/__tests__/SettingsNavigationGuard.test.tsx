@@ -169,11 +169,12 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Unsaved changes" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(navigate).not.toHaveBeenCalled();
-    // The draft stays intact; the modal hides background controls from assistive technology.
+    // Opening the confirmation preserves the draft in the underlying panel.
     expect(staffInput).toHaveValue(3);
-    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Keep editing" })).toHaveFocus();
   });
 
   it("keeps the edit when the user chooses to stay", async () => {

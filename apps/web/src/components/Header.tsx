@@ -31,7 +31,7 @@ import { fetchOrganizationBilling } from "@/features/billing/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
@@ -698,6 +698,7 @@ export default function Header({ orgName }: HeaderProps) {
           >
             <div
               style={{
+                ...getAvatarTypography(28),
                 width: 28,
                 height: 28,
                 boxSizing: "border-box",
@@ -707,8 +708,6 @@ export default function Header({ orgName }: HeaderProps) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
                 color: avatarTone.textColor,
                 flexShrink: 0,
               }}

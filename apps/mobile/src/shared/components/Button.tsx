@@ -75,6 +75,7 @@ export function Button({
   iconOnly = false,
   accessibilityLabel,
   leadingAccessory,
+  trailingAccessory,
   selected,
   expanded,
   disabled = false,
@@ -96,6 +97,8 @@ export function Button({
   accessibilityLabel?: string;
   /** @deprecated pass `icon`, or a node for genuinely custom accessories. */
   leadingAccessory?: ReactNode;
+  /** Optional content after the label, such as a count badge. */
+  trailingAccessory?: ReactNode;
   /** Toggle state for segment/filter usage. Surfaced to assistive tech. */
   selected?: boolean;
   /** Set when the button opens a sheet or panel, so screen readers announce it. */
@@ -206,6 +209,7 @@ export function Button({
           </Text>
         ) : null}
         {!isBusy && !iconOnly && iconPosition === "trailing" ? iconNode : null}
+        {!iconOnly ? trailingAccessory : null}
       </View>
     </AnimatedPressable>
   );

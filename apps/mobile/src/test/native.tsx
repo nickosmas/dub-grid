@@ -66,6 +66,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
       key === "numberOfLines" ||
+      key === "adjustsFontSizeToFit" ||
       key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"

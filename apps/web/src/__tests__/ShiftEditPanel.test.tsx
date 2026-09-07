@@ -965,7 +965,7 @@ describe("ShiftEditPanel", () => {
       expect(container.textContent).not.toContain("|");
     });
 
-    it("shows the previous label when a published single shift is replaced", () => {
+    it("shows the compact Edited status when a published single shift is replaced", () => {
       const { container } = renderPanel({
         currentShift: "E",
         currentAssignmentIds: [2],
@@ -974,7 +974,7 @@ describe("ShiftEditPanel", () => {
       });
 
       expect(container.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
-        "Was Day Shift · Supervisor",
+        "Edited",
       );
     });
   });

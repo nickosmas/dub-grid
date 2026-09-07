@@ -1,4 +1,6 @@
 "use client";
+
+import { getAvatarTypography } from "@dubgrid/design-tokens";
 import { ChevronDown, ChevronLeft, User } from "lucide-react";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -823,6 +825,7 @@ export default function GridmasterPortal() {
             >
               <div
                 style={{
+                  ...getAvatarTypography(28),
                   width: 28,
                   height: 28,
                   boxSizing: "border-box",
@@ -832,8 +835,6 @@ export default function GridmasterPortal() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
                   color: avatarTone.textColor,
                   flexShrink: 0,
                 }}

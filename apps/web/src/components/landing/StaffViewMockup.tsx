@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
    no color dots), Certification (plain text), Account (tonal StatusPill).
    ── */
 
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 
 /* ── Focus areas from Calm Haven seed ── */
 const FOCUS_AREAS = ["Skilled Nursing", "Sheltered Care", "Night Shift", "Visiting CSNS"];
@@ -373,14 +373,13 @@ export default function StaffViewMockup() {
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               <div
                 style={{
+                  ...getAvatarTypography(36),
                   width: 36,
                   height: 36,
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 11,
-                  fontWeight: 700,
                   background: avatarTone.backgroundColor,
                   color: avatarTone.textColor,
                   border: `1px solid ${avatarTone.borderColor}`,

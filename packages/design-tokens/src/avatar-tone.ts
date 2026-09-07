@@ -22,70 +22,92 @@ type AvatarHue = {
  * draws this same chip, presence included, so someone looks the same in the
  * people table, on their own profile, and beside a cell they are editing.
  *
- * Generated in OKLCH: ten chromatic slots spaced 36 degrees apart at close to
- * the highest chroma each hue can hold, plus one desaturated slate. Light
- * backgrounds sit near L 0.82 so a chip reads as a color, not a tint. Hue alone
- * cannot separate eleven chips, so adjacent slots also alternate lightness;
- * that second axis is what stops neighbours like blue and indigo reading as the
- * same color in a dense list. `avatar-tone.test.ts` gates both properties:
- * every background/text pairing clears WCAG AA (>=4.5:1), and no two slots fall
- * within an OKLab deltaE of 0.05.
+ * Sixteen softened colors from the approved avatar preview, spanning bright,
+ * earthy, and neutral hues. A few dark fills have small lightness adjustments
+ * to preserve the existing perceptual-distance threshold. Tests hold every
+ * text/background pairing at WCAG AA (>=4.5:1), with at least 0.05 OKLab
+ * deltaE between every pair of fills.
  */
 const AVATAR_HUES: AvatarHue[] = [
   {
-    name: "blue",
-    light: { background: "#AFCDFA", border: "#78ABF7", text: "#174A92" },
-    dark: { background: "#1352A7", border: "#2E6FCD", text: "#B0CEFA" },
+    name: "cornflower",
+    light: { background: "#A3C5FB", border: "#82AAE6", text: "#173D75" },
+    dark: { background: "#1F5BAB", border: "#3876D0", text: "#D0E2FC" },
   },
   {
-    name: "indigo",
-    light: { background: "#C0B1F9", border: "#A385F6", text: "#51398A" },
-    dark: { background: "#522E96", border: "#6D4DB6", text: "#CDC1FA" },
+    name: "sunflower",
+    light: { background: "#F6DC70", border: "#D7BD4F", text: "#59440B" },
+    dark: { background: "#795D11", border: "#AA9038", text: "#FFF6CC" },
   },
   {
-    name: "magenta",
-    light: { background: "#FAACF3", border: "#E47EDC", text: "#722C6E" },
-    dark: { background: "#84297F", border: "#A4499E", text: "#EDB6E7" },
+    name: "terracotta",
+    light: { background: "#F2A890", border: "#DB8870", text: "#612719" },
+    dark: { background: "#9B462F", border: "#BC644B", text: "#FFE8DF" },
   },
   {
-    name: "rose",
-    light: { background: "#F99FB2", border: "#F0688C", text: "#822341" },
-    dark: { background: "#85153D", border: "#AB3157", text: "#FAB4C2" },
+    name: "sea glass",
+    light: { background: "#87EACB", border: "#64C6A8", text: "#14503F" },
+    dark: { background: "#23735C", border: "#33977D", text: "#D7FFF0" },
   },
   {
-    name: "orange",
-    light: { background: "#FABAA1", border: "#F88658", text: "#7E3310" },
-    dark: { background: "#8C3913", border: "#B74D1C", text: "#FABBA3" },
+    name: "lilac",
+    light: { background: "#D7AFF3", border: "#BB8EDC", text: "#512467" },
+    dark: { background: "#7C3D9C", border: "#995EBB", text: "#F4E3FF" },
   },
   {
-    name: "amber",
-    light: { background: "#F1AF36", border: "#C8912B", text: "#61440F" },
-    dark: { background: "#60440F", border: "#835E19", text: "#EBC487" },
+    name: "moss",
+    light: { background: "#B8C780", border: "#9BAA62", text: "#354116" },
+    dark: { background: "#566A27", border: "#778E44", text: "#EEF6CC" },
   },
   {
-    name: "lime",
-    light: { background: "#CAD657", border: "#A9B430", text: "#4D5211" },
-    dark: { background: "#555B14", border: "#72791D", text: "#CDD590" },
+    name: "candy pink",
+    light: { background: "#F8AACD", border: "#E086AE", text: "#721F47" },
+    dark: { background: "#9C3768", border: "#BD5888", text: "#FFE3F1" },
   },
   {
-    name: "green",
-    light: { background: "#6ED888", border: "#34B860", text: "#13592B" },
-    dark: { background: "#13582A", border: "#1D793C", text: "#A0DCAC" },
+    name: "glacier",
+    light: { background: "#94E2F9", border: "#6BC6E0", text: "#154F61" },
+    dark: { background: "#21738C", border: "#3C93AC", text: "#E2F8FF" },
   },
   {
-    name: "teal",
-    light: { background: "#43E7D8", border: "#37C1B5", text: "#145952" },
-    dark: { background: "#17635C", border: "#22827A", text: "#87E3D8" },
+    name: "apricot",
+    light: { background: "#FAC783", border: "#DFAA61", text: "#673B0A" },
+    dark: { background: "#945916", border: "#BD833B", text: "#FFEED2" },
   },
   {
-    name: "cyan",
-    light: { background: "#42CFF9", border: "#31ACCF", text: "#125265" },
-    dark: { background: "#125264", border: "#1D7088", text: "#85D8F5" },
+    name: "denim",
+    light: { background: "#9FB7D2", border: "#809DBD", text: "#253D57" },
+    dark: { background: "#33557F", border: "#51759F", text: "#E3EFFF" },
   },
   {
-    name: "slate",
-    light: { background: "#B2B8C2", border: "#8F97A6", text: "#3F4754" },
-    dark: { background: "#3F4551", border: "#586170", text: "#C7CBD2" },
+    name: "pistachio",
+    light: { background: "#D7EC85", border: "#BACF66", text: "#465411" },
+    dark: { background: "#799035", border: "#8CA844", text: "#202020" },
+  },
+  {
+    name: "cocoa",
+    light: { background: "#D3A988", border: "#B88C6B", text: "#472A15" },
+    dark: { background: "#7E4E2C", border: "#A26E47", text: "#FFECDA" },
+  },
+  {
+    name: "lagoon",
+    light: { background: "#74CFD1", border: "#55B1B5", text: "#10454B" },
+    dark: { background: "#18696F", border: "#358F97", text: "#D7FBFF" },
+  },
+  {
+    name: "oat",
+    light: { background: "#E6CCAC", border: "#CAAD87", text: "#584022" },
+    dark: { background: "#886A43", border: "#A5855C", text: "#FFF2DF" },
+  },
+  {
+    name: "jade",
+    light: { background: "#88DF9D", border: "#59C57D", text: "#13592B" },
+    dark: { background: "#1F6035", border: "#288046", text: "#C6EACD" },
+  },
+  {
+    name: "silver",
+    light: { background: "#C0C5CD", border: "#A3AAB6", text: "#3F4754" },
+    dark: { background: "#494E5A", border: "#606977", text: "#DDE0E4" },
   },
 ];
 

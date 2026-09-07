@@ -1,5 +1,7 @@
 "use client";
 
+import { getAvatarTypography } from "@dubgrid/design-tokens";
+
 import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -46,8 +48,8 @@ export function PersonProfileHeader({
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 shrink-0">
               <AvatarFallback
-                className="text-xl font-bold"
                 style={{
+                  ...getAvatarTypography(64),
                   background: avatarTone.backgroundColor,
                   border: `1px solid ${avatarTone.borderColor}`,
                   color: avatarTone.textColor,

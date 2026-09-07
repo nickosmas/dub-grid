@@ -2,6 +2,7 @@ import {
   borderColorFromText,
   colorTokens,
   darkColorTokens,
+  getAvatarTypography,
   getMobileEasingCurve,
   getMobileElevation,
   getMobileIconToneColor,
@@ -265,6 +266,18 @@ export const mobileRadii = radiusTokens;
 /** Small-surface radius ramp for chips, inputs and inline badges. */
 export const mobileRadius = mobileRadiusTokens;
 export const mobileTypography = mobileTypographyTokens;
+
+/** Avatar initials use the actual DM Sans medium face on both native platforms. */
+export function mobileAvatarText(diameter: number): TextStyle {
+  const { fontSize } = getAvatarTypography(diameter);
+  return {
+    fontFamily: mobileTypography.fontFamily.medium,
+    fontSize,
+    lineHeight: Math.ceil(fontSize * 1.2),
+    maxWidth: "100%",
+    textAlign: "center",
+  };
+}
 export const dubGridNavigationTheme = mobileNavigationTheme;
 export const mobileBorderColorFromText = borderColorFromText;
 /** Durations, springs and easing curves. See `shared/motion` for the hooks. */

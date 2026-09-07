@@ -20,7 +20,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { AccessInsignia } from "./AccessInsignia";
-import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 interface StaffReadOnlyDetailPanelProps {
   employee: Employee;
@@ -136,6 +136,7 @@ export function StaffReadOnlyDetailPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(56),
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
@@ -143,8 +144,6 @@ export function StaffReadOnlyDetailPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 18,
-                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `1px solid ${avatarTone.borderColor}`,

@@ -13,12 +13,7 @@ import {
   getDashboardRoleVariant,
   hasDashboardAdminCapability,
 } from "@/components/dashboard/DashboardView";
-import {
-  getDatesInRange,
-  getWeekStart,
-  type EmployeeHours,
-  type OpenShift,
-} from "@/lib/dashboard-stats";
+import { getDatesInRange, type EmployeeHours, type OpenShift } from "@/lib/dashboard-stats";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AssignmentDefinition,
@@ -1297,8 +1292,7 @@ describe("UserDashboard", () => {
   });
 
   it("does not repeat general or absence labels in Your Week rows", () => {
-    const periodStart = getWeekStart(new Date());
-    const periodDates = getDatesInRange(periodStart, 7);
+    const { periodDates } = makeProps();
     const generalDate = formatDateKey(periodDates[0] ?? new Date());
     const absenceDate = formatDateKey(periodDates[1] ?? periodDates[0] ?? new Date());
     const currentPeriodShifts: ShiftMap = {

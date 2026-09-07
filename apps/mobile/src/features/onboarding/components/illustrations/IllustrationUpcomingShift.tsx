@@ -4,7 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useIsDarkMode, useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
-import { mobileText, mobileTextWeighted, type MobileColors } from "../../../../shared/theme/tokens";
+import {
+  mobileAvatarText,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../../shared/theme/tokens";
 import { IllustrationFrame } from "./illustration-primitives";
 
 /**
@@ -117,7 +122,11 @@ export function IllustrationUpcomingShift() {
                         },
                       ]}
                     >
-                      <Text style={[styles.avatarText, { color: avatarTone.textColor }]}>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        style={[styles.avatarText, { color: avatarTone.textColor }]}
+                      >
                         {shiftmate.initials}
                       </Text>
                     </View>
@@ -293,7 +302,7 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     avatarText: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileAvatarText(38),
     },
     avatarOverflow: {
       width: 38,

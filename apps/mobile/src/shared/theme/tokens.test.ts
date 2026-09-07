@@ -9,10 +9,22 @@ import {
   mobileSpacing,
   mobileText,
   mobileTextWeighted,
+  mobileAvatarText,
   mobileTypography,
   mobileDarkenTone,
   mobileVisiblePillBorder,
 } from "./tokens";
+
+describe("mobileAvatarText", () => {
+  it("uses the native medium face without a synthetic font weight", () => {
+    const style = mobileAvatarText(48);
+    expect(style.fontFamily).toBe(mobileTypography.fontFamily.medium);
+    expect(style).not.toHaveProperty("fontWeight");
+    expect(style.fontSize).toBe(20);
+    expect(style.maxWidth).toBe("100%");
+    expect(style.lineHeight).toBeGreaterThan(style.fontSize!);
+  });
+});
 
 describe("mobileBorderColorFromText", () => {
   it("derives a visible rgba border from a hex text color", () => {
