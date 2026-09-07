@@ -8,7 +8,14 @@ import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { registerModalPresentation } from "../lib/modal-presentation";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import {
+  mobileElevation,
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 import { AppText } from "./AppText";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
@@ -71,6 +78,16 @@ const SHEET_TOP_GAP = mobileSpace.md;
  * would cut two backdrop-coloured notches into the very bottom.
  */
 const SHEET_CORNER_RADIUS = 40;
+
+/**
+ * Tap target for the close button, and the box centred on the title's line.
+ * 44 matches the week chevrons and the alerts bell, which is the size this
+ * chrome reads at everywhere else.
+ */
+const CLOSE_BUTTON_SIZE = 44;
+
+/** What `SheetHeader` renders its title at, which is what the close button lines up with. */
+const SHEET_TITLE_LINE_HEIGHT = mobileText.screenTitle.lineHeight ?? 28;
 
 export function BottomSheetModal({
   visible,
@@ -250,6 +267,29 @@ export function BottomSheetModal({
                   <View style={styles.grabberArea}>
                     <View style={styles.grabber} />
                   </View>
+                  {/* The one *visible* way out. The drag, the outside tap and
+                    the Android back gesture all leave too, but a sheet holding
+                    unsaved input answers its own dismiss button with Discard,
+                    which resets rather than leaves — so without this there is
+                    no control on screen that closes it. Routed through
+                    `handleDismiss` like every other exit, so a guard still gets
+                    its say. Hidden when dismissal is disabled at all: a gate
+                    must not offer a way out it will refuse. */}
+                  {dismissDisabled ? null : (
+                    <Pressable
+                      accessibilityLabel="Close"
+                      accessibilityRole="button"
+                      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
+                      hitSlop={10}
+                      style={({ pressed }) => [
+                        styles.closeButton,
+                        pressed && styles.closeButtonPressed,
+                      ]}
+                      onPress={handleDismiss}
+                    >
+                      <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
+                    </Pressable>
+                  )}
                   {header ? <View style={styles.header}>{header}</View> : null}
                 </View>
                 {scrollable ? (
@@ -309,6 +349,40 @@ const createStyles = (
     dragRegion: {
       minHeight: 44,
       justifyContent: "center",
+    },
+    // Absolute so it can't push the title off-centre or add height to the drag
+    // region, and so a header that wraps to two lines keeps it pinned to the
+    // first line rather than drifting to the middle of the block.
+    closeButton: {
+      position: "absolute",
+      // Centred on the title's first line. The grabber area is exactly
+      // `SHEET_CONTENT_TOP_PADDING` tall and the header adds no padding of its
+      // own, so that is where the title starts; the rest centres this button's
+      // box on that line box rather than on the header as a whole.
+      top: SHEET_CONTENT_TOP_PADDING + (SHEET_TITLE_LINE_HEIGHT - CLOSE_BUTTON_SIZE) / 2,
+      // Matches the header's own `paddingHorizontal`, so the gap to the right
+      // edge is the gap the title keeps from the left.
+      right: mobileSpace.xl,
+      zIndex: 1,
+      width: CLOSE_BUTTON_SIZE,
+      height: CLOSE_BUTTON_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: mobileRadii.pill,
+      // The same outlined chrome as the week chevrons and the alerts bell: the
+      // button is the same `surface` as the sheet it sits on, so the edge is
+      // what makes it a control. `border` rather than `borderSubtle` for that
+      // reason - at 1.23:1 the subtle one leaves the icon looking unenclosed.
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surface,
+      // `raised`, not `card`: a heavier blur under a white pill on a white
+      // sheet reads as a smudge, and with the outline there are already two
+      // separators doing one job.
+      ...mobileElevation("raised", isDark),
+    },
+    closeButtonPressed: {
+      transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
     header: {
       paddingHorizontal: mobileSpace.xl,
