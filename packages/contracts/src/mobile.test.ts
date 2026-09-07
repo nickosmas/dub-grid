@@ -4,7 +4,6 @@ import {
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestBodySchema,
   mobileDashboardMetricsSchema,
-  mobileDashboardTrendPointSchema,
   mobileNotificationPreferencesResponseSchema,
   mobileNotificationSchema,
   mobilePersonSchema,
@@ -56,27 +55,6 @@ describe("mobile contracts", () => {
       mobileDashboardMetricsSchema.safeParse({
         ...baseMetrics,
         draftSummary: { newCount: 1, modifiedCount: 0, deletedCount: 0, total: 0 },
-      }).success,
-    ).toBe(false);
-  });
-
-  it("requires raw bounded facts for each dashboard trend point", () => {
-    expect(
-      mobileDashboardTrendPointSchema.parse({
-        startDate: "2026-04-01",
-        endDate: "2026-04-07",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      }),
-    ).toMatchObject({ coveragePct: null, totalRequiredSlots: 0 });
-    expect(
-      mobileDashboardTrendPointSchema.safeParse({
-        startDate: "2026-04-01",
-        endDate: "2026-04-07",
-        coveragePct: 101,
-        staffScheduled: -1,
-        totalRequiredSlots: 0,
       }).success,
     ).toBe(false);
   });

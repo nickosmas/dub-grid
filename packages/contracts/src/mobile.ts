@@ -695,17 +695,6 @@ export const mobileDashboardMetricsSchema = z.object({
   draftSummary: mobileDashboardDraftSummarySchema.nullable(),
 });
 
-export const mobileDashboardTrendPointSchema = z.object({
-  startDate: z.string().date(),
-  endDate: z.string().date(),
-  // Null distinguishes missing coverage requirements from a fully covered period.
-  coveragePct: z.number().int().min(0).max(100).nullable(),
-  staffScheduled: z.number().int().nonnegative(),
-  totalRequiredSlots: z.number().int().nonnegative(),
-});
-
-export const mobileDashboardTrendsSchema = z.array(mobileDashboardTrendPointSchema).length(5);
-
 export const mobileDashboardResponseSchema = z.object({
   range: z.object({
     startDate: z.string().date(),
@@ -714,7 +703,6 @@ export const mobileDashboardResponseSchema = z.object({
   overtimeThresholdHours: z.number().int().positive(),
   heroSummary: mobileDashboardHeroSummarySchema,
   metrics: mobileDashboardMetricsSchema,
-  trends: mobileDashboardTrendsSchema,
   coverageBySection: z.array(mobileDashboardCoverageSectionSchema),
   openShifts: z.array(mobileOpenShiftSchema),
   activity: z.array(mobileDashboardActivityItemSchema),
@@ -1215,7 +1203,6 @@ export type MobileFocusArea = z.infer<typeof mobileFocusAreaSchema>;
 export type MobileNamedItem = z.infer<typeof mobileNamedItemSchema>;
 export type MobileBootstrapRole = z.infer<typeof mobileBootstrapRoleSchema>;
 export type MobileDepartment = z.infer<typeof mobileDepartmentSchema>;
-export type MobileDashboardTrendPoint = z.infer<typeof mobileDashboardTrendPointSchema>;
 export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>["range"];
 export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;

@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireMobileAuth = vi.fn();
 const resolveMobileDateRange = vi.fn();
 const fetchMobileCoverageSummary = vi.fn();
-const fetchMobileDashboardTrends = vi.fn();
 const fetchMobileShiftRequests = vi.fn();
 const fetchMobileOpenShiftContext = vi.fn();
 const fetchMobilePublishHistoryRows = vi.fn();
@@ -20,7 +19,6 @@ vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   resolveMobileDateRange,
   fetchMobileCoverageSummary,
-  fetchMobileDashboardTrends,
   fetchMobileShiftRequests,
   fetchMobileOpenShiftContext,
 }));
@@ -54,43 +52,6 @@ describe("mobile dashboard route", () => {
       hasCoverageRequirements: false,
       scheduleRows: [],
     });
-    fetchMobileDashboardTrends.mockResolvedValue([
-      {
-        startDate: "2026-04-13",
-        endDate: "2026-04-19",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      },
-      {
-        startDate: "2026-04-20",
-        endDate: "2026-04-26",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      },
-      {
-        startDate: "2026-04-27",
-        endDate: "2026-05-03",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      },
-      {
-        startDate: "2026-05-04",
-        endDate: "2026-05-10",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      },
-      {
-        startDate: "2026-05-11",
-        endDate: "2026-05-17",
-        coveragePct: null,
-        staffScheduled: 0,
-        totalRequiredSlots: 0,
-      },
-    ]);
     fetchMobileShiftRequests.mockResolvedValue([]);
     fetchMobileOpenShiftContext.mockResolvedValue({
       assignments: [],
@@ -193,11 +154,6 @@ describe("mobile dashboard route", () => {
       },
     );
     expect(fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
-    expect(fetchMobileDashboardTrends).toHaveBeenCalledWith(
-      {},
-      { orgId: "org-1", range: { startDate: "2026-05-11", endDate: "2026-05-17" } },
-    );
-    expect(payload.trends).toHaveLength(5);
     expect(fetchMobileScheduleComparisonRows).toHaveBeenCalledWith(
       {},
       { orgId: "org-1", startDate: "2026-05-11", endDate: "2026-05-17" },
