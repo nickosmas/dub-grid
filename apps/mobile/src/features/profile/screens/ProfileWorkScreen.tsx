@@ -429,28 +429,19 @@ export default function ProfileWorkScreen() {
         <View style={styles.actionButton}>
           <Button
             compact
-            disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
-            label={isNameRequest ? "Send request" : "Save changes"}
-            loading={saveMutation.isPending}
-            onPress={handleSave}
-          />
-        </View>
-        <View style={styles.actionButton}>
-          <Button
-            compact
-            disabled={saveMutation.isPending || !hasChanges}
-            label="Discard"
-            onPress={discardChanges}
-            tone="neutral"
-          />
-        </View>
-        <View style={styles.actionButton}>
-          <Button
-            compact
             disabled={saveMutation.isPending}
             label="Cancel"
             onPress={() => router.back()}
             tone="plain"
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
+            label={isNameRequest ? "Send request" : "Save changes"}
+            loading={saveMutation.isPending}
+            onPress={handleSave}
           />
         </View>
       </View>

@@ -755,7 +755,10 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Staffing")).toBeInTheDocument();
     expect(screen.getByText("Assignments")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
-    expect(screen.getByText("Discard")).toBeInTheDocument();
+    // Two buttons, not three: Cancel is the only way out, and it confirms when
+    // there is something to lose rather than sitting beside a separate Discard.
+    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
     expect(screen.getByText("Save changes")).toBeInTheDocument();
     expect(screen.queryByText("Call")).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
@@ -1365,41 +1368,37 @@ describe("PersonDetailScreen", () => {
       return mutationCalls;
     }
 
-    it("offers Remove from Schedule to someone with management access", () => {
-      renderForSchedule({ managementDepartmentIds: [9] });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-
-      expect(screen.getByRole("button", { name: "Remove from Schedule" })).toBeInTheDocument();
-    });
-
-    // Without management access the focus areas are the whole staff record, and
-    // clearing them is what Deactivate is for.
-    it("withholds Remove from Schedule from plain staff", () => {
-      renderForSchedule({ managementDepartmentIds: [] });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-
-      expect(
-        screen.queryByRole("button", { name: "Remove from Schedule" }),
-      ).not.toBeInTheDocument();
-    });
-
-    // The server allows the empty focus-area set only because they keep
-    // managing, so Save has to stay live once the row is cleared.
+    // Deselecting the focus areas is the removal path; there is no separate
+    // button. The server allows the empty set only because they keep managing,
+    // so Save has to stay live once the last chip comes off.
     it("clears the focus areas and keeps Save available", () => {
       renderForSchedule({ managementDepartmentIds: [9] });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Remove from Schedule" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
 
-      expect(screen.getByText("Not scheduled")).toBeInTheDocument();
       expect(
         screen.getByText(
           "Saving now removes them from the schedule. They'll keep management access.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    });
+
+    // Without management access the focus areas are the whole staff record, so
+    // clearing them is a validation error, not a removal. Deactivate is what
+    // takes plain staff off the grid.
+    it("withholds the removal note from plain staff", () => {
+      renderForSchedule({ managementDepartmentIds: [] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+
+      expect(
+        screen.queryByText(
+          "Saving now removes them from the schedule. They'll keep management access.",
+        ),
+      ).not.toBeInTheDocument();
     });
 
     it("offers Add to Schedule to someone who isn't on it", () => {

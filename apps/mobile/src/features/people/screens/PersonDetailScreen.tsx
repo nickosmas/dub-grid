@@ -85,7 +85,6 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   getProfileInitials,
-  ProfileActionRow,
   ProfileActionStack,
   ProfileChoiceGroup,
   ProfileHero,
@@ -101,9 +100,14 @@ import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
 import { hasManagementAccess } from "../lib/managementAccess";
 import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
-import { AccessStatusRow } from "../components/AccessStatusRow";
+import { SectionNotice } from "../components/SectionNotice";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
-import { getPersonOrgRole, OrgRoleSheet, type OrgRole } from "../components/OrgRoleSheet";
+import {
+  getPersonOrgRole,
+  getPersonOrgRoleSubject,
+  OrgRoleSheet,
+  type OrgRole,
+} from "../components/OrgRoleSheet";
 
 type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
@@ -662,13 +666,13 @@ export default function PersonDetailScreen() {
   }
 
   if (isSelf) {
-    return <Screen bottomPaddingMode="tabbed" scrollEnabled={false} />;
+    return <Screen bottomPaddingMode="stack" scrollEnabled={false} />;
   }
 
   if (contentState.kind === "loading") {
     return (
       <Screen
-        bottomPaddingMode="tabbed"
+        bottomPaddingMode="stack"
         // A skeleton must not scroll, and there is nothing to pull-to-refresh
         // while the profile is still loading.
         scrollEnabled={false}
@@ -692,7 +696,7 @@ export default function PersonDetailScreen() {
   if (contentState.kind === "error") {
     return (
       <Screen
-        bottomPaddingMode="tabbed"
+        bottomPaddingMode="stack"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
@@ -713,7 +717,7 @@ export default function PersonDetailScreen() {
   if (!person || !draft) {
     return (
       <Screen
-        bottomPaddingMode="tabbed"
+        bottomPaddingMode="stack"
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
@@ -893,28 +897,19 @@ export default function PersonDetailScreen() {
         <View style={styles.actionButton}>
           <Button
             compact
-            disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
-            label="Save changes"
-            loading={updateMutation.isPending}
-            onPress={handleSave}
-          />
-        </View>
-        <View style={styles.actionButton}>
-          <Button
-            compact
-            disabled={updateMutation.isPending || !hasChanges}
-            label="Discard"
-            onPress={guard.discard}
-            tone="neutral"
-          />
-        </View>
-        <View style={styles.actionButton}>
-          <Button
-            compact
             disabled={updateMutation.isPending}
             label="Cancel"
             onPress={guard.requestClose}
             tone="plain"
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
+            label="Save changes"
+            loading={updateMutation.isPending}
+            onPress={handleSave}
           />
         </View>
       </View>
@@ -923,7 +918,7 @@ export default function PersonDetailScreen() {
 
   return (
     <Screen
-      bottomPaddingMode="tabbed"
+      bottomPaddingMode="stack"
       footer={footer}
       onRefresh={manualRefresh.refresh}
       onScroll={handlePersonScroll}
@@ -1194,7 +1189,7 @@ export default function PersonDetailScreen() {
           <ProfileActionStack>
             {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
-                <ProfileActionRow>
+                <>
                   {/* A filled control, not a link: it sits beside a solid
                       Revoke, and a bare label next to one reads as the
                       caption on it rather than the peer action it is. Neutral
@@ -1214,7 +1209,7 @@ export default function PersonDetailScreen() {
                     onPress={() => setInvitationConfirmAction("revoke")}
                     tone="danger"
                   />
-                </ProfileActionRow>
+                </>
               ) : (
                 <Button
                   compact
@@ -1225,9 +1220,9 @@ export default function PersonDetailScreen() {
                 />
               )
             ) : null}
-            {/* The mirror of Remove from Schedule, which lives in the edit
-                panel. Only offered to someone who isn't on the grid at all;
-                anyone with focus areas changes them in that panel instead. */}
+            {/* Only offered to someone who isn't on the grid at all. Anyone with
+                focus areas changes them in the edit panel, where clearing them
+                all is what takes them back off it. */}
             {canManageEmployees && person.status !== "removed" && !isOnSchedule ? (
               <Button
                 compact
@@ -1411,7 +1406,7 @@ export default function PersonDetailScreen() {
             orgRoleMutation.mutate(orgRole, { onSettled: () => resolve() });
           })
         }
-        person={person}
+        subject={getPersonOrgRoleSubject(person)}
         visible={showOrgRole}
       />
       <ConfirmationModal
@@ -1585,6 +1580,10 @@ function EditPanel({
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
+  const assignmentNotices =
+    hasManagementAccess && draft.focusAreaIds.length === 0
+      ? ["Saving now removes them from the schedule. They'll keep management access."]
+      : [];
   const toggle = (key: "focusAreaIds" | "roleIds", id: number) => {
     const current = draft[key];
     setField(
@@ -1595,42 +1594,6 @@ function EditPanel({
 
   return (
     <>
-      {/* What their schedule access is right now, and what saving would do to
-          it. Only someone with management access can be taken off the schedule:
-          for anyone else the focus areas are the whole staff record, and
-          clearing them is what Deactivate is for. */}
-      <ProfileSection>
-        <AccessStatusRow
-          actionLabel={
-            hasManagementAccess && draft.focusAreaIds.length > 0
-              ? "Remove from Schedule"
-              : undefined
-          }
-          disabled={saving}
-          label={focusAreaLabel}
-          note={
-            hasManagementAccess && draft.focusAreaIds.length === 0
-              ? "Saving now removes them from the schedule. They'll keep management access."
-              : undefined
-          }
-          statusText={
-            draft.focusAreaIds.length > 0
-              ? `Scheduled - ${draft.focusAreaIds.length} ${
-                  draft.focusAreaIds.length === 1
-                    ? singularLabelNoun(focusAreaLabel).toLowerCase()
-                    : focusAreaLabel.toLowerCase()
-                }`
-              : "Not scheduled"
-          }
-          tone={draft.focusAreaIds.length > 0 ? "active" : "neutral"}
-          onAction={
-            hasManagementAccess && draft.focusAreaIds.length > 0
-              ? () => setField("focusAreaIds", [])
-              : undefined
-          }
-        />
-      </ProfileSection>
-
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput
@@ -1731,6 +1694,11 @@ function EditPanel({
       </ProfileSection>
 
       <ProfileSection title="Assignments">
+        {/* Raised once for the whole section rather than under the chips that
+            produced it. Only management users can come off the schedule at
+            all - for anyone else an empty set is the group's own validation
+            error, which stays where it is. */}
+        <SectionNotice messages={assignmentNotices} />
         <ProfilePanel>
           <ProfileChoiceGroup
             error={fieldErrors.focusAreaIds}

@@ -251,22 +251,21 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
   });
 
-  it("keeps Save and Discard disabled (but visible) until a field changes, then saves", async () => {
+  it("keeps Save disabled (but visible) until a field changes, then saves", async () => {
     render(<ProfileWorkScreen />);
 
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    // Always present, grayed out until there's something to discard — not
-    // removed from the layout, which is what made the footer's three buttons
-    // jump around as soon as the first field changed.
-    expect(screen.getByRole("button", { name: "Discard" })).toBeDisabled();
+    // Save is grayed rather than removed, so the footer doesn't reflow the
+    // moment the first field changes. Cancel is the only other button: it is
+    // always live, because backing out is valid whether or not there is work.
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "Discard" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(screen.queryByRole("alert")).toBeNull();
