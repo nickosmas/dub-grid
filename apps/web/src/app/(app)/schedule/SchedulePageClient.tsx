@@ -17,6 +17,7 @@ import ScheduleGrid, {
   type ScheduleGridHandlers,
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import PrintLegend from "@/components/PrintLegend";
@@ -217,6 +218,8 @@ import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationB
 import { queryKeys } from "@/lib/query-keys";
 import {
   buildScheduleNoteMap,
+  removeScheduleNotesForCell,
+  buildScheduleNoteMarks,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -241,6 +244,7 @@ import {
   SeriesFrequency,
   SeriesScope,
   DraftKind,
+  NotePublishChange,
   PublishChange,
   PublishHistoryEntry,
   GridOpenShift,
@@ -1541,11 +1545,39 @@ function SchedulerContent() {
     return map;
   }, [inWindowPublishHistory]);
 
+  /**
+   * Published note changes, per cell and indicator.
+   *
+   * Notes are not part of a cell snapshot, so they arrive on their own list and
+   * key on the focus area too: the same indicator can sit on two focus-area
+   * sections of one employee's day.
+   */
+  const publishNoteChangesMap = useMemo(() => {
+    if (inWindowPublishHistory.length === 0) return null;
+    const map = new Map<string, Map<number, NotePublishChange>>();
+    for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
+      for (const change of inWindowPublishHistory[i].noteChanges ?? []) {
+        // A period's first publication is the baseline, not a set of additions.
+        // Marking its notes would ring every dot on a week whose shifts are all
+        // deliberately unmarked.
+        if (change.kind === "new" && change.isNewAddition === false) continue;
+        const key = scheduleNoteKey(change.empId, change.date, change.focusAreaId);
+        const byIndicator = map.get(key) ?? new Map<number, NotePublishChange>();
+        byIndicator.set(change.indicatorTypeId, change);
+        map.set(key, byIndicator);
+      }
+    }
+    return map.size > 0 ? map : null;
+  }, [inWindowPublishHistory]);
+
   // What the "Highlight Changes" toggle puts on the grid, counted by kind so
   // the banner can name and key each one. A publish can carry any mix of new,
   // edited and deleted cells.
   const publishChangeCounts = useMemo(() => {
-    const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0 };
+    const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0, notes: 0 };
+    for (const byIndicator of publishNoteChangesMap?.values() ?? []) {
+      counts.notes += byIndicator.size;
+    }
     if (!publishChangesMap) return counts;
     for (const change of publishChangesMap.values()) {
       // A period's first publication has no prior published schedule for the
@@ -1556,7 +1588,7 @@ function SchedulerContent() {
       else counts.modifiedShifts += 1;
     }
     return counts;
-  }, [publishChangesMap]);
+  }, [publishChangesMap, publishNoteChangesMap]);
 
   // Dismissals persist for the tab session via useDismissibleBanner — no
   // auto-reset on data change. The X means "hide this for the rest of the
@@ -3454,10 +3486,35 @@ function SchedulerContent() {
       const key =
         focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
       const noteList = notes[key] ?? [];
-      // Only return notes that aren't marked as deleted in draft
-      return noteList.filter((n) => n.status !== "draft_deleted").map((n) => n.indicatorTypeId);
+      // A note pending removal is still on the schedule, and one pending
+      // addition is not on it yet. Non-schedulers see neither draft state, the
+      // same way they never see draft shift state.
+      return noteList
+        .filter((n) => (isScheduleEditor ? n.status !== "draft_deleted" : n.status !== "draft"))
+        .map((n) => n.indicatorTypeId);
     },
-    [notes],
+    [isScheduleEditor, notes],
+  );
+
+  /**
+   * The grid's note dots, carrying each note's publication state.
+   *
+   * A note change never touches the cell snapshot, so nothing else in the cell
+   * moves when one is added or removed — without this the dot for an
+   * unpublished note is identical to a published one, and a note queued for
+   * removal simply disappears as though it were already gone.
+   */
+  const noteMarksForKey = useCallback(
+    (empId: string, date: Date, focusAreaId?: number): ScheduleNoteMark[] => {
+      const dateKey = formatDateKey(date);
+      const key = scheduleNoteKey(empId, dateKey, focusAreaId ?? null);
+      return buildScheduleNoteMarks({
+        notes: notes[key],
+        publishedChanges: showPublishDiff ? publishNoteChangesMap?.get(key) : undefined,
+        isScheduleEditor,
+      });
+    },
+    [isScheduleEditor, notes, publishNoteChangesMap, showPublishDiff],
   );
 
   const panelActiveIndicatorIds = useCallback(
@@ -3674,6 +3731,17 @@ function SchedulerContent() {
         return next;
       });
 
+      // The delete endpoints clear each cell's notes, so drop them here too
+      // rather than leave dots behind on a cell that no longer has a shift.
+      setNotes((prev) => {
+        let next = prev;
+        for (const update of updates) {
+          next = removeScheduleNotesForCell(next, update.empId, update.dateKey);
+        }
+        notesRef.current = next;
+        return next;
+      });
+
       if (options.broadcast) {
         const broadcastPayload: Record<string, ShiftMap[string] | null> = {};
         for (const update of updates) {
@@ -3745,7 +3813,14 @@ function SchedulerContent() {
   );
 
   const setShift = useCallback(
-    (empId: string, date: Date, entry: ScheduleCellInput | null): boolean => {
+    (
+      empId: string,
+      date: Date,
+      entry: ScheduleCellInput | null,
+      // A paste replaces the cell's shift, so its indicators described the
+      // shift being displaced and cannot carry over. An ordinary edit keeps them.
+      options: { replacesShift?: boolean } = {},
+    ): boolean => {
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
@@ -3841,9 +3916,22 @@ function SchedulerContent() {
         });
         if (!upsertValue) return false;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
+        if (options.replacesShift) {
+          const remainingNotes = removeScheduleNotesForCell(notesRef.current, empId, dateKey);
+          setNotes(remainingNotes);
+          notesRef.current = remainingNotes;
+        }
         void enqueueShiftWrite(key, async () => {
           try {
-            await upsertShift(empId, dateKey, normalizedEntry, orgId, existingVersion);
+            await upsertShift(
+              empId,
+              dateKey,
+              normalizedEntry,
+              orgId,
+              existingVersion,
+              undefined,
+              options.replacesShift,
+            );
           } catch (err) {
             if (err instanceof OptimisticLockError) {
               await handleShiftWriteConflict();
@@ -4803,6 +4891,18 @@ function SchedulerContent() {
         return next;
       });
 
+      // Mirror the note clearing the move endpoint performs, so the grid does
+      // not keep painting dots for a shift that is no longer in the cell. A
+      // copy leaves the source shift, and therefore its notes, alone.
+      setNotes((prev) => {
+        let next = removeScheduleNotesForCell(prev, targetCellId.empId, targetCellId.dateKey);
+        if (mode !== "copy") {
+          next = removeScheduleNotesForCell(next, sourceCellId.empId, sourceCellId.dateKey);
+        }
+        notesRef.current = next;
+        return next;
+      });
+
       broadcastDraftChanged({
         shifts: {
           [targetKey]: movedEntry,
@@ -4923,7 +5023,7 @@ function SchedulerContent() {
         return;
       }
 
-      if (setShift(empId, date, clipboard)) {
+      if (setShift(empId, date, clipboard, { replacesShift: true })) {
         toast.success("Entry pasted");
       }
     },
@@ -5681,7 +5781,7 @@ function SchedulerContent() {
           segmentsForKey,
           publishedSegmentsForKey: getPublishedShiftSegments,
           getShiftStyle,
-          activeIndicatorIdsForKey,
+          noteMarksForKey,
           getCustomShiftTimes,
           getPublishedCustomShiftTimes,
           draftKindForKey,
@@ -5731,7 +5831,7 @@ function SchedulerContent() {
       segmentsForKey,
       getPublishedShiftSegments,
       getShiftStyle,
-      activeIndicatorIdsForKey,
+      noteMarksForKey,
       getCustomShiftTimes,
       getPublishedCustomShiftTimes,
       draftKindForKey,
@@ -7100,6 +7200,7 @@ function SchedulerContent() {
                       pendingPasteOver.empId,
                       pendingPasteOver.date,
                       pendingPasteOver.pasteEntry,
+                      { replacesShift: true },
                     )
                   ) {
                     setPendingPasteOver(null);

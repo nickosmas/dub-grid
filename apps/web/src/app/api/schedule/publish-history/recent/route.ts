@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { toPublishChanges, type ScheduleChangeRow } from "@/lib/db/publish-history";
+import {
+  toNotePublishChanges,
+  toPublishChanges,
+  type ScheduleChangeRow,
+} from "@/lib/db/publish-history";
 import logger from "@/lib/logger";
 
 const querySchema = z
@@ -17,25 +21,32 @@ const querySchema = z
 
 const MAX_RECENT_HISTORY_ROWS = 200;
 
-function addNewAdditionFlags(
-  entries: Array<{
+function addNewAdditionFlags<
+  TEntry extends {
     startDate: string;
     endDate: string;
     changes: ReturnType<typeof toPublishChanges>;
-  }>,
-) {
+    noteChanges: ReturnType<typeof toNotePublishChanges>;
+  },
+>(entries: TEntry[]) {
+  const isAddition = (entryIndex: number, kind: string, date: string) =>
+    kind === "new" &&
+    entries
+      .slice(entryIndex + 1)
+      .some((olderEntry) => olderEntry.startDate <= date && olderEntry.endDate >= date);
+
   return entries.map((entry, entryIndex) => ({
     ...entry,
     changes: entry.changes.map((change) => ({
       ...change,
-      isNewAddition:
-        change.kind === "new" &&
-        entries
-          .slice(entryIndex + 1)
-          .some(
-            (olderEntry) =>
-              olderEntry.startDate <= change.date && olderEntry.endDate >= change.date,
-          ),
+      isNewAddition: isAddition(entryIndex, change.kind, change.date),
+    })),
+    // Notes take the same baseline rule as cells: a period's first publication
+    // is not a set of additions, so its notes must not be marked either while
+    // every shift beside them stays clean.
+    noteChanges: entry.noteChanges.map((change) => ({
+      ...change,
+      isNewAddition: isAddition(entryIndex, change.kind, change.date),
     })),
   }));
 }
@@ -93,6 +104,10 @@ export async function GET(req: NextRequest) {
           endDate: row.end_date as string,
           changeCount: row.change_count as number,
           changes: toPublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
+          // Kept beside the cell changes rather than mixed in: a note carries no
+          // cell state, and nothing downstream should have to guess which of the
+          // two a change row describes.
+          noteChanges: toNotePublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
           publishedAt: row.published_at as string,
         })),
       ),

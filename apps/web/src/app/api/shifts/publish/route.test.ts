@@ -8,6 +8,8 @@ const loggerError = vi.fn();
 const captureException = vi.fn();
 const fetchScheduleDraftBreakdown = vi.fn();
 const publishScheduleDirect = vi.fn();
+const fetchPendingNotePublishChanges = vi.fn();
+const recordNotePublishChanges = vi.fn();
 const membershipMaybeSingle = vi.fn();
 const profileMaybeSingle = vi.fn();
 const organizationMaybeSingle = vi.fn();
@@ -40,6 +42,8 @@ vi.mock("@/lib/sentry", () => ({
 vi.mock("@/lib/server/schedule-draft-safety", () => ({
   fetchScheduleDraftBreakdown: (...args: unknown[]) => fetchScheduleDraftBreakdown(...args),
   publishScheduleDirect: (...args: unknown[]) => publishScheduleDirect(...args),
+  fetchPendingNotePublishChanges: (...args: unknown[]) => fetchPendingNotePublishChanges(...args),
+  recordNotePublishChanges: (...args: unknown[]) => recordNotePublishChanges(...args),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -181,6 +185,8 @@ describe("POST /api/shifts/publish", () => {
       error: null,
     });
     auditInsert.mockResolvedValue({ error: null });
+    fetchPendingNotePublishChanges.mockResolvedValue([]);
+    recordNotePublishChanges.mockResolvedValue(undefined);
   });
 
   it("publishes and records the post-publish summary in the audit log", async () => {
@@ -264,5 +270,78 @@ describe("POST /api/shifts/publish", () => {
 
     expect(response.status).toBe(200);
     expect(publishScheduleDirect).toHaveBeenCalled();
+  });
+
+  it("records the note changes against the publish it just made", async () => {
+    const noteChange = {
+      empId: "33333333-3333-4333-8333-333333333333",
+      date: "2026-04-13",
+      kind: "new" as const,
+      updatedBy: "22222222-2222-4222-8222-222222222222",
+      state: {
+        type: "note" as const,
+        indicatorTypeId: 7,
+        focusAreaId: 20,
+        indicatorName: "Float",
+        indicatorColor: "#ff0000",
+      },
+    };
+    fetchScheduleDraftBreakdown.mockResolvedValue({
+      newShifts: 0,
+      modifiedShifts: 0,
+      deletedShifts: 0,
+      newNotes: 1,
+      deletedNotes: 0,
+      totalChanges: 1,
+    });
+    fetchPendingNotePublishChanges.mockResolvedValue([noteChange]);
+    publishScheduleDirect.mockResolvedValue("44444444-4444-4444-8444-444444444444");
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        startDate: "2026-04-12",
+        endDate: "2026-04-18",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    // Read before the publish: the RPC promotes the draft notes and deletes the
+    // removed ones, so afterwards there is nothing left to describe.
+    expect(fetchPendingNotePublishChanges.mock.invocationCallOrder[0]).toBeLessThan(
+      publishScheduleDirect.mock.invocationCallOrder[0],
+    );
+    expect(recordNotePublishChanges).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        publishHistoryId: "44444444-4444-4444-8444-444444444444",
+        changes: [noteChange],
+      }),
+    );
+  });
+
+  it("still reports a successful publish when the note history cannot be recorded", async () => {
+    fetchScheduleDraftBreakdown.mockResolvedValue({
+      newShifts: 0,
+      modifiedShifts: 0,
+      deletedShifts: 0,
+      newNotes: 1,
+      deletedNotes: 0,
+      totalChanges: 1,
+    });
+    fetchPendingNotePublishChanges.mockResolvedValue([]);
+    publishScheduleDirect.mockResolvedValue("44444444-4444-4444-8444-444444444444");
+    recordNotePublishChanges.mockRejectedValue(new Error("insert failed"));
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        startDate: "2026-04-12",
+        endDate: "2026-04-18",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(loggerError).toHaveBeenCalled();
   });
 });

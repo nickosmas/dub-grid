@@ -146,8 +146,63 @@ describe("GET /api/schedule/publish-history", () => {
             toCustomEnd: null,
           },
         ],
+        noteChanges: [],
         publishedAt: "2026-05-06T17:00:00.000Z",
       },
+    ]);
+  });
+
+  it("returns a note-only publish as a note change rather than an empty entry", async () => {
+    const serviceClient = createServiceClient();
+    publishHistoryRange.mockResolvedValueOnce({
+      data: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: "emp-1",
+              date: "2026-05-04",
+              kind: "new",
+              from_state: null,
+              to_state: {
+                type: "note",
+                indicatorTypeId: 7,
+                focusAreaId: 3,
+                indicatorName: "Float",
+                indicatorColor: "#ff0000",
+              },
+              from_absence_type_id: null,
+              to_absence_type_id: null,
+              updated_by: null,
+              from_custom_start: null,
+              from_custom_end: null,
+              to_custom_start: null,
+              to_custom_end: null,
+            },
+          ],
+          published_at: "2026-05-06T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID }));
+    const body = await response.json();
+
+    expect(body.entries[0].changes).toEqual([]);
+    expect(body.entries[0].noteChanges).toEqual([
+      expect.objectContaining({ empId: "emp-1", kind: "new", indicatorName: "Float" }),
     ]);
   });
 

@@ -3,7 +3,11 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
-import { toPublishChanges, type ScheduleChangeRow } from "@/lib/db/publish-history";
+import {
+  toNotePublishChanges,
+  toPublishChanges,
+  type ScheduleChangeRow,
+} from "@/lib/db/publish-history";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -113,6 +117,9 @@ export async function GET(req: NextRequest) {
         endDate: row.end_date,
         changeCount: row.change_count,
         changes: toPublishChanges(row.schedule_publish_changes),
+        // Notes are counted in change_count, so the panel needs them to explain
+        // a publish that changed nothing else.
+        noteChanges: toNotePublishChanges(row.schedule_publish_changes),
         publishedAt: row.published_at,
       })),
     });

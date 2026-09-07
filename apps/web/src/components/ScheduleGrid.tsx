@@ -109,6 +109,7 @@ import {
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
+import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import {
   getFocusAreaInitials,
   getCrossFocusBadgePalette,
@@ -180,7 +181,7 @@ interface LegacyScheduleGridProps {
   isCellInteractive?: boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
   canDragShifts?: boolean;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
@@ -293,7 +294,7 @@ interface SectionBlockProps {
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
   canDragShifts?: boolean;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,
@@ -696,7 +697,7 @@ const SectionBlock = memo(function SectionBlock({
   indicatorTypes,
   isCellInteractive,
   canDragShifts = isCellInteractive,
-  activeIndicatorIdsForKey,
+  noteMarksForKey,
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
@@ -1892,8 +1893,7 @@ const SectionBlock = memo(function SectionBlock({
                       const publishedSegments = publishedSegmentsForKey?.(emp.id, date) ?? [];
                       const publishedCustomTimes =
                         getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
-                      const noteTypes =
-                        activeIndicatorIdsForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
+                      const noteMarks = noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                       const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
                       const cellEditor = cellEditors?.get(cellKey);
                       const hasPeerEditor = !!cellEditor;
@@ -1980,7 +1980,14 @@ const SectionBlock = memo(function SectionBlock({
                             };
                           });
                       const hoverIndicatorNames = indicatorTypes
-                        .filter((indicator) => noteTypes.includes(indicator.id))
+                        .filter((indicator) =>
+                          noteMarks.some(
+                            (mark) =>
+                              mark.indicatorTypeId === indicator.id &&
+                              mark.state !== "draft_removed" &&
+                              mark.state !== "published_removed",
+                          ),
+                        )
                         .map((indicator) => indicator.name);
                       const hoverStatus = draftKind
                         ? draftKind === "new"
@@ -2836,39 +2843,14 @@ const SectionBlock = memo(function SectionBlock({
                                                 )}
                                               </span>
                                             )}
-                                            {noteTypes.length > 0 && (
-                                              <div
-                                                style={{
-                                                  position: "absolute",
-                                                  bottom: shouldShowAuthorName ? 18 : 3,
-                                                  right: 4,
-                                                  display: "flex",
-                                                  gap: 2,
-                                                }}
-                                              >
-                                                {indicatorTypes
-                                                  .filter((ind) => noteTypes.includes(ind.id))
-                                                  .map((ind) => (
-                                                    <MaybeHint
-                                                      key={ind.name}
-                                                      content={ind.name}
-                                                      side="top"
-                                                    >
-                                                      <div
-                                                        style={{
-                                                          width: 10,
-                                                          height: 10,
-                                                          borderRadius: "50%",
-                                                          background: ind.color,
-                                                          border:
-                                                            "1.5px solid rgba(255,255,255,0.9)",
-                                                          flexShrink: 0,
-                                                        }}
-                                                      />
-                                                    </MaybeHint>
-                                                  ))}
-                                              </div>
-                                            )}
+                                            <NoteDots
+                                              marks={noteMarks}
+                                              indicatorTypes={indicatorTypes}
+                                              style={{
+                                                bottom: shouldShowAuthorName ? 18 : 3,
+                                                right: 4,
+                                              }}
+                                            />
                                             {(draftBadge || publishBadge) && (
                                               <GridDiffBadge
                                                 badge={{
@@ -2886,7 +2868,7 @@ const SectionBlock = memo(function SectionBlock({
                                           <AuthorBadge
                                             name={auditName}
                                             leftInset={singleAuthorLeftInset}
-                                            rightInset={noteTypes.length > 0 ? 21 : 5}
+                                            rightInset={noteMarks.length > 0 ? 21 : 5}
                                             bottomInset={singleAuthorBottomInset}
                                           />
                                         )}
@@ -3327,39 +3309,15 @@ const SectionBlock = memo(function SectionBlock({
                                               );
                                             })}
                                           </div>
-                                          {noteTypes.length > 0 && (
-                                            <div
-                                              style={{
-                                                position: "absolute",
-                                                bottom: 2,
-                                                right: multiNotesRightOffset,
-                                                display: "flex",
-                                                gap: NOTE_DOT_GAP,
-                                                zIndex: 1,
-                                              }}
-                                            >
-                                              {indicatorTypes
-                                                .filter((ind) => noteTypes.includes(ind.id))
-                                                .map((ind) => (
-                                                  <MaybeHint
-                                                    key={ind.name}
-                                                    content={ind.name}
-                                                    side="top"
-                                                  >
-                                                    <div
-                                                      style={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        borderRadius: "50%",
-                                                        background: ind.color,
-                                                        border: "1.5px solid rgba(255,255,255,0.9)",
-                                                        flexShrink: 0,
-                                                      }}
-                                                    />
-                                                  </MaybeHint>
-                                                ))}
-                                            </div>
-                                          )}
+                                          <NoteDots
+                                            marks={noteMarks}
+                                            indicatorTypes={indicatorTypes}
+                                            style={{
+                                              bottom: 2,
+                                              right: multiNotesRightOffset,
+                                              zIndex: 1,
+                                            }}
+                                          />
                                           {(draftBadge || publishBadge) && (
                                             <GridDiffBadge
                                               badge={{
@@ -3583,35 +3541,11 @@ const SectionBlock = memo(function SectionBlock({
                                         branch used to drop them, so a note went
                                         invisible for exactly as long as the
                                         delete sat unpublished. */}
-                                    {noteTypes.length > 0 && (
-                                      <div
-                                        style={{
-                                          position: "absolute",
-                                          top: 5,
-                                          right: 5,
-                                          display: "flex",
-                                          gap: NOTE_DOT_GAP,
-                                          zIndex: 7,
-                                        }}
-                                      >
-                                        {indicatorTypes
-                                          .filter((ind) => noteTypes.includes(ind.id))
-                                          .map((ind) => (
-                                            <MaybeHint key={ind.name} content={ind.name} side="top">
-                                              <div
-                                                style={{
-                                                  width: NOTE_DOT_SIZE,
-                                                  height: NOTE_DOT_SIZE,
-                                                  borderRadius: "50%",
-                                                  background: ind.color,
-                                                  border: "1.5px solid rgba(255,255,255,0.9)",
-                                                  flexShrink: 0,
-                                                }}
-                                              />
-                                            </MaybeHint>
-                                          ))}
-                                      </div>
-                                    )}
+                                    <NoteDots
+                                      marks={noteMarks}
+                                      indicatorTypes={indicatorTypes}
+                                      style={{ top: 5, right: 5, zIndex: 7 }}
+                                    />
                                     {shouldShowAuthorName && auditName && (
                                       <AuthorBadge
                                         name={auditName}
@@ -3638,34 +3572,11 @@ const SectionBlock = memo(function SectionBlock({
                                     OFF
                                   </span>
                                 )}
-                                {noteTypes.length > 0 && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: 5,
-                                      right: 5,
-                                      display: "flex",
-                                      gap: 2,
-                                    }}
-                                  >
-                                    {indicatorTypes
-                                      .filter((ind) => noteTypes.includes(ind.id))
-                                      .map((ind) => (
-                                        <MaybeHint key={ind.name} content={ind.name} side="top">
-                                          <div
-                                            style={{
-                                              width: 10,
-                                              height: 10,
-                                              borderRadius: "50%",
-                                              background: ind.color,
-                                              border: "1.5px solid rgba(255,255,255,0.85)",
-                                              flexShrink: 0,
-                                            }}
-                                          />
-                                        </MaybeHint>
-                                      ))}
-                                  </div>
-                                )}
+                                <NoteDots
+                                  marks={noteMarks}
+                                  indicatorTypes={indicatorTypes}
+                                  style={{ top: 5, right: 5 }}
+                                />
                               </>
                             )}
                             {cellEditor && (
@@ -3885,7 +3796,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   indicatorTypes = [],
   isCellInteractive = true,
   canDragShifts,
-  activeIndicatorIdsForKey,
+  noteMarksForKey,
   activeFocusArea = null,
   certifications = [],
   orgRoles = [],
@@ -4212,7 +4123,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     indicatorTypes={indicatorTypes}
                     isCellInteractive={isCellInteractive}
                     canDragShifts={canDragShifts ?? isCellInteractive}
-                    activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                    noteMarksForKey={noteMarksForKey}
                     getCustomShiftTimes={getCustomShiftTimes}
                     getPublishedCustomShiftTimes={getPublishedCustomShiftTimes}
                     draftKindForKey={draftKindForKey}
@@ -4434,7 +4345,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         indicatorTypes={model.indicatorTypes}
         isCellInteractive={model.options.isCellInteractive}
         canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
-        activeIndicatorIdsForKey={model.accessors.activeIndicatorIdsForKey}
+        noteMarksForKey={model.accessors.noteMarksForKey}
         activeFocusArea={model.activeFocusArea}
         certifications={model.certifications}
         orgRoles={model.orgRoles}

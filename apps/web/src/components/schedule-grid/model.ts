@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { formatDateKey } from "@/lib/utils";
+import type { ScheduleNoteMark } from "./noteDots";
 import type {
   AbsenceType,
   ActiveShiftRequestSummary,
@@ -34,7 +35,7 @@ export interface ScheduleGridAccessors {
     date: Date,
   ) => Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,

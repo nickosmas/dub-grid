@@ -5,7 +5,7 @@ import type {
   MobileShiftRequestHistoryCursor,
   ScheduleCellState,
 } from "@dubgrid/contracts";
-import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { isNotePublishChangeState, scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { AdminPermissions, PlatformRole } from "@dubgrid/domain";
 import type {
   DbAbsenceType,
@@ -900,13 +900,20 @@ export async function fetchMobilePublishHistoryRows(
 
   return rows.map(({ schedule_publish_changes, ...row }) => ({
     ...row,
-    changes: (schedule_publish_changes ?? []).map((c) => ({
-      empId: c.emp_id,
-      date: c.date,
-      kind: c.kind as MobilePublishChange["kind"],
-      fromState: scheduleCellStateSchema.safeParse(c.from_state).data ?? null,
-      toState: scheduleCellStateSchema.safeParse(c.to_state).data ?? null,
-    })),
+    // Published note changes share this table with cell changes and mobile has
+    // no note surface. Left in, their payload fails the cell-state schema and
+    // the row would reach the app as a "New" with no states at all.
+    changes: (schedule_publish_changes ?? [])
+      .filter(
+        (c) => !isNotePublishChangeState(c.to_state) && !isNotePublishChangeState(c.from_state),
+      )
+      .map((c) => ({
+        empId: c.emp_id,
+        date: c.date,
+        kind: c.kind as MobilePublishChange["kind"],
+        fromState: scheduleCellStateSchema.safeParse(c.from_state).data ?? null,
+        toState: scheduleCellStateSchema.safeParse(c.to_state).data ?? null,
+      })),
   }));
 }
 

@@ -330,6 +330,24 @@ export interface PublishChange {
   toCustomEnd?: string | null;
 }
 
+/**
+ * A note added or removed by one publication. Carries the indicator's name and
+ * colour because a removed note has no `schedule_notes` row left to read them
+ * from.
+ */
+export interface NotePublishChange {
+  empId: string;
+  date: string;
+  kind: "new" | "deleted";
+  /** False when this note rode along on the date's first publication. */
+  isNewAddition?: boolean;
+  indicatorTypeId: number;
+  focusAreaId: number | null;
+  indicatorName: string;
+  indicatorColor: string;
+  updatedBy?: string | null;
+}
+
 export interface PublishHistoryEntry {
   id: string;
   publishedBy: string;
@@ -337,6 +355,7 @@ export interface PublishHistoryEntry {
   endDate: string;
   changeCount: number;
   changes: PublishChange[];
+  noteChanges?: NotePublishChange[];
   publishedAt: string;
 }
 

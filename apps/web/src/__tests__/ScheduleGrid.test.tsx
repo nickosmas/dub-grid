@@ -9,6 +9,7 @@ import ScheduleGrid, {
 import { getReadableTextOnSurface } from "@/lib/colors";
 import { REQUEST_FOLD_CLEARANCE, REQUEST_FOLD_SIZE } from "@/components/schedule-grid/badges";
 import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
@@ -232,6 +233,7 @@ interface RenderGridOptions {
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   getCustomShiftTimes?: (
     empId: string,
@@ -357,7 +359,17 @@ function renderGrid(options: RenderGridOptions = {}) {
       segmentsForKey: options.segmentsForKey,
       publishedSegmentsForKey: options.publishedSegmentsForKey,
       getShiftStyle: options.getShiftStyle ?? getShiftStyleFromCodes(resolvedAssignmentDefinitions),
-      activeIndicatorIdsForKey: options.activeIndicatorIdsForKey,
+      noteMarksForKey:
+        options.noteMarksForKey ??
+        (options.activeIndicatorIdsForKey
+          ? (empId: string, date: Date, focusAreaId?: number) =>
+              options.activeIndicatorIdsForKey!(empId, date, focusAreaId).map(
+                (indicatorTypeId) => ({
+                  indicatorTypeId,
+                  state: "published" as const,
+                }),
+              )
+          : undefined),
       getCustomShiftTimes: options.getCustomShiftTimes,
       getPublishedCustomShiftTimes: options.getPublishedCustomShiftTimes,
       draftKindForKey: options.draftKindForKey,
@@ -1888,6 +1900,50 @@ describe("ScheduleGrid", () => {
 
     expect(firstCell.querySelector('[data-shift-pill="deleted"]')).not.toBeNull();
     expect(firstCell.querySelectorAll('div[style*="border-radius: 50%"]')).toHaveLength(1);
+  });
+
+  it("marks an added and a removed note that have not been published", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      indicatorTypes: [
+        { id: 1, orgId: "org-1", name: "Flag", color: "#ff0000", sortOrder: 1 },
+        { id: 2, orgId: "org-1", name: "Float", color: "#00ff00", sortOrder: 2 },
+      ],
+      noteMarksForKey: () => [
+        { indicatorTypeId: 1, state: "draft_added" },
+        { indicatorTypeId: 2, state: "draft_removed" },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const added = firstCell.querySelector('[data-note-dot="draft_added"]') as HTMLElement;
+    const removed = firstCell.querySelector('[data-note-dot="draft_removed"]') as HTMLElement;
+
+    expect(added?.getAttribute("aria-label")).toBe("Flag · Added, not published");
+    expect(removed?.getAttribute("aria-label")).toBe("Float · Removed, not published");
+    // The removal is still pending, so its dot stays visible as an outline
+    // rather than disappearing as though it had already published.
+    expect(removed?.style.background).toBe("transparent");
+  });
+
+  it("renders a note removed by the last publish from its change record", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      indicatorTypes: [],
+      noteMarksForKey: () => [
+        { indicatorTypeId: 9, state: "published_removed", name: "Gone", color: "#0000ff" },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const removed = firstCell.querySelector('[data-note-dot="published_removed"]') as HTMLElement;
+
+    // Its schedule_notes row is gone, so the name and colour can only come from
+    // the publish record.
+    expect(removed?.getAttribute("aria-label")).toBe("Gone · Removed in the last publish");
+    expect(removed?.style.border).toContain("rgb(0, 0, 255)");
   });
 
   it("folds the corner of a shift with an open request", () => {

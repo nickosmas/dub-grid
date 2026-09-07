@@ -147,9 +147,140 @@ describe("GET /api/schedule/publish-history/recent", () => {
             toCustomEnd: null,
           },
         ],
+        noteChanges: [],
         publishedAt: "2026-05-06T17:00:00.000Z",
       },
     ]);
+  });
+
+  it("returns published note changes separately from cell changes", async () => {
+    const serviceClient = createServiceClient();
+    publishHistoryLimit.mockResolvedValue({
+      data: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 2,
+          schedule_publish_changes: [
+            {
+              emp_id: "emp-1",
+              date: "2026-05-04",
+              kind: "new",
+              from_state: null,
+              to_state: {
+                type: "note",
+                indicatorTypeId: 7,
+                focusAreaId: 3,
+                indicatorName: "Float",
+                indicatorColor: "#ff0000",
+              },
+              from_absence_type_id: null,
+              to_absence_type_id: null,
+              updated_by: null,
+              from_custom_start: null,
+              from_custom_end: null,
+              to_custom_start: null,
+              to_custom_end: null,
+            },
+          ],
+          published_at: "2026-05-06T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const body = await response.json();
+
+    // A note row carries no cell state, so it must not reach the shift-change
+    // paths — or it lands on the grid as a "New" with nothing in it.
+    expect(body.entries[0].changes).toEqual([]);
+    expect(body.entries[0].noteChanges).toEqual([
+      {
+        empId: "emp-1",
+        date: "2026-05-04",
+        kind: "new",
+        // Only publication of this period, so the note is baseline, not an
+        // addition — the same rule its neighbouring shifts follow.
+        isNewAddition: false,
+        indicatorTypeId: 7,
+        focusAreaId: 3,
+        indicatorName: "Float",
+        indicatorColor: "#ff0000",
+        updatedBy: null,
+      },
+    ]);
+  });
+
+  it("marks a note added by a later publish of an already-published date", async () => {
+    const serviceClient = createServiceClient();
+    const noteRow = {
+      emp_id: "emp-1",
+      date: "2026-05-04",
+      kind: "new",
+      from_state: null,
+      to_state: {
+        type: "note",
+        indicatorTypeId: 7,
+        focusAreaId: 3,
+        indicatorName: "Float",
+        indicatorColor: "#ff0000",
+      },
+      from_absence_type_id: null,
+      to_absence_type_id: null,
+      updated_by: null,
+      from_custom_start: null,
+      from_custom_end: null,
+      to_custom_start: null,
+      to_custom_end: null,
+    };
+    publishHistoryLimit.mockResolvedValue({
+      data: [
+        {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 1,
+          schedule_publish_changes: [noteRow],
+          published_at: "2026-05-07T17:00:00.000Z",
+        },
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 0,
+          schedule_publish_changes: [],
+          published_at: "2026-05-06T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const body = await response.json();
+
+    expect(body.entries[0].noteChanges[0].isNewAddition).toBe(true);
   });
 
   it("does not authorize invalid queries", async () => {

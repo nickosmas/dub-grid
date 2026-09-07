@@ -74,6 +74,30 @@ export const scheduleCellStateSchema = z
   });
 
 /**
+ * A published note change, stored in a `schedule_publish_changes` row's
+ * `to_state` (added) or `from_state` (removed).
+ *
+ * Notes live outside the schedule-cell snapshot system, so they have no cell
+ * state to record. The `type` discriminator is what every reader of that table
+ * filters on to keep note rows out of the shift-change paths. Indicator name
+ * and colour are denormalized because a removed note still has to render after
+ * its indicator type is archived.
+ */
+export const notePublishChangeStateSchema = z.object({
+  type: z.literal("note"),
+  indicatorTypeId: z.number().int(),
+  focusAreaId: z.number().int().nullable(),
+  indicatorName: z.string(),
+  indicatorColor: z.string(),
+});
+
+export function isNotePublishChangeState(state: unknown): boolean {
+  return (
+    typeof state === "object" && state !== null && (state as { type?: unknown }).type === "note"
+  );
+}
+
+/**
  * A saved recurring-schedule draft: employee id -> day of week -> cell state,
  * where null clears that day.
  *
@@ -128,6 +152,7 @@ export const resolvedSchedulePresentationSchema = z.object({
 export type ScheduleCellKind = z.infer<typeof scheduleCellKindSchema>;
 export type ScheduleCellSegment = z.infer<typeof scheduleCellSegmentSchema>;
 export type ScheduleCellState = z.infer<typeof scheduleCellStateSchema>;
+export type NotePublishChangeState = z.infer<typeof notePublishChangeStateSchema>;
 export type RecurringScheduleDraftPayload = z.infer<typeof recurringScheduleDraftSchema>;
 export type ResolvedSchedulePresentationSegment = z.infer<
   typeof resolvedSchedulePresentationSegmentSchema
