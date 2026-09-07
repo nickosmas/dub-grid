@@ -139,15 +139,19 @@ describe("LoginScreen", () => {
     });
   });
 
-  // The name is cached alongside the slug precisely so a returning user is
-  // greeted by it at once, including when the lookup never answers.
-  it("names the remembered organization from cache, before the lookup", async () => {
+  it("keeps the remembered organization ready for an actionable retry when lookup fails", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: "DubGrid Health" });
     lookupOrganization.mockRejectedValue(new Error("Network request failed"));
 
     render(<LoginScreen />);
 
-    expect(await screen.findByText(/Continue to/)).toHaveTextContent("Continue to DubGrid Health.");
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't connect right now. Check your internet connection and try again.",
+      ),
+    ).toBeInTheDocument();
   });
 
   // The subdomain is a last resort for when no name is coming. Showing it while
@@ -163,9 +167,8 @@ describe("LoginScreen", () => {
 
     render(<LoginScreen />);
 
-    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
-    expect(screen.queryByText(/Signing in at/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Continue to/)).not.toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
 
     await act(async () => {
       resolveLookup({
@@ -177,22 +180,37 @@ describe("LoginScreen", () => {
       });
     });
 
+    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
     expect(screen.getByText(/Continue to/)).toHaveTextContent("Continue to DubGrid Health.");
   });
 
-  // Without the lookup there is no full organization name to show, and a raw
-  // slug must not stand in for one — name the destination by subdomain instead.
-  it("still goes to the credentials stage even when the remembered lookup fails", async () => {
+  it("does not let a stale remembered organization bypass lookup", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     lookupOrganization.mockRejectedValue(new Error("Network request failed"));
 
     render(<LoginScreen />);
 
-    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
-    expect(screen.getByText(/Signing in at/)).toHaveTextContent(
-      "Signing in at dubgrid-health.dubgrid.com.",
-    );
-    expect(screen.queryByText(/Continue to/)).not.toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't connect right now. Check your internet connection and try again.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render entry UI over an already authenticated session", () => {
+    useSessionState.mockReturnValue({
+      session: { user: { id: "user-1" } },
+      accessToken: "active-token",
+      isLoading: false,
+    });
+
+    render(<LoginScreen />);
+
+    expect(screen.getByText("redirect:/(tabs)/home")).toBeInTheDocument();
+    expect(loadLastOrg).not.toHaveBeenCalled();
+    expect(lookupOrganization).not.toHaveBeenCalled();
   });
 
   it("verifies the organization before showing the credential form", async () => {

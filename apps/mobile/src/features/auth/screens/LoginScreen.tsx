@@ -142,7 +142,7 @@ export default function LoginScreen() {
     // consent sheet slid up over it. Wait for the decision instead of racing
     // it: this effect re-runs once consent resolves, and the focus below then
     // lands on a screen the user can actually act on.
-    if (isConsentDecisionPending) {
+    if (isConsentDecisionPending || accessToken) {
       return;
     }
 
@@ -154,24 +154,30 @@ export default function LoginScreen() {
         return;
       }
 
-      // Take the user straight to the credentials step: the saved slug is
-      // enough to attempt sign-in. The cached name renders the subtitle right
-      // away, so a returning user sees their organization named in full even
-      // before (or without) the network lookup below, which only refreshes a
-      // name that may have changed server-side.
+      // A remembered organization is convenience, not proof that the
+      // organization remains available. Keep its slug in the field so retrying
+      // is effortless, but do not expose credentials until the public lookup
+      // confirms an active organization target.
       setOrgSlug(storedOrg.slug);
       setOrgName(storedOrg.name);
-      setStage("credentials");
       setIsResolvingOrgName(!storedOrg.name);
-      setTimeout(() => emailInputRef.current?.focus(), 0);
       try {
         const result = await lookupOrganization(storedOrg.slug);
         if (!active) return;
         setOrgName(result.organization.name);
         setOrgSlug(result.organization.slug);
         await saveLastOrg(result.organization);
-      } catch {
-        // Ignore: the cached name (or the subdomain) still names the target.
+        if (!active) return;
+        setStage("credentials");
+        setTimeout(() => emailInputRef.current?.focus(), 0);
+      } catch (organizationError) {
+        if (!active) return;
+        const nextError = getInlineErrorMessageOrToast(pushToast, {
+          error: organizationError,
+          fallbackMessage: "We couldn't find that organization. Check the subdomain and try again.",
+          preferInlineNetworkError: true,
+        });
+        setError(nextError);
       } finally {
         if (active) setIsResolvingOrgName(false);
       }
@@ -180,7 +186,7 @@ export default function LoginScreen() {
     return () => {
       active = false;
     };
-  }, [isConsentDecisionPending]);
+  }, [accessToken, isConsentDecisionPending]);
 
   // No splash here: the only time the session is still restoring is launch, and
   // `StartupSplashGate` is already covering the screen with the app's one

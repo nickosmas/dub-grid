@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash fe44af19f94bc307b208119e4dc3dc2d9c9c09a8d29144d175db6bcfd278e117 -->
+<!-- blueprint:source-hash e322c22d1da7fb1de9e1122857ac9bd0166e369a676914968a02fff5627b54b0 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -87,6 +87,20 @@ Everything below is already shipped except the unchecked work in items 18-22.
       organization entry, sign-in, session restoration, recovery, MFA,
       revocation, onboarding variants, and trial/setup gates for every role on
       web and mobile.
+      - **19b1. Invitation and organization entry** - verify invitation
+        acceptance, subdomain and organization selection, and signed-out and
+        signed-in entry states on web and mobile.
+      - **19b2. Sign-in, restoration, expiry, and revocation** - verify
+        web/mobile login, session restoration, expired-session recovery,
+        logout, and forced or session-specific revocation.
+      - **19b3. Password recovery and reset** - verify web recovery links and
+        the mobile OTP reset flow, including error and replay states.
+      - **19b4. MFA enrollment and challenge** - verify TOTP enrollment,
+        verification, unenrollment, required-MFA challenges, and role
+        differences across web and mobile.
+      - **19b5. Role-based setup, onboarding, and trial gates** - verify every
+        role's setup, onboarding, and trial path without duplicating 19a's
+        stale-bootstrap admission repair.
     - **19c. Authentication speed and resilience** - measure cold and warm
       entry, remove avoidable serial work and duplicate requests, prevent blank
       states, and verify slow, offline, retry, cross-tab, and token-refresh

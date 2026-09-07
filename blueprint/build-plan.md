@@ -76,6 +76,20 @@
         session restoration, password reset and recovery, MFA enrollment and
         challenge, logout and revocation, expired sessions, onboarding variants,
         and trial/setup gates across every role on web and mobile.
+    - [x] 19b1. **Invitation and organization entry** - verify invitation
+          acceptance, subdomain and organization selection, and signed-out and
+          signed-in entry states on web and mobile.
+    - [ ] 19b2. **Sign-in, restoration, expiry, and revocation** - verify
+          web/mobile login, session restoration, expired-session recovery,
+          logout, and forced or session-specific revocation.
+    - [ ] 19b3. **Password recovery and reset** - verify web recovery links
+          and the mobile OTP reset flow, including error and replay states.
+    - [ ] 19b4. **MFA enrollment and challenge** - verify TOTP enrollment,
+          verification, unenrollment, required-MFA challenges, and role
+          differences across web and mobile.
+    - [ ] 19b5. **Role-based setup, onboarding, and trial gates** - verify
+          every role's setup, onboarding, and trial path without duplicating
+          19a's stale-bootstrap admission repair.
   - [ ] 19c. **Authentication speed and resilience** - measure cold and warm
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
