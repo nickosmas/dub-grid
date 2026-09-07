@@ -42,6 +42,11 @@ export function resolveOnboardingDecision(input: OnboardingDecisionInput): Onboa
   if (input.bootstrapUnavailable) return { kind: "bootstrap-recovery" };
   if (input.completedThisSession) return { kind: "app", settled: true };
 
+  // Bootstrap data from the previous organization can survive briefly while
+  // the effective organization changes. It cannot decide onboarding, billing,
+  // or setup access for the new organization.
+  if (!input.orgDataReliable) return { kind: "app", settled: false };
+
   if (input.entryGate?.billingLocked) {
     return input.onBillingRecoveryRoute
       ? { kind: "app", settled: true }

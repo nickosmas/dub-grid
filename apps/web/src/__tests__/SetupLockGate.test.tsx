@@ -142,6 +142,7 @@ beforeEach(() => {
   mockPermissions.isSuperAdmin = false;
   mockPermissions.isImpersonating = false;
   mockPermissions.canManageOrg = true;
+  mockOrganizationData.org = { id: "org-1", name: "Acme" };
   mockOrganizationData.setupStatus = {
     isComplete: false,
     missing: {
@@ -316,6 +317,36 @@ describe("OnboardingGate setup lock", () => {
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
     expect(screen.queryByText("Loading your workspace")).not.toBeInTheDocument();
+  });
+
+  it("waits for matching bootstrap data before applying another org's admission state", async () => {
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+
+    const { rerenderGate } = renderGate();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+
+    mockPermissions.orgId = "org-2";
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: false,
+      adminOnboardingCompleted: true,
+      billingLocked: true,
+    };
+    rerenderGate();
+
+    expect(screen.getByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    mockOrganizationData.org = { id: "org-2", name: "Baker" };
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: false,
+      adminOnboardingCompleted: true,
+      billingLocked: null,
+    };
+    rerenderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });
 
   it("treats org setup as complete even when no employees exist (adding employees is post-wizard)", async () => {

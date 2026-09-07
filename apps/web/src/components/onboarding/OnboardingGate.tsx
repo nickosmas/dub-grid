@@ -171,11 +171,11 @@ function OnboardingCheck({
   // the cross-session source of truth for the queries above.)
   const onboardingComplete = isOnboardingComplete(userId, orgId);
 
-  // Latched for the life of this mount, in an effect so a discarded
+  // Latched for the current organization in an effect so a discarded
   // concurrent/strict-mode render can never set it. App Router keeps the gate
-  // mounted across in-app navigation, so this covers a whole visit; a hard
-  // refresh re-decides from scratch.
-  const appShownRef = useRef(false);
+  // mounted across in-app navigation and organization switches, so the org id
+  // is part of the latch: a previous org cannot suppress the next org's gate.
+  const appShownForOrgRef = useRef<string | null>(null);
 
   const decision = resolveOnboardingDecision({
     // A failed bootstrap has no organization for the wizard steps to render,
@@ -183,7 +183,7 @@ function OnboardingCheck({
     // has no path to recover.
     bootstrapUnavailable: Boolean(loadError) && !org,
     completedThisSession: onboardingComplete,
-    appAlreadyShown: appShownRef.current,
+    appAlreadyShown: appShownForOrgRef.current === orgId,
     orgLoading,
     entryGate,
     onBillingRecoveryRoute: isBillingRecoveryRoute(pathname, section),
@@ -197,17 +197,17 @@ function OnboardingCheck({
     // config wizard, so they wait (SetupPendingScreen) until a super_admin
     // finishes, then get the orientation.
     canCompleteSetup: canManageOrg,
-    // Only treat the bootstrap as reliable once it is for THIS org. On a login
-    // that switches orgs, useOrganizationData briefly resolves a different one,
-    // so freezing the phase then could latch the wrong wizard.
+    // Only treat the bootstrap as reliable once it is for THIS org. On an org
+    // switch, useOrganizationData can briefly resolve the previous org, which
+    // must not decide the next org's onboarding, billing, or setup access.
     orgDataReliable: Boolean(org) && org?.id === orgId,
     frozenPhase: getOnboardingPhase(userId, orgId),
   });
 
   const settledAppRender = decision.kind === "app" && decision.settled;
   useEffect(() => {
-    if (settledAppRender) appShownRef.current = true;
-  }, [settledAppRender]);
+    if (settledAppRender) appShownForOrgRef.current = orgId;
+  }, [orgId, settledAppRender]);
 
   // Consume the post-login auth-transition flag once we've reached a settled
   // state (onboarding already complete, or a final wizard/app decision). Done in

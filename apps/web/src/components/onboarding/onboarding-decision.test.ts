@@ -110,14 +110,37 @@ describe("resolveOnboardingDecision", () => {
     ).toEqual({ kind: "wizard", isOrgSetup: false, freezePhase: null });
   });
 
-  it("only asks to freeze a phase for setup-capable users with reliable org data", () => {
+  it("keeps the app unsettled while bootstrap data belongs to another organization", () => {
     expect(
-      resolveOnboardingDecision(input({ canCompleteSetup: true, orgDataReliable: false })),
-    ).toEqual({ kind: "wizard", isOrgSetup: true, freezePhase: null });
-    expect(resolveOnboardingDecision(input({ canCompleteSetup: true }))).toEqual({
+      resolveOnboardingDecision(
+        input({
+          orgDataReliable: false,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: false,
+            billingLocked: true,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: false });
+  });
+
+  it("uses completed and incomplete admission states only after reliable bootstrap data", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: true,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+    expect(resolveOnboardingDecision(input())).toEqual({
       kind: "wizard",
       isOrgSetup: true,
-      freezePhase: "orientation",
+      freezePhase: null,
     });
   });
 

@@ -65,7 +65,7 @@
 - [ ] 19. **Authentication and onboarding release hardening** - leave no known
       correctness, performance, resilience, or security defects across the
       complete web and mobile entry lifecycle before production readiness.
-  - [ ] 19a. **Admission and onboarding state correctness** - make durable
+  - [x] 19a. **Admission and onboarding state correctness** - make durable
         per-member, per-organization completion authoritative; completed users
         must never see onboarding again after app admission, refresh, token
         rotation, realtime organization changes, role changes, or a new session,
