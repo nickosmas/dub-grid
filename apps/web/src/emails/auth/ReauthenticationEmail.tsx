@@ -23,7 +23,7 @@ export function ReauthenticationEmail({ logoUrl = SUPABASE.siteUrl }: { logoUrl?
             color: emailTheme.brand,
             backgroundColor: emailTheme.pageBg,
             border: `1px solid ${emailTheme.border}`,
-            borderRadius: "var(--dg-radius-md)",
+            borderRadius: "8px",
             padding: "16px 28px",
             margin: 0,
           }}

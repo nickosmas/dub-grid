@@ -41,7 +41,7 @@ export const styles = {
   },
   card: {
     backgroundColor: emailTheme.cardBg,
-    borderRadius: "var(--dg-radius-xl)",
+    borderRadius: "12px",
     overflow: "hidden",
     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
   },
