@@ -60,6 +60,10 @@ export interface CalendarDatePickerProps {
   disabled?: boolean;
   allowClear?: boolean;
   style?: React.CSSProperties;
+  /** Replaces the formatted date on the trigger, e.g. the period a view shows. */
+  triggerLabel?: string;
+  /** Centers the trigger text and drops its chevron, for use as a heading. */
+  triggerVariant?: "field" | "inline";
 }
 
 export default function CalendarDatePicker({
@@ -72,6 +76,8 @@ export default function CalendarDatePicker({
   disabled = false,
   allowClear = false,
   style,
+  triggerLabel: triggerLabelOverride,
+  triggerVariant = "field",
 }: CalendarDatePickerProps) {
   const selectedDate = useMemo(() => (value ? parseLocalDate(value) : null), [value]);
   const minSelectableDate = useMemo(() => (minDate ? parseLocalDate(minDate) : null), [minDate]);
@@ -91,7 +97,10 @@ export default function CalendarDatePicker({
 
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
-  const triggerLabel = selectedDate ? FIELD_DATE_FORMATTER.format(selectedDate) : placeholder;
+  const triggerLabel =
+    triggerLabelOverride ??
+    (selectedDate ? FIELD_DATE_FORMATTER.format(selectedDate) : placeholder);
+  const isInline = triggerVariant === "inline";
 
   return (
     <>
@@ -122,7 +131,7 @@ export default function CalendarDatePicker({
             color: selectedDate ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
-            textAlign: "left",
+            textAlign: isInline ? "center" : "left",
             transition: "box-shadow 150ms ease",
             boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
             borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
@@ -142,19 +151,22 @@ export default function CalendarDatePicker({
               minWidth: 0,
               overflow: "hidden",
               textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {triggerLabel}
           </span>
-          <ChevronDown
-            size={14}
-            style={{
-              color: "var(--dg-color-text-faint)",
-              flexShrink: 0,
-              transition: "transform 150ms ease",
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            }}
-          />
+          {isInline ? null : (
+            <ChevronDown
+              size={14}
+              style={{
+                color: "var(--dg-color-text-faint)",
+                flexShrink: 0,
+                transition: "transform 150ms ease",
+                transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
+          )}
         </Button>
       </div>
 

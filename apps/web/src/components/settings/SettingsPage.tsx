@@ -345,7 +345,7 @@ export default function SettingsPage({
         )}
 
       {activeSection === "org-activity" && isSuperAdmin && (
-        <OrgActivityLog orgId={organization.id} />
+        <OrgActivityLog orgId={organization.id} timeZone={organization.timezone ?? null} />
       )}
 
       {activeSection === "org-display" && canManageOrgSettings && (

@@ -36,10 +36,9 @@ describe("getOrgRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("invalidates the audit log and role-history views on role_change_log changes", () => {
+  it("invalidates the audit-log prefix, which covers person timelines, on role_change_log changes", () => {
     expect(getOrgRealtimeInvalidationKeys(ORG, "role_change_log")).toEqual([
       [...queryKeys.org.auditLog(ORG)],
-      [...queryKeys.org.roleHistory(ORG)],
     ]);
   });
 

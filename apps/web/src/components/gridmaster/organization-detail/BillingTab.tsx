@@ -524,6 +524,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
         orgId={organization.id}
         title="Billing Activity"
         initialActionFilter="billing"
+        timeZone={organization.timezone ?? null}
       />
       <BillingConfirmDialog
         action={confirmAction}

@@ -169,7 +169,7 @@ export function getOrgRealtimeInvalidationKeys(
     case "audit_log":
       return uniqueKeys([queryKeys.org.auditLog(orgId)]);
     case "role_change_log":
-      return uniqueKeys([queryKeys.org.auditLog(orgId), queryKeys.org.roleHistory(orgId)]);
+      return uniqueKeys([queryKeys.org.auditLog(orgId)]);
   }
 }
 

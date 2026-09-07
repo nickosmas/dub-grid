@@ -370,6 +370,39 @@ export function fetchGridmasterAuditLog(options?: {
   ).then((data) => data.entries);
 }
 
+export interface AuditDayCountsResult {
+  counts: Record<string, number>;
+  total: number;
+  truncated: boolean;
+}
+
+/**
+ * How many events each day of a period holds, independent of which page of
+ * rows is loaded. Supports only the filters the count endpoint can apply.
+ */
+export function fetchAuditLogDayCounts(options: {
+  orgId?: string;
+  startDate: string;
+  endDate: string;
+  timeZone?: string | null;
+  actionPrefixes?: string[];
+  resourceType?: string;
+}): Promise<AuditDayCountsResult> {
+  const params = new URLSearchParams();
+  if (options.orgId) params.set("orgId", options.orgId);
+  params.set("startDate", options.startDate);
+  params.set("endDate", options.endDate);
+  if (options.timeZone) params.set("timeZone", options.timeZone);
+  if (options.actionPrefixes?.length) {
+    params.set("actionPrefixes", options.actionPrefixes.join(","));
+  }
+  if (options.resourceType) params.set("resourceType", options.resourceType);
+
+  return requestGridmasterJson<AuditDayCountsResult>(
+    `/api/gridmaster/audit-log/day-counts?${params.toString()}`,
+  );
+}
+
 export function fetchGridmasterFullAuditLog(options?: {
   orgId?: string;
   action?: string;

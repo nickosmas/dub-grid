@@ -290,4 +290,172 @@ describe("POST /api/employees/manage", () => {
       expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
     });
   });
+
+  describe("fetchEmployeeActivity", () => {
+    const ADMIN_ID = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
+    const INVITATION_ID = "1c7b7f3e-2f1a-4b0c-9d6e-5a4b3c2d1e0f";
+
+    function makeTableQuery(rows: unknown[], single: unknown = null) {
+      const query: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "in", "or", "order", "limit"]) {
+        query[method] = vi.fn(() => query);
+      }
+      query.maybeSingle = vi.fn(() => Promise.resolve({ data: single, error: null }));
+      query.then = (
+        resolve: (value: { data: unknown[]; error: null }) => unknown,
+        reject: (reason?: unknown) => unknown,
+      ) => Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+      return query as Record<string, ReturnType<typeof vi.fn>> & typeof query;
+    }
+
+    function makeActivityServiceClient(tables: Record<string, ReturnType<typeof makeTableQuery>>) {
+      return { from: vi.fn((table: string) => tables[table] ?? makeTableQuery([])) };
+    }
+
+    function activityRequest() {
+      return new NextRequest("http://localhost/api/employees/manage", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "fetchEmployeeActivity",
+          orgId: ORG_ID,
+          employeeId: EMPLOYEE_ID,
+        }),
+      });
+    }
+
+    const SUPER_ADMIN = {
+      isGridmaster: false,
+      isSuperAdmin: true,
+      role: "super_admin",
+      canViewEmployeeDetails: true,
+    };
+
+    it("opens the timeline to gridmasters, super admins, and admins who can view details", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }),
+      });
+
+      const response = await POST(activityRequest());
+      expect(response.status).toBe(403);
+
+      const isAllowed = requireOrgPermissions.mock.calls[0][2] as (
+        permissions: Record<string, unknown>,
+      ) => boolean;
+      const base = {
+        isGridmaster: false,
+        isSuperAdmin: false,
+        role: "user",
+        canViewEmployeeDetails: true,
+      };
+      expect(isAllowed({ ...base, isGridmaster: true })).toBe(true);
+      expect(isAllowed({ ...base, isSuperAdmin: true, role: "super_admin" })).toBe(true);
+      expect(isAllowed({ ...base, role: "admin" })).toBe(true);
+      expect(isAllowed({ ...base, role: "admin", canViewEmployeeDetails: false })).toBe(false);
+      expect(isAllowed(base)).toBe(false);
+    });
+
+    it("merges audit rows, the role ledger, and the invitation lifecycle for one person", async () => {
+      const tables = {
+        employees: makeTableQuery(
+          [{ id: EMPLOYEE_ID, first_name: "Mina", last_name: "Diaz", email: "mina@dubgrid.com" }],
+          {
+            id: EMPLOYEE_ID,
+            org_id: ORG_ID,
+            user_id: PERSON_USER_ID,
+            created_at: "2026-01-01T09:00:00.000Z",
+            created_by: ADMIN_ID,
+          },
+        ),
+        invitations: makeTableQuery([
+          {
+            id: INVITATION_ID,
+            org_id: ORG_ID,
+            invited_by: ADMIN_ID,
+            email: "mina@dubgrid.com",
+            role_to_assign: "user",
+            expires_at: "2099-01-01T00:00:00.000Z",
+            accepted_at: "2026-01-02T10:00:00.000Z",
+            revoked_at: null,
+            created_at: "2026-01-01T10:00:00.000Z",
+            first_name: "Mina",
+            last_name: "Diaz",
+          },
+        ]),
+        audit_log: makeTableQuery([
+          {
+            id: 42,
+            org_id: ORG_ID,
+            actor_id: ADMIN_ID,
+            actor_email: "alex@dubgrid.com",
+            action: "employee.updated",
+            resource_type: "employee",
+            resource_id: EMPLOYEE_ID,
+            details: { changes: [] },
+            created_at: "2026-02-01T10:00:00.000Z",
+          },
+        ]),
+        role_change_log: makeTableQuery([
+          {
+            id: "rcl-1",
+            org_id: ORG_ID,
+            target_user_id: PERSON_USER_ID,
+            changed_by_id: ADMIN_ID,
+            from_role: "user",
+            to_role: "admin",
+            change_type: "role_change",
+            permissions_before: null,
+            permissions_after: null,
+            created_at: "2026-03-01T10:00:00.000Z",
+          },
+        ]),
+        profiles: makeTableQuery([
+          { id: ADMIN_ID, first_name: "Alex", last_name: "Admin" },
+          { id: PERSON_USER_ID, first_name: "Mina", last_name: "Diaz" },
+        ]),
+        organizations: makeTableQuery([{ id: ORG_ID, name: "Calm Haven" }]),
+      };
+      requireOrgPermissions.mockResolvedValue({
+        permissions: SUPER_ADMIN,
+        serviceClient: makeActivityServiceClient(tables),
+        actor: { id: VIEWER_USER_ID },
+        orgId: ORG_ID,
+      });
+
+      const response = await POST(activityRequest());
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { entries: Array<Record<string, unknown>> };
+
+      expect(body.entries.map((entry) => entry.action)).toEqual([
+        "role.changed",
+        "employee.updated",
+        "invitation.accepted",
+        "invitation.sent",
+        "employee.created",
+      ]);
+      expect(body.entries[0]).toMatchObject({
+        id: "role-change-rcl-1",
+        actorName: "Alex Admin",
+        targetLabel: "Mina Diaz",
+        details: { fromRole: "user", toRole: "admin" },
+      });
+      expect(body.entries.find((entry) => entry.action === "invitation.accepted")).toMatchObject({
+        actorName: "Mina Diaz",
+      });
+      expect(tables.audit_log.eq).toHaveBeenCalledWith("org_id", ORG_ID);
+      expect(tables.role_change_log.eq).toHaveBeenCalledWith("target_user_id", PERSON_USER_ID);
+    });
+
+    it("returns an empty timeline for an employee outside the effective organization", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        permissions: SUPER_ADMIN,
+        serviceClient: makeActivityServiceClient({ employees: makeTableQuery([], null) }),
+        actor: { id: VIEWER_USER_ID },
+        orgId: ORG_ID,
+      });
+
+      const response = await POST(activityRequest());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ entries: [] });
+    });
+  });
 });

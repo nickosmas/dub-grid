@@ -2544,6 +2544,327 @@ textarea {
   line-height: var(--dg-type-metadata-line-height);
 }
 
+/* Activity toolbar controls read as one line, so a long period label cannot
+   make its button grow mid-row and push the rest of the toolbar out of line.
+   Deliberately not app-wide: the schedule toolbar relies on its buttons
+   wrapping to stay inside a phone screen, and forcing nowrap there pushed its
+   controls off the viewport. */
+.dg-activity-toolbar button,
+.dg-activity-toolbar .dg-btn,
+.dg-activity-toolbar [role="button"] {
+  white-space: nowrap;
+}
+
+/* ── Activity log: period navigation, summary, and table ── */
+
+.dg-activity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+
+/* The filters move as one cluster: either they sit beside the navigation or
+   they take their own row, never split with the select stranded below. */
+.dg-activity-toolbar-filters {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.dg-activity-search {
+  position: relative;
+  flex: 0 1 220px;
+  min-width: 150px;
+}
+
+.dg-activity-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  pointer-events: none;
+  color: var(--dg-color-text-faint);
+}
+
+.dg-activity-search .dg-input {
+  width: 100%;
+  padding-left: 32px;
+  padding-right: 30px;
+}
+
+.dg-activity-navigator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The arrows and the period they move stay together when the toolbar wraps. */
+.dg-activity-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dg-activity-period-label {
+  width: 210px;
+}
+
+.dg-activity-today {
+  height: var(--dg-toolbar-h);
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+.dg-activity-zone-note {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+
+/* Below this the row genuinely cannot hold every control, so the stepper takes
+   its own line and the remaining tools sit under it. */
+@media (max-width: 640px) {
+  .dg-activity-navigator,
+  .dg-activity-stepper {
+    width: 100%;
+  }
+
+  .dg-activity-period-label {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .dg-activity-navigator .dg-span-tabs {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .dg-activity-toolbar-filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .dg-activity-search {
+    flex: 1 1 150px;
+  }
+}
+
+.dg-activity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0;
+}
+
+.dg-activity-summary-meta {
+  font-size: var(--dg-fs-body-sm);
+  color: var(--dg-color-text-muted);
+}
+
+.dg-activity-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.dg-activity-chip-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 4px;
+}
+
+.dg-activity-chip-button:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+
+.dg-activity-chip-button[aria-pressed="true"] {
+  box-shadow: 0 0 0 1px var(--dg-color-brand);
+  border-radius: 4px;
+}
+
+/* `clip` rather than `hidden`: `hidden` makes a scroll container, which would
+   become the containing block for the sticky day headings inside. */
+.dg-activity-table-shell {
+  overflow: clip;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-surface);
+}
+
+/* Separate borders keep the day headings' background painted while stuck;
+   collapsed borders detach from a sticky cell in Chromium. */
+.dg-activity-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dg-activity-head-row > th {
+  background: var(--dg-color-bg);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+  border-right: 1px solid var(--dg-color-border-light);
+}
+
+.dg-activity-head-row > th:first-child {
+  padding-left: 24px;
+}
+
+.dg-activity-head-row > th:last-child {
+  padding-right: 24px;
+  border-right: 0;
+}
+
+.dg-activity-day-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--dg-color-bg);
+  padding: 10px 24px;
+  text-align: left;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+
+.dg-activity-day-heading-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dg-activity-day-label {
+  font-size: var(--dg-type-content-group-heading-size);
+  font-weight: var(--dg-type-content-group-heading-weight);
+  line-height: var(--dg-type-content-group-heading-line-height);
+  color: var(--dg-type-content-group-heading-color);
+}
+
+.dg-activity-day-date {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+
+.dg-activity-row {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.dg-activity-row:hover,
+.dg-activity-row:focus-visible {
+  background: var(--dg-color-row-alt);
+}
+
+.dg-activity-row:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+
+.dg-activity-cell {
+  padding: 14px 12px;
+  vertical-align: top;
+  font-size: var(--dg-fs-body-sm);
+  color: var(--dg-color-text-primary);
+  border-bottom: 1px solid var(--dg-color-border-light);
+  border-right: 1px solid var(--dg-color-border-light);
+}
+
+.dg-activity-cell:first-child {
+  padding-left: 24px;
+}
+
+.dg-activity-cell:last-child {
+  padding-right: 24px;
+  border-right: 0;
+}
+
+.dg-activity-cell--when,
+.dg-activity-cell--type,
+.dg-activity-cell--identity {
+  white-space: nowrap;
+}
+
+.dg-activity-time {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-activity-identity {
+  min-width: 0;
+  max-width: 220px;
+}
+
+.dg-activity-identity-primary {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dg-activity-identity-secondary {
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dg-activity-description {
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+}
+
+.dg-activity-detail-list {
+  margin-top: 2px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dg-activity-detail-key {
+  font-weight: 600;
+}
+
+.dg-activity-context {
+  margin-top: 4px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+
+.dg-activity-cell--chevron {
+  width: 40px;
+  text-align: right;
+  vertical-align: middle;
+  color: var(--dg-color-text-faint);
+}
+
+.dg-activity-skeleton-row {
+  display: flex;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+
+.dg-activity-skeleton-row:last-child {
+  border-bottom: 0;
+}
+
 .dg-role-department-edit-pills,
 .dg-role-requirement-edit-pills,
 .dg-role-requirement-pills {
@@ -3080,6 +3401,9 @@ table tbody > tr:last-child > th {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Change chips intentionally rise above their pills. They must be allowed
+     to clear a neighbouring cell instead of being cropped at the cell edge. */
+  overflow: visible;
 }
 
 .dg-grid-cell__content {

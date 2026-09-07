@@ -17,14 +17,7 @@ import type { DbEmployee, DbInvitation, DbScheduleCell } from "./types";
 import { rowToEmployee, employeeToRow, rowToDepartment, rowToInvitation } from "./mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
-import type {
-  Employee,
-  Department,
-  ShiftMap,
-  Invitation,
-  EmployeeStatus,
-  AuditLogEntry,
-} from "@/types";
+import type { Employee, Department, ShiftMap, Invitation, EmployeeStatus } from "@/types";
 
 export class EmployeeStatusConflictError extends Error {
   constructor(public readonly latestEmployee: Employee) {
@@ -544,30 +537,6 @@ export async function fetchEmployeeShifts(
     }
   }
   return map;
-}
-
-// ── Employee Role Change History ──────────────────────────────────────────────
-
-export async function fetchEmployeeRoleHistory(userId: string): Promise<AuditLogEntry[]> {
-  const { data, error } = await supabase.rpc("get_audit_log", {
-    p_org_id: null,
-    p_limit: 50,
-    p_offset: 0,
-    p_target_user_id: userId,
-  });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    targetUserId: row.target_user_id as string,
-    targetEmail: (row.target_email as string | null) ?? null,
-    changedById: row.changed_by_id as string,
-    changedByEmail: (row.changed_by_email as string | null) ?? null,
-    fromRole: row.from_role as string,
-    toRole: row.to_role as string,
-    createdAt: row.created_at as string,
-    orgId: (row.org_id as string | null) ?? null,
-    orgName: (row.org_name as string | null) ?? null,
-  }));
 }
 
 // ── Employee Invitations ─────────────────────────────────────────────────────

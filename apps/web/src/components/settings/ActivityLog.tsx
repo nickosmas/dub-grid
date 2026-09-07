@@ -1,642 +1,264 @@
 "use client";
-import { Search } from "lucide-react";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
-import { Button } from "@/components/Button";
-import Modal from "@/components/Modal";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import { fetchAuditLogDayCounts, fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
-import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
-import { Pagination as SharedPagination } from "@/components/ui/pagination";
-import { useMediaQuery, MOBILE } from "@/hooks";
-import {
-  ACTIVITY_CATEGORIES,
-  matchesCategory,
-  describeAction,
-  getActionSeverity,
-  formatRelativeTime,
-  formatDetails,
-  groupByDate,
-  getAuditActorLabel,
-  getAuditActorSecondaryLabel,
-  getAuditCategoryLabel,
-  getAuditTargetLabel,
-  getResourceTypeLabel,
-} from "@/lib/activity-log-utils";
-import type { DetailItem } from "@/lib/activity-log-utils";
+import { Pagination } from "@/components/ui/pagination";
+import { queryKeys } from "@/lib/query-keys";
+import { countActors, groupByDay, summarizeCategories } from "@/lib/activity-log-utils";
+import { getAuditCategoryOptions, ORG_ACTIVITY_CATEGORIES } from "@/lib/audit/registry";
+import { formatActivityPeriodPhrase, shiftActivityPeriod } from "@/lib/activity-period";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { EmptyState } from "@/components/EmptyState";
-import { formatDateTime } from "@/lib/audit/details";
+import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityTable } from "@/components/activity/ActivityTable";
+import { ActivitySkeleton } from "@/components/activity/ActivitySkeleton";
+import { ActivityPeriodStats } from "@/components/activity/ActivityPeriodStats";
+import { ActivityEmptyPeriod } from "@/components/activity/ActivityEmptyPeriod";
+import { PeriodNavigator } from "@/components/activity/PeriodNavigator";
+import { useUrlActivityPeriod } from "@/components/activity/useActivityPeriod";
 
-const PAGE_SIZE = 50;
+export { ActivityDetailsDialog };
 
-const ACTION_TONES = {
-  create: "success",
-  delete: "danger",
-  warning: "warning",
-  update: "neutral",
-} satisfies Record<ReturnType<typeof getActionSeverity>, StatusPillTone>;
+const PAGE_SIZE = 200;
 
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-
-const SEARCH_ICON = <Search size={14} />;
-
-// ---------------------------------------------------------------------------
-// Shared styles
-// ---------------------------------------------------------------------------
-
-const TH_STYLE: React.CSSProperties = {
-  textAlign: "left",
-  padding: "8px 12px",
-  fontWeight: "var(--dg-type-table-heading-weight)",
-  color: "var(--dg-type-table-heading-color)",
-  fontSize: "var(--dg-type-table-heading-size)",
-  letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
-  lineHeight: "var(--dg-type-table-heading-line-height)",
-  whiteSpace: "nowrap",
-  borderBottom: "1px solid var(--dg-color-border)",
-  borderRight: "1px solid var(--dg-color-border)",
-};
-
-const TD_STYLE: React.CSSProperties = {
-  padding: "10px 12px",
-  fontSize: "var(--dg-fs-body-sm)",
-  verticalAlign: "top",
-  borderBottom: "1px solid var(--dg-color-border-light)",
-  borderRight: "1px solid var(--dg-color-border-light)",
-};
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function Toolbar({
-  searchQuery,
-  onSearchChange,
-  categoryFilter,
-  onCategoryChange,
-  isMobile,
+export default function ActivityLog({
+  orgId,
+  timeZone = null,
 }: {
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  categoryFilter: string;
-  onCategoryChange: (v: string) => void;
-  isMobile: boolean;
+  orgId: string;
+  timeZone?: string | null;
 }) {
-  const selectOptions = ACTIVITY_CATEGORIES.map((c) => ({
-    value: c.value,
-    label: c.label,
-  }));
+  const period = useUrlActivityPeriod({ timeZone });
 
-  return (
-    <div
-      className="dg-toolbar-type"
-      style={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        gap: 10,
-        marginBottom: 16,
-      }}
-    >
-      <div style={{ position: "relative", flex: 1 }}>
-        <span
-          style={{
-            position: "absolute",
-            left: 10,
-            top: "50%",
-            transform: "translateY(-50%)",
-            color: "var(--dg-color-text-faint)",
-            display: "flex",
-            pointerEvents: "none",
-          }}
-        >
-          {SEARCH_ICON}
-        </span>
-        <input
-          type="text"
-          placeholder="Search activity"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: "100%",
-            padding: `7px ${searchQuery ? 30 : 12}px 7px 32px`,
-            borderRadius: "var(--dg-radius-md, 8px)",
-            border: "1px solid var(--dg-color-border)",
-            background: "var(--dg-color-surface)",
-            fontSize: "var(--dg-fs-navigation-item)",
-            fontWeight: "var(--dg-type-control-weight)",
-            letterSpacing: "normal",
-            color: "var(--dg-color-text-primary)",
-            outline: "none",
-          }}
-        />
-        {searchQuery && (
-          <CloseButton
-            size="sm"
-            onClick={() => onSearchChange("")}
-            aria-label="Clear search"
-            style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
-          />
-        )}
-      </div>
-      <CustomSelect
-        value={categoryFilter}
-        options={selectOptions}
-        onChange={onCategoryChange}
-        style={{ minWidth: isMobile ? undefined : 160 }}
-        fontSize="var(--dg-fs-navigation-item)"
-        fontWeight="var(--dg-type-control-weight)"
-        activeFontWeight="var(--dg-type-control-weight)"
-        letterSpacing="normal"
-      />
-    </div>
-  );
-}
-
-function DateGroupRow({ label, colSpan }: { label: string; colSpan: number }) {
-  return (
-    <tr>
-      <td
-        colSpan={colSpan}
-        style={{
-          padding: "14px 12px 6px",
-          fontSize: "var(--dg-type-table-heading-size)",
-          fontWeight: "var(--dg-type-table-heading-weight)",
-          color: "var(--dg-type-table-heading-color)",
-          letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
-          lineHeight: "var(--dg-type-table-heading-line-height)",
-          background: "var(--dg-color-bg)",
-          borderBottom: "1px solid var(--dg-color-border-light)",
-        }}
-      >
-        {label}
-      </td>
-    </tr>
-  );
-}
-
-function ActionBadge({ action }: { action: string }) {
-  return (
-    <StatusPill tone={ACTION_TONES[getActionSeverity(action)]} variant="category">
-      {getAuditCategoryLabel(action)}
-    </StatusPill>
-  );
-}
-
-function DetailsCell({
-  description,
-  details,
-  onOpen,
-}: {
-  description: string;
-  details: DetailItem[];
-  onOpen: () => void;
-}) {
-  const hasDetails = details.length > 0;
-
-  return (
-    <td style={TD_STYLE}>
-      <div
-        style={{
-          fontWeight: 500,
-          color: "var(--dg-color-text-primary)",
-          marginBottom: hasDetails ? 2 : 0,
-        }}
-      >
-        {description}
-      </div>
-      {hasDetails && (
-        <div
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
-            lineHeight: 1.5,
-          }}
-        >
-          {details.map((item) => (
-            <div key={`${item.label}:${item.value}`} style={{ overflowWrap: "anywhere" }}>
-              <span style={{ fontWeight: 700 }}>{item.label}:</span> {item.value}
-            </div>
-          ))}
-        </div>
-      )}
-      <Button
-        className="dg-btn dg-btn-ghost dg-btn-sm"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpen();
-        }}
-        style={{ marginTop: hasDetails ? 8 : 6 }}
-      >
-        View details
-      </Button>
-    </td>
-  );
-}
-
-export function ActivityDetailsDialog({
-  entry,
-  onClose,
-}: {
-  entry: FullAuditLogEntry;
-  onClose: () => void;
-}) {
-  const details = formatDetails(entry);
-  const actor = getAuditActorLabel(entry);
-  const actorSecondary = getAuditActorSecondaryLabel(entry);
-  const target = getAuditTargetLabel(entry);
-  const targetSecondary = entry.targetLabel ? entry.targetEmail : null;
-  const timestamp = new Date(entry.createdAt);
-
-  return (
-    <Modal title="Activity details" onClose={onClose} className="dg-activity-details-modal">
-      <div className="dg-activity-details">
-        <div className="dg-activity-details-summary">
-          <ActionBadge action={entry.action} />
-          <div className="dg-activity-details-headline">{describeAction(entry)}</div>
-        </div>
-        <DetailRows
-          rows={[
-            [
-              "Date and time",
-              Number.isNaN(timestamp.getTime())
-                ? entry.createdAt
-                : timestamp.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
-            ],
-            [
-              "Performed by",
-              <ActivityDetailIdentity key="actor" primary={actor} secondary={actorSecondary} />,
-            ],
-            [
-              "Target changed",
-              <ActivityDetailIdentity key="target" primary={target} secondary={targetSecondary} />,
-            ],
-            ["Item type", getResourceTypeLabel(entry.resourceType)],
-            ["Activity type", getAuditCategoryLabel(entry.action)],
-          ]}
-        />
-        <section className="dg-activity-details-changes" aria-labelledby="activity-changes-title">
-          <div id="activity-changes-title" className="dg-type-content-group-heading">
-            What changed
-          </div>
-          {details.length > 0 ? (
-            <DetailRows
-              rows={details.map((detail): [string, React.ReactNode] => [
-                detail.label,
-                detail.value,
-              ])}
-            />
-          ) : (
-            <div className="dg-activity-details-empty">No additional details were recorded.</div>
-          )}
-        </section>
-      </div>
-    </Modal>
-  );
-}
-
-function DetailRows({ rows }: { rows: Array<[string, React.ReactNode]> }) {
-  return (
-    <dl className="dg-activity-details-list">
-      {rows.map(([label, value], index) => (
-        <div className="dg-activity-details-row" key={`${label}:${index}`}>
-          <dt className="dg-activity-details-label">{label}</dt>
-          <dd className="dg-activity-details-value">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function ActivityDetailIdentity({
-  primary,
-  secondary,
-}: {
-  primary: string;
-  secondary?: string | null;
-}) {
-  const showSecondary = secondary && secondary !== primary;
-
-  return (
-    <span className="dg-activity-details-identity">
-      <span className="dg-activity-details-identity-primary">{primary}</span>
-      {showSecondary ? (
-        <span className="dg-activity-details-identity-secondary">{secondary}</span>
-      ) : null}
-    </span>
-  );
-}
-
-function IdentityStack({ primary, secondary }: { primary: string; secondary?: string | null }) {
-  const showSecondary = secondary && secondary !== primary;
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>{primary}</div>
-      {showSecondary && (
-        <div style={{ color: "var(--dg-color-text-muted)", fontSize: "var(--dg-fs-footnote)" }}>
-          {secondary}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Pagination({
-  page,
-  onPageChange,
-  entryCount,
-  pageSize,
-}: {
-  page: number;
-  onPageChange: (p: number) => void;
-  entryCount: number;
-  pageSize: number;
-}) {
-  return (
-    <SharedPagination
-      page={page + 1}
-      hasNext={entryCount >= pageSize}
-      onPageChange={(next) => onPageChange(next - 1)}
-      summary={`Showing ${page * pageSize + 1}–${page * pageSize + entryCount}`}
-    />
-  );
-}
-
-function SkeletonTable() {
-  return (
-    <div style={{ padding: "16px 0" }}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="dg-list-row"
-          style={{
-            display: "flex",
-            gap: 16,
-            padding: "12px 0",
-            borderBottom: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <div
-            className="dg-skeleton"
-            style={{ width: 80, height: 12, borderRadius: "var(--dg-radius-xs)" }}
-          />
-          <div
-            className="dg-skeleton"
-            style={{ width: 70, height: 12, borderRadius: "var(--dg-radius-xs)" }}
-          />
-          <div
-            className="dg-skeleton"
-            style={{ flex: 1, height: 12, borderRadius: "var(--dg-radius-xs)" }}
-          />
-          <div
-            className="dg-skeleton"
-            style={{ width: 120, height: 12, borderRadius: "var(--dg-radius-xs)" }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
-export default function ActivityLog({ orgId }: { orgId: string }) {
-  const isMobile = useMediaQuery(MOBILE);
-
-  const [entries, setEntries] = useState<FullAuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
 
-  // Every category filters server-side, so the page counts stay honest.
-  const serverPrefixes = useMemo(
-    () => ACTIVITY_CATEGORIES.find((c) => c.value === categoryFilter)?.prefixes ?? [],
-    [categoryFilter],
+  const categoryOptions = useMemo(() => getAuditCategoryOptions(ORG_ACTIVITY_CATEGORIES), []);
+  const categoryPrefixes = useMemo(
+    () => categoryOptions.find((category) => category.value === categoryFilter)?.prefixes ?? [],
+    [categoryOptions, categoryFilter],
   );
+  const search = searchQuery.trim();
+  const hasFilters = categoryFilter !== "all" || search.length > 0;
+  const filterKey = JSON.stringify({ categoryFilter, search });
 
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
+  const requestFilters = {
+    orgId,
+    actionPrefixes: categoryPrefixes.length > 0 ? categoryPrefixes : undefined,
+    target: search || undefined,
+  };
 
-    fetchGridmasterFullAuditLog({
-      orgId,
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-      actionPrefixes: serverPrefixes.length > 0 ? serverPrefixes : undefined,
-      target: searchQuery.trim() || undefined,
-    })
-      .then((data) => {
-        if (!cancelled) setEntries(data);
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setError(formatClientErrorMessage(err, "We couldn't load activity right now."));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+  const activityQuery = useQuery({
+    queryKey: queryKeys.org.auditLogRange(orgId, period.startAt, period.endAt, page, filterKey),
+    queryFn: () =>
+      fetchGridmasterFullAuditLog({
+        ...requestFilters,
+        startDate: period.startAt,
+        endDate: period.endAt,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
+    placeholderData: keepPreviousData,
+  });
 
-    return () => {
-      cancelled = true;
+  const entries = useMemo(() => activityQuery.data ?? [], [activityQuery.data]);
+  const isEmpty = !activityQuery.isPending && entries.length === 0;
+
+  // Only asked for when the period came back empty, so the reader gets a way
+  // back to real activity instead of stepping blindly.
+  const previousQuery = useQuery({
+    queryKey: queryKeys.org.auditLogLatestBefore(orgId, period.startAt, filterKey),
+    queryFn: () =>
+      fetchGridmasterFullAuditLog({
+        ...requestFilters,
+        endDate: new Date(Date.parse(period.startAt) - 1).toISOString(),
+        limit: 1,
+      }),
+    enabled: isEmpty && page === 0,
+  });
+
+  // Day headings and the period totals should describe the period, not the page
+  // that happened to load. The count endpoint cannot apply the free-text
+  // search, so a searching reader keeps counting their own rows.
+  const countsQuery = useQuery({
+    queryKey: [
+      ...queryKeys.org.auditLog(orgId),
+      "dayCounts",
+      period.startAt,
+      period.endAt,
+      categoryFilter,
+    ],
+    queryFn: () =>
+      fetchAuditLogDayCounts({
+        orgId,
+        startDate: period.startAt,
+        endDate: period.endAt,
+        timeZone,
+        actionPrefixes: categoryPrefixes.length > 0 ? categoryPrefixes : undefined,
+      }),
+    enabled: search.length === 0,
+    placeholderData: keepPreviousData,
+  });
+  const periodCounts = search.length === 0 ? (countsQuery.data ?? null) : null;
+
+  const groups = useMemo(
+    () => groupByDay(entries, { timeZone, todayDate: period.todayDate }),
+    [entries, timeZone, period.todayDate],
+  );
+  const categories = useMemo(() => summarizeCategories(entries), [entries]);
+
+  const resetPage = <T,>(apply: (value: T) => void) => {
+    return (value: T) => {
+      apply(value);
+      setPage(0);
     };
-  }, [orgId, page, searchQuery, serverPrefixes]);
-
-  const handleCategoryChange = (value: string) => {
-    setCategoryFilter(value);
-    setPage(0);
-    setLoading(true);
   };
 
-  const handleSearchChange = (q: string) => {
-    setSearchQuery(q);
-    setPage(0);
-    setLoading(true);
-  };
+  const error = activityQuery.error
+    ? formatClientErrorMessage(activityQuery.error, "We couldn't load activity right now.")
+    : null;
 
-  const descriptions = useMemo(
-    () => new Map(entries.map((e) => [e.id, describeAction(e)])),
-    [entries],
-  );
-
-  const detailsMap = useMemo(
-    () => new Map(entries.map((e) => [e.id, formatDetails(e)])),
-    [entries],
-  );
-
-  const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => matchesCategory(entry.action, categoryFilter));
-  }, [entries, categoryFilter]);
-
-  const groups = useMemo(() => groupByDate(filteredEntries), [filteredEntries]);
-
-  const COL_COUNT = isMobile ? 3 : 5;
-
-  if (error) {
-    return (
-      <div style={{ textAlign: "center", padding: 40, color: "var(--dg-color-danger)" }}>
-        {error}
-      </div>
-    );
-  }
+  const previousActivity = useMemo(() => {
+    const entry = previousQuery.data?.[0];
+    if (!entry) return null;
+    const dateKey = getIsoDateInTimeZone(new Date(entry.createdAt), timeZone);
+    return {
+      label: `the latest activity, ${formatDate(dateKey, { month: "short", day: "numeric", year: "numeric" })}`,
+      onJump: () => {
+        period.jumpTo(dateKey);
+        setPage(0);
+      },
+    };
+  }, [previousQuery.data, timeZone]);
 
   return (
     <div>
-      <Toolbar
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        categoryFilter={categoryFilter}
-        onCategoryChange={handleCategoryChange}
-        isMobile={isMobile}
-      />
+      <div className="dg-activity-toolbar">
+        <PeriodNavigator
+          unit={period.unit}
+          label={period.label}
+          anchorDate={period.anchorDate}
+          isCurrent={period.isCurrent}
+          nextDisabled={period.nextDisabled}
+          onUnitChange={resetPage(period.setUnit)}
+          onPrev={() => {
+            period.goPrev();
+            setPage(0);
+          }}
+          onNext={() => {
+            period.goNext();
+            setPage(0);
+          }}
+          onToday={() => {
+            period.goToday();
+            setPage(0);
+          }}
+          onJumpToDate={resetPage(period.jumpTo)}
+        />
 
-      {loading && entries.length === 0 ? (
-        <SkeletonTable />
-      ) : filteredEntries.length === 0 ? (
-        <EmptyState
-          title={
-            searchQuery || categoryFilter !== "all" ? "No matching activity" : "No activity yet"
-          }
-          description={
-            searchQuery || categoryFilter !== "all"
-              ? "Try adjusting your search or filter."
-              : "Actions taken in your organization will appear here."
-          }
-          action={
-            searchQuery || categoryFilter !== "all" ? (
-              <Button
-                className="dg-btn dg-btn-secondary dg-btn-sm"
+        <div className="dg-activity-toolbar-filters">
+          <div className="dg-activity-search">
+            <span className="dg-activity-search-icon">
+              <Search size={14} />
+            </span>
+            <input
+              type="text"
+              className="dg-input"
+              placeholder="Search activity"
+              aria-label="Search activity"
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setPage(0);
+              }}
+            />
+            {searchQuery && (
+              <CloseButton
+                size="sm"
                 onClick={() => {
                   setSearchQuery("");
-                  setCategoryFilter("all");
+                  setPage(0);
                 }}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+              />
+            )}
+          </div>
+          <CustomSelect
+            value={categoryFilter}
+            options={categoryOptions.map(({ value, label }) => ({ value, label }))}
+            onChange={resetPage(setCategoryFilter)}
+            ariaLabel="Filter by activity type"
+            style={{ minWidth: 160 }}
+            fontSize="var(--dg-fs-navigation-item)"
+            fontWeight="var(--dg-type-control-weight)"
+            activeFontWeight="var(--dg-type-control-weight)"
+            letterSpacing="normal"
+          />
+        </div>
+      </div>
+
+      {error ? (
+        <p role="alert" className="py-10 text-center text-[var(--dg-color-danger)]">
+          {error}
+        </p>
+      ) : activityQuery.isPending ? (
+        <ActivitySkeleton />
+      ) : entries.length === 0 ? (
+        <ActivityEmptyPeriod
+          periodPhrase={period.phrase}
+          hasFilters={hasFilters}
+          onClearFilters={() => {
+            setSearchQuery("");
+            setCategoryFilter("all");
+            setPage(0);
+          }}
+          previousActivity={previousActivity}
         />
       ) : (
         <>
-          <div
-            style={{
-              overflowX: "auto",
-              border: "1px solid var(--dg-color-border)",
-              borderRadius: "var(--dg-radius-lg)",
-              background: "var(--dg-color-surface)",
-            }}
-          >
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={TH_STYLE}>Date and time</th>
-                  <th style={TH_STYLE}>Activity type</th>
-                  {!isMobile && <th style={TH_STYLE}>Performed by</th>}
-                  {!isMobile && <th style={TH_STYLE}>Target changed</th>}
-                  <th style={{ ...TH_STYLE, width: "100%" }}>Activity and changes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((group) => (
-                  <React.Fragment key={group.label}>
-                    <DateGroupRow label={group.label} colSpan={COL_COUNT} />
-                    {group.entries.map((entry) => {
-                      const details = detailsMap.get(entry.id) ?? [];
-                      const description = descriptions.get(entry.id) ?? "";
-                      const actorLabel = getAuditActorLabel(entry);
-                      const targetLabel = getAuditTargetLabel(entry);
-                      const mobileDescription = `${description}. Performed by ${actorLabel}. Target changed: ${targetLabel}.`;
-                      const exactDateTime = formatDateTime(entry.createdAt);
-
-                      return (
-                        <tr
-                          key={entry.id}
-                          onClick={() => setSelectedEntry(entry)}
-                          style={{ cursor: "pointer", transition: "background 150ms ease" }}
-                        >
-                          {/* When */}
-                          <td
-                            style={{
-                              ...TD_STYLE,
-                              whiteSpace: "nowrap",
-                              color: "var(--dg-color-text-muted)",
-                            }}
-                          >
-                            {formatRelativeTime(entry.createdAt)}
-                            {exactDateTime && (
-                              <div
-                                style={{
-                                  marginTop: 2,
-                                  color: "var(--dg-color-text-faint)",
-                                  fontSize: "var(--dg-fs-footnote)",
-                                }}
-                              >
-                                {exactDateTime}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Category badge */}
-                          <td style={{ ...TD_STYLE, whiteSpace: "nowrap" }}>
-                            <ActionBadge action={entry.action} />
-                          </td>
-
-                          {/* Who (desktop only) */}
-                          {!isMobile && (
-                            <td style={{ ...TD_STYLE, whiteSpace: "nowrap" }}>
-                              <IdentityStack
-                                primary={actorLabel}
-                                secondary={getAuditActorSecondaryLabel(entry)}
-                              />
-                            </td>
-                          )}
-
-                          {/* Target (desktop only) */}
-                          {!isMobile && (
-                            <td style={{ ...TD_STYLE, whiteSpace: "nowrap" }}>
-                              <IdentityStack
-                                primary={targetLabel}
-                                secondary={entry.targetLabel ? entry.targetEmail : null}
-                              />
-                            </td>
-                          )}
-
-                          {/* Details — description + inline data */}
-                          <DetailsCell
-                            description={isMobile ? mobileDescription : description}
-                            details={details}
-                            onOpen={() => setSelectedEntry(entry)}
-                          />
-                        </tr>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <Pagination
-            page={page}
-            onPageChange={(p: number) => {
-              setPage(p);
-              setLoading(true);
-            }}
-            entryCount={filteredEntries.length}
+          <ActivityPeriodStats
+            total={periodCounts?.total ?? entries.length}
+            dayCount={periodCounts ? Object.keys(periodCounts.counts).length : groups.length}
+            actorCount={countActors(entries)}
+            categories={categories}
+            periodPhrase={period.phrase}
+            truncated={!periodCounts && entries.length >= PAGE_SIZE}
             pageSize={PAGE_SIZE}
           />
+
+          <ActivityTable
+            groups={groups}
+            timeZone={timeZone}
+            dayCounts={periodCounts?.counts}
+            onSelect={(entry) => setSelectedEntry(entry as FullAuditLogEntry)}
+          />
+
+          {(page > 0 || entries.length >= PAGE_SIZE) && (
+            <Pagination
+              className="mt-4"
+              page={page + 1}
+              hasNext={entries.length >= PAGE_SIZE}
+              onPageChange={(next) => setPage(next - 1)}
+              summary={`Showing ${page * PAGE_SIZE + 1} to ${page * PAGE_SIZE + entries.length}`}
+            />
+          )}
         </>
       )}
+
       {selectedEntry ? (
-        <ActivityDetailsDialog entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
+        <ActivityDetailsDialog
+          entry={selectedEntry}
+          timeZone={timeZone}
+          onClose={() => setSelectedEntry(null)}
+        />
       ) : null}
     </div>
   );

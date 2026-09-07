@@ -40,6 +40,21 @@ export function permissionLabel(key: string): string {
   return PERMISSION_LABELS[key as keyof AdminPermissions] ?? key;
 }
 
+/** Only the flags whose effective value flipped, keyed to their new value. */
+export function diffPermissions(
+  before: Record<string, unknown> | null | undefined,
+  after: Record<string, unknown> | null | undefined,
+): Record<string, boolean> {
+  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
+  const diff: Record<string, boolean> = {};
+  for (const key of keys) {
+    const was = Boolean(before?.[key]);
+    const is = Boolean(after?.[key]);
+    if (was !== is) diff[key] = is;
+  }
+  return diff;
+}
+
 /** Lowercase form for mid-sentence use ("can now edit shifts"). */
 function inSentence(label: string): string {
   return label.charAt(0).toLowerCase() + label.slice(1);

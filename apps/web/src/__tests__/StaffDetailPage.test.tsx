@@ -9,7 +9,7 @@ import {
   fetchEmployeeById,
   fetchEmployeeShifts,
   fetchEmployeeInvitations,
-  fetchEmployeeRoleHistory,
+  fetchEmployeeActivity,
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
@@ -81,7 +81,7 @@ vi.mock("@/features/employees/client", () => {
     fetchEmployeeById: vi.fn(),
     fetchEmployeeShifts: vi.fn(),
     fetchEmployeeInvitations: vi.fn(),
-    fetchEmployeeRoleHistory: vi.fn(),
+    fetchEmployeeActivity: vi.fn(),
     updateEmployee: vi.fn(),
     deactivateEmployee: vi.fn(),
     activateEmployee: vi.fn(),
@@ -161,7 +161,7 @@ const mockedCreateOrganizationInvitation = vi.mocked(createOrganizationInvitatio
 const mockedFetchEmployeeShifts = vi.mocked(fetchEmployeeShifts);
 const mockedFetchRecurringShifts = vi.mocked(fetchRecurringShifts);
 const mockedFetchEmployeeInvitations = vi.mocked(fetchEmployeeInvitations);
-const mockedFetchEmployeeRoleHistory = vi.mocked(fetchEmployeeRoleHistory);
+const mockedFetchEmployeeActivity = vi.mocked(fetchEmployeeActivity);
 
 function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   return {
@@ -245,6 +245,7 @@ describe("StaffDetailPage", () => {
     });
 
     mockUsePermissions.mockReturnValue({
+      role: "admin",
       canViewEmployeeDetails: true,
       canViewRecurringShifts: false,
       canManageEmployees: true,
@@ -272,7 +273,7 @@ describe("StaffDetailPage", () => {
         employeeId: "emp-1",
       },
     ]);
-    mockedFetchEmployeeRoleHistory.mockResolvedValue([]);
+    mockedFetchEmployeeActivity.mockResolvedValue([]);
     mockedUpdateEmployee.mockImplementation(async (employee) => ({
       ...employee,
       version: employee.version + 1,

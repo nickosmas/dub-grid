@@ -1,273 +1,223 @@
 "use client";
 
-import { useMemo } from "react";
-import { useTheme } from "next-themes";
-import type { Employee, AuditLogEntry, Invitation } from "@/types";
-import { formatRelativeTime, getEmployeeDisplayName } from "@/lib/utils";
-import { formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import type { Employee, EmployeeActivityEntry } from "@/types";
+import { getEmployeeDisplayName } from "@/lib/utils";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ROLE_BADGE_COLORS } from "@/lib/styles";
-import { toDarkPillColors } from "@/lib/colors";
-import { UserCheck, UserPlus, UserX, Mail, Clock, History } from "lucide-react";
+  countActors,
+  formatActivityDayDate,
+  groupByDay,
+  matchesActivitySearch,
+  matchesCategory,
+  summarizeCategories,
+} from "@/lib/activity-log-utils";
+import CustomSelect from "@/components/CustomSelect";
+import { CloseButton } from "@/components/ui/CloseButton";
+import { isDateInPeriod } from "@/lib/activity-period";
+import { getAuditCategoryOptions, PERSON_ACTIVITY_CATEGORIES } from "@/lib/audit/registry";
+import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityTable } from "@/components/activity/ActivityTable";
+import { ActivitySkeleton } from "@/components/activity/ActivitySkeleton";
+import { ActivityPeriodStats } from "@/components/activity/ActivityPeriodStats";
+import { ActivityEmptyPeriod } from "@/components/activity/ActivityEmptyPeriod";
+import { PeriodNavigator } from "@/components/activity/PeriodNavigator";
+import { useActivityPeriod } from "@/components/activity/useActivityPeriod";
 
 interface ActivityTabProps {
   employee: Employee;
-  roleHistory: AuditLogEntry[];
-  invitations: Invitation[];
+  entries: EmployeeActivityEntry[];
+  loading: boolean;
+  error: string | null;
+  timeZone?: string | null;
 }
 
-interface TimelineEvent {
-  id: string;
-  date: Date;
-  type:
-    | "role_change"
-    | "invitation_sent"
-    | "invitation_accepted"
-    | "invitation_revoked"
-    | "invitation_expired";
-  category: string;
-  description: string;
-  meta?: string;
-  fromRole?: string;
-  toRole?: string;
-}
+export function ActivityTab({
+  employee,
+  entries,
+  loading,
+  error,
+  timeZone = null,
+}: ActivityTabProps) {
+  const [selectedEntry, setSelectedEntry] = useState<EmployeeActivityEntry | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabProps) {
-  const timeline = useMemo(() => {
-    const events: TimelineEvent[] = [];
+  const categoryOptions = useMemo(
+    () =>
+      getAuditCategoryOptions(PERSON_ACTIVITY_CATEGORIES).map(({ value, label }) => ({
+        value,
+        label,
+      })),
+    [],
+  );
 
-    for (const entry of roleHistory) {
-      events.push({
-        id: `role-${entry.id}`,
-        date: new Date(entry.createdAt),
-        type: "role_change",
-        category: "Role",
-        description: "Role changed",
-        meta: entry.changedByEmail ?? "System",
-        fromRole: entry.fromRole,
-        toRole: entry.toRole,
-      });
-    }
+  const dated = useMemo(
+    () =>
+      entries.map((entry) => ({
+        entry,
+        dateKey: getIsoDateInTimeZone(new Date(entry.createdAt), timeZone),
+      })),
+    [entries, timeZone],
+  );
 
-    for (const invitation of invitations) {
-      events.push({
-        id: `inv-sent-${invitation.id}`,
-        date: new Date(invitation.createdAt),
-        type: "invitation_sent",
-        category: "Invitation",
-        description: `Invitation sent to ${invitation.email}`,
-        meta: `as ${formatOrganizationRoleLabel(invitation.roleToAssign)} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`,
-      });
+  // A person's history is sparse, so opening on the current month would show
+  // an empty screen for most people. Start where their latest event is.
+  const latestDateKey = dated.length > 0 ? dated[0].dateKey : null;
 
-      if (invitation.acceptedAt) {
-        events.push({
-          id: `inv-accepted-${invitation.id}`,
-          date: new Date(invitation.acceptedAt),
-          type: "invitation_accepted",
-          category: "Invitation",
-          description: `Invitation accepted by ${invitation.email}`,
-        });
-      } else if (invitation.revokedAt) {
-        events.push({
-          id: `inv-revoked-${invitation.id}`,
-          date: new Date(invitation.revokedAt),
-          type: "invitation_revoked",
-          category: "Invitation",
-          description: "Invitation revoked",
-          meta: invitation.email,
-        });
-      } else if (new Date(invitation.expiresAt) < new Date()) {
-        events.push({
-          id: `inv-expired-${invitation.id}`,
-          date: new Date(invitation.expiresAt),
-          type: "invitation_expired",
-          category: "Invitation",
-          description: "Invitation expired",
-          meta: invitation.email,
-        });
-      }
-    }
+  const period = useActivityPeriod({
+    timeZone,
+    defaultUnit: "month",
+    initialAnchorDate: latestDateKey,
+  });
 
-    return events.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [roleHistory, invitations]);
+  const inPeriod = useMemo(
+    () => dated.filter((item) => isDateInPeriod(period.period, item.dateKey)).map((i) => i.entry),
+    [dated, period.period],
+  );
+
+  const hasFilters = categoryFilter !== "all" || searchQuery.trim().length > 0;
+  const visible = useMemo(
+    () =>
+      inPeriod.filter(
+        (entry) =>
+          matchesCategory(entry.action, categoryFilter) &&
+          matchesActivitySearch(entry, searchQuery),
+      ),
+    [inPeriod, categoryFilter, searchQuery],
+  );
+
+  const groups = useMemo(
+    () => groupByDay(visible, { timeZone, todayDate: period.todayDate }),
+    [visible, timeZone, period.todayDate],
+  );
+  const categories = useMemo(() => summarizeCategories(visible), [visible]);
+
+  // The nearest event either side of an empty period, so it is never a dead end.
+  // Stepping back before someone's first event is as easy to do as stepping
+  // into a quiet month, and both need a way out.
+  const nearestActivity = useMemo(() => {
+    if (dated.length === 0) return null;
+    const earlier = dated.find((item) => item.dateKey < period.period.startDate);
+    const target = earlier ?? dated[dated.length - 1];
+    const isEarlier = Boolean(earlier);
+    return {
+      label: `the ${isEarlier ? "previous" : "earliest"} activity, ${formatActivityDayDate(target.dateKey)}`,
+      onJump: () => period.jumpTo(target.dateKey),
+    };
+  }, [dated, period.period.startDate]);
+
+  const name = getEmployeeDisplayName(employee);
+
+  if (loading) {
+    return <ActivitySkeleton rows={5} />;
+  }
+
+  if (error) {
+    return (
+      <p
+        role="alert"
+        className="py-10 text-center text-[length:var(--dg-fs-body-sm)] text-[var(--dg-color-danger)]"
+      >
+        {error}
+      </p>
+    );
+  }
 
   return (
-    <div className="dg-card">
-      <div className="dg-card-header">
-        <div>
-          <div className="dg-card-title flex items-center gap-2">
-            <History className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
-            History
-            <Badge
-              variant="secondary"
-              className="ml-1 h-4 px-1.5 py-0 font-mono text-[length:var(--dg-type-badge-size)]"
-            >
-              {timeline.length}
-            </Badge>
+    <div>
+      <div className="dg-activity-toolbar">
+        <PeriodNavigator
+          unit={period.unit}
+          label={period.label}
+          anchorDate={period.anchorDate}
+          isCurrent={period.isCurrent}
+          nextDisabled={period.nextDisabled}
+          onUnitChange={period.setUnit}
+          onPrev={period.goPrev}
+          onNext={period.goNext}
+          onToday={period.goToday}
+          onJumpToDate={period.jumpTo}
+        />
+
+        <div className="dg-activity-toolbar-filters">
+          <div className="dg-activity-search">
+            <span className="dg-activity-search-icon">
+              <Search size={14} />
+            </span>
+            <input
+              type="text"
+              className="dg-input"
+              placeholder="Search activity"
+              aria-label="Search activity"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {searchQuery && (
+              <CloseButton
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+              />
+            )}
           </div>
-          <div className="dg-card-subtitle">
-            Account and permission timeline for {getEmployeeDisplayName(employee)}.
-          </div>
+          <CustomSelect
+            value={categoryFilter}
+            options={categoryOptions}
+            onChange={setCategoryFilter}
+            ariaLabel="Filter by activity type"
+            style={{ minWidth: 160 }}
+            fontSize="var(--dg-fs-navigation-item)"
+            fontWeight="var(--dg-type-control-weight)"
+            activeFontWeight="var(--dg-type-control-weight)"
+            letterSpacing="normal"
+          />
         </div>
       </div>
-      <div className={timeline.length === 0 ? "dg-card-body" : "p-0"}>
-        {timeline.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <History className="mb-3 h-7 w-7 text-[var(--dg-color-text-faint)]" />
-            <p className="text-[13px] text-[var(--dg-color-text-muted)]">No activity recorded</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {timeline.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell>
-                      <div className="flex min-w-[120px] flex-col gap-0.5">
-                        <span className="font-medium text-[var(--dg-color-text-primary)]">
-                          {formatRelativeTime(event.date.toISOString())}
-                        </span>
-                        <span className="text-[12px] text-[var(--dg-color-text-muted)]">
-                          {event.date.toLocaleDateString()}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <EventBadge event={event} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex min-w-[220px] items-center gap-2">
-                        <EventIcon type={event.type} />
-                        <span className="font-medium text-[var(--dg-color-text-primary)]">
-                          {event.description}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex min-w-[240px] flex-wrap items-center gap-1.5 text-[13px] text-[var(--dg-color-text-muted)]">
-                        {event.fromRole && event.toRole ? (
-                          <>
-                            <RoleBadge role={event.fromRole} />
-                            <span className="text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
-                              →
-                            </span>
-                            <RoleBadge role={event.toRole} />
-                          </>
-                        ) : null}
-                        {event.meta ? (
-                          <span className="text-[12px] text-[var(--dg-color-text-muted)]">
-                            {event.meta}
-                          </span>
-                        ) : null}
-                        {!event.fromRole && !event.toRole && !event.meta ? (
-                          <span className="text-[12px] text-[var(--dg-color-text-faint)]">—</span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function EventBadge({ event }: { event: TimelineEvent }) {
-  const tone =
-    event.type === "invitation_revoked" || event.type === "invitation_expired"
-      ? {
-          bg: "var(--dg-color-danger-bg)",
-          color: "var(--dg-color-danger)",
-          border: "var(--dg-color-danger-bg)",
-        }
-      : event.type === "role_change"
-        ? {
-            bg: "var(--dg-color-warning-bg)",
-            color: "var(--dg-color-warning)",
-            border: "var(--dg-color-warning-bg)",
+      {visible.length === 0 ? (
+        <ActivityEmptyPeriod
+          periodPhrase={period.phrase}
+          hasFilters={hasFilters}
+          onClearFilters={() => {
+            setSearchQuery("");
+            setCategoryFilter("all");
+          }}
+          previousActivity={nearestActivity}
+          description={
+            entries.length === 0 && !hasFilters
+              ? `Changes to ${name}'s profile, status, access, or invitations will show up here.`
+              : undefined
           }
-        : {
-            bg: "var(--dg-color-success-bg)",
-            color: "var(--dg-color-success)",
-            border: "var(--dg-color-success-bg)",
-          };
+        />
+      ) : (
+        <>
+          <ActivityPeriodStats
+            total={visible.length}
+            dayCount={groups.length}
+            actorCount={countActors(visible)}
+            categories={categories}
+            periodPhrase={period.phrase}
+          />
 
-  return (
-    <Badge
-      variant="outline"
-      className="h-5 px-2 py-0 text-[length:var(--dg-type-badge-size)] font-medium"
-      style={{
-        backgroundColor: tone.bg,
-        borderColor: tone.border,
-        color: tone.color,
-      }}
-    >
-      {event.category}
-    </Badge>
-  );
-}
+          <ActivityTable
+            groups={groups}
+            timeZone={timeZone}
+            showTarget={false}
+            onSelect={setSelectedEntry}
+          />
+        </>
+      )}
 
-function EventIcon({ type }: { type: TimelineEvent["type"] }) {
-  const className = "h-3.5 w-3.5 shrink-0";
-  switch (type) {
-    case "role_change":
-      return <UserPlus className={className} style={{ color: "var(--dg-color-success)" }} />;
-    case "invitation_sent":
-      return <Mail className={className} style={{ color: "var(--dg-color-text-muted)" }} />;
-    case "invitation_accepted":
-      return <UserCheck className={className} style={{ color: "var(--dg-color-success)" }} />;
-    case "invitation_revoked":
-      return <UserX className={className} style={{ color: "var(--dg-color-danger)" }} />;
-    case "invitation_expired":
-      return <Clock className={className} style={{ color: "var(--dg-color-text-faint)" }} />;
-  }
-}
-
-function RoleBadge({ role }: { role: string }) {
-  const { resolvedTheme } = useTheme();
-  const colors0 = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
-  // Only the "gridmaster" entry is a literal hex triple (others are already
-  // var(--color-*) tokens, which toDarkPillColors can't parse as hex).
-  const isDarkTheme = resolvedTheme === "dark";
-  const colors =
-    isDarkTheme && colors0.bg.startsWith("#")
-      ? {
-          bg: toDarkPillColors(colors0.bg).bg,
-          text: toDarkPillColors(colors0.bg).text,
-          border: colors0.border,
-        }
-      : colors0;
-
-  return (
-    <Badge
-      variant="outline"
-      className="h-4 px-1.5 py-0 text-[length:var(--dg-type-badge-size)] capitalize"
-      style={{
-        backgroundColor: colors.bg,
-        color: colors.text,
-        borderColor: colors.border,
-      }}
-    >
-      {formatOrganizationRoleLabel(role)}
-    </Badge>
+      {selectedEntry ? (
+        <ActivityDetailsDialog
+          entry={selectedEntry}
+          timeZone={timeZone}
+          onClose={() => setSelectedEntry(null)}
+        />
+      ) : null}
+    </div>
   );
 }

@@ -8,6 +8,7 @@
  */
 
 import type { FullAuditLogEntry } from "@/types";
+import { addDaysToIsoDate, formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
   AuditDetails,
   flattenDetails,
@@ -20,6 +21,7 @@ import {
   AUDIT_CATEGORY_OPTIONS,
   describeUnknownAction,
   getAuditActionSpec,
+  getAuditCategory,
   getAuditCategoryLabel,
   getAuditSeverity,
   getResourceTypeLabel,
@@ -30,6 +32,9 @@ import {
 } from "@/lib/audit/registry";
 
 export type { DetailItem, ActionSeverity };
+
+/** An audit-shaped entry from any source; the id type is the only thing that varies. */
+export type ActivityEntryLike = Partial<Omit<FullAuditLogEntry, "id">>;
 export { getResourceTypeLabel, getAuditCategoryLabel, AUDIT_CATEGORY_OPTIONS, formatShortDate };
 export { formatRelativeTime } from "@/lib/utils";
 
@@ -59,44 +64,11 @@ export function getActionSeverity(action: string): ActionSeverity {
   return getAuditSeverity(action);
 }
 
-export function severityColor(severity: ActionSeverity): {
-  bg: string;
-  border: string;
-  fg: string;
-} {
-  switch (severity) {
-    case "create":
-      return {
-        bg: "var(--dg-color-success-bg, #f0fdf4)",
-        border: "var(--dg-color-success-border, #bbf7d0)",
-        fg: "var(--dg-color-success-text, #166534)",
-      };
-    case "delete":
-      return {
-        bg: "var(--dg-color-danger-bg, #fde8e8)",
-        border: "var(--dg-color-danger-border, #fecaca)",
-        fg: "var(--dg-color-danger-text, #b91c1c)",
-      };
-    case "warning":
-      return {
-        bg: "var(--dg-color-warning-bg, #fff8e6)",
-        border: "var(--dg-color-warning-border, #fde68a)",
-        fg: "var(--dg-color-warning-text, #92400e)",
-      };
-    case "update":
-      return {
-        bg: "var(--dg-color-bg-secondary)",
-        border: "var(--dg-color-border)",
-        fg: "var(--dg-color-text-primary)",
-      };
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Descriptions
 // ---------------------------------------------------------------------------
 
-function contextFromEntry(entry: Partial<FullAuditLogEntry>): AuditContext {
+function contextFromEntry(entry: ActivityEntryLike): AuditContext {
   return {
     targetLabel: entry.targetLabel ?? null,
     targetEmail: entry.targetEmail ?? null,
@@ -106,14 +78,14 @@ function contextFromEntry(entry: Partial<FullAuditLogEntry>): AuditContext {
   };
 }
 
-function detailsOf(entry: Partial<FullAuditLogEntry>): Record<string, unknown> {
+function detailsOf(entry: ActivityEntryLike): Record<string, unknown> {
   const raw = entry.details;
   return raw && typeof raw === "object" && !Array.isArray(raw)
     ? (raw as Record<string, unknown>)
     : {};
 }
 
-export function describeAction(entry: Partial<FullAuditLogEntry> & { action: string }): string {
+export function describeAction(entry: ActivityEntryLike & { action: string }): string {
   const spec = getAuditActionSpec(entry.action);
   if (!spec) return describeUnknownAction(entry.action);
   return spec.headline(new AuditDetails(detailsOf(entry)), contextFromEntry(entry));
@@ -127,9 +99,7 @@ export function describeAuditEvent(action: string, details: Record<string, unkno
 // Detail rows
 // ---------------------------------------------------------------------------
 
-export function formatDetails(
-  entry: Partial<FullAuditLogEntry> & { action: string },
-): DetailItem[] {
+export function formatDetails(entry: ActivityEntryLike & { action: string }): DetailItem[] {
   const details = detailsOf(entry);
   if (Object.keys(details).length === 0) return [];
 
@@ -146,7 +116,7 @@ export function formatDetails(
 }
 
 /** Compact inline summary for a table cell. */
-export function summarizeDetails(entry: Partial<FullAuditLogEntry> & { action: string }): string {
+export function summarizeDetails(entry: ActivityEntryLike & { action: string }): string {
   const items = formatDetails(entry);
   if (items.length === 0) return "—";
   return items.map((i) => `${i.label}: ${i.value}`).join(" · ");
@@ -156,7 +126,7 @@ export function summarizeDetails(entry: Partial<FullAuditLogEntry> & { action: s
 // Actor / target labels
 // ---------------------------------------------------------------------------
 
-export function getAuditActorLabel(entry: Partial<FullAuditLogEntry>): string {
+export function getAuditActorLabel(entry: ActivityEntryLike): string {
   const initiatedBy = detailsOf(entry).initiated_by;
   if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
     return "Gridmaster";
@@ -164,76 +134,156 @@ export function getAuditActorLabel(entry: Partial<FullAuditLogEntry>): string {
   return entry.actorName ?? entry.actorEmail ?? "System";
 }
 
-export function getAuditActorSecondaryLabel(entry: Partial<FullAuditLogEntry>): string | null {
+export function getAuditActorSecondaryLabel(entry: ActivityEntryLike): string | null {
   if (getAuditActorLabel(entry) === "Gridmaster") return null;
   return entry.actorName ? (entry.actorEmail ?? null) : null;
 }
 
-export function getAuditTargetLabel(entry: Partial<FullAuditLogEntry>): string {
+export function getAuditTargetLabel(entry: ActivityEntryLike): string {
   return entry.targetLabel ?? getResourceTypeLabel(entry.resourceType ?? "");
 }
 
 // ---------------------------------------------------------------------------
-// Date grouping
+// Grouping across time
 // ---------------------------------------------------------------------------
 
-export interface DateGroup {
+export interface ActivityDayGroup<T> {
+  dateKey: string;
   label: string;
-  entries: FullAuditLogEntry[];
+  entries: T[];
 }
 
-export function groupByDate(entries: FullAuditLogEntry[]): DateGroup[] {
-  const now = new Date();
-  const todayStr = now.toDateString();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toDateString();
-
-  const groups = new Map<string, DateGroup>();
+/**
+ * Buckets entries into the organization's calendar days, newest day first.
+ *
+ * The timezone is the organization's, never the reader's: a manager in Denver
+ * looking at a Boston facility has to see the facility's Tuesday, and the day
+ * headings have to line up with the range the query asked the database for.
+ * `todayDate` is passed in rather than read from the clock so the labels agree
+ * with the period navigation and stay deterministic under test.
+ */
+export function groupByDay<T extends { createdAt: string }>(
+  entries: T[],
+  options: { timeZone: string | null; todayDate: string },
+): ActivityDayGroup<T>[] {
+  const groups = new Map<string, ActivityDayGroup<T>>();
 
   for (const entry of entries) {
-    const d = new Date(entry.createdAt);
-    const dateStr = d.toDateString();
-
-    let label: string;
-    if (dateStr === todayStr) label = "Today";
-    else if (dateStr === yesterdayStr) label = "Yesterday";
-    else
-      label = d.toLocaleDateString(undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
+    const dateKey = getIsoDateInTimeZone(new Date(entry.createdAt), options.timeZone);
+    const existing = groups.get(dateKey);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      groups.set(dateKey, {
+        dateKey,
+        label: formatActivityDayLabel(dateKey, options.todayDate),
+        entries: [entry],
       });
-
-    const existing = groups.get(dateStr);
-    if (existing) existing.entries.push(entry);
-    else groups.set(dateStr, { label, entries: [entry] });
+    }
   }
 
-  return Array.from(groups.values());
+  return Array.from(groups.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+}
+
+export function formatActivityDayLabel(dateKey: string, todayDate: string): string {
+  if (dateKey === todayDate) return "Today";
+  if (dateKey === addDaysToIsoDate(todayDate, -1)) return "Yesterday";
+  return formatDate(dateKey, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
+/** The full date, for the muted line beside a Today or Yesterday heading. */
+export function formatActivityDayDate(dateKey: string): string {
+  return formatDate(dateKey, { month: "long", day: "numeric", year: "numeric" });
+}
+
+export interface ActivityCategoryCount {
+  value: string;
+  label: string;
+  count: number;
+}
+
+/** What kinds of thing happened in this period, most frequent first. */
+export function summarizeCategories(entries: { action: string }[]): ActivityCategoryCount[] {
+  const counts = new Map<string, ActivityCategoryCount>();
+
+  for (const entry of entries) {
+    const value = getAuditCategory(entry.action) ?? "other";
+    const existing = counts.get(value);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(value, { value, label: getAuditCategoryLabel(entry.action), count: 1 });
+    }
+  }
+
+  return Array.from(counts.values()).sort(
+    (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+  );
+}
+
+/**
+ * Whether an entry matches a typed query, over everything the row shows: its
+ * description, who did it, what it touched, its category, and its detail rows.
+ * Client-side, for views that already hold the whole period in memory.
+ */
+export function matchesActivitySearch(
+  entry: ActivityEntryLike & { action: string },
+  query: string,
+): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+
+  const haystack = [
+    describeAction(entry),
+    getAuditActorLabel(entry),
+    entry.actorEmail ?? "",
+    getAuditTargetLabel(entry),
+    entry.targetEmail ?? "",
+    getAuditCategoryLabel(entry.action),
+    getResourceTypeLabel(entry.resourceType ?? ""),
+    ...formatDetails(entry).map((item) => `${item.label} ${item.value}`),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(needle);
+}
+
+/** How many distinct people acted in this period, by the label the log shows. */
+export function countActors(entries: ActivityEntryLike[]): number {
+  const actors = new Set<string>();
+  for (const entry of entries) actors.add(getAuditActorLabel(entry));
+  return actors.size;
 }
 
 // ---------------------------------------------------------------------------
-// Search
+// Timestamps
 // ---------------------------------------------------------------------------
 
-export function matchesSearch(
-  entry: FullAuditLogEntry,
-  query: string,
-  description: string,
-): boolean {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  return (
-    description.toLowerCase().includes(q) ||
-    (entry.actorName ?? "").toLowerCase().includes(q) ||
-    (entry.actorEmail ?? "").toLowerCase().includes(q) ||
-    (entry.targetLabel ?? "").toLowerCase().includes(q) ||
-    (entry.targetEmail ?? "").toLowerCase().includes(q) ||
-    getAuditCategoryLabel(entry.action).toLowerCase().includes(q) ||
-    getResourceTypeLabel(entry.resourceType).toLowerCase().includes(q)
-  );
+/** "10:21 AM" in the org's zone. The day is already named by its heading. */
+export function formatActivityTime(createdAt: string, timeZone: string | null): string {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return createdAt;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timeZone ?? "UTC",
+  }).format(date);
+}
+
+/** "Sep 2, 2026, 10:21 AM EDT", for hints and the details dialog. */
+export function formatActivityTimestamp(createdAt: string, timeZone: string | null): string {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return createdAt;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+    timeZone: timeZone ?? "UTC",
+  }).format(date);
 }
 
 /** Retained for callers that still need to humanize an arbitrary token. */

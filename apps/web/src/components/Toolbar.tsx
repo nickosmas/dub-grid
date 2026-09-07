@@ -824,10 +824,16 @@ export default function Toolbar({
             display: "flex",
             alignItems: "center",
             gap: 8,
+            // Wraps at every size, not only once the tablet layout takes over:
+            // this row also renders for a frame at phone widths before the
+            // media query resolves, and a rigid row there pushes its own
+            // controls off the side of the screen.
+            flexWrap: "wrap",
+            rowGap: 8,
             flex: isTablet ? undefined : "1 1 auto",
             minWidth: 0,
             maxWidth: "100%",
-            ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%", flexWrap: "wrap" } : {}),
+            ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
           }}
         >
           {/* Focus area filter */}
@@ -877,7 +883,12 @@ export default function Toolbar({
           <div
             style={{
               position: "relative",
-              minWidth: isTablet ? 0 : 200,
+              // No hard floor: the flex basis already asks for a comfortable
+              // width, and a floor made the field push itself out of the
+              // toolbar instead of compressing when the row ran out of room
+              // (a zoomed-in desktop is narrow in CSS pixels without being
+              // narrow enough to reach the tablet layout).
+              minWidth: 0,
               maxWidth: isTablet ? undefined : 320,
               flex: isTablet ? "1 1 160px" : "1 1 220px",
             }}

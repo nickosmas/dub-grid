@@ -9,26 +9,35 @@ function Table({
   className,
   showScrollCues = false,
   scrollLabel = "table",
+  scrollable = true,
   ...props
 }: React.ComponentProps<"table"> & {
   showScrollCues?: boolean;
   scrollLabel?: string;
+  /**
+   * Opt out of the horizontal scroll container. A scroll container is a
+   * containing block for sticky descendants, so a table with sticky headings
+   * has to scroll with the page instead and drop columns on narrow screens.
+   */
+  scrollable?: boolean;
 }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = React.useState(false);
   const [canScrollRight, setCanScrollRight] = React.useState(false);
 
+  const cuesEnabled = showScrollCues && scrollable;
+
   const updateScrollState = React.useCallback(() => {
     const element = scrollRef.current;
-    if (!element || !showScrollCues) return;
+    if (!element || !cuesEnabled) return;
     setCanScrollLeft(element.scrollLeft > 4);
     setCanScrollRight(element.scrollLeft < element.scrollWidth - element.clientWidth - 4);
-  }, [showScrollCues]);
+  }, [cuesEnabled]);
 
   React.useEffect(() => {
     updateScrollState();
     const element = scrollRef.current;
-    if (!element || !showScrollCues) return;
+    if (!element || !cuesEnabled) return;
     const observer =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollState);
     observer?.observe(element);
@@ -39,7 +48,7 @@ function Table({
       element.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, [updateScrollState, showScrollCues]);
+  }, [updateScrollState, cuesEnabled]);
 
   const scroll = (direction: -1 | 1) => {
     const element = scrollRef.current;
@@ -52,21 +61,25 @@ function Table({
 
   return (
     <div data-slot="table-scroll-shell" className="relative w-full">
-      <div ref={scrollRef} data-slot="table-container" className="relative w-full overflow-x-auto">
+      <div
+        ref={scrollRef}
+        data-slot="table-container"
+        className={cn("relative w-full", scrollable && "overflow-x-auto")}
+      >
         <table
           data-slot="table"
           className={cn("w-full caption-bottom text-sm", className)}
           {...props}
         />
       </div>
-      {showScrollCues && canScrollLeft && (
+      {cuesEnabled && canScrollLeft && (
         <TableScrollCue
           direction="left"
           label={`Scroll ${scrollLabel} left`}
           onClick={() => scroll(-1)}
         />
       )}
-      {showScrollCues && canScrollRight && (
+      {cuesEnabled && canScrollRight && (
         <TableScrollCue
           direction="right"
           label={`Scroll ${scrollLabel} right`}
