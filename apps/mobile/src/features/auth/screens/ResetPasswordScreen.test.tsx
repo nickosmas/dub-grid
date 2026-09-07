@@ -146,6 +146,28 @@ describe("ResetPasswordScreen", () => {
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
 
+  it("keeps the verified recovery flow recoverable when the password update is rejected", async () => {
+    updateUser.mockResolvedValue({ error: { code: "same_password", message: "same password" } });
+
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    fireEvent.change(screen.getByPlaceholderText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Update password"));
+    });
+
+    expect(screen.getAllByText("Choose a password you haven't used before.")).toHaveLength(2);
+    expect(signOut).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
   // The warning has to land while typing. Previously it only appeared after
   // pressing Update, so the user learned about it by wasting a tap.
   it("warns about a mismatch as the user types, before any submit", async () => {

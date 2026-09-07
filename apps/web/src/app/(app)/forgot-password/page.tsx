@@ -31,7 +31,7 @@ function ForgotPasswordContent() {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("rate") || msg.includes("limit")) {
         toast.error("Too many requests. Wait a few minutes and try again.");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
+      } else if (err instanceof TypeError || msg.includes("fetch") || msg.includes("network")) {
         toast.error("We couldn't reach DubGrid. Check your connection and try again.");
       } else {
         // Always show success to prevent email enumeration

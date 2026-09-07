@@ -82,7 +82,7 @@
     - [x] 19b2. **Sign-in, restoration, expiry, and revocation** - verify
           web/mobile login, session restoration, expired-session recovery,
           logout, and forced or session-specific revocation.
-    - [ ] 19b3. **Password recovery and reset** - verify web recovery links
+    - [x] 19b3. **Password recovery and reset** - verify web recovery links
           and the mobile OTP reset flow, including error and replay states.
     - [ ] 19b4. **MFA enrollment and challenge** - verify TOTP enrollment,
           verification, unenrollment, required-MFA challenges, and role
