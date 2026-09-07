@@ -39,6 +39,89 @@ on `main`. Keep `main` for an explicitly requested release PR whose head is
 `dev`; preparing that PR does not authorize a checkout, merge, rewrite, or push
 of `main`.
 
+This governs agent sessions working in this checkout, where several share one
+working tree and branches would collide. Branch-based contributions still
+exist and still merge into `dev` through a pull request: Claude Code cloud
+sessions push `claude/*` branches, Dependabot pushes its own, and
+`CONTRIBUTING.md` documents the naming for anyone working in their own clone.
+
+### Several agents share this checkout
+
+Claude Code, Codex and others frequently run against this working tree at the
+same time, and they share its files _and_ its git index. Two rules follow, one
+for everyone and one for the sessions that can take it.
+
+**Everyone: never leave a gap between staging and committing.** Another session
+can change the index in that gap. On 2026-09-07 one did: a commit took 8 files
+instead of the 13 staged, dropping five and sweeping in two unrelated ones, and
+left `dev` failing to type-check. So stage exact paths rather than `-A` or `.`,
+run the staging and the commit in one shell invocation, and assert the staged
+file count before committing. Expect files to change under you mid-edit, and
+re-read before assuming your edit is still there. When a check fails, confirm
+it is yours before chasing it: `git show HEAD:<path>` reads the committed
+version without touching the tree, and another session's half-written file can
+fail your run.
+
+**Terminal sessions: work in a throwaway worktree.** If nobody is watching an
+editor window on this checkout, take the stronger option and isolate yourself
+completely, so neither your files nor your index can be touched:
+
+```bash
+R=$(git rev-parse --show-toplevel); W=/tmp/dg-$(date +%s)
+git worktree add --detach -q "$W" dev
+ln -s "$R/node_modules" "$W/node_modules"
+ln -s "$R/apps/web/node_modules" "$W/apps/web/node_modules"
+ln -s "$R/apps/mobile/node_modules" "$W/apps/mobile/node_modules"
+# edit, type-check and test inside $W
+git -C "$W" add -- <exact paths> && git -C "$W" commit
+git -C "$W" fetch -q origin && git -C "$W" rebase origin/dev   # commit first: rebase
+git -C "$W" push origin HEAD:dev                               # refuses a dirty tree
+git merge --ff-only origin/dev                  # in the repo root: keep it current
+git worktree remove --force "$W" && git worktree prune
+```
+
+Do not do this from an editor-embedded agent (Cursor, Copilot, Zed, Windsurf,
+the Codex and Claude Code VS Code extensions). The user is watching this
+workspace, and files you change under `/tmp` are invisible to them. Nor from a
+cloud session in its own container: you are already isolated and you push a
+branch instead, per `CONTRIBUTING.md`. Those sessions follow the first rule
+only.
+
+`--detach` is required: git allows a branch in one worktree only, and `dev` is
+already checked out at the repo root. Detaching creates no branch, so the
+dev-only policy above still holds, and pushing `HEAD:dev` keeps every commit on
+`dev`.
+
+Base the worktree on local `dev` rather than `origin/dev`: other sessions
+often hold unpushed commits there. Rebase onto `origin/dev` before pushing and
+never force-push. A rebase conflict means another session touched the same
+files, so resolve it deliberately; in the shared checkout that edit would have
+overwritten your work silently.
+
+Symlink `node_modules` per workspace and never run `npm install` inside the
+worktree. Hooks run there normally, so the pre-commit and pre-push gates still
+apply.
+
+Verify a commit from inside the worktree, never from the main checkout. That
+tree carries other sessions' uncommitted changes, so it can pass while the
+commit on its own does not.
+
+Fast-forward the main checkout after pushing. The Blueprint reads its state
+from there, not from your worktree: `blueprint/context/current-feature.md` is
+loaded into every session by `CLAUDE.md`, and `blueprint/build-plan.md` and
+`blueprint/history/` drive the next step. Skipping the merge leaves the next
+session working from a stale spec. Check first whether it will be refused, and
+report it rather than leaving the tree behind if so:
+
+```bash
+git -C "$W" diff --name-only dev..HEAD > /tmp/mine.lst
+git diff --name-only | grep -Fxf /tmp/mine.lst   # any hit blocks --ff-only
+```
+
+`blueprint/.state/run.json` is the exception: it is gitignored, so it cannot
+travel through a commit at all. Write it in the main checkout, which is where
+the dashboard reads it.
+
 `blueprint/config.json` is the user-owned, machine-readable workflow policy for
 this project. Workflow skills read the relevant settings before acting. A
 missing file means built-in defaults. An invalid file falls back to defaults for

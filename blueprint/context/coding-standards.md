@@ -138,7 +138,10 @@ reviewable diff.
   jsdom throws `payload must be a Uint8Array`
 - This is a concurrent, multi-session dev environment: check `ps` before
   installs/builds, and re-run a suspect test file in isolation rather
-  than judging a regression off a full-suite run under parallel load
+  than judging a regression off a full-suite run under parallel load.
+  In a terminal session, run the suite from a throwaway worktree (see
+  `AGENTS.md`) so it tests your own commit rather than the shared tree's mix
+  of everyone's changes
 
 ## Browser Verification
 
