@@ -561,6 +561,8 @@ export function upsertShift(
   orgId: string,
   expectedVersion?: number,
   echo?: CellEcho,
+  /** Replacing the cell's shift rather than editing it, as a paste does. */
+  clearNotes?: boolean,
 ): Promise<EchoedCells | null> {
   return requestManageWithEcho({
     action: "upsertShift",
@@ -570,6 +572,7 @@ export function upsertShift(
     input,
     expectedVersion,
     echo: serializeEcho(echo),
+    clearNotes,
   });
 }
 

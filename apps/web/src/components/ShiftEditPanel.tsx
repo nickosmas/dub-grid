@@ -3633,8 +3633,9 @@ export default function ShiftEditPanel({
                   </div>
                 )}
 
-              {/* Notes / Indicators — single shift only; multi-shift shows inline per pill; hidden for absences */}
-              {currentLabels.length <= 1 && !isAbsence && renderNotesSection()}
+              {/* Notes / Indicators — single shift only; multi-shift shows inline per pill; hidden for
+                  absences and for an empty cell, since an indicator describes a shift */}
+              {hasActiveShift && currentLabels.length <= 1 && !isAbsence && renderNotesSection()}
 
               {/* Audit metadata footer — admin+ only */}
               {auditInfo && (auditInfo.createdByName || auditInfo.updatedByName) && (
