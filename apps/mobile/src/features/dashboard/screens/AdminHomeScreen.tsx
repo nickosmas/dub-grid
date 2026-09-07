@@ -142,6 +142,8 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
+  const hasPersonalSchedule =
+    Boolean(myScheduleQuery.error) || (myScheduleQuery.data?.entries.length ?? 0) > 0;
   // Prefer the linked employee record's name — it's always populated from the
   // employees table. auth user_metadata.first_name (user.firstName) is often
   // empty for invited accounts, and email is the last resort, mirroring web's
@@ -176,7 +178,7 @@ export function AdminHomeScreen() {
         loading={dashboardQuery.isFetching}
       />
       <DashboardHeroCard summary={data.heroSummary} metrics={data.metrics} />
-      {role === "admin" ? (
+      {role === "admin" && data.actionQueue.length > 0 ? (
         <ActionQueueCard
           requests={data.actionQueue}
           onSeeAll={() =>
@@ -184,34 +186,46 @@ export function AdminHomeScreen() {
           }
         />
       ) : null}
-      {!managementOnly ? (
+      {!managementOnly && hasPersonalSchedule ? (
         <MyScheduleCard
           accessToken={accessToken}
           onExpand={() => router.push("/(tabs)/home/my-schedule")}
         />
       ) : null}
-      <CoverageBySectionCard
-        sections={data.coverageBySection}
-        focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
-        onSeeAll={() => router.push({ pathname: "/(tabs)/home/coverage", params: { periodMode } })}
-      />
-      <OpenShiftsCard
-        openShifts={data.openShifts}
-        onSeeAll={() =>
-          router.push({ pathname: "/(tabs)/home/open-shifts", params: { periodMode } })
-        }
-      />
-      <StaffHoursCard
-        entries={data.staffHours}
-        thresholdHours={data.overtimeThresholdHours}
-        onSeeAll={() =>
-          router.push({ pathname: "/(tabs)/home/staff-hours", params: { periodMode } })
-        }
-      />
-      <ActivityFeedCard
-        items={data.activity}
-        onSeeAll={() => router.push({ pathname: "/(tabs)/home/activity", params: { periodMode } })}
-      />
+      {data.coverageBySection.length > 0 ? (
+        <CoverageBySectionCard
+          sections={data.coverageBySection}
+          focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
+          onSeeAll={() =>
+            router.push({ pathname: "/(tabs)/home/coverage", params: { periodMode } })
+          }
+        />
+      ) : null}
+      {data.openShifts.length > 0 ? (
+        <OpenShiftsCard
+          openShifts={data.openShifts}
+          onSeeAll={() =>
+            router.push({ pathname: "/(tabs)/home/open-shifts", params: { periodMode } })
+          }
+        />
+      ) : null}
+      {data.staffHours.length > 0 ? (
+        <StaffHoursCard
+          entries={data.staffHours}
+          thresholdHours={data.overtimeThresholdHours}
+          onSeeAll={() =>
+            router.push({ pathname: "/(tabs)/home/staff-hours", params: { periodMode } })
+          }
+        />
+      ) : null}
+      {data.activity.length > 0 ? (
+        <ActivityFeedCard
+          items={data.activity}
+          onSeeAll={() =>
+            router.push({ pathname: "/(tabs)/home/activity", params: { periodMode } })
+          }
+        />
+      ) : null}
     </Screen>
   );
 }

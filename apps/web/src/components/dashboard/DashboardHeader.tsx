@@ -56,41 +56,6 @@ interface DashboardHeaderProps {
   onNext: () => void;
   onToday: () => void;
   onViewModeChange: (mode: ViewMode) => void;
-  /** Admin/super-admin only. Opens the period-over-period trend/stats panel. */
-  onViewTrends?: () => void;
-}
-
-function ViewTrendsLink({ onClick }: { onClick: () => void }) {
-  return (
-    <Button
-      onClick={onClick}
-      className="dg-btn dg-btn-ghost"
-      style={{
-        height: "var(--dg-toolbar-h)",
-        padding: "0 10px",
-        borderRadius: "var(--dg-btn-radius)",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        flexShrink: 0,
-      }}
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="3 17 9 11 13 15 21 7" />
-        <polyline points="14 7 21 7 21 14" />
-      </svg>
-      Trends
-    </Button>
-  );
 }
 
 export default function DashboardHeader({
@@ -103,7 +68,6 @@ export default function DashboardHeader({
   onNext,
   onToday,
   onViewModeChange,
-  onViewTrends,
 }: DashboardHeaderProps) {
   const viewModeOptions = availableViewModes
     ? VIEW_MODES.filter((mode) => availableViewModes.includes(mode.value))
@@ -224,7 +188,6 @@ export default function DashboardHeader({
           >
             {todayLabel}
           </Button>
-          {onViewTrends ? <ViewTrendsLink onClick={onViewTrends} /> : null}
         </div>
       </div>
     );
@@ -336,8 +299,6 @@ export default function DashboardHeader({
             onViewModeChange={onViewModeChange}
           />
         ) : null}
-
-        {onViewTrends ? <ViewTrendsLink onClick={onViewTrends} /> : null}
       </div>
     </div>
   );

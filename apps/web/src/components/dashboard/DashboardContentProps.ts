@@ -21,7 +21,6 @@ import type {
   EmployeeHours,
   ShiftTypeBreakdown,
   ActivityItem,
-  TrendDataPoint,
 } from "@/lib/dashboard-stats";
 import type { ViewMode } from "./DashboardView";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -66,7 +65,6 @@ export interface DashboardContentProps {
   prevHours: EmployeeHours[];
   shiftBreakdown: ShiftTypeBreakdown;
   activityItems: ActivityItem[];
-  trendData: TrendDataPoint[];
   publishedWindowState: PublishedWindowState;
   overtimeThreshold: number;
 

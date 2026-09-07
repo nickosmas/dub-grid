@@ -124,13 +124,6 @@ export interface ActivityItem {
   href: string;
 }
 
-export interface TrendDataPoint {
-  week: string;
-  coveragePct: number;
-  staffScheduled: number;
-  totalSlots: number;
-}
-
 // ─── Private Helpers ────────────────────────────────────
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -771,62 +764,4 @@ export function buildActivityFeed(
   return items
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, maxItems);
-}
-
-/**
- * Compute coverage trend data for the current and previous periods.
- * Useful for displaying a trend line chart on the dashboard.
- */
-export function computeCoverageTrendData(
-  focusAreas: FocusArea[],
-  assignments: AssignmentDefinition[],
-  coverageRequirements: CoverageRequirement[],
-  allEmployees: Employee[],
-  allShifts: ShiftMap,
-  periodStart: Date,
-  periodDays: number,
-  shiftCategories: ShiftCategory[] = [],
-  coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
-): TrendDataPoint[] {
-  const trend: TrendDataPoint[] = [];
-  const activeEmployees = allEmployees.filter((e) => e.status === "active");
-  const periods = 5; // Look back 5 periods
-
-  for (let i = periods - 1; i >= 0; i--) {
-    const periodStartDate = new Date(periodStart);
-    periodStartDate.setDate(periodStartDate.getDate() - i * periodDays);
-    const periodEndDate = new Date(periodStartDate);
-    periodEndDate.setDate(periodEndDate.getDate() + periodDays - 1);
-
-    const periodDates = getDatesInRange(periodStartDate, periodDays);
-    const startKey = formatDateKey(periodStartDate);
-    const endKey = formatDateKey(periodEndDate);
-
-    const periodShifts = filterShiftsByWeek(allShifts, startKey, endKey);
-    const coverage = computeCoveragePctAndSlots(
-      focusAreas,
-      assignments,
-      coverageRequirements,
-      periodDates,
-      activeEmployees,
-      periodShifts,
-      shiftCategories,
-      coverageRuleConfig,
-    );
-
-    const staffScheduled = countStaffScheduled(
-      periodShifts,
-      new Map(assignments.map((sc) => [sc.id, sc])),
-    );
-    const totalSlots = coverage.totalRequired || 0;
-
-    trend.push({
-      week: formatDateKey(periodStartDate).slice(5), // e.g., "04-11"
-      coveragePct: coverage.pct,
-      staffScheduled,
-      totalSlots,
-    });
-  }
-
-  return trend;
 }

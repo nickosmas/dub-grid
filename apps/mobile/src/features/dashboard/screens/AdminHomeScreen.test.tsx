@@ -132,7 +132,13 @@ describe("AdminHomeScreen", () => {
     useBootstrap.mockReset();
     useAdminDashboard.mockReset();
     useMyScheduleQuery.mockReset();
-    useMyScheduleQuery.mockReturnValue({ isLoading: false, data: undefined });
+    useMyScheduleQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        entries: [{ id: "shift-1" }],
+      },
+    });
     invalidateQueries.mockReset();
     routerPush.mockReset();
     capturedOnRefresh = undefined;
@@ -200,6 +206,13 @@ describe("AdminHomeScreen", () => {
       isError: false,
       data: EMPTY_DASHBOARD_DATA,
     });
+    useMyScheduleQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        entries: [{ id: "shift-1" }],
+      },
+    });
 
     render(<AdminHomeScreen />);
 
@@ -208,6 +221,30 @@ describe("AdminHomeScreen", () => {
     // rendered its data (the queued requester), not just the ambiguous title.
     expect(screen.getByText("Casey Lee")).toBeInTheDocument();
     expect(screen.getByText("my-schedule-card")).toBeInTheDocument();
+  });
+
+  it("omits empty summary cards on mobile", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...EMPTY_DASHBOARD_DATA, actionQueue: [] },
+    });
+    useMyScheduleQuery.mockReturnValue({
+      isLoading: false,
+      data: { range: { startDate: "2026-05-11", endDate: "2026-05-17" }, entries: [] },
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByText("Casey Lee")).not.toBeInTheDocument();
+    expect(screen.queryByText("my-schedule-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("No coverage to track yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("No open shifts right now")).not.toBeInTheDocument();
+    expect(screen.queryByText("No recent activity")).not.toBeInTheDocument();
   });
 
   it("omits the pending-approvals queue for a super_admin", () => {
