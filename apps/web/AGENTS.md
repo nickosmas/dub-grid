@@ -151,6 +151,11 @@ explicit action right, omit the redundant X, and block every dismissal while
 pending. Render failures in the active surface. Keep one task with at most one
 brief confirmation above it; never stack unrelated editors.
 
+Action groups follow the same semantic order in every responsive layout:
+supporting or secondary actions first, then the primary action last. This maps
+to secondary-left/primary-right in rows and secondary-top/primary-bottom in
+stacks. Use `EditorActionRow` for editor footers where possible.
+
 ## Double-Press
 
 An action button that fires a request must not run it twice when it is

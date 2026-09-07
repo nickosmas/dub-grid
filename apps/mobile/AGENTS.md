@@ -281,10 +281,21 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   wait for a scroll event — a sheet whose content never fills it never fires one.
   The list's own overscroll stays off (`bounces` / `overScrollMode`) so only one
   of the two effects ever answers a drag.
-- **Confirmation actions use `<ActionButtons>`; sheet footers use `<SheetActions>`.**
-  Keep the first two visible buttons side by side at equal width, with any
-  additional buttons in full-width rows. Keep errors and supporting text
-  outside the action group; long labels wrap inside their buttons.
+- **Action groups use `<ActionButtons>`; sheet footers use `<SheetActions>`.**
+  Two buttons always share one equal-width row. With three or more, the first
+  two share a row and each remaining button is full width below them. A single
+  button stays full width. Supporting actions come first and the primary
+  decision comes last, so pairs read secondary-left/primary-right and stacks
+  read secondary-top/primary-bottom. Pass the primary decision through the
+  group's `primaryAction` prop instead of relying on caller order. Keep errors
+  or supporting text outside the action group. Conditional actions and
+  fragments count by the buttons actually shown. Do not switch pairs to a
+  vertical layout on narrow screens or at larger text sizes; let labels wrap
+  within each button.
+- **Profile hero quick actions keep their established centered wrapping
+  layout.** They are navigation and communication shortcuts, not a bottom form
+  action group. Keep `ProfileQuickActions` out of `ActionButtons`; apply the
+  secondary-first/primary-last rule to bottom content, form, and sheet actions.
 - **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
   it. Only the app lock wants this, and for it the choice is a security one.
 - **A sheet holding unsaved input must guard its dismissal.** Route `onDismiss`

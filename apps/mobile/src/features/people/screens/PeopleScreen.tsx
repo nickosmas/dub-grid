@@ -835,18 +835,22 @@ export default function PeopleScreen() {
                     {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
                   </Text>
                 </View>
-                <ActionButtons style={styles.requestActions}>
-                  <Button
-                    compact
-                    disabled={resolveRequestMutation.isPending}
-                    label="Approve"
-                    onPress={() => {
-                      setProfileRequestConfirmation({
-                        request,
-                        action: "approve",
-                      });
-                    }}
-                  />
+                <ActionButtons
+                  primaryAction={
+                    <Button
+                      compact
+                      disabled={resolveRequestMutation.isPending}
+                      label="Approve"
+                      onPress={() => {
+                        setProfileRequestConfirmation({
+                          request,
+                          action: "approve",
+                        });
+                      }}
+                    />
+                  }
+                  style={styles.requestActions}
+                >
                   <Button
                     compact
                     disabled={resolveRequestMutation.isPending}
