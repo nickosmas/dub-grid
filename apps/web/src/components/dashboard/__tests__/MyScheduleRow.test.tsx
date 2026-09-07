@@ -269,6 +269,155 @@ describe("MyScheduleRow", () => {
     expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-draft-badge", "modified");
   });
 
+  it("keeps a long changed shift name readable beside its change pill", () => {
+    const longAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 404,
+      name: "Very long overnight medication support shift",
+      label: "VL",
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "VL",
+            assignmentIds: [404],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [404],
+            publishedLabel: "VL",
+          },
+        }}
+        recentPublishedChanges={
+          new Map([
+            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+          ])
+        }
+        assignmentById={new Map([[longAssignment.id, longAssignment]])}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const name = screen.getByText(longAssignment.name);
+    const pill = name.parentElement as HTMLElement;
+    expect(screen.getByLabelText("Edited shift")).toBeInTheDocument();
+    // Only the name line can collide with the pill, but the whole cell moves
+    // left together so its lines stay on one edge.
+    expect(pill).toHaveStyle({ textAlign: "left" });
+    expect(name).toHaveStyle({ paddingRight: "56px", paddingLeft: "" });
+    expect(screen.getByText(job.name).style.paddingRight).toBe("");
+  });
+
+  it("keeps a short changed shift name centered clear of its change pill", () => {
+    const shortAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 606,
+      name: "Day",
+      label: "D",
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "D",
+            assignmentIds: [606],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [606],
+            publishedLabel: "D",
+          },
+        }}
+        recentPublishedChanges={
+          new Map([
+            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+          ])
+        }
+        assignmentById={new Map([[shortAssignment.id, shortAssignment]])}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const strip = screen.getByTestId("schedule-day-strip");
+    Object.defineProperty(strip, "clientWidth", { value: 1400, configurable: true });
+    fireEvent.scroll(strip);
+
+    const name = screen.getByText("Day");
+    const pill = name.parentElement as HTMLElement;
+    expect(screen.getByLabelText("Edited shift")).toBeInTheDocument();
+    expect(pill.style.textAlign).toBe("");
+    expect(name).toHaveStyle({ paddingLeft: "56px", paddingRight: "56px" });
+  });
+
+  it("caps an extreme shift name without adding hover detail", () => {
+    const runawayName =
+      "Overnight medication support and resident escort coverage relief shift rotation";
+    const runawayAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 505,
+      name: runawayName,
+      label: "RL",
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "RL",
+            assignmentIds: [505],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [505],
+            publishedLabel: "RL",
+          },
+        }}
+        assignmentById={new Map([[runawayAssignment.id, runawayAssignment]])}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const name = screen.getByText(/^Overnight medication support/);
+    expect(name.textContent?.length).toBeLessThanOrEqual(64);
+    expect(name.textContent?.endsWith("\u2026")).toBe(true);
+    expect(name).not.toHaveAttribute("title");
+  });
+
+  it("keeps unchanged shift cells centered", () => {
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "D",
+            assignmentIds: [101],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [101],
+            publishedLabel: "D",
+          },
+        }}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    const pill = screen.getByText(assignment.name).parentElement as HTMLElement;
+    expect(pill.style.textAlign).toBe("");
+  });
+
   it.each([
     ["Week", weekDates, 7],
     ["2 Weeks", twoWeekDates, 14],
@@ -373,6 +522,93 @@ describe("MyScheduleRow", () => {
     expect(screen.getByText("10:00 PM - 6:00 AM")).toBeInTheDocument();
   });
 
+  it("aligns both cards of a double shift left when one has to clear its pill", () => {
+    const longAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 707,
+      name: "Very long overnight medication support shift",
+      label: "VL",
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={{
+          "emp-1_2026-05-11": {
+            label: "D+VL",
+            assignmentIds: [101, 707],
+            segments: [
+              { shiftId: 10, jobId: 7, position: 0, assignmentId: 101, label: "D" },
+              { shiftId: 11, jobId: 8, position: 1, assignmentId: 707, label: "VL" },
+            ],
+            isDraft: false,
+            draftKind: null,
+            publishedAssignmentDefinitionIds: [101, 707],
+            publishedLabel: "D+VL",
+          },
+        }}
+        recentPublishedChanges={
+          new Map([
+            ["emp-1_2026-05-11", { empId: "emp-1", date: "2026-05-11", kind: "modified" as const }],
+          ])
+        }
+        assignmentById={new Map([...assignmentById, [longAssignment.id, longAssignment]])}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    // The long second segment must move left to clear its pill, so the short
+    // first segment follows rather than staying centered above it.
+    for (const name of ["Day shift", longAssignment.name]) {
+      expect(screen.getByText(name).parentElement).toHaveStyle({ textAlign: "left" });
+    }
+  });
+
+  it("keeps a single shift card at its own height next to a double shift", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D+N",
+        assignmentIds: [101, 202],
+        segments: [
+          { shiftId: 10, jobId: 7, position: 0, assignmentId: 101, label: "D" },
+          { shiftId: 11, jobId: 8, position: 1, assignmentId: 202, label: "N" },
+        ],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101, 202],
+        publishedLabel: "D+N",
+      },
+      "emp-1_2026-05-12": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    // A taller neighbouring day must not stretch a single card to match it.
+    for (const card of document.querySelectorAll<HTMLElement>("[data-schedule-day] [style]")) {
+      if (card.style.minHeight !== "62px") continue;
+      expect(card.style.flex).toBe("");
+      expect(card.style.flexGrow).toBe("");
+    }
+  });
+
   it("colors a chip from the segment's assignment, not a stale assignmentIds entry", () => {
     const currentPeriodShifts: ShiftMap = {
       "emp-1_2026-05-11": {
@@ -437,12 +673,12 @@ describe("MyScheduleRow", () => {
     expect(screen.getByTestId("schedule-scroll-slot-left")).toHaveStyle({
       position: "absolute",
       left: "12px",
-      top: "calc(50% + 13px)",
+      top: "57px",
     });
     expect(screen.getByTestId("schedule-scroll-slot-right")).toHaveStyle({
       position: "absolute",
       right: "12px",
-      top: "calc(50% + 13px)",
+      top: "57px",
     });
 
     Object.defineProperty(scrollContainer, "scrollWidth", { value: 2000, configurable: true });
@@ -483,6 +719,14 @@ describe("MyScheduleRow", () => {
       height: "28px",
       borderRadius: "50%",
     });
+    // Anchored to the first shift card, not the strip, so a double-shift day
+    // elsewhere in the period cannot drag the cues down.
+    for (const slot of ["left", "right"]) {
+      expect(screen.getByTestId(`schedule-scroll-slot-${slot}`)).toHaveStyle({
+        top: "57px",
+        transform: "translateY(-50%)",
+      });
+    }
 
     scrollContainer.scrollLeft = 1500;
     fireEvent.scroll(scrollContainer);

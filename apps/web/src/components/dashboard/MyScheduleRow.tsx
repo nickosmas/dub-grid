@@ -28,6 +28,20 @@ const DAY_BOX_MIN_HEIGHT = 86;
 const DAY_GAP = 10;
 const SCROLL_CONTROL_SLOT_WIDTH = 32;
 const SHIFT_PILL_MIN_HEIGHT = 62;
+// Day name line, its margin, and the shift stack's own offset: how far the
+// first card sits below the top of the strip.
+const FIRST_CARD_OFFSET = 26;
+// Room for the widest change pill ("Deleted") plus its inset.
+const CHANGE_PILL_RESERVE = 56;
+const DAY_BOX_PADDING_X = 20;
+const SHIFT_PILL_PADDING_X = 18;
+// Rough advance width of the semibold badge-size name text, used only to decide
+// whether a name still clears the change pill on both sides.
+const APPROX_NAME_CHAR_WIDTH = 6.6;
+// An admin-entered shift or absence name has no server-side length limit, and a
+// runaway one would push the whole day strip taller. Roughly four wrapped lines
+// in a week-sized cell; the cell links through to the schedule for the full value.
+const MAX_SHIFT_TEXT_LENGTH = 64;
 
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
@@ -67,6 +81,12 @@ const DRAFT_LABELS: Record<NonNullable<DraftKind>, string> = {
   modified: "Edited",
   new: "New",
 };
+
+function capShiftText(value: string): string {
+  return value.length > MAX_SHIFT_TEXT_LENGTH
+    ? `${value.slice(0, MAX_SHIFT_TEXT_LENGTH - 1).trimEnd()}\u2026`
+    : value;
+}
 
 function normalizeLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -336,12 +356,21 @@ function useHorizontalScrollState(dependency: unknown) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  // A scrolling period (2 weeks) should still show week-sized cells, so the
+  // visible cell width is derived from what one week would occupy here.
+  const [cellWidth, setCellWidth] = useState(DAY_BOX_WIDTH);
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 4);
     setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+    const viewportWidth = el.clientWidth;
+    setCellWidth(
+      viewportWidth > 0
+        ? Math.max(DAY_BOX_WIDTH, Math.floor((viewportWidth - DAY_GAP * 6) / 7))
+        : DAY_BOX_WIDTH,
+    );
   }, []);
 
   useEffect(() => {
@@ -360,15 +389,18 @@ function useHorizontalScrollState(dependency: unknown) {
     };
   }, [updateScrollState, dependency]);
 
-  const scrollByPage = useCallback((direction: 1 | -1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const cellStride = DAY_BOX_WIDTH + DAY_GAP;
-    const visibleCellCount = Math.max(1, Math.floor((el.clientWidth + DAY_GAP) / cellStride));
-    el.scrollBy({ left: direction * visibleCellCount * cellStride, behavior: "smooth" });
-  }, []);
+  const scrollByPage = useCallback(
+    (direction: 1 | -1) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const cellStride = cellWidth + DAY_GAP;
+      const visibleCellCount = Math.max(1, Math.floor((el.clientWidth + DAY_GAP) / cellStride));
+      el.scrollBy({ left: direction * visibleCellCount * cellStride, behavior: "smooth" });
+    },
+    [cellWidth],
+  );
 
-  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage };
+  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth };
 }
 
 function ScrollCue({
@@ -385,7 +417,9 @@ function ScrollCue({
       data-testid={`schedule-scroll-slot-${direction}`}
       style={{
         position: "absolute",
-        top: "calc(50% + 13px)",
+        // Anchored to the first card rather than the strip, whose height varies
+        // with the tallest day.
+        top: FIRST_CARD_OFFSET + SHIFT_PILL_MIN_HEIGHT / 2,
         [direction]: 12,
         transform: "translateY(-50%)",
         zIndex: 1,
@@ -406,20 +440,37 @@ function ScrollCue({
   );
 }
 
-function ShiftPill({ shift }: { shift: MyScheduleShift }) {
-  const draftLabel =
-    shift.draftKind && (shift.draftKind !== "new" || shift.isNewAddition)
-      ? DRAFT_LABELS[shift.draftKind]
-      : null;
+function resolveDraftLabel(shift: MyScheduleShift): string | null {
+  return shift.draftKind && (shift.draftKind !== "new" || shift.isNewAddition)
+    ? DRAFT_LABELS[shift.draftKind]
+    : null;
+}
+
+// Only the name line can run under the change pill, so it alone decides the
+// layout. Centering it between two reserved gutters can starve it down to a
+// one-character-per-line column, so the symmetric reserve only holds while the
+// name still clears the pill on its own.
+function isCrowdedByPill(shift: MyScheduleShift, cellWidth: number): boolean {
+  if (!resolveDraftLabel(shift)) return false;
+  const textWidth = cellWidth - DAY_BOX_PADDING_X - SHIFT_PILL_PADDING_X;
+  return (
+    capShiftText(shift.label).length * APPROX_NAME_CHAR_WIDTH > textWidth - CHANGE_PILL_RESERVE * 2
+  );
+}
+
+function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: boolean }) {
+  const draftLabel = resolveDraftLabel(shift);
+  const label = capShiftText(shift.label);
+  const jobName = shift.jobName ? capShiftText(shift.jobName) : null;
 
   return (
     <div
       style={{
         minHeight: SHIFT_PILL_MIN_HEIGHT,
-        flex: 1,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
+        textAlign: alignLeft ? "left" : undefined,
         padding: "8px",
         borderRadius: "var(--dg-radius-sm, 6px)",
         border:
@@ -439,11 +490,11 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           fontWeight: 600,
           lineHeight: 1.25,
           overflowWrap: "anywhere",
-          paddingLeft: draftLabel ? 56 : 0,
-          paddingRight: draftLabel ? 56 : 0,
+          paddingLeft: draftLabel && !alignLeft ? CHANGE_PILL_RESERVE : 0,
+          paddingRight: draftLabel ? CHANGE_PILL_RESERVE : 0,
         }}
       >
-        {shift.label}
+        {label}
       </div>
       {shift.draftKind && draftLabel ? (
         <PublishDiffPill
@@ -456,7 +507,7 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
         </PublishDiffPill>
       ) : null}
       <div
-        aria-hidden={!shift.jobName}
+        aria-hidden={!jobName}
         style={{
           fontSize: "var(--dg-type-metadata-size)",
           fontWeight: 500,
@@ -464,10 +515,10 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           opacity: 0.8,
           lineHeight: 1.25,
           overflowWrap: "anywhere",
-          visibility: shift.jobName ? "visible" : "hidden",
+          visibility: jobName ? "visible" : "hidden",
         }}
       >
-        {shift.jobName ?? " "}
+        {jobName ?? " "}
       </div>
       <div
         aria-hidden={!shift.timeRange}
@@ -490,7 +541,6 @@ function EmptyDayPlaceholder() {
     <div
       style={{
         minHeight: SHIFT_PILL_MIN_HEIGHT,
-        flex: 1,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -506,7 +556,19 @@ function EmptyDayPlaceholder() {
   );
 }
 
-function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailableWidth: boolean }) {
+function DayBox({
+  day,
+  fillAvailableWidth,
+  cellWidth,
+}: {
+  day: MyScheduleDay;
+  fillAvailableWidth: boolean;
+  cellWidth: number;
+}) {
+  // A day's cards share one alignment: once any of them has to move left to
+  // clear its change pill, the ones stacked with it follow.
+  const alignLeft = day.shifts.some((shift) => isCrowdedByPill(shift, cellWidth));
+
   return (
     <Link
       href="/schedule"
@@ -526,7 +588,7 @@ function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailable
     >
       <div
         style={{
-          width: fillAvailableWidth ? "100%" : DAY_BOX_WIDTH,
+          width: fillAvailableWidth ? "100%" : cellWidth,
           minHeight: DAY_BOX_MIN_HEIGHT,
           flex: 1,
           display: "flex",
@@ -560,7 +622,9 @@ function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailable
           {day.shifts.length === 0 ? (
             <EmptyDayPlaceholder />
           ) : (
-            day.shifts.map((shift, index) => <ShiftPill key={index} shift={shift} />)
+            day.shifts.map((shift, index) => (
+              <ShiftPill key={index} shift={shift} alignLeft={alignLeft} />
+            ))
           )}
         </div>
       </div>
@@ -636,9 +700,8 @@ export default function MyScheduleRow({
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
   const fillsWithoutScrolling = days.length <= 7 && !isMobile;
-  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(
-    days.length,
-  );
+  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth } =
+    useHorizontalScrollState(days.length);
 
   if (!currentEmpId || isManagementOnly) return null;
 
@@ -680,7 +743,12 @@ export default function MyScheduleRow({
               }}
             >
               {days.map((day) => (
-                <DayBox key={day.key} day={day} fillAvailableWidth={fillsWithoutScrolling} />
+                <DayBox
+                  key={day.key}
+                  day={day}
+                  fillAvailableWidth={fillsWithoutScrolling}
+                  cellWidth={isMobile ? DAY_BOX_WIDTH : cellWidth}
+                />
               ))}
             </div>
             <ScrollCue direction="right" visible={canScrollRight} onClick={() => scrollByPage(1)} />
