@@ -139,14 +139,6 @@ The remaining 52 are blocked on a contract decision, not effort. Neither `client
 **Suggested fix:** Either replace the raw 9 with a token, or add `ScheduleGrid.tsx` to `documentedMicroTextCounts` if 9px is deliberate for that cell-editor affordance.
 **Resolution:** Fixed 2026-09-05 by documenting the exception. The 9px is deliberate and the code comment says why: two initials at badge size run wider than the 20px marker circle, so the marker sizes its text off the ring. Tokenising it would reintroduce the overflow, so `components/ScheduleGrid.tsx: 1` was added to `documentedMicroTextCounts` instead. The typography suite is green again.
 
-### F-54 [P1] fixed - Actions that run silently before anything appears on screen
-
-**File:** apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:45-53
-**Found:** 2026-09-05 by /audit (scope: full; lens: quality)
-**Why it matters:** Reported from production: Print schedule ran silently for a stretch before the preview appeared. The cause is broader than print. `dynamic(..., { ssr: false })` with no `loading` option renders a Suspense fallback of literally `null`, so a component mounted by a click paints nothing until its chunk arrives; 23 boundaries across schedule, gridmaster, and dashboard were in that state, including `ShiftEditPanel` (~150 KB, every schedule cell click) and both print steps in sequence. The project's feedback machinery could not catch any of it: `Button`, `useAsyncAction`, `require-busy-button`, and `no-floating-async-handler` all key off a handler returning a promise, and these handlers are synchronous. Three related classes shared that root: 13 handlers discarded their promise before it reached the latch (Auto Fill worst, where a `ButtonLoading` was already wired but to the post-confirm flag, leaving a fetch plus a full date-by-employee sweep with no feedback), 2 containers unmounted before their own work finished, and 4 handlers had no pending state at all.
-**Suggested fix:** Give every lazy boundary a shape-matched `loading` fallback, warm the print chunks on intent, return promises instead of discarding them, and widen `no-floating-async-handler` so the concise `() => void fn()` form cannot reintroduce the class.
-**Resolution:** Fixed 2026-09-05. Added `components/ui/lazy-fallback.tsx` (overlay, print, progress-bar variants) and wired all 23 boundaries; `PrintOptionsModal` is warmed when the Tools menu opens and `PrintScheduleView` while the options modal is open, so the fallback is the safety net rather than the normal path. Auto Fill now sets its pending flag around the preview, and the toolbar's async action props widened from `() => void` to `() => unknown` so the promise survives the call site. Dropped `void` from 10 concise handlers, returned the promise in `PrintScheduleView.handlePrint` and `StaffDetailPanel.handleFooterSave`, kept the staff-export confirm dialog mounted for its request, moved the reports export spinner onto the trigger that outlives the popover, and added the missing pending states (staff CSV toast, address autocomplete spinner plus error toast, optimistic unread clear in the bell, per-row spinner on the mobile alerts list). `no-floating-async-handler` now flags concise `void` bodies, covered by `apps/web/src/__tests__/no-floating-async-handler.test.ts`.
-
 ### F-55 [P2] open - Delete dependency checks read every schedule cell in the org
 
 **File:** apps/web/src/lib/db/config.ts:103-126
@@ -205,39 +197,6 @@ The remaining 52 are blocked on a contract decision, not effort. Neither `client
 Audit validation for F-56 through F-61: focused quality/tests review of current dev checkout, including pre-existing uncommitted UI changes. Source inventory found 28 mobile ConfirmationModal uses, 17 mobile BottomSheetModal uses, and 79 web ConfirmDialog uses; counts exclude comments and tests. Reviewed shared primitives, dismissal/drag/handoff guards, and representative People, profile/session, request, filter, navigation, and change-review consumers. Dependency/generated/build output and backend security/performance were outside scope. This was not an exhaustive runtime audit of every caller.
 
 Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tests__/ConfirmDialog.test.tsx apps/web/src/__tests__/Modal.test.tsx apps/web/src/__tests__/useUnsavedChangesPrompt.test.tsx` collected the two existing suites, 18 passed. `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/components/ConfirmationModal.test.tsx apps/mobile/src/shared/components/BottomSheetModal.presentation.test.tsx apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.tsx apps/mobile/src/shared/hooks/useModalHandoff.test.tsx apps/mobile/src/features/profile/screens/ProfileSessionsScreen.test.tsx` collected three existing suites, 15 passed. The guard test actually has a `.test.ts` extension and was then run with `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.ts apps/mobile/src/shared/hooks/useSheetDragToDismiss.test.ts`, 25 passed. Total: 58 passed. The mobile session suite emits DOM-shim warnings for overScrollMode and onContentSizeChange. No skipped/focused test declarations found in these seven suites. No full suite, build, typecheck, authenticated browser, VoiceOver/TalkBack, keyboard-layout, or native gesture/presentation validation was performed. No prior findings were closed.
-
-### F-62 [P1] closed - Web dashboard marks every segment of a changed multi-shift cell
-
-**File:** apps/web/src/components/dashboard/MyScheduleRow.tsx:282-288; apps/web/src/components/dashboard/UserDashboard.tsx:670-702
-**Found:** 2026-09-06 by /audit (scope: current; lenses: quality, tests)
-**Why it matters:** A publish change is attached to the employee/date cell and copied unchanged to every rendered segment. Editing only the second portion of a double shift therefore gives both the first and second portions an `Edited` tag, contradicting the required affected-shift-only behavior and creating a false alert on the unchanged shift.
-**Suggested fix:** Compare `fromState.segments` with the effective/to segments by stable segment identity or position, derive a per-segment change kind, and use it in both `MyScheduleRow` and `UserDashboard`. Add web regressions for an edit to one half of a regular/general mixed double shift.
-**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. `MyScheduleRow` now
-compares each effective segment with its corresponding published segment, and
-`UserDashboard` uses `getSegmentChangeKind` for every rendered segment. Focused
-dashboard regressions pass, including the changed-segment path.
-
-### F-63 [P1] closed - Web change history disappears when a user browses a completed period
-
-**File:** apps/web/src/app/api/schedule/publish-history/recent/route.ts:55-65; apps/web/src/components/dashboard/DashboardView.tsx:445-466
-**Found:** 2026-09-06 by /audit (scope: current; lenses: quality, tests)
-**Why it matters:** The dashboard's history request always filters `publish_history.end_date >= today`, regardless of the selected dashboard week or two-week period. Navigating to a completed period still loads its schedule cells, but never its published edit/deletion data, so badges and `Was ...` history vanish for those dates.
-**Suggested fix:** Send the selected period range to the recent-history endpoint and filter for overlap with that range. Keep a separate forward range only for the hero if it needs one. Add a route and dashboard regression for a prior completed week.
-**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. `DashboardView` now
-requests publish history for the selected period plus the hero look-ahead range,
-and the route filters records by interval overlap. The focused route and
-dashboard tests pass.
-
-### F-64 [P2] closed - Current-history dashboard request is unbounded
-
-**File:** apps/web/src/app/api/schedule/publish-history/recent/route.ts:55-65; apps/web/src/components/dashboard/DashboardView.tsx:445-466
-**Found:** 2026-09-06 by /audit (scope: current; lens: performance)
-**Why it matters:** `includeCurrent=true` loads every publish-history row whose period ends today or later, including embedded changes, with no selected range, limit, or pagination. Large or long-running organizations can pay an increasingly large payload and may hit the database client's row cap, silently omitting older still-relevant future changes.
-**Suggested fix:** Bound the query to the visible period plus the hero look-ahead window, select only the needed change fields, and add an explicit pagination/limit contract if one window can still exceed a safe response size.
-**Resolution:** Re-reviewed 2026-09-06 by `/audit current`. The dashboard sends
-an explicit visible-period range, and the route caps results at 200 rows after
-ordering by publication time. Focused route tests confirm the bounded overlap
-query.
 
 ### F-65 [P2] fixed - Sticky date row's ARIA rows and column headers have no owning grid
 
