@@ -85,6 +85,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Explicit schedule-indicator removal: active shift note/indicator controls in
   the slideover must offer a clear, accessible removal affordance instead of
   requiring users to discover that clicking the active indicator removes it.
+- Production display-mode layout resilience: keep Settings display-mode previews
+  fully visible and selectable at supported desktop widths and browser zoom levels;
+  render role names as plain table text and keep the compact Roles table's columns
+  content-aware rather than unnecessarily wide.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -95,11 +99,11 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 The roadmap starts with management-only assignment visibility in item 17, then
 the mobile release catch-up in item 18, authentication and onboarding release
 hardening in item 19, explicit schedule-indicator removal in item 20, and
-production migration safety in item 21. Item 18 is deliberately split into role
+production migration safety in item 22. Item 18 is deliberately split into role
 eligibility, the shared dashboard model, and native dashboard presentation so
 each can be reviewed independently. Item 19 is split into state correctness,
 full journey coverage, performance and resilience, security, and release
-qualification. Item 21 must remain last.
+qualification. Item 22 must remain last.
 
 ## 4. Data - What are we storing?
 

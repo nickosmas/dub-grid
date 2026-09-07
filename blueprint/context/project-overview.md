@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 18-21.
+Everything below is already shipped except the unchecked work in items 18-22.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -101,7 +101,12 @@ Everything below is already shipped except the unchecked work in items 18-21.
 20. **Explicit schedule-indicator removal** - provide a discoverable,
     accessible removal control for active shift notes/indicators in the shift
     slideover rather than relying only on clicking the selected indicator.
-21. **Production migration safety** - the final release gate after all product
+21. **Production display-mode layout resilience** - repair the Settings
+    display-mode preview layout so choices remain fully visible, readable, and
+    selectable at supported desktop widths and browser zoom levels; render role
+    names as plain table text and use content-aware widths for the compact Roles table.
+
+22. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,

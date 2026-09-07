@@ -14,6 +14,7 @@ import {
 } from "@dubgrid/data-access";
 import {
   fetchMobileCoverageSummary,
+  fetchMobileDashboardTrends,
   fetchMobileOpenShiftContext,
   fetchMobileShiftRequests,
   requireMobileAuth,
@@ -84,6 +85,7 @@ export async function GET(req: NextRequest) {
       {
         fetchMobileCoverageSummary,
         fetchMobileShiftRequests,
+        fetchMobileDashboardTrends,
         fetchMobileDashboardDraftComparisons: fetchMobileScheduleComparisonRows,
         fetchMobileOpenShiftContext,
         fetchMobilePublishHistoryRows,

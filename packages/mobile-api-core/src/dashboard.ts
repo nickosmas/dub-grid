@@ -18,6 +18,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
 const OVERTIME_THRESHOLD_HOURS = 40;
+const DASHBOARD_TREND_PERIOD_COUNT = 5;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 // Coverage sections, open shifts, staff-hours entries, and the action queue
 // are all naturally bounded by org size (focus areas, employees, coverage
 // gaps) — not unbounded historical data — so they're returned in full; the
@@ -172,6 +174,11 @@ type FetchMobileDashboardDraftComparisons = (
   input: { orgId: string; startDate: string; endDate: string },
 ) => Promise<DashboardDraftComparisonRow[]>;
 
+type FetchMobileDashboardTrends = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; range: MobileScheduleRange },
+) => Promise<MobileDashboardResponse["trends"]>;
+
 // Mapped (camelCase) shapes matching @dubgrid/schedule-core's
 // HoursAssignmentLike/HoursShiftCategoryLike structurally, so the same
 // assignment/category rows the coverage engine already resolves (via web's
@@ -297,6 +304,50 @@ function getDateKeysInRange(startDate: string, endDate: string): string[] {
     cursor.setDate(cursor.getDate() + 1);
   }
   return keys;
+}
+
+function parseExactLocalDateKey(value: string): Date {
+  if (!DATE_KEY_PATTERN.test(value)) {
+    throw new RangeError(`Invalid local date key: ${value}`);
+  }
+
+  const parsed = parseLocalDateKey(value);
+  if (Number.isNaN(parsed.getTime()) || formatLocalDateKey(parsed) !== value) {
+    throw new RangeError(`Invalid local date key: ${value}`);
+  }
+  return parsed;
+}
+
+/**
+ * Builds the five contiguous inclusive reporting periods for dashboard trends.
+ * The requested range is always the newest point so native clients can render
+ * the resulting array without inferring ordering from display labels.
+ */
+export function buildDashboardTrendPeriods(
+  range: MobileScheduleRange,
+): Array<{ startDate: string; endDate: string }> {
+  const requestedStart = parseExactLocalDateKey(range.startDate);
+  const requestedEnd = parseExactLocalDateKey(range.endDate);
+  if (requestedStart > requestedEnd) {
+    throw new RangeError("startDate must be on or before endDate");
+  }
+
+  const periodDays =
+    Math.round((requestedEnd.getTime() - requestedStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  const periods: Array<{ startDate: string; endDate: string }> = [];
+
+  for (let index = DASHBOARD_TREND_PERIOD_COUNT - 1; index >= 0; index -= 1) {
+    const end = new Date(requestedEnd);
+    end.setDate(end.getDate() - index * periodDays);
+    const start = new Date(end);
+    start.setDate(start.getDate() - (periodDays - 1));
+    periods.push({
+      startDate: formatLocalDateKey(start),
+      endDate: formatLocalDateKey(end),
+    });
+  }
+
+  return periods;
 }
 
 export function buildHeroSummary(input: {
@@ -579,6 +630,7 @@ export async function loadMobileDashboardPayload(
   deps: {
     fetchMobileCoverageSummary: FetchMobileCoverageSummary;
     fetchMobileShiftRequests: FetchMobileShiftRequests;
+    fetchMobileDashboardTrends: FetchMobileDashboardTrends;
     fetchMobileDashboardDraftComparisons?: FetchMobileDashboardDraftComparisons;
     fetchMobileOpenShiftContext: FetchMobileOpenShiftContext;
     fetchMobilePublishHistoryRows: FetchMobilePublishHistoryRows;
@@ -602,6 +654,7 @@ export async function loadMobileDashboardPayload(
     publishHistoryRows,
     acceptedInvitations,
     draftComparisonRows,
+    trends,
   ] = await Promise.all([
     deps.fetchMobileCoverageSummary(auth.serviceClient, {
       orgId: auth.currentOrg.id,
@@ -639,6 +692,10 @@ export async function loadMobileDashboardPayload(
           endDate: range.endDate,
         })
       : Promise.resolve([]),
+    deps.fetchMobileDashboardTrends(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      range,
+    }),
   ]);
 
   const legacyOpenShiftContext = openShiftContext as typeof openShiftContext & {
@@ -712,6 +769,7 @@ export async function loadMobileDashboardPayload(
         ? summarizeDashboardDraftComparisons(draftComparisonRows, Boolean(auth.canEditSchedule))
         : null,
     },
+    trends,
     coverageBySection: buildCoverageSectionsResponse(byFocusArea),
     openShifts: openShifts.slice().sort((a, b) => (a.date < b.date ? -1 : 1)),
     activity: buildActivityFeed(

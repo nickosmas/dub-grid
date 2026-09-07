@@ -115,6 +115,43 @@ describe("mobileApiRequest", () => {
           pendingApprovalsCount: 0,
           draftSummary: { newCount: 1, modifiedCount: 2, deletedCount: 0, total: 3 },
         },
+        trends: [
+          {
+            startDate: "2026-04-13",
+            endDate: "2026-04-19",
+            coveragePct: 100,
+            staffScheduled: 4,
+            totalRequiredSlots: 7,
+          },
+          {
+            startDate: "2026-04-20",
+            endDate: "2026-04-26",
+            coveragePct: 100,
+            staffScheduled: 4,
+            totalRequiredSlots: 7,
+          },
+          {
+            startDate: "2026-04-27",
+            endDate: "2026-05-03",
+            coveragePct: 100,
+            staffScheduled: 4,
+            totalRequiredSlots: 7,
+          },
+          {
+            startDate: "2026-05-04",
+            endDate: "2026-05-10",
+            coveragePct: 100,
+            staffScheduled: 4,
+            totalRequiredSlots: 7,
+          },
+          {
+            startDate: "2026-05-11",
+            endDate: "2026-05-17",
+            coveragePct: 100,
+            staffScheduled: 4,
+            totalRequiredSlots: 7,
+          },
+        ],
         coverageBySection: [],
         openShifts: [],
         activity: [],
@@ -125,9 +162,11 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { getDashboard } = await import("./api");
 
-    await expect(getDashboard("token-123")).resolves.toMatchObject({
-      metrics: { draftSummary: { total: 3 } },
-    });
+    const dashboard = await getDashboard("token-123");
+
+    expect(dashboard.metrics.draftSummary).toMatchObject({ total: 3 });
+    expect(dashboard.trends).toHaveLength(5);
+    expect(dashboard.trends[0]).toMatchObject({ staffScheduled: 4 });
   });
 
   it("adds both cursor fields when loading another request-history page", async () => {

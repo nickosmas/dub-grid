@@ -6,6 +6,7 @@ process.env.TZ = "UTC";
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchMobileCoverageSummary,
+  fetchMobileDashboardTrends,
   fetchMobileOpenShifts,
   fetchMobilePeople,
   fetchMobileScheduleEntries,
@@ -2074,5 +2075,74 @@ describe("fetchMobileCoverageSummary", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("fetchMobileDashboardTrends", () => {
+  it("uses one effective schedule-history read for five draft-preferred trend periods", async () => {
+    const serviceClient = createServiceClientForOpenShifts({
+      scheduleCells: [
+        {
+          id: "cell-1",
+          emp_id: "196d610f-2283-486c-a9e0-197852969a31",
+          date: "2026-04-16",
+          org_id: "org-1",
+          focus_area_id: 12,
+          version: 1,
+          series_id: null,
+          from_recurring: false,
+          created_by: null,
+          updated_by: null,
+          created_at: null,
+          updated_at: null,
+          snapshots: [
+            {
+              id: "draft-snapshot",
+              cell_id: "cell-1",
+              org_id: "org-1",
+              snapshot_kind: "draft",
+              state_kind: "worked",
+              absence_type_id: null,
+              custom_start_time: null,
+              custom_end_time: null,
+              segments: [
+                {
+                  id: "segment-0",
+                  snapshot_id: "draft-snapshot",
+                  org_id: "org-1",
+                  position: 0,
+                  shift_id: 101,
+                  job_id: 91,
+                  is_mentored: false,
+                },
+              ],
+            },
+          ],
+          employees: {
+            id: "196d610f-2283-486c-a9e0-197852969a31",
+            first_name: "Nic",
+            last_name: "Kosmas",
+            org_id: "org-1",
+          },
+        },
+      ],
+    });
+
+    const trends = await fetchMobileDashboardTrends(serviceClient as never, {
+      orgId: "org-1",
+      range: { startDate: "2026-04-16", endDate: "2026-04-16" },
+    });
+
+    expect(trends).toHaveLength(5);
+    expect(trends.at(-1)).toMatchObject({
+      startDate: "2026-04-16",
+      endDate: "2026-04-16",
+      coveragePct: 100,
+      staffScheduled: 1,
+      totalRequiredSlots: 1,
+    });
+    expect(
+      serviceClient.from.mock.calls.filter(([table]) => table === "schedule_cells"),
+    ).toHaveLength(1);
   });
 });

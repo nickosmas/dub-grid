@@ -10,6 +10,7 @@ import { MobileApiAuthorizationError } from "./read";
 import {
   buildActivityFeed,
   buildCoverageSectionsResponse,
+  buildDashboardTrendPeriods,
   buildHeroSummary,
   classifyDashboardDraftChange,
   computeStaffHoursForPeriod,
@@ -45,6 +46,27 @@ describe("summarizeDashboardDraftChanges", () => {
 
   it("redacts draft information when the member cannot edit the schedule", () => {
     expect(summarizeDashboardDraftChanges(["new"], false)).toBeNull();
+  });
+});
+
+describe("buildDashboardTrendPeriods", () => {
+  it("returns five contiguous periods in oldest-first order", () => {
+    expect(buildDashboardTrendPeriods({ startDate: "2026-05-11", endDate: "2026-05-17" })).toEqual([
+      { startDate: "2026-04-13", endDate: "2026-04-19" },
+      { startDate: "2026-04-20", endDate: "2026-04-26" },
+      { startDate: "2026-04-27", endDate: "2026-05-03" },
+      { startDate: "2026-05-04", endDate: "2026-05-10" },
+      { startDate: "2026-05-11", endDate: "2026-05-17" },
+    ]);
+  });
+
+  it("rejects malformed and inverted ranges instead of inferring trend bounds", () => {
+    expect(() =>
+      buildDashboardTrendPeriods({ startDate: "2026-02-30", endDate: "2026-03-07" }),
+    ).toThrow(RangeError);
+    expect(() =>
+      buildDashboardTrendPeriods({ startDate: "2026-05-17", endDate: "2026-05-11" }),
+    ).toThrow("startDate must be on or before endDate");
   });
 });
 
@@ -499,6 +521,43 @@ describe("loadMobileDashboardPayload", () => {
     return {
       fetchMobileCoverageSummary: vi.fn().mockResolvedValue(makeCoverageSummary()),
       fetchMobileShiftRequests: vi.fn().mockResolvedValue([]),
+      fetchMobileDashboardTrends: vi.fn().mockResolvedValue([
+        {
+          startDate: "2026-04-13",
+          endDate: "2026-04-19",
+          coveragePct: null,
+          staffScheduled: 0,
+          totalRequiredSlots: 0,
+        },
+        {
+          startDate: "2026-04-20",
+          endDate: "2026-04-26",
+          coveragePct: null,
+          staffScheduled: 0,
+          totalRequiredSlots: 0,
+        },
+        {
+          startDate: "2026-04-27",
+          endDate: "2026-05-03",
+          coveragePct: null,
+          staffScheduled: 0,
+          totalRequiredSlots: 0,
+        },
+        {
+          startDate: "2026-05-04",
+          endDate: "2026-05-10",
+          coveragePct: null,
+          staffScheduled: 0,
+          totalRequiredSlots: 0,
+        },
+        {
+          startDate: "2026-05-11",
+          endDate: "2026-05-17",
+          coveragePct: null,
+          staffScheduled: 0,
+          totalRequiredSlots: 0,
+        },
+      ]),
       fetchMobileDashboardDraftComparisons: vi.fn().mockResolvedValue([]),
       fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({
         shiftCategoryRows: [],
@@ -551,6 +610,7 @@ describe("loadMobileDashboardPayload", () => {
     expect(deps.fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
     expect(adminPayload.actionQueue).toEqual([pendingRequest]);
     expect(adminPayload.metrics.pendingApprovalsCount).toBe(1);
+    expect(deps.fetchMobileDashboardTrends).toHaveBeenCalledWith({}, { orgId: "org-1", range });
 
     deps.fetchMobileShiftRequests.mockClear();
     const superAdminAuth = {
@@ -800,6 +860,15 @@ describe("cross-platform coverage parity", () => {
         }),
       ),
       fetchMobileShiftRequests: vi.fn().mockResolvedValue([]),
+      fetchMobileDashboardTrends: vi.fn().mockResolvedValue([
+        {
+          startDate: "2026-05-11",
+          endDate: "2026-05-11",
+          coveragePct: webTotals.pct,
+          staffScheduled: 3,
+          totalRequiredSlots: webTotals.totalRequired,
+        },
+      ]),
       fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({
         shiftCategoryRows: [],
         coverageRequirementRows: [],

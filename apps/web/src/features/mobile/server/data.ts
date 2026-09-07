@@ -66,7 +66,13 @@ import {
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
 import { isRegularStaffSystemJob } from "@/lib/system-jobs";
-import { normalizeMobileScheduleRange, type MobileScheduleQuery } from "@dubgrid/contracts";
+import {
+  normalizeMobileScheduleRange,
+  type MobileDashboardTrendPoint,
+  type MobileScheduleQuery,
+  type MobileScheduleRange,
+} from "@dubgrid/contracts";
+import { buildDashboardTrendPeriods } from "@dubgrid/mobile-api-core";
 import type {
   MobileAbsenceType,
   MobileDepartment,
@@ -1081,7 +1087,7 @@ function getMobileDatesBetween(startDate: string, endDate: string): Date[] {
 
 function getPublishedMobileDates(
   dates: Date[],
-  publishHistory: MobilePublishHistoryEntry[],
+  publishHistory: ReadonlyArray<Pick<MobilePublishHistoryEntry, "startDate" | "endDate">>,
 ): Date[] {
   if (publishHistory.length === 0) {
     return [];
@@ -1266,25 +1272,7 @@ async function buildMobileCoverageEngineInputs(
     }
   }
   const rowByEmployeeDate = new Map(scheduleRows.map((row) => [`${row.emp_id}_${row.date}`, row]));
-  // The one platform-specific adapter: reads an employee's resolved shift
-  // segments for a date out of mobile's row shape. Everything downstream
-  // (credit resolution, gap/total math) is the shared @dubgrid/schedule-core
-  // engine — see assembleDashboardCoverage in coverage-assembly.ts.
-  const segmentsForKey: SegmentsForEmployeeDate = (empId, date) => {
-    const row = rowByEmployeeDate.get(`${empId}_${formatMobileIsoDate(date)}`);
-    if (!row || row.state.kind !== "worked") {
-      return [];
-    }
-
-    return row.state.segments.flatMap((segment) => {
-      const assignmentId = assignmentIdByPair.get(
-        buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
-      );
-      return assignmentId == null
-        ? []
-        : [{ assignmentId, isMentored: Boolean(segment.isMentored) }];
-    });
-  };
+  const segmentsForKey = buildMobileCoverageSegmentsForRows(scheduleRows, assignmentIdByPair);
   const jobNameMap = new Map(context.jobs.map((job) => [job.id, job.name]));
 
   return {
@@ -1303,6 +1291,109 @@ async function buildMobileCoverageEngineInputs(
 }
 
 type MobileCoverageEngineInputs = Awaited<ReturnType<typeof buildMobileCoverageEngineInputs>>;
+
+function buildMobileCoverageSegmentsForRows(
+  scheduleRows: MobilePublishedScheduleRow[],
+  assignmentIdByPair: Map<string, number>,
+): SegmentsForEmployeeDate {
+  const rowByEmployeeDate = new Map(scheduleRows.map((row) => [`${row.emp_id}_${row.date}`, row]));
+
+  return (empId, date) => {
+    const row = rowByEmployeeDate.get(`${empId}_${formatMobileIsoDate(date)}`);
+    if (!row || row.state.kind !== "worked") {
+      return [];
+    }
+
+    return row.state.segments.flatMap((segment) => {
+      const assignmentId = assignmentIdByPair.get(
+        buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
+      );
+      return assignmentId == null
+        ? []
+        : [{ assignmentId, isMentored: Boolean(segment.isMentored) }];
+    });
+  };
+}
+
+function countMobileScheduledStaff(
+  scheduleRows: MobilePublishedScheduleRow[],
+  includedDates: Date[],
+  assignmentIdByPair: Map<string, number>,
+): number {
+  const includedDateKeys = new Set(includedDates.map(formatMobileIsoDate));
+  const scheduledEmployeeIds = new Set<string>();
+
+  for (const row of scheduleRows) {
+    if (row.state.kind !== "worked" || !includedDateKeys.has(row.date)) {
+      continue;
+    }
+
+    const hasKnownAssignment = row.state.segments.some((segment) =>
+      assignmentIdByPair.has(buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId)),
+    );
+    if (hasKnownAssignment) {
+      scheduledEmployeeIds.add(row.emp_id);
+    }
+  }
+
+  return scheduledEmployeeIds.size;
+}
+
+/**
+ * Loads five dashboard trend points from one effective schedule-history read.
+ * The period loop is in-memory so coverage facts cannot drift between periods
+ * through repeated data fetches.
+ */
+export async function fetchMobileDashboardTrends(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; range: MobileScheduleRange },
+): Promise<MobileDashboardTrendPoint[]> {
+  const periods = buildDashboardTrendPeriods(input.range);
+  const historicalRange = {
+    startDate: periods[0]?.startDate ?? input.range.startDate,
+    endDate: input.range.endDate,
+  };
+  const [context, scheduleRows, publishHistoryRows] = await Promise.all([
+    fetchMobileOpenShiftContext(serviceClient, input.orgId),
+    fetchMobileEffectiveScheduleRows(serviceClient, { orgId: input.orgId, ...historicalRange }),
+    fetchMobilePublishHistoryRows(serviceClient, input.orgId, historicalRange),
+  ]);
+  const publishHistory = publishHistoryRows.map((row) => ({
+    startDate: row.start_date,
+    endDate: row.end_date,
+  }));
+  const segmentsForKey = buildMobileCoverageSegmentsForRows(
+    scheduleRows,
+    context.assignmentIdByPair,
+  );
+  const hasCoverageRequirements = context.coverageRequirements.length > 0;
+
+  return periods.map((period) => {
+    const dates = getPublishedMobileDates(
+      getMobileDatesBetween(period.startDate, period.endDate),
+      publishHistory,
+    );
+    const totals = assembleDashboardCoverage({
+      focusAreas: context.focusAreas,
+      shiftCategories: context.shiftCategories,
+      assignments: context.assignments,
+      requirements: context.coverageRequirements,
+      employees: context.employees,
+      dates,
+      segmentsForKey,
+      coverageRuleConfig: context.coverageRuleConfig,
+      assignmentNameMap: context.assignmentNameMap,
+    }).totals;
+
+    return {
+      startDate: period.startDate,
+      endDate: period.endDate,
+      coveragePct: hasCoverageRequirements ? totals.pct : null,
+      staffScheduled: countMobileScheduledStaff(scheduleRows, dates, context.assignmentIdByPair),
+      totalRequiredSlots: totals.totalRequired,
+    };
+  });
+}
 
 /** Transforms coverage gaps into the volunteer-eligibility-annotated MobileOpenShift feed shape. */
 function buildMobileOpenShiftsFromGaps(

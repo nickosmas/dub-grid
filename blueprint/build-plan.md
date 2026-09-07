@@ -53,13 +53,13 @@
   - [x] 18a. **Mobile role certification eligibility** - expose role
         certification requirements to mobile and prevent incompatible new role
         selections before save.
-  - [ ] 18b. **Canonical mobile dashboard model** - make web and mobile consume
+  - [x] 18b. **Canonical mobile dashboard model** - make web and mobile consume
         one dashboard calculation model and extend the authenticated mobile
         payload with canonical metrics, coverage, drafts, and trends.
     - [x] 18b1. **Canonical mobile dashboard metrics** - extend the authenticated
           mobile payload with permission-safe, draft-aware canonical dashboard
           metrics that use the same coverage and draft semantics as web.
-    - [ ] 18b2. **Canonical mobile dashboard trends** - deliver canonical
+    - [x] 18b2. **Canonical mobile dashboard trends** - deliver canonical
           period-history coverage and staffing data through the authenticated
           mobile API, ready for read-only native presentation.
   - [ ] 18c. **Canonical mobile dashboard experience** - present the canonical
@@ -97,7 +97,14 @@
       on clicking the active indicator itself. Preserve authorization,
       confirmation, audit, and save behavior; provide an accessible explicit
       removal affordance and regression coverage.
-- [ ] 21. **Production migration safety** - final release gate only after all
+- [ ] 21. **Production display-mode layout resilience** - repair the production
+      Settings display-mode preview layout so both choices remain fully visible,
+      readable, selectable, and responsive at supported desktop widths and
+      browser zoom levels. Also make role names plain table text rather than
+      pills, and give the compact Roles table content-aware column widths so it
+      does not consume unnecessary horizontal space. Prevent horizontal clipping
+      or overflow without changing settings behavior, and add regression coverage.
+- [ ] 22. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,
