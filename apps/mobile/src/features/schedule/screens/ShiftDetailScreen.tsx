@@ -1996,7 +1996,7 @@ function DetailJobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
+            <Text style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}>
               (Mentored)
             </Text>
           ) : null}

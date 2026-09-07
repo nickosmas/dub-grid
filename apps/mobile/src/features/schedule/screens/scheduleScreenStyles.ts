@@ -251,6 +251,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.heroMetric,
       color: mobileColors.textInverse,
     },
+    meHeroTitleBadgeSlot: {
+      // Hangs a split-shift or change pill from the hero title's baseline.
+      // `flex-end` alone lands on the line box, a descender below the text.
+      alignSelf: "flex-end",
+      marginBottom: 6,
+    },
     meHeroTitleRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -297,10 +303,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     shiftChangeBadge: {
       alignSelf: "flex-start",
+      alignItems: "center",
+      justifyContent: "center",
       borderRadius: 999,
       borderWidth: 1,
       paddingHorizontal: 8,
-      paddingVertical: 3,
+      paddingVertical: 4,
     },
     shiftChangeBadgeNew: {
       backgroundColor: mobileColors.successSoft,
@@ -317,18 +325,32 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     shiftChangeBadgeCompactSegment: {
       paddingVertical: 4,
     },
+    // The hero's lone change chip stands in for the `Shift N · Edited` pill a
+    // split shift shows in the same slot, so it copies `SplitShiftBadge`.
     shiftChangeBadgeInverse: {
+      alignSelf: "flex-start",
+      alignItems: "center",
       backgroundColor: "rgba(255, 255, 255, 0.16)",
-      borderColor: "rgba(255, 255, 255, 0.26)",
+      borderColor: "rgba(255, 255, 255, 0.28)",
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
     },
     shiftChangeBadgeText: {
       ...mobileText.micro,
       color: mobileColors.textSecondary,
       fontWeight: "700",
       textTransform: "uppercase",
+      // Android's font padding pushes uppercase glyphs high inside a pill this
+      // tight, leaving the label visibly off-center in its own chip.
+      includeFontPadding: false,
+      textAlignVertical: "center",
     },
     shiftChangeBadgeTextInverse: {
+      ...mobileText.badge,
       color: mobileColors.textInverse,
+      textTransform: "none",
     },
     shiftChangeBadgeTextCompactSegment: {
       ...mobileText.badge,
@@ -693,7 +715,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     upcomingShiftTitle: {
-      flex: 1,
       flexShrink: 1,
       minWidth: 0,
       ...mobileText.sectionTitle,
@@ -972,6 +993,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillMentoredText: {
       textTransform: "none",
+    },
+    // The nested variant inherits the value text's metrics; this inline one is
+    // a sibling of the label, so it has to state them or it falls back to the
+    // system default size and sits off the label's baseline.
+    jobPillMentoredInlineText: {
+      ...mobileTextWeighted("badge", "medium"),
+      textTransform: "none",
+    },
+    jobPillMentoredInlineTextCompact: {
+      fontSize: 12,
+      lineHeight: 16,
     },
     jobPillTextCompact: {
       fontSize: 12,

@@ -1503,7 +1503,15 @@ function JobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>(Mentored)</Text>
+            <Text
+              style={[
+                styles.jobPillMentoredInlineText,
+                compact && styles.jobPillMentoredInlineTextCompact,
+                { color: chip.textColor },
+              ]}
+            >
+              (Mentored)
+            </Text>
           ) : null}
         </View>
       )}

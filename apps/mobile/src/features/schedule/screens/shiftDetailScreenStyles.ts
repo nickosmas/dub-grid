@@ -320,6 +320,13 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailJobChipMentoredText: {
       textTransform: "none",
     },
+    // The nested variant inherits the value text's metrics; this inline one is
+    // a sibling of the label, so it has to state them or it falls back to the
+    // system default size and sits off the label's baseline.
+    detailJobChipMentoredInlineText: {
+      ...mobileTextWeighted("badge", "medium"),
+      textTransform: "none",
+    },
     detailJobChipValueText: {
       ...mobileTextWeighted("badge", "semibold"),
     },

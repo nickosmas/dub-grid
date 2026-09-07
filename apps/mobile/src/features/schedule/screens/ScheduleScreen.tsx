@@ -2125,7 +2125,15 @@ function JobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>(Mentored)</Text>
+            <Text
+              style={[
+                styles.jobPillMentoredInlineText,
+                compact && styles.jobPillMentoredInlineTextCompact,
+                { color: chip.textColor },
+              ]}
+            >
+              (Mentored)
+            </Text>
           ) : null}
         </View>
       ) : (
@@ -2295,20 +2303,30 @@ function ShiftChangeBadge({
   return (
     <View
       accessibilityLabel={`Shift ${SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
-      style={[
-        styles.shiftChangeBadge,
-        change.kind === "modified" && styles.shiftChangeBadgeModified,
-        change.kind === "deleted" && styles.shiftChangeBadgeDeleted,
-        compactSegment && styles.shiftChangeBadgeCompactSegment,
-        inverse && styles.shiftChangeBadgeInverse,
-      ]}
+      style={
+        // The inverse chip replaces the base styling outright rather than
+        // layering onto it: `shiftChangeBadgeText` carries a numeric
+        // `fontWeight`, which would send the bold DM Sans face to Android's
+        // system-font fallback once the inverse style names that family.
+        inverse
+          ? styles.shiftChangeBadgeInverse
+          : [
+              styles.shiftChangeBadge,
+              change.kind === "modified" && styles.shiftChangeBadgeModified,
+              change.kind === "deleted" && styles.shiftChangeBadgeDeleted,
+              compactSegment && styles.shiftChangeBadgeCompactSegment,
+            ]
+      }
     >
       <Text
-        style={[
-          styles.shiftChangeBadgeText,
-          compactSegment && styles.shiftChangeBadgeTextCompactSegment,
-          inverse && styles.shiftChangeBadgeTextInverse,
-        ]}
+        style={
+          inverse
+            ? styles.shiftChangeBadgeTextInverse
+            : [
+                styles.shiftChangeBadgeText,
+                compactSegment && styles.shiftChangeBadgeTextCompactSegment,
+              ]
+        }
       >
         {SHIFT_CHANGE_LABELS[change.kind]}
       </Text>
@@ -2490,6 +2508,8 @@ function MeHeroCard({
   const heroSplitShiftLabel = getScheduleItemSplitShiftLabel(featuredItem);
   const shouldShowHeroSplitBadge = splitShiftCount > 1 && heroSplitSegments.segments.length > 0;
   const heroSplitChangeLabel = splitShiftCount > 1 ? getShiftChangeLabel(change) : null;
+  const heroChange = splitShiftCount > 1 ? null : change;
+  const heroChangeLabel = getShiftChangeLabel(heroChange);
   const badgeDotStyle =
     status === "active"
       ? styles.meHeroBadgeDotActive
@@ -2502,30 +2522,34 @@ function MeHeroCard({
       {badgeLabel || heroDateParts || shouldShowShiftName || shouldShowHeroSplitBadge ? (
         <View style={styles.meHeroHeader}>
           <View style={styles.meHeroHeaderCopy}>
-            {badgeLabel || change ? (
+            {badgeLabel ? (
               <View style={styles.meHeroBadgeRow}>
-                {badgeLabel ? (
-                  <View style={styles.meHeroBadge}>
-                    <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
-                    <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
-                  </View>
-                ) : null}
-                <ShiftChangeBadge change={splitShiftCount > 1 ? null : change} inverse />
+                <View style={styles.meHeroBadge}>
+                  <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
+                  <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+                </View>
               </View>
             ) : null}
-            {shouldShowShiftName || shouldShowHeroSplitBadge ? (
+            {shouldShowShiftName || shouldShowHeroSplitBadge || heroChangeLabel ? (
               <View style={styles.meHeroTitleRow}>
                 {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {heroChangeLabel ? (
+                  <View style={styles.meHeroTitleBadgeSlot}>
+                    <ShiftChangeBadge change={heroChange} inverse />
+                  </View>
+                ) : null}
                 {shouldShowHeroSplitBadge ? (
-                  <SplitShiftBadge
-                    count={splitShiftCount}
-                    inverse
-                    label={
-                      heroSplitChangeLabel
-                        ? `${heroSplitShiftLabel ?? "Shift"} · ${heroSplitChangeLabel}`
-                        : heroSplitShiftLabel
-                    }
-                  />
+                  <View style={styles.meHeroTitleBadgeSlot}>
+                    <SplitShiftBadge
+                      count={splitShiftCount}
+                      inverse
+                      label={
+                        heroSplitChangeLabel
+                          ? `${heroSplitShiftLabel ?? "Shift"} · ${heroSplitChangeLabel}`
+                          : heroSplitShiftLabel
+                      }
+                    />
+                  </View>
                 ) : null}
               </View>
             ) : null}

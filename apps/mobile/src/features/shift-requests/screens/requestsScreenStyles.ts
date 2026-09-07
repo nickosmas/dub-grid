@@ -202,6 +202,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     jobPillMentoredText: {
       textTransform: "none",
     },
+    // The nested variant inherits the value text's metrics; this inline one is
+    // a sibling of the label, so it has to state them or it falls back to the
+    // system default size and sits off the label's baseline.
+    jobPillMentoredInlineText: {
+      ...mobileTextWeighted("badge", "medium"),
+      textTransform: "none",
+      includeFontPadding: false,
+    },
+    jobPillMentoredInlineTextCompact: {
+      fontSize: 12,
+      lineHeight: 16,
+    },
     jobPillTextCompact: {
       fontSize: 12,
       lineHeight: 16,

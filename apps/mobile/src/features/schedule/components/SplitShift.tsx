@@ -444,7 +444,6 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 6,
     },
     segmentHeroTitleText: {
-      flex: 1,
       flexShrink: 1,
       minWidth: 0,
     },
@@ -473,7 +472,9 @@ const createStyles = (mobileColors: MobileColors) =>
       textAlign: "right",
     },
     segmentHeroPrimaryText: {
-      ...mobileText.sectionTitle,
+      // The hero's later segments name a shift just like its 24px headline, so
+      // they sit a step under it rather than down at section-title size.
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
     segmentHeroPrimaryTextInverse: {
@@ -504,7 +505,6 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 8,
     },
     segmentTitleMain: {
-      flex: 1,
       flexShrink: 1,
       minWidth: 0,
     },
