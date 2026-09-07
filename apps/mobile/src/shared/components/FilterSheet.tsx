@@ -232,7 +232,12 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
+      // A hairline, not `cardBorder`. Cards on the page are drawn by their
+      // shadow, which is why `cardBorder` is transparent in light mode - but a
+      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
+      // no shadow to draw it there was no edge at all in light mode. Dark is
+      // unchanged: `cardBorder` already resolves to this token there.
+      borderColor: mobileColors.borderSubtle,
       overflow: "hidden",
     },
     /** The full-bleed box a row occupies. Carries the divider and nothing else. */

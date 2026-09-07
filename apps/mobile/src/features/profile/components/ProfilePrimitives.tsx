@@ -804,11 +804,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textMuted,
       marginTop: -4,
     },
-    // Cancels the card shadow when this is rendered inside a sheet.
+    // Cancels the card shadow when this is rendered inside a sheet, and hands
+    // the edge to a hairline instead. On the page the shadow is the whole edge,
+    // which is why `cardBorder` is transparent in light mode; dropping the
+    // shadow here without putting something back left these with no edge at all
+    // there. Dark is unchanged, since `cardBorder` already resolves to
+    // `borderSubtle`.
     flatInSheet: {
       boxShadow: undefined,
       shadowOpacity: 0,
       elevation: 0,
+      borderColor: mobileColors.borderSubtle,
     },
     panel: {
       backgroundColor: mobileColors.surface,
