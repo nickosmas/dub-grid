@@ -83,7 +83,6 @@ export default function ProfileTwoFactorScreen() {
   // now the way out of this screen. A ref rather than state so the cleanup
   // reads the latest id without re-running on every step.
   const pendingFactorIdRef = useRef<string | null>(null);
-  pendingFactorIdRef.current = mfaFactorId;
   useEffect(() => {
     return () => {
       const factorId = pendingFactorIdRef.current;
@@ -108,6 +107,7 @@ export default function ProfileTwoFactorScreen() {
   useNavigationDiscardGuard(guard);
 
   function resetMfaEnrollment() {
+    pendingFactorIdRef.current = null;
     setIsEnrolling(false);
     setMfaSecret(null);
     setMfaFactorId(null);
@@ -150,6 +150,7 @@ export default function ProfileTwoFactorScreen() {
       if (error) throw error;
 
       setMfaSecret(data.totp.secret);
+      pendingFactorIdRef.current = data.id;
       setMfaFactorId(data.id);
       setIsEnrolling(true);
     } catch (error) {
@@ -177,6 +178,8 @@ export default function ProfileTwoFactorScreen() {
         throw new Error("We couldn't finish two-factor setup. Try again.");
       }
 
+      pendingFactorIdRef.current = null;
+
       // Verifying TOTP promotes the current Supabase session to AAL2. The
       // accessToken captured by this render is still the password-only AAL1
       // token, which the mobile API must reject once a verified factor exists.
@@ -202,12 +205,13 @@ export default function ProfileTwoFactorScreen() {
   }
 
   function cancelMfaEnrollment() {
-    if (mfaFactorId) {
+    const pendingFactorId = mfaFactorId;
+    resetMfaEnrollment();
+    if (pendingFactorId) {
       getSupabaseClient()
-        .auth.mfa.unenroll({ factorId: mfaFactorId })
+        .auth.mfa.unenroll({ factorId: pendingFactorId })
         .catch(() => {});
     }
-    resetMfaEnrollment();
   }
 
   async function disableMfa() {

@@ -84,7 +84,7 @@
           logout, and forced or session-specific revocation.
     - [x] 19b3. **Password recovery and reset** - verify web recovery links
           and the mobile OTP reset flow, including error and replay states.
-    - [ ] 19b4. **MFA enrollment and challenge** - verify TOTP enrollment,
+    - [x] 19b4. **MFA enrollment and challenge** - verify TOTP enrollment,
           verification, unenrollment, required-MFA challenges, and role
           differences across web and mobile.
     - [ ] 19b5. **Role-based setup, onboarding, and trial gates** - verify

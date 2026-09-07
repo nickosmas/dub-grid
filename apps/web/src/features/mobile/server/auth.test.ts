@@ -247,6 +247,27 @@ describe("requireMobileAuth", () => {
     expect(result.permissions.orgId).toBe(ORG_ID);
   });
 
+  it("allows an aal1 mobile session when no verified TOTP factor exists", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClient({
+        setupComplete: true,
+        claims: { aal: "aal1" },
+        factors: [],
+      }),
+    );
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer password-only-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(false);
+    if ("response" in result) return;
+    expect(result.currentOrg.id).toBe(ORG_ID);
+  });
+
   it("blocks aal1 mobile sessions when a verified TOTP factor exists", async () => {
     getServiceClient.mockReturnValue(
       createServiceClient({

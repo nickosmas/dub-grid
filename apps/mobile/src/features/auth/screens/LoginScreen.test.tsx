@@ -546,6 +546,67 @@ describe("LoginScreen", () => {
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
   });
 
+  it("keeps the pending session out of storage when MFA verification fails", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToOrganization.mockResolvedValue({
+      session: {
+        accessToken: "pending-token",
+        refreshToken: "pending-refresh",
+        expiresIn: 3600,
+        tokenType: "bearer",
+      },
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+      user: {
+        id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        email: "staff@dubgrid.com",
+        firstName: "Mina",
+        lastName: "Diaz",
+      },
+      mfaRequired: true,
+      mfa: {
+        factorId: "factor-123",
+        friendlyName: "DubGrid Authenticator",
+      },
+    });
+    verifyMobileTotpFactor.mockRejectedValue(new Error("That code didn't match"));
+    const setSession = vi.fn();
+    getSupabaseClient.mockReturnValue({ auth: { setSession } } as never);
+
+    render(<LoginScreen />);
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    await screen.findByText("Two-factor authentication");
+
+    fireEvent.change(screen.getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+
+    expect(await screen.findByText("That code didn't match")).toBeInTheDocument();
+    expect(setSession).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
   it("shows a returned auth error without navigating", async () => {
     lookupOrganization.mockResolvedValue({
       organization: {

@@ -153,6 +153,43 @@ describe("ProfileTwoFactorScreen", () => {
     expect(unenroll).toHaveBeenCalledWith({ factorId: "factor-1" });
   });
 
+  it("does not remove a verified factor when persisting its status fails", async () => {
+    const unenroll = vi.fn().mockResolvedValue({ error: null });
+    updateProfileMfaStatus.mockRejectedValue(new Error("Status write failed"));
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        mfa: {
+          listFactors: vi.fn().mockResolvedValue({ data: { all: [], totp: [] }, error: null }),
+          enroll: vi
+            .fn()
+            .mockResolvedValue({ data: { id: "factor-1", totp: { secret: "S" } }, error: null }),
+          challengeAndVerify: vi.fn().mockResolvedValue({
+            data: { access_token: "aal2-token" },
+            error: null,
+          }),
+          unenroll,
+        },
+      },
+    } as never);
+
+    const { unmount } = render(<ProfileTwoFactorScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await screen.findByLabelText("6-digit verification code");
+    fireEvent.change(screen.getByLabelText("6-digit verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify & enable" }));
+
+    await waitFor(() => {
+      expect(updateProfileMfaStatus).toHaveBeenCalledWith("aal2-token", { enabled: true });
+    });
+    await act(async () => {
+      unmount();
+    });
+
+    expect(unenroll).not.toHaveBeenCalled();
+  });
+
   it("disables two-factor after confirming", async () => {
     const unenroll = vi.fn().mockResolvedValue({ error: null });
     const listFactors = vi.fn().mockResolvedValue({

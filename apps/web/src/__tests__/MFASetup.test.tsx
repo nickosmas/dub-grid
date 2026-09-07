@@ -52,6 +52,7 @@ describe("MFASetup", () => {
       },
       error: null,
     });
+    mockDisableFactor.mockResolvedValue({ error: null });
     mockUpdateMfaStatus.mockResolvedValue(undefined);
   });
 
@@ -63,6 +64,17 @@ describe("MFASetup", () => {
   it("shows the matching secret for manual entry", async () => {
     await startEnrollment();
     expect(screen.getByText(SECRET)).toBeInTheDocument();
+  });
+
+  it("unenrolls an unfinished factor when the setup component unmounts", async () => {
+    const { unmount } = render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /enable 2fa/i }));
+    await screen.findByAltText(/scan this qr code/i);
+    unmount();
+
+    expect(mockDisableFactor).toHaveBeenCalledTimes(1);
+    expect(mockDisableFactor).toHaveBeenCalledWith("factor-1");
   });
 
   it("names both causes when the authenticator's code is rejected", async () => {
@@ -106,5 +118,20 @@ describe("MFASetup", () => {
       await screen.findByText(/couldn't update two-factor authentication/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/didn't match/i)).not.toBeInTheDocument();
+  });
+
+  it("does not remove a verified factor when persisting its status fails", async () => {
+    const { unmount } = render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /enable 2fa/i }));
+    await screen.findByAltText(/scan this qr code/i);
+    mockVerifyEnrollment.mockResolvedValue({ error: null });
+    mockUpdateMfaStatus.mockRejectedValue(new Error("Status write failed"));
+
+    await userEvent.type(screen.getByPlaceholderText("000000"), "123456");
+    await userEvent.click(screen.getByRole("button", { name: /verify/i }));
+    await screen.findByText(/status write failed/i);
+    unmount();
+
+    expect(mockDisableFactor).not.toHaveBeenCalled();
   });
 });

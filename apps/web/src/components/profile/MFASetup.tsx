@@ -1,7 +1,7 @@
 "use client";
 
 import type { Factor } from "@supabase/supabase-js";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -86,6 +86,16 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const pendingFactorIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const pendingFactorId = pendingFactorIdRef.current;
+      if (pendingFactorId) {
+        disableBrowserMfaFactor(pendingFactorId).catch(() => {});
+      }
+    };
+  }, []);
 
   async function startEnrollment() {
     setLoading(true);
@@ -113,6 +123,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
 
       setQrCode(data.totp.qr_code);
       setSecret(data.totp.secret);
+      pendingFactorIdRef.current = data.id;
       setFactorId(data.id);
       setStep("verifying");
     } catch (err: unknown) {
@@ -133,6 +144,8 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         code: verifyCode,
       });
       if (error) throw error;
+
+      pendingFactorIdRef.current = null;
 
       await updateMfaStatus(true);
 
@@ -173,6 +186,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   }
 
   function resetState() {
+    pendingFactorIdRef.current = null;
     setStep("idle");
     setQrCode(null);
     setSecret(null);
@@ -415,10 +429,11 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         <Button
           onClick={() => {
             // Cancel enrollment — unenroll the pending factor
-            if (factorId) {
-              disableBrowserMfaFactor(factorId).catch(() => {});
-            }
+            const pendingFactorId = factorId;
             resetState();
+            if (pendingFactorId) {
+              disableBrowserMfaFactor(pendingFactorId).catch(() => {});
+            }
           }}
           disabled={loading}
           className="dg-btn dg-btn-secondary"
