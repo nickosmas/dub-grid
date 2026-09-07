@@ -34,7 +34,7 @@ concurrently.
 
 ## 3. Features - What does the product need?
 
-Already shipped (see build-plan.md for the checked list):
+Shipped capabilities and active roadmap (see `build-plan.md` for status):
 
 - Multi-tenant, subdomain-isolated organizations
 - Four-tier RBAC (Gridmaster > Super Admin > Admin > User) with per-person
@@ -63,13 +63,37 @@ Already shipped (see build-plan.md for the checked list):
   pre-confirmed via the invitation API, never a public self-serve signup)
 - Auth: password reset (mobile uses an in-app OTP flow via an ephemeral
   Supabase client), MFA/TOTP, per-session org isolation
+- Authentication and onboarding release hardening: systematically audit,
+  repair, and regression-test every web and mobile entry path for correctness,
+  speed, resilience, and security. The durable per-member, per-organization
+  onboarding state is authoritative: once a member has been admitted to the
+  app, background refreshes, realtime organization changes, token rotation,
+  role changes, or a new session must never send them back through onboarding.
+  Conversely, a genuinely incomplete member must not be able to bypass required
+  onboarding, setup, billing, or MFA gates. Completion means no known defects
+  remain after automated journey coverage plus authenticated browser and native
+  device checks; it is not a claim that future defects are impossible.
 - Notification inbox
 - Print / export (PDF, CSV, .ics)
 - Test sandbox: cookie-based cloned org for safe QA without touching real
   tenant data
+- Explicit schedule-indicator removal: active shift note/indicator controls in
+  the slideover must offer a clear, accessible removal affordance instead of
+  requiring users to discover that clicking the active indicator removes it.
+- Production migration safety: the final release gate only after product work
+  and release hardening are complete. Inventory linked production state,
+  reconcile the migration ledger, rehearse against a production-shaped
+  Supabase branch, apply only reviewed forward migrations, and verify health,
+  schema, tenant isolation, and ledger state. Planning this gate does not
+  authorize any production mutation.
 
-The next roadmap work is the mobile release catch-up in `build-plan.md` item 17. It is deliberately split into role eligibility, the shared dashboard model,
-and native dashboard presentation so each can be reviewed independently.
+The roadmap order is the mobile release catch-up in item 17, authentication and
+onboarding release hardening in item 18, explicit schedule-indicator removal in
+item 19, then production migration safety in item 20. Item 17 is deliberately
+split into role eligibility, the shared dashboard model, and native dashboard
+presentation so each can be reviewed independently. Item 18 is split into state
+correctness, full journey coverage, performance and resilience, security, and
+release qualification. Item 20 must remain last.
 
 ## 4. Data - What are we storing?
 
@@ -78,6 +102,7 @@ and native dashboard presentation so each can be reviewed independently.
   (Gridmaster/Super Admin/Admin/User) plus per-user `admin_permissions`
   (25-key JSONB)
 - Organization memberships (per-tenant role assignment)
+- Per-membership onboarding completion and onboarding-tour state
 - Employees / staff records, focus areas, certifications, employment
   status
 - Schedules: recurring shifts, published schedule entries, draft state,
@@ -131,6 +156,12 @@ before conversion is required.
 
 ## 7. UI/UX - How should this look and feel?
 
+- Every organization gets the same product-quality and interaction contract:
+  shared components, layout, spacing, typography, responsive behavior,
+  accessibility, loading, errors, and action placement must not drift by tenant
+  or by the data path used to reach a surface. Only intentional tenant content
+  and configuration may differ, including names/data, terminology overrides,
+  permissions, branding, and enabled features.
 - Tailwind v4, dark mode first with light mode as an option
 - Design system tokens live in `packages/design-tokens` (avatar tone,
   elevation, gradients, icon tone, animated logo) and a parallel

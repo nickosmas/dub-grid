@@ -26,6 +26,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
+import { StaffPanelFooter } from "./StaffPanelFooter";
 import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -264,6 +265,21 @@ export function ManagementStaffPanel({
         ? `/people/${person.employeeId}`
         : null
     : null;
+  const showAddToScheduleAction = Boolean(
+    canManageScheduleEmployees &&
+    !isOnSchedule &&
+    person.isManagementUser &&
+    person.userId &&
+    onAddToSchedule,
+  );
+  const showResendInvitationAction = Boolean(
+    canManageManagementAccess && isPending && !isExpired && onResendInvitation,
+  );
+  const showRevokeInvitationAction = Boolean(
+    canManageManagementAccess && isPending && onRevokeInvitation,
+  );
+  const showPersonActionFooter =
+    showAddToScheduleAction || showResendInvitationAction || showRevokeInvitationAction;
   const fieldErrors = useMemo(
     () => ({
       firstName:
@@ -789,35 +805,6 @@ export function ManagementStaffPanel({
               )}
 
               {accessControls}
-
-              <EditorActionRow
-                secondaryAction={
-                  <Button
-                    onClick={handleDismissClick}
-                    disabled={saving}
-                    className="dg-btn dg-btn-secondary"
-                  >
-                    {dismissLabel}
-                  </Button>
-                }
-                primaryAction={
-                  <Button
-                    onClick={handleSave}
-                    disabled={
-                      saving ||
-                      !hasChanges ||
-                      !currentDraft.firstName ||
-                      !currentDraft.lastName ||
-                      currentDraft.managementDepartmentIds.length === 0
-                    }
-                    className="dg-btn dg-btn-primary"
-                  >
-                    <ButtonLoading loading={saving} spinnerSize={16}>
-                      {EDITOR_ACTION_LABELS.save}
-                    </ButtonLoading>
-                  </Button>
-                }
-              />
             </>
           )}
 
@@ -1033,30 +1020,19 @@ export function ManagementStaffPanel({
               )}
             </div>
           )}
+        </div>
 
-          {/* Actions section */}
-          {(canManageManagementAccess || canManageScheduleEmployees) && (
-            <div
-              style={{
-                borderTop: "1px solid var(--dg-color-border-light)",
-                paddingTop: 16,
-                marginTop: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              {/* Add to Schedule — show for any linked management user who
-                  isn't already on the schedule grid. The old `source ===
-                  "user_only"` check fell apart once every member got an
-                  employees row (Flow B + seed backfill); now we gate on the
-                  same "appears on schedule" signal used everywhere else
-                  (focusAreaIds). */}
-              {canManageScheduleEmployees &&
-                !isOnSchedule &&
-                person.isManagementUser &&
-                person.userId &&
-                onAddToSchedule && (
+        <StaffPanelFooter
+          actions={
+            showPersonActionFooter ? (
+              <div className="flex flex-col gap-2.5">
+                {/* Add to Schedule — show for any linked management user who
+                    isn't already on the schedule grid. The old `source ===
+                    "user_only"` check fell apart once every member got an
+                    employees row (Flow B + seed backfill); now we gate on the
+                    same "appears on schedule" signal used everywhere else
+                    (focusAreaIds). */}
+                {showAddToScheduleAction && onAddToSchedule && (
                   <Button
                     onClick={() => onAddToSchedule(person)}
                     className="dg-btn dg-btn-secondary"
@@ -1082,76 +1058,105 @@ export function ManagementStaffPanel({
                   </Button>
                 )}
 
-              {/* Resend invitation */}
-              {canManageManagementAccess && isPending && !isExpired && onResendInvitation && (
-                <Button
-                  onClick={handleResend}
-                  disabled={resending}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ width: "100%" }}
-                >
-                  <ButtonLoading loading={resending} spinnerSize={14}>
-                    Resend Invitation
-                  </ButtonLoading>
-                </Button>
-              )}
-
-              {/* Revoke invitation (pending invites only — app access revocation is in Settings > User Management) */}
-              {canManageManagementAccess &&
-                isPending &&
-                onRevokeInvitation &&
-                (!showRevokeConfirm ? (
+                {showResendInvitationAction && (
                   <Button
-                    onClick={() => setShowRevokeConfirm(true)}
-                    className="dg-btn dg-btn-ghost"
-                    style={{ width: "100%", color: "var(--dg-color-danger)" }}
+                    onClick={handleResend}
+                    disabled={resending}
+                    className="dg-btn dg-btn-secondary"
+                    style={{ width: "100%" }}
                   >
-                    Revoke Invitation
+                    <ButtonLoading loading={resending} spinnerSize={14}>
+                      Resend Invitation
+                    </ButtonLoading>
                   </Button>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      background: "var(--dg-color-danger-bg)",
-                      padding: "14px 16px",
-                      borderRadius: "var(--dg-radius-lg)",
-                      border: "1px solid var(--dg-color-danger-border)",
-                    }}
-                  >
-                    <span
+                )}
+
+                {showRevokeInvitationAction &&
+                  (!showRevokeConfirm ? (
+                    <Button
+                      onClick={() => setShowRevokeConfirm(true)}
+                      className="dg-btn dg-btn-ghost"
+                      style={{ width: "100%", color: "var(--dg-color-danger)" }}
+                    >
+                      Revoke Invitation
+                    </Button>
+                  ) : (
+                    <div
                       style={{
-                        fontSize: "var(--dg-fs-label)",
-                        fontWeight: 600,
-                        color: "var(--dg-color-danger-text)",
-                        lineHeight: 1.4,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        background: "var(--dg-color-danger-bg)",
+                        padding: "14px 16px",
+                        borderRadius: "var(--dg-radius-lg)",
+                        border: "1px solid var(--dg-color-danger-border)",
                       }}
                     >
-                      Revoke this invitation? The link will no longer work.
-                    </span>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <Button
-                        onClick={() => setShowRevokeConfirm(false)}
-                        className="dg-btn dg-btn-secondary"
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-danger-text)",
+                          lineHeight: 1.4,
+                        }}
                       >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleRevoke}
-                        disabled={revoking}
-                        className="dg-btn dg-btn-danger-filled"
-                      >
-                        <ButtonLoading loading={revoking} spinnerSize={14}>
-                          Confirm
-                        </ButtonLoading>
-                      </Button>
+                        Revoke this invitation? The link will no longer work.
+                      </span>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Button
+                          onClick={() => setShowRevokeConfirm(false)}
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleRevoke}
+                          disabled={revoking}
+                          className="dg-btn dg-btn-danger-filled"
+                        >
+                          <ButtonLoading loading={revoking} spinnerSize={14}>
+                            Confirm
+                          </ButtonLoading>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
+                  ))}
+              </div>
+            ) : undefined
+          }
+          editorActions={
+            canManageManagementAccess ? (
+              <EditorActionRow
+                secondaryAction={
+                  <Button
+                    onClick={handleDismissClick}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary"
+                  >
+                    {dismissLabel}
+                  </Button>
+                }
+                primaryAction={
+                  <Button
+                    onClick={handleSave}
+                    disabled={
+                      saving ||
+                      !hasChanges ||
+                      !currentDraft.firstName ||
+                      !currentDraft.lastName ||
+                      currentDraft.managementDepartmentIds.length === 0
+                    }
+                    className="dg-btn dg-btn-primary"
+                  >
+                    <ButtonLoading loading={saving} spinnerSize={16}>
+                      {EDITOR_ACTION_LABELS.save}
+                    </ButtonLoading>
+                  </Button>
+                }
+              />
+            ) : undefined
+          }
+        />
 
         {unsavedChangesDialog}
         <ScrollOverflowCue />

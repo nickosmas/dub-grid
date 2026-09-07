@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 84b3f3453d6e27fa734f02f853f1fb341799bc6d50a303146bd744844b8e7baa -->
+<!-- blueprint:source-hash 12c15fd46eb823362ff3d14c555672bd6f7a20e32874269b5e0096c567ae79d1 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,8 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except item 17, which is an open
-roadmap slot (see Open questions).
+Everything below is already shipped except the unchecked work in items 17-19.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -71,6 +70,38 @@ roadmap slot (see Open questions).
       and deliver canonical dashboard data through the authenticated mobile API.
     - **17c. Canonical mobile dashboard experience** - show those facts in
       native, read-only dashboard cards and detail screens.
+18. **Authentication and onboarding release hardening** - leave no known
+    correctness, performance, resilience, or security defects across the full
+    web and mobile entry lifecycle.
+    - **18a. Admission and onboarding state correctness** - treat durable
+      per-member, per-organization completion as authoritative. A completed
+      member must never be returned to onboarding after admission, refresh,
+      token rotation, realtime organization changes, role changes, or a new
+      session; an incomplete member cannot bypass required gates.
+    - **18b. Complete authentication journey coverage** - verify invitation,
+      organization entry, sign-in, session restoration, recovery, MFA,
+      revocation, onboarding variants, and trial/setup gates for every role on
+      web and mobile.
+    - **18c. Authentication speed and resilience** - measure cold and warm
+      entry, remove avoidable serial work and duplicate requests, prevent blank
+      states, and verify slow, offline, retry, cross-tab, and token-refresh
+      behavior.
+    - **18d. Authentication security hardening** - verify tenant/session
+      isolation, live membership, stale claims, MFA assurance, replay/expiry,
+      redirect and CSRF safety, enumeration resistance, rate limiting, token
+      secrecy, auditability, and RLS authorization.
+    - **18e. Authentication release qualification** - maintain an automated
+      role/state/browser matrix, run authenticated browser and native device
+      checks, close confirmed defects, and disclose unavailable evidence.
+19. **Explicit schedule-indicator removal** - provide a discoverable,
+    accessible removal control for active shift notes/indicators in the shift
+    slideover rather than relying only on clicking the selected indicator.
+20. **Production migration safety** - the final release gate after all product
+    work and hardening: inventory linked production, reconcile migration
+    history, rehearse on a production-shaped Supabase branch, apply only
+    reviewed forward migrations, and verify health, schema, tenant isolation,
+    and ledger state. This item must remain last and does not authorize a
+    production mutation.
 
 ## Data model
 
@@ -90,7 +121,8 @@ roadmap slot (see Open questions).
 ### Organization Membership
 
 - `org_id`, `user_id`, `org_role` (Super Admin / Admin / User),
-  `admin_permissions` (25-key JSONB, per-person, not department-templated)
+  `admin_permissions` (25-key JSONB, per-person, not department-templated),
+  `onboarding_completed_at`, onboarding-tour state
 - relationship: belongs to one Organization and one Profile
 
 ### Employee / Staff
@@ -174,6 +206,13 @@ trial before conversion is required.
 
 ## UI/UX
 
+Every organization receives the same product-quality and interaction contract.
+Component choice, layout, spacing, typography, responsive behavior,
+accessibility, loading/error treatment, and action placement cannot drift by
+tenant or data path. Intentional organization content and configuration may
+differ, including data, terminology, permissions, branding, and enabled
+features.
+
 Dark mode first, light mode as an option. Tailwind v4 with design tokens
 in `packages/design-tokens` (avatar tone, elevation, gradients, icon
 tone) shared conceptually with a parallel `mobile*` token set (the two
@@ -201,6 +240,11 @@ Main route groups (web, App Router):
   not a migration.
 - **Background jobs:** `cron-expire-requests.yml` (GitHub Action) expires
   stale shift requests on a schedule.
+- **Final migration gate:** after all product work and authentication release
+  qualification, inventory and reconcile linked production, rehearse against a
+  production-shaped Supabase branch, then apply only reviewed forward
+  migrations and verify health, schema, tenant isolation, and ledger state.
+  The tracked plan grants no authority to mutate production.
 
 > TODO: env vars by name, health check path, and domain notes. Run
 > `/release vercel` for a real readiness pass instead of guessing here.
