@@ -125,12 +125,23 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   }
 
   // Successful login lands on an authenticated route and renders the primary
-  // nav (Header.tsx) — the most stable "we're signed in" signal available,
+  // nav (Header.tsx), the most stable "we're signed in" signal available,
   // since it doesn't depend on any particular page's own content.
-  await expect(dashboardLink).toBeVisible({ timeout: 15_000 });
-
-  // Cover every path (including the fast one where neither terms nor
-  // onboarding triggered) — something's usually still sitting on top of the
-  // nav for whatever the calling test clicks next otherwise.
+  //
+  // The shared Modal is a Base UI dialog in modal mode, which marks everything
+  // outside the popup aria-hidden while it is open. TrialWelcomeModal opens
+  // right after a first login, so role queries cannot see the nav until the
+  // popup is gone: wait for either the nav or that popup's close button, clear
+  // whatever is on top, and only then assert on the nav.
+  const closeModalButton = page.getByRole("button", { name: "Close modal" });
+  await Promise.race([
+    closeModalButton.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    dashboardLink.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+  ]);
+  // Also covers the fast path where neither terms nor onboarding triggered:
+  // something is usually still sitting on top of the nav for whatever the
+  // calling test clicks next otherwise.
   await clearBlockingOverlays(page);
+
+  await expect(dashboardLink).toBeVisible({ timeout: 15_000 });
 }
