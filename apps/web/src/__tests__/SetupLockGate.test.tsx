@@ -267,6 +267,27 @@ describe("OnboardingGate setup lock", () => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
+  it("routes a super admin with setup capability to the setup wizard", async () => {
+    mockPermissions.role = "super_admin";
+    mockPermissions.isSuperAdmin = true;
+    mockPermissions.canManageOrg = true;
+
+    renderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
+  it("routes an admin with setup capability to the setup wizard", async () => {
+    mockPermissions.role = "admin";
+    mockPermissions.canManageOrg = true;
+
+    renderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
   it("renders the wizard inline on every route, including /settings, while setup is incomplete", async () => {
     mockPathname = "/settings";
 

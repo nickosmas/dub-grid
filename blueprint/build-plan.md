@@ -90,6 +90,12 @@
     - [ ] 19b5. **Role-based setup, onboarding, and trial gates** - verify
           every role's setup, onboarding, and trial path without duplicating
           19a's stale-bootstrap admission repair.
+      - [x] 19b5a. **Role-based setup and onboarding gates** - verify the
+            Super Admin, Admin, and User paths through incomplete organization
+            setup and member onboarding across web and mobile.
+      - [ ] 19b5b. **Trial and billing recovery gates** - verify pending,
+            active, grace, and locked trial paths, including Super Admin billing
+            recovery and non-admin restrictions across web and mobile.
   - [ ] 19c. **Authentication speed and resilience** - measure cold and warm
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
