@@ -427,7 +427,7 @@ function NotificationCard({ notification, pending, onPress, onArchive }: Notific
       accessibilityRole="button"
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
       onPress={onPress}
-      style={[styles.alertCard, !isUnread && styles.alertCardMuted]}
+      style={styles.alertCard}
     >
       <View style={styles.alertHeader}>
         <View style={styles.alertTitleRow}>
@@ -544,9 +544,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.cardBorder,
       ...mobileElevation("card", isDark),
     },
-    alertCardMuted: {
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
     alertHeader: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -577,8 +574,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       backgroundColor: mobileColors.brandSoft,
     },
+    // Read cards are `surface` like unread ones, so the frame can no longer be
+    // `surface` itself — it was only visible while the card behind it was
+    // tinted. A step up the neutral ramp keeps the circle readable on white
+    // while staying quieter than the unread `brandSoft`.
     alertIconFrameMuted: {
-      backgroundColor: mobileColors.surface,
+      backgroundColor: mobileColors.surfaceSecondary,
     },
     unreadDot: {
       width: 10,
