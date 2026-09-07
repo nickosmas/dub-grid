@@ -169,7 +169,6 @@ function getProfileEditFieldErrors(
 export default function ProfileWorkScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
-  const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
   const seededIdentityRef = useRef<string | null>(null);
   const draftTouchedRef = useRef(false);
@@ -375,14 +374,16 @@ export default function ProfileWorkScreen() {
   const hasChanges = Boolean(
     profile && draft && profileDraftHasChanges(draft, profile, linkedEmployee),
   );
-  // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
-  // back-swipe target, so a guard that fired for an untouched open panel would
-  // put a confirmation in front of an ordinary swipe back.
+  // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
+  // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
+  // `useNavigationDiscardGuard` below is what puts the confirmation in front of
+  // it. `hasChanges` alone is a tight enough flag on a screen that is only ever
+  // the editor: on iOS the whole surface is a back-swipe target, so a guard
+  // keyed on anything looser would interrupt an ordinary swipe back.
   const guard = useUnsavedChangesGuard({
-    isDirty: editing && hasChanges,
+    isDirty: hasChanges,
     disabled: saveMutation.isPending,
     onDiscard: discardChanges,
-    onClose: () => setEditing(false),
   });
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
