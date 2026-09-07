@@ -46,6 +46,7 @@ export function MemberAccessControls({
   labels,
   showRole = true,
   showPermissionControl = true,
+  permissionActionClassName,
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
@@ -59,6 +60,8 @@ export function MemberAccessControls({
   /** Lets a panel place the role selector in its header and permissions in its body. */
   showRole?: boolean;
   showPermissionControl?: boolean;
+  /** Lets a panel place the access action in its shared action row. */
+  permissionActionClassName?: string;
 }) {
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
@@ -148,17 +151,14 @@ export function MemberAccessControls({
         </div>
       )}
       {showPermissionControl && onPermissionsChange && orgRole === "admin" && (
-        <div>
-          <label style={fieldLabelStyle}>Permissions</label>
-          <div>
-            <Button
-              type="button"
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              onClick={() => setShowPermissions(true)}
-            >
-              Manage permissions
-            </Button>
-          </div>
+        <div className={permissionActionClassName}>
+          <Button
+            type="button"
+            className={`dg-btn dg-btn-secondary${permissionActionClassName ? " w-full" : " dg-btn-sm"}`}
+            onClick={() => setShowPermissions(true)}
+          >
+            Edit admin access
+          </Button>
           {showPermissions && (
             <PermissionsEditor
               title="Edit permissions"

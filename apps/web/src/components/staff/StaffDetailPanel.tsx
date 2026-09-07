@@ -129,10 +129,9 @@ export function StaffDetailPanel({
     showSendInviteAction ||
     showManagementAccessAction ||
     showEmploymentStatusActions;
-  // Access, management access, and the status action read as one row of things
-  // you do to this person, so they sit side by side rather than stacked. The
-  // access slot is always present: "no app access" is itself the answer for
-  // someone with no login, and a missing control reads as a broken row.
+  // Person actions are a single, predictable two-column grid. The final action
+  // spans both columns when the count is odd, so buttons remain symmetrical
+  // whether an organization exposes one, two, three, or more actions.
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
   // Only staff managers can open the full /people/[id] page (mirrors the
   // table's name-link gate); the self link just goes to /profile.
@@ -370,28 +369,28 @@ export function StaffDetailPanel({
                 surface, so it is the same popup wherever it opens from. Role
                 already lives in the header's inline select, so this renders
                 only the permissions launcher. */}
-                <MemberAccessControls
-                  orgRole={orgRole}
-                  adminPermissions={adminPermissions}
-                  onPermissionsChange={onPermissionsChange}
-                  labels={{ focusAreaLabel, certificationLabel, roleLabel }}
-                />
-                {(showSendInviteAction ||
+                {(showPermissionsAction ||
+                  showSendInviteAction ||
                   showManagementAccessAction ||
                   showEmploymentStatusActions) && (
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "stretch",
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
+                    data-slot="staff-person-actions"
+                    className="grid grid-cols-2 items-stretch gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
                   >
+                    {showPermissionsAction && (
+                      <MemberAccessControls
+                        orgRole={orgRole}
+                        adminPermissions={adminPermissions}
+                        onPermissionsChange={onPermissionsChange}
+                        labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+                        permissionActionClassName="w-full"
+                      />
+                    )}
                     {showSendInviteAction && onInvite && (
                       <Button
                         onClick={() => onInvite(employee)}
                         disabled={isInSandbox}
-                        className="dg-btn dg-btn-secondary flex-1 basis-[150px]"
+                        className="dg-btn dg-btn-secondary w-full"
                         title={
                           isInSandbox
                             ? "Sending invitations isn't available in sandbox mode."
@@ -417,7 +416,7 @@ export function StaffDetailPanel({
                     {showManagementAccessAction && onManageManagementAccess && (
                       <Button
                         onClick={() => onManageManagementAccess(employee)}
-                        className="dg-btn dg-btn-secondary flex-1 basis-[150px]"
+                        className="dg-btn dg-btn-secondary w-full"
                       >
                         <svg
                           width="13"
@@ -440,7 +439,7 @@ export function StaffDetailPanel({
                       </Button>
                     )}
                     {showEmploymentStatusActions && (
-                      <div className="flex-1 basis-[150px]">
+                      <div className="w-full">
                         <EmployeeStatusActions
                           employee={employee}
                           canEdit={canManageEmployees}

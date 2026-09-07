@@ -79,6 +79,11 @@
 - Never hardcode a default English term for an org-customizable label
   (Wings/Focus Areas, Skill Levels/Certifications, etc.) - read it
   through the org's terminology config
+- Peer action buttons use a two-column grid with equal width and height. Two
+  actions sit side by side; four use two equal rows. For an odd action count,
+  the final action spans both columns (three is two above, one full-width below;
+  five continues with two equal rows, then one full-width below). Do not let
+  labels or variants make a peer larger within a row.
 
 ## Database and data access
 

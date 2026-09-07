@@ -202,7 +202,7 @@ describe("StaffDetailPanel access controls", () => {
     expect(getPanelStructureContract()).toEqual(calmHavenContract);
   });
 
-  it("keeps compact action rows wrapped inside the action footer", () => {
+  it("uses the shared two-column grid for person actions", () => {
     renderPanel({
       employee: { ...employee, userId: null, email: "pat@example.com" },
       canManageManagementAccess: true,
@@ -214,22 +214,29 @@ describe("StaffDetailPanel access controls", () => {
     const inviteButton = screen.getByRole("button", { name: /send invitation/i });
     const managementButton = screen.getByRole("button", { name: /add to management/i });
 
+    const personActions = document.querySelector<HTMLElement>('[data-slot="staff-person-actions"]');
+
     expect(actionFooter).toContainElement(inviteButton);
     expect(inviteButton.parentElement).toBe(managementButton.parentElement);
-    expect((inviteButton.parentElement as HTMLElement).style.flexWrap).toBe("wrap");
+    expect(personActions).toContainElement(inviteButton);
+    expect(personActions).toHaveClass(
+      "grid",
+      "grid-cols-2",
+      "[&>:last-child:nth-child(odd)]:col-span-2",
+    );
   });
   // Permissions were only reachable from inside the management-access popup,
   // which now edits departments and nothing else. The launcher lives on the
   // panel instead, and this is the panel's only route to it.
-  it("offers Manage permissions on the panel for an admin the viewer can edit", () => {
+  it("offers a self-descriptive admin-access action for an editable admin", () => {
     renderPanel({ orgRole: "admin", onPermissionsChange: vi.fn() });
 
-    expect(screen.getByRole("button", { name: "Manage permissions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit admin access" })).toBeInTheDocument();
   });
 
-  it("withholds Manage permissions when the role carries no permission set", () => {
+  it("withholds the admin-access action when the role carries no permission set", () => {
     renderPanel({ orgRole: "user", onPermissionsChange: vi.fn() });
 
-    expect(screen.queryByRole("button", { name: "Manage permissions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit admin access" })).not.toBeInTheDocument();
   });
 });
