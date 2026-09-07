@@ -19,6 +19,13 @@ export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
 export const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
 export const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
+/**
+ * Height of every control in the header row — the week chevrons, Today and the
+ * alerts bell. One constant because they sit side by side and read as one set:
+ * Today had drifted to 36 against the icon buttons' 44, which showed up as a
+ * short pill between two taller circles.
+ */
+export const HEADER_CONTROL_HEIGHT = 44;
 // Fallback single-row height, used until the real row is measured. Matches
 // monthCalendarDaySlot's minHeight in styles below.
 export const WEEK_STRIP_ROW_HEIGHT = 44;
@@ -105,7 +112,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // border, pill. The JSX still hand-rolls the Pressable; it converts to
     // <Button> when this screen's animation rework opens the file.
     meTodayButton: {
-      minHeight: 36,
+      height: HEADER_CONTROL_HEIGHT,
       borderRadius: mobileRadii.pill,
       // Same outlined chrome as `iconControlButton`, which it sits beside — the
       // two are one row of header controls and have to read as one set.
@@ -1147,8 +1154,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     iconControlButton: {
-      width: 44,
-      height: 44,
+      width: HEADER_CONTROL_HEIGHT,
+      height: HEADER_CONTROL_HEIGHT,
       borderRadius: mobileRadii.pill,
       // Outlined chrome: the week chevrons and the alerts bell share this, and
       // both sit *on* the header bar, which is now the same `surface` they are.
