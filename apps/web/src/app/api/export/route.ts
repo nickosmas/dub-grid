@@ -229,10 +229,14 @@ export async function GET(req: NextRequest) {
     const orgAuth = await requireOrgPermissions(
       req,
       orgId,
+      // Staff export carries contact details, so it follows the permission
+      // that names them. Schedule export stays on canEditShifts: the only
+      // schedule view key is true for every user, and handing the whole grid
+      // to Tier 0 users was closed deliberately.
       (permissions) =>
         permissions.isGridmaster ||
         permissions.isSuperAdmin ||
-        (type === "staff" && permissions.canManageEmployees) ||
+        (type === "staff" && permissions.canViewEmployeeDetails) ||
         (type === "schedule" && permissions.canEditShifts),
       { actor: user },
     );

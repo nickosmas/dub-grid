@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Factor } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +31,7 @@ import {
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
-const MOBILE_TOTP_FRIENDLY_NAME = "DubGrid Mobile Authenticator";
+const MOBILE_TOTP_FRIENDLY_NAME = "Mobile App Authenticator";
 
 function isVerifiedTotpFactor(factor: Factor): boolean {
   return factor.factor_type === "totp" && factor.status === "verified";
@@ -283,23 +284,27 @@ export default function ProfileTwoFactorScreen() {
               onChangeText={(text) => setMfaVerifyCode(text.replace(/\D/g, "").slice(0, 6))}
             />
           </ProfilePanel>
-          <View style={styles.actionsStack}>
-            <Button
-              disabled={mfaLoading || mfaVerifyCode.length !== 6}
-              label="Verify & enable"
-              loading={mfaLoading}
-              onPress={() => verifyMfaEnrollment()}
-            />
+          <ActionButtons
+            primaryAction={
+              <Button
+                disabled={mfaLoading || mfaVerifyCode.length !== 6}
+                label="Verify & enable"
+                loading={mfaLoading}
+                onPress={() => verifyMfaEnrollment()}
+              />
+            }
+            style={styles.actionsStack}
+          >
             <Button
               disabled={mfaLoading}
               label="Cancel"
               onPress={cancelMfaEnrollment}
               tone="neutral"
             />
-          </View>
+          </ActionButtons>
         </ProfileSection>
       ) : (
-        <ProfileSection description="An authenticator app generates a short code that DubGrid asks for alongside your password, so a stolen password isn't enough to sign in.">
+        <ProfileSection description="An authenticator app generates a short code that the app asks for alongside your password, so a stolen password isn't enough to sign in.">
           <ProfileList>
             <ProfileInfoRow
               iconName="shield-outline"

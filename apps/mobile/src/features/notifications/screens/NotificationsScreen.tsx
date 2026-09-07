@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -25,6 +25,7 @@ import {
   isNotificationActionSupportedOnMobile,
   openNotificationAction,
 } from "../lib/openNotificationAction";
+import { filterNotificationsForViewer } from "../lib/notification-visibility";
 import {
   bulkUpdateNotifications,
   getNotifications,
@@ -47,6 +48,7 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { useBootstrap } from "../../auth/hooks/useBootstrap";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -126,8 +128,11 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
+  const bootstrapQuery = useBootstrap(accessToken);
+  const canApproveShiftRequests = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const facetsQuery = useNotificationFacets(accessToken);
   const facets = facetsQuery.data;
 
@@ -170,9 +175,17 @@ export default function NotificationsScreen() {
     placeholderData: keepPreviousData,
   });
 
+  // Alerts are addressed by role at send time, but a role can change after one
+  // is sent: an approver who has since become a regular user would otherwise
+  // keep a backlog of other people's approval requests they can no longer act
+  // on. Filtered here rather than server-side so a re-promotion restores them.
   const notifications = useMemo(
-    () => notificationsQuery.data?.pages.flatMap((p) => p.notifications) ?? [],
-    [notificationsQuery.data],
+    () =>
+      filterNotificationsForViewer(
+        notificationsQuery.data?.pages.flatMap((page) => page.notifications) ?? [],
+        { canApproveShiftRequests: canApproveShiftRequests },
+      ),
+    [canApproveShiftRequests, notificationsQuery.data],
   );
 
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
@@ -216,6 +229,9 @@ export default function NotificationsScreen() {
     async (notification: MobileNotification) => {
       if (!accessToken) return;
       if (!notification.readAt) {
+        // Navigation deliberately waits on this write (a failure keeps the user
+        // here with the toast), so the row has to say it is working meanwhile.
+        setPendingRowId(notification.id);
         try {
           const response = await markNotificationRead(accessToken, notification.id);
           syncBootstrapUnread(response.unreadCount);
@@ -227,6 +243,8 @@ export default function NotificationsScreen() {
             fallbackMessage: "We couldn't mark that alert as read.",
           });
           return;
+        } finally {
+          setPendingRowId(null);
         }
       }
       router.push({
@@ -363,6 +381,7 @@ export default function NotificationsScreen() {
           {notifications.map((notification, index) => (
             <AnimatedListItem index={index} key={notification.id}>
               <NotificationCard
+                pending={pendingRowId === notification.id}
                 notification={notification}
                 onPress={() => handleRowPress(notification)}
                 onArchive={() => handleArchive(notification)}
@@ -401,11 +420,12 @@ export default function NotificationsScreen() {
 
 interface NotificationCardProps {
   notification: MobileNotification;
+  pending: boolean;
   onPress: () => void;
   onArchive: () => void;
 }
 
-function NotificationCard({ notification, onPress, onArchive }: NotificationCardProps) {
+function NotificationCard({ notification, pending, onPress, onArchive }: NotificationCardProps) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -419,16 +439,20 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
       accessibilityRole="button"
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
       onPress={onPress}
-      style={[styles.alertCard, !isUnread && styles.alertCardMuted]}
+      style={styles.alertCard}
     >
       <View style={styles.alertHeader}>
         <View style={styles.alertTitleRow}>
           <View style={[styles.alertIconFrame, !isUnread && styles.alertIconFrameMuted]}>
-            <Ionicons
-              color={isUnread ? mobileColors.brand : mobileColors.textMuted}
-              name={getNotificationIconName(notification.type)}
-              size={18}
-            />
+            {pending ? (
+              <ActivityIndicator color={mobileColors.brand} size="small" />
+            ) : (
+              <Ionicons
+                color={isUnread ? mobileColors.brand : mobileColors.textMuted}
+                name={getNotificationIconName(notification.type)}
+                size={18}
+              />
+            )}
           </View>
           <View style={styles.titleColumn}>
             <View style={styles.titleLine}>
@@ -532,9 +556,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.cardBorder,
       ...mobileElevation("card", isDark),
     },
-    alertCardMuted: {
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
     alertHeader: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -565,8 +586,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       backgroundColor: mobileColors.brandSoft,
     },
+    // Read cards are `surface` like unread ones, so the frame can no longer be
+    // `surface` itself — it was only visible while the card behind it was
+    // tinted. A step up the neutral ramp keeps the circle readable on white
+    // while staying quieter than the unread `brandSoft`.
     alertIconFrameMuted: {
-      backgroundColor: mobileColors.surface,
+      backgroundColor: mobileColors.surfaceSecondary,
     },
     unreadDot: {
       width: 10,

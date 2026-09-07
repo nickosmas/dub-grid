@@ -14,11 +14,15 @@
  *   onConfirm={() => { setOpen(false); return handlePublish(); }}
  *
  * Flags a block-bodied, non-async handler that calls an in-file async function
- * (or wraps one in `void`) as a bare statement rather than returning it.
+ * (or wraps one in `void`) as a bare statement rather than returning it, and a
+ * concise arrow body that discards the call through `void`:
  *
- * Not flagged: an `async` handler (it returns a promise already), a concise
- * arrow body (`() => save()` returns it), a synchronous call, or a handler
- * whose callee is a prop this file cannot resolve.
+ *   onClick={() => void createLink()}    // reads like a return, is not one
+ *   onClick={() => createLink()}
+ *
+ * Not flagged: an `async` handler (it returns a promise already), a bare
+ * concise arrow body (`() => save()` returns it), a synchronous call, or a
+ * handler whose callee is a prop this file cannot resolve.
  */
 
 const HANDLER_PROPS = new Set([
@@ -71,6 +75,7 @@ function callOf(statement) {
   return expr.type === "CallExpression" ? expr : null;
 }
 
+/** @type {import("eslint").Rule.RuleModule} */
 export const noFloatingAsyncHandler = {
   meta: {
     type: "problem",
@@ -81,6 +86,8 @@ export const noFloatingAsyncHandler = {
     messages: {
       floating:
         "`{{name}}()` is async but its promise is dropped, so the double-press latch releases immediately and a second press runs it again. Return it (`return {{name}}(...)`) or make the handler `async`.",
+      voided:
+        "`void` discards `{{name}}()`'s promise, so the latch releases immediately and the button never shows it is working. Drop the `void` (`() => {{name}}(...)`).",
     },
     schema: [],
   },
@@ -98,10 +105,21 @@ export const noFloatingAsyncHandler = {
         if (fn.type !== "ArrowFunctionExpression" && fn.type !== "FunctionExpression") return;
         // An async handler already hands its promise back.
         if (fn.async) return;
-        // A concise body returns whatever it evaluates to.
-        if (fn.body.type !== "BlockStatement") return;
 
         const scope = sourceCode.getScope ? sourceCode.getScope(fn.body) : context.getScope();
+
+        // A concise body returns whatever it evaluates to, so `() => save()` is
+        // fine -- but `void` discards the promise while still looking like one
+        // of those, which is the shape that slipped past this rule.
+        if (fn.body.type !== "BlockStatement") {
+          if (fn.body.type !== "UnaryExpression" || fn.body.operator !== "void") return;
+          const call = fn.body.argument;
+          if (call.type !== "CallExpression" || call.callee.type !== "Identifier") return;
+          const name = call.callee.name;
+          if (!resolvesToAsync(scope, name)) return;
+          context.report({ node: fn.body, messageId: "voided", data: { name } });
+          return;
+        }
 
         for (const statement of fn.body.body) {
           const call = callOf(statement);

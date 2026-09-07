@@ -87,7 +87,7 @@ describe("mobile error helpers", () => {
     });
 
     expect(result).toBe(
-      "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
+      "We couldn't connect right now. Check your internet connection and try again.",
     );
     expect(pushToast).not.toHaveBeenCalled();
   });
@@ -103,7 +103,7 @@ describe("mobile error helpers", () => {
     });
 
     expect(result).toBe(
-      "We couldn't reach DubGrid from this device. Make sure your phone is on the same Wi-Fi network as the laptop running the dev server, then try again.",
+      "We couldn't reach the local service from this device. Make sure your phone is on the same Wi-Fi network as the laptop running the dev server, then try again.",
     );
     expect(pushToast).not.toHaveBeenCalled();
   });

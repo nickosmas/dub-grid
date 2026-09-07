@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { FocusArea } from "@/types";
 import { Button } from "@/components/Button";
@@ -42,6 +42,13 @@ export default function PrintOptionsModal({
   );
   const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(currentSpanWeeks);
   const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>("medium");
+
+  // Confirming here unmounts this modal and mounts the preview, which is a much
+  // larger separate chunk. Fetching it while the user is still choosing options
+  // keeps that swap from landing on an empty screen.
+  useEffect(() => {
+    void import("@/components/PrintScheduleView");
+  }, []);
 
   const allSelected = selectedFocusAreas.length === focusAreas.length;
   const hasUnsavedChanges =

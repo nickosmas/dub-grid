@@ -1,5 +1,7 @@
 import { StyleSheet } from "react-native";
+import { createIconControlStyle } from "../../../shared/components/icon-control-style";
 import {
+  mobileAvatarText,
   mobileElevation,
   mobileMotion,
   mobileRadii,
@@ -18,6 +20,13 @@ export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
 export const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
 export const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
+/**
+ * Height of every control in the header row — the week chevrons, Today and the
+ * alerts bell. One constant because they sit side by side and read as one set:
+ * Today had drifted to 36 against the icon buttons' 44, which showed up as a
+ * short pill between two taller circles.
+ */
+export const HEADER_CONTROL_HEIGHT = 44;
 // Fallback single-row height, used until the real row is measured. Matches
 // monthCalendarDaySlot's minHeight in styles below.
 export const WEEK_STRIP_ROW_HEIGHT = 44;
@@ -104,7 +113,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // border, pill. The JSX still hand-rolls the Pressable; it converts to
     // <Button> when this screen's animation rework opens the file.
     meTodayButton: {
-      minHeight: 36,
+      height: HEADER_CONTROL_HEIGHT,
       borderRadius: mobileRadii.pill,
       // Same outlined chrome as `iconControlButton`, which it sits beside — the
       // two are one row of header controls and have to read as one set.
@@ -169,7 +178,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "rgba(255, 255, 255, 0.22)",
     },
     meHeroContent: {
-      gap: 11,
+      gap: 16,
     },
     meHeroHeader: {
       flexDirection: "row",
@@ -180,12 +189,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroHeaderCopy: {
       flex: 1,
       minWidth: 0,
-      gap: 10,
+      gap: 6,
     },
     meHeroBadge: {
       alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
+      gap: 8,
+    },
+    meHeroBadgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
       gap: 8,
     },
     meHeroBadgeMuted: {
@@ -244,11 +259,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.heroMetric,
       color: mobileColors.textInverse,
     },
+    meHeroTitleBadgeSlot: {
+      // Hangs a split-shift or change pill from the hero title's baseline.
+      // `flex-end` alone lands on the line box, a descender below the text.
+      alignSelf: "flex-end",
+      marginBottom: 6,
+    },
     meHeroTitleRow: {
       flexDirection: "row",
       alignItems: "center",
       flexWrap: "wrap",
-      gap: 8,
+      gap: 6,
     },
     meHeroHeading: {
       ...mobileText.rowTitle,
@@ -284,7 +305,80 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
-      marginTop: 2,
+    },
+    meHeroContextGroup: {
+      gap: 8,
+    },
+    shiftChangeBadge: {
+      alignSelf: "flex-start",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    shiftChangeBadgeNew: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+    },
+    shiftChangeBadgeModified: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    shiftChangeBadgeDeleted: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    shiftChangeBadgeCompactSegment: {
+      paddingVertical: 4,
+    },
+    // The hero's lone change chip stands in for the `Shift N · Edited` pill a
+    // split shift shows in the same slot, so it copies `SplitShiftBadge`.
+    shiftChangeBadgeInverse: {
+      alignSelf: "flex-start",
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.28)",
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    shiftChangeBadgeText: {
+      ...mobileText.micro,
+      color: mobileColors.textSecondary,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      // Android's font padding pushes uppercase glyphs high inside a pill this
+      // tight, leaving the label visibly off-center in its own chip.
+      includeFontPadding: false,
+      textAlignVertical: "center",
+    },
+    shiftChangeBadgeTextInverse: {
+      ...mobileText.badge,
+      color: mobileColors.textInverse,
+      textTransform: "none",
+    },
+    shiftChangeBadgeTextCompactSegment: {
+      ...mobileText.badge,
+      color: mobileColors.brand,
+      textTransform: "none",
+    },
+    previousShiftRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minWidth: 0,
+    },
+    previousShiftText: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    previousShiftTextInverse: {
+      color: "rgba(255, 255, 255, 0.82)",
     },
     meHeroRoleRow: {
       flexDirection: "row",
@@ -316,7 +410,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "space-between",
       flexWrap: "wrap",
       gap: 10,
-      marginTop: 6,
     },
     meHeroTimeRow: {
       flexDirection: "row",
@@ -457,7 +550,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     meHeroCollaboratorAvatarText: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileAvatarText(38),
     },
     meHeroCollaboratorOverflow: {
       width: 38,
@@ -537,6 +630,24 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 18,
       paddingVertical: 18,
     },
+    upcomingUnscheduledRow: {
+      minHeight: 132,
+      justifyContent: "center",
+      gap: 4,
+      paddingVertical: 18,
+    },
+    upcomingDeletedHistoryRow: {
+      paddingVertical: 14,
+    },
+    upcomingUnscheduledTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 17,
+      color: mobileColors.textSecondary,
+    },
+    upcomingUnscheduledBody: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
     upcomingShiftRowBorder: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -609,7 +720,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
       alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
       gap: 8,
     },
     upcomingShiftTitle: {
@@ -636,11 +746,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       fontSize: 13,
       lineHeight: 18,
       color: mobileColors.textSubtle,
-    },
-    upcomingShiftAction: {
-      width: 24,
-      alignItems: "center",
-      justifyContent: "center",
     },
     meSectionHeader: {
       flexDirection: "row",
@@ -842,7 +947,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     requestAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(42),
     },
     requestHeaderText: {
       ...mobileText.rowTitle,
@@ -896,6 +1001,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillMentoredText: {
       textTransform: "none",
+    },
+    // The nested variant inherits the value text's metrics; this inline one is
+    // a sibling of the label, so it has to state them or it falls back to the
+    // system default size and sits off the label's baseline.
+    jobPillMentoredInlineText: {
+      ...mobileTextWeighted("badge", "medium"),
+      textTransform: "none",
+    },
+    jobPillMentoredInlineTextCompact: {
+      fontSize: 12,
+      lineHeight: 16,
     },
     jobPillTextCompact: {
       fontSize: 12,
@@ -1038,26 +1154,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 1,
       minWidth: 0,
     },
-    iconControlButton: {
-      width: 44,
-      height: 44,
-      borderRadius: mobileRadii.pill,
-      // Outlined chrome: the week chevrons and the alerts bell share this, and
-      // both sit *on* the header bar, which is now the same `surface` they are.
-      // So the edge is the control — `border` (1.49:1 on white, 1.39:1 on the
-      // dark bar), not `borderSubtle`, which at 1.23:1 leaves a 44pt target
-      // reading as a floating icon with no button around it.
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      // Down from `card`. A 12pt-blur shadow under a white pill on a white bar
-      // reads as a smudge, and with the outline above it there are two
-      // separators doing one job. `raised` keeps the control from looking
-      // printed on without competing with its own edge.
-      ...mobileElevation("raised", isDark),
-    },
+    // The week chevrons and the alerts bell. Shared with the sheet close
+    // button, which is the same chrome on a different surface.
+    iconControlButton: createIconControlStyle(mobileColors, isDark),
     iconControlButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
@@ -1270,7 +1369,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     teamMemberAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(48),
       color: mobileColors.brand,
     },
     teamMemberMain: {

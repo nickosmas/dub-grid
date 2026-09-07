@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import type {
   MobileFocusArea,
   MobileBootstrapRole,
@@ -18,7 +19,9 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
+import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
@@ -38,7 +41,7 @@ import {
   getScheduledDepartmentNames,
   MANAGEMENT_DEPARTMENT_LABELS,
 } from "../../../shared/lib/departments";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -133,16 +136,46 @@ function profileDraftHasChanges(
   );
 }
 
+/**
+ * Field-level validation for the edit form.
+ *
+ * Module scope, same reasoning as `profileDraftHasChanges` above: the footer
+ * Save button's `disabled` state and the panel's inline per-field errors both
+ * need this, and computing it twice by hand risks the two disagreeing about
+ * whether the draft is actually valid.
+ */
+function getProfileEditFieldErrors(
+  draft: ProfileDraft,
+  {
+    canEditProfileDirectly,
+    hasLinkedEmployee,
+    focusAreaLabel,
+  }: { canEditProfileDirectly: boolean; hasLinkedEmployee: boolean; focusAreaLabel: string },
+) {
+  return {
+    firstName: getStaffNameError(draft.firstName, "First name"),
+    lastName: getStaffNameError(draft.lastName, "Last name"),
+    email: getRequiredStaffEmailError(draft.email),
+    phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
+    contactNotes: getStaffNotesError(draft.contactNotes),
+    requestNote: getStaffNotesError(draft.requestNote),
+    focusAreaIds:
+      canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
+        : null,
+  };
+}
+
 export default function ProfileWorkScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
-  const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
   const seededIdentityRef = useRef<string | null>(null);
   const draftTouchedRef = useRef(false);
   // Only the save confirmation now: the discard half belongs to the guard,
   // which has to answer to back navigation as well as to the Cancel button.
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -159,6 +192,11 @@ export default function ProfileWorkScreen() {
     draft &&
     (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
       draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
+  );
+  const hasEmailChange = Boolean(
+    profile &&
+    draft &&
+    draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase(),
   );
   const hasOtherChanges = Boolean(
     profile &&
@@ -287,14 +325,14 @@ export default function ProfileWorkScreen() {
         requestedNameChange: !canEditProfileDirectly && nameChanged,
       };
     },
+    onMutate: () => setSaveError(null),
     onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not save profile",
-        fallbackMessage: "We couldn't save your profile right now.",
-      });
+      setSaveError(
+        getClientFriendlyErrorMessage(error, "We couldn't save your profile right now."),
+      );
     },
     onSuccess: async (result) => {
+      setShowSaveConfirmation(false);
       const [profileResult] = await Promise.all([
         profileQuery.refetch(),
         bootstrapQuery.refetch(),
@@ -336,22 +374,88 @@ export default function ProfileWorkScreen() {
   const hasChanges = Boolean(
     profile && draft && profileDraftHasChanges(draft, profile, linkedEmployee),
   );
-  // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
-  // back-swipe target, so a guard that fired for an untouched open panel would
-  // put a confirmation in front of an ordinary swipe back.
+  // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
+  // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
+  // `useNavigationDiscardGuard` below is what puts the confirmation in front of
+  // it. `hasChanges` alone is a tight enough flag on a screen that is only ever
+  // the editor: on iOS the whole surface is a back-swipe target, so a guard
+  // keyed on anything looser would interrupt an ordinary swipe back.
   const guard = useUnsavedChangesGuard({
-    isDirty: editing && hasChanges,
+    isDirty: hasChanges,
     disabled: saveMutation.isPending,
     onDiscard: discardChanges,
-    onClose: () => setEditing(false),
   });
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
 
+  const editFieldErrors =
+    draft && profile
+      ? getProfileEditFieldErrors(draft, {
+          canEditProfileDirectly,
+          hasLinkedEmployee: Boolean(linkedEmployee),
+          focusAreaLabel: profile.currentOrg.labels.focusArea,
+        })
+      : null;
+  const hasValidationErrors = editFieldErrors
+    ? Object.values(editFieldErrors).some(Boolean)
+    : false;
+
+  function handleSave() {
+    if (!profile || !draft || !editFieldErrors) return;
+    const firstError =
+      editFieldErrors.firstName ??
+      editFieldErrors.lastName ??
+      editFieldErrors.email ??
+      editFieldErrors.phone ??
+      editFieldErrors.requestNote ??
+      editFieldErrors.focusAreaIds;
+    if (firstError) {
+      pushToast({
+        tone: "warning",
+        title: "Check profile",
+        message: firstError,
+      });
+      return;
+    }
+    if (isNameRequest || hasEmailChange) {
+      setShowSaveConfirmation(true);
+      return;
+    }
+    return saveMutation.mutateAsync();
+  }
+
+  const footer =
+    draft && profile ? (
+      <View style={styles.actionsRow}>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={saveMutation.isPending}
+            // Same tri-state web uses. Discard resets the fields and stays on
+            // the screen; leaving with edits in hand is the back gesture, which
+            // `useNavigationDiscardGuard` already routes through a confirmation.
+            label={getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
+            onPress={hasChanges ? discardChanges : () => router.back()}
+            tone="plain"
+          />
+        </View>
+        <View style={styles.actionButton}>
+          <Button
+            compact
+            disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
+            label={isNameRequest ? "Send request" : "Save changes"}
+            loading={saveMutation.isPending}
+            onPress={handleSave}
+          />
+        </View>
+      </View>
+    ) : null;
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      footer={footer}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -393,6 +497,7 @@ export default function ProfileWorkScreen() {
               profile hub's job, and printing it again above the editable fields
               made the first thing on "Profile details" the one thing on it that
               isn't a profile detail. */}
+          {saveError && !showSaveConfirmation ? <InlineError message={saveError} /> : null}
           {draft ? (
             <>
               {linkedEmployee ? (
@@ -435,39 +540,9 @@ export default function ProfileWorkScreen() {
                 focusAreas={focusAreas}
                 hasLinkedEmployee={Boolean(linkedEmployee)}
                 isNameRequest={isNameRequest}
-                hasChanges={hasChanges}
                 onChange={(nextDraft) => {
                   draftTouchedRef.current = true;
                   setDraft(nextDraft);
-                }}
-                onDiscard={discardChanges}
-                onSave={() => {
-                  if (!profile || !draft) return;
-                  const firstNameError = getStaffNameError(draft.firstName, "First name");
-                  const lastNameError = getStaffNameError(draft.lastName, "Last name");
-                  const emailError = getRequiredStaffEmailError(draft.email);
-                  const phoneError = linkedEmployee ? getOptionalUsPhoneError(draft.phone) : null;
-                  const requestNoteError = getStaffNotesError(draft.requestNote);
-                  const focusAreaError =
-                    canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
-                      ? `Select at least one ${singularLabelNoun(profile.currentOrg.labels.focusArea)}.`
-                      : null;
-                  const firstError =
-                    firstNameError ??
-                    lastNameError ??
-                    emailError ??
-                    phoneError ??
-                    requestNoteError ??
-                    focusAreaError;
-                  if (firstError) {
-                    pushToast({
-                      tone: "warning",
-                      title: "Check profile",
-                      message: firstError,
-                    });
-                    return;
-                  }
-                  setShowSaveConfirmation(true);
                 }}
                 roleLabel={profile.currentOrg.labels.role}
                 roles={roles}
@@ -479,23 +554,27 @@ export default function ProfileWorkScreen() {
         </>
       )}
       <ConfirmationModal
-        body={
+        body={[
           isNameRequest
             ? hasOtherChanges
               ? "Your new name will be sent to an admin for review. Your other edits will be saved."
               : "Your new name will be sent to an admin for review."
-            : canEditProfileDirectly
-              ? "Your profile will be updated."
-              : "Your changes will be saved."
-        }
-        confirmLabel={isNameRequest ? "Send request" : "Save"}
+            : null,
+          hasEmailChange
+            ? `Request a sign-in email change to ${draft?.email.trim()}. Check your email to confirm the change.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        error={saveError}
+        confirmLabel={hasEmailChange ? "Request changes" : "Send request"}
         loading={saveMutation.isPending}
-        onCancel={() => setShowSaveConfirmation(false)}
-        onConfirm={() => {
+        onCancel={() => {
+          setSaveError(null);
           setShowSaveConfirmation(false);
-          return saveMutation.mutateAsync();
         }}
-        title={isNameRequest ? "Send name change request?" : "Save these changes?"}
+        onConfirm={() => saveMutation.mutateAsync()}
+        title={hasEmailChange ? "Change your sign-in email?" : "Send name change request?"}
         visible={showSaveConfirmation}
       />
       <ConfirmationModal {...guard.confirmationProps} />
@@ -510,12 +589,9 @@ function EditPanel({
   draft,
   focusAreaLabel,
   focusAreas,
-  hasChanges,
   hasLinkedEmployee,
   isNameRequest,
   onChange,
-  onDiscard,
-  onSave,
   roleLabel,
   roles,
   useCompactRoleCertificationLabels,
@@ -527,12 +603,9 @@ function EditPanel({
   draft: ProfileDraft;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
-  hasChanges: boolean;
   hasLinkedEmployee: boolean;
   isNameRequest: boolean;
   onChange: (draft: ProfileDraft) => void;
-  onDiscard: () => void;
-  onSave: () => void;
   roleLabel: string;
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
@@ -542,19 +615,11 @@ function EditPanel({
     "firstName" | "lastName" | "email" | "phone" | "contactNotes" | "requestNote" | null
   >(null);
 
-  const fieldErrors = {
-    firstName: getStaffNameError(draft.firstName, "First name"),
-    lastName: getStaffNameError(draft.lastName, "Last name"),
-    email: getRequiredStaffEmailError(draft.email),
-    phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
-    contactNotes: getStaffNotesError(draft.contactNotes),
-    requestNote: getStaffNotesError(draft.requestNote),
-    focusAreaIds:
-      canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
-        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
-        : null,
-  };
-  const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
+  const fieldErrors = getProfileEditFieldErrors(draft, {
+    canEditProfileDirectly,
+    hasLinkedEmployee,
+    focusAreaLabel,
+  });
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -745,19 +810,6 @@ function EditPanel({
           </ProfilePanel>
         </ProfileSection>
       ) : null}
-
-      <View style={styles.actionsRow}>
-        <Button
-          compact
-          disabled={saving || !hasChanges || hasValidationErrors}
-          label={isNameRequest ? "Send request" : "Save changes"}
-          loading={saving}
-          onPress={onSave}
-        />
-        {hasChanges ? (
-          <Button compact disabled={saving} label="Discard" onPress={onDiscard} tone="neutral" />
-        ) : null}
-      </View>
     </>
   );
 }
@@ -765,7 +817,9 @@ function EditPanel({
 const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

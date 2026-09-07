@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import Modal from "@/components/Modal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useState } from "react";
 
 function renderModal(onClose = vi.fn(), title = "Test Modal") {
   return render(
@@ -48,13 +50,33 @@ describe("Modal — Rendering", () => {
       screen.getByText("Modal content"),
     );
   });
+
+  it("pins the footer outside the scroll region and marks the dialog", () => {
+    render(
+      <Modal title="With footer" onClose={vi.fn()} footer={<button type="button">Save</button>}>
+        <p>Modal content</p>
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(dialog.querySelector(".dg-modal-footer")).toContainElement(save);
+    expect(save.closest(".dg-modal-scroll-region")).toBeNull();
+    expect(dialog).toHaveClass("dg-modal--with-footer");
+  });
+
+  it("renders no footer band without a footer", () => {
+    renderModal();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector(".dg-modal-footer")).toBeNull();
+    expect(dialog).not.toHaveClass("dg-modal--with-footer");
+  });
 });
 
 describe("Modal — Focus", () => {
-  it("first focusable element receives focus on mount", () => {
+  it("first focusable element receives focus on mount", async () => {
     renderModal();
     const closeBtn = screen.getByRole("button", { name: "Close modal" });
-    expect(document.activeElement).toBe(closeBtn);
+    await waitFor(() => expect(document.activeElement).toBe(closeBtn));
   });
 });
 
@@ -103,5 +125,72 @@ describe("Modal — Close interactions", () => {
 
     expect(onRequestClose).toHaveBeenCalledOnce();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("Modal focus lifecycle", () => {
+  it("returns focus to the editor after canceling its nested confirmation", async () => {
+    const closeEditor = vi.fn();
+    function Editor() {
+      const [confirming, setConfirming] = useState(false);
+      return (
+        <Modal title="Editor" onClose={closeEditor}>
+          <button onClick={() => setConfirming(true)}>Remove entry</button>
+          {confirming ? (
+            <ConfirmDialog
+              title="Remove entry?"
+              message="This cannot be undone."
+              onCancel={() => setConfirming(false)}
+              onConfirm={vi.fn()}
+            />
+          ) : null}
+        </Modal>
+      );
+    }
+    render(<Editor />);
+    const trigger = screen.getByRole("button", { name: "Remove entry" });
+    await userEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(closeEditor).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to a surviving target when its menu invoker disappears", async () => {
+    const target = document.createElement("button");
+    const menuItem = document.createElement("button");
+    document.body.append(target, menuItem);
+    menuItem.focus();
+    const view = render(
+      <Modal title="Menu action" onClose={vi.fn()} returnFocus={{ current: target }}>
+        <p>Confirm the action</p>
+      </Modal>,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close modal" })).toHaveFocus());
+    menuItem.remove();
+    view.unmount();
+    await waitFor(() => expect(target).toHaveFocus());
+    target.remove();
+  });
+
+  it("restores focus to its invoker when dismissed", async () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const view = renderModal();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close modal" })).toHaveFocus());
+    view.unmount();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    trigger.remove();
+  });
+
+  it("keeps keyboard focus in the active dialog", async () => {
+    renderModal();
+    const close = screen.getByRole("button", { name: "Close modal" });
+    await waitFor(() => expect(close).toHaveFocus());
+    await userEvent.tab();
+    await waitFor(() => expect(close).toHaveFocus());
+    await userEvent.tab({ shift: true });
+    await waitFor(() => expect(close).toHaveFocus());
   });
 });

@@ -70,9 +70,6 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
                 <SkeletonLine variant="rowTitle" width="48%" />
                 <SkeletonLine variant="caption" width="38%" />
               </View>
-              <View style={scheduleStyles.upcomingShiftAction}>
-                <SkeletonLine variant="body" width={12} />
-              </View>
             </View>
           ))}
         </View>

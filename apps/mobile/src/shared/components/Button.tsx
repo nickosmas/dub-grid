@@ -75,6 +75,7 @@ export function Button({
   iconOnly = false,
   accessibilityLabel,
   leadingAccessory,
+  trailingAccessory,
   selected,
   expanded,
   disabled = false,
@@ -96,6 +97,8 @@ export function Button({
   accessibilityLabel?: string;
   /** @deprecated pass `icon`, or a node for genuinely custom accessories. */
   leadingAccessory?: ReactNode;
+  /** Optional content after the label, such as a count badge. */
+  trailingAccessory?: ReactNode;
   /** Toggle state for segment/filter usage. Surfaced to assistive tech. */
   selected?: boolean;
   /** Set when the button opens a sheet or panel, so screen readers announce it. */
@@ -199,13 +202,18 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
+            adjustsFontSizeToFit
+            ellipsizeMode="tail"
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}
+            minimumFontScale={0.75}
+            numberOfLines={1}
+            style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}
           </Text>
         ) : null}
         {!isBusy && !iconOnly && iconPosition === "trailing" ? iconNode : null}
+        {!iconOnly ? trailingAccessory : null}
       </View>
     </AnimatedPressable>
   );
@@ -325,7 +333,12 @@ const createStyles = (mobileColors: MobileColors) =>
     toneLink: {
       backgroundColor: "transparent",
     },
+    label: {
+      flexShrink: 1,
+      textAlign: "center",
+    },
     content: {
+      alignSelf: "stretch",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",

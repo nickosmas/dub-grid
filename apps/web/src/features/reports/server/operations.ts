@@ -32,6 +32,7 @@ export const OPERATIONS_REPORT_TYPES = [
   "certification-role-matrix",
   "account-access",
   "schedule-matrix",
+  "shift-notes",
 ] as const;
 
 export type OperationsReportType = (typeof OPERATIONS_REPORT_TYPES)[number];
@@ -71,6 +72,7 @@ export interface StaffHoursReportRow {
   overtime: boolean;
   shiftBreakdown: string;
   jobBreakdown: string;
+  indicatorBreakdown: string;
 }
 
 export interface StaffActivitySummaryReportRow {
@@ -81,6 +83,7 @@ export interface StaffActivitySummaryReportRow {
   workedDays: number;
   shiftBreakdown: string;
   jobBreakdown: string;
+  indicatorBreakdown: string;
   publishedAbsenceDays: number;
   absenceBreakdown: string;
   unscheduledDays: number;
@@ -228,11 +231,20 @@ export interface ScheduleMatrixReportRow {
   cells: Record<string, string>;
 }
 
+export interface ShiftNotesReportRow {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  indicator: string;
+  focusArea: string;
+}
+
 export interface OperationsReportFilters {
   employeeIds?: string[];
   focusAreaIds?: number[];
   shiftCategoryIds?: number[];
   jobIds?: number[];
+  indicatorTypeIds?: number[];
   dates?: string[];
 }
 
@@ -258,6 +270,7 @@ export interface OperationsReportPayload {
     focusAreaIds: number[];
     shiftCategoryIds: number[];
     jobIds: number[];
+    indicatorTypeIds: number[];
     dates: string[];
   };
   filterOptions: {
@@ -265,6 +278,7 @@ export interface OperationsReportPayload {
     focusAreas: OperationsReportFilterOption[];
     shiftCategories: OperationsReportFilterOption[];
     jobs: OperationsReportFilterOption[];
+    indicators: OperationsReportFilterOption[];
     dates: string[];
   };
   reports: {
@@ -287,6 +301,7 @@ export interface OperationsReportPayload {
       dates: string[];
       rows: ScheduleMatrixReportRow[];
     };
+    shiftNotes: ShiftNotesReportRow[];
   };
 }
 
@@ -362,6 +377,19 @@ type InvitationRow = {
   expires_at: string;
 };
 
+type IndicatorTypeRow = {
+  id: number;
+  name: string;
+};
+
+type ScheduleNoteRow = {
+  emp_id: string;
+  date: string;
+  indicator_type_id: number;
+  focus_area_id: number | null;
+  status: string;
+};
+
 type PublishedShiftReportRow = PublishedShiftRow & {
   focus_area_id?: number | null;
 };
@@ -387,6 +415,9 @@ export interface OperationsReportSourceData {
   jobs: NamedRow[];
   shiftRequests: ShiftRequestRow[];
   invitations: InvitationRow[];
+  indicatorTypes: IndicatorTypeRow[];
+  /** Published notes only: draft rows are unpublished schedule state. */
+  scheduleNotes: ScheduleNoteRow[];
   publishedRows: PublishedShiftReportRow[];
   generatedAt?: string;
 }
@@ -656,6 +687,7 @@ export function buildOperationsReportPayload(
   const focusAreaIdSet = new Set(filters.focusAreaIds ?? []);
   const shiftCategoryIdSet = new Set(filters.shiftCategoryIds ?? []);
   const jobIdSet = new Set(filters.jobIds ?? []);
+  const indicatorTypeIdSet = new Set(filters.indicatorTypeIds ?? []);
   const historicalEmployeeDirectory = [...source.employees, ...source.historicalEmployees];
   const employeeById = new Map(historicalEmployeeDirectory.map((row) => [row.id, row]));
   const employeeNameById = new Map(
@@ -672,6 +704,7 @@ export function buildOperationsReportPayload(
   );
   const absenceTypeById = buildMap(source.absenceTypes);
   const jobById = buildMap(source.jobs);
+  const indicatorById = new Map(source.indicatorTypes.map((row) => [row.id, row.name]));
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
   const shiftNameById = new Map(source.shiftCategories.map((row) => [row.id, row.name]));
   const currentReportEmployees = source.employees.filter((employee) => {
@@ -741,7 +774,62 @@ export function buildOperationsReportPayload(
       label: shift.name,
     })),
     jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
+    indicators: source.indicatorTypes.map((indicator) => ({
+      id: String(indicator.id),
+      label: indicator.name,
+    })),
     dates: rangeDates,
+  };
+
+  const reportNotes = source.scheduleNotes.filter((note) => {
+    // Unpublished additions never belong in a published view, whatever the
+    // caller loaded. draft_deleted stays: it is published until the next publish.
+    if (note.status === "draft") return false;
+    if (!reportDateSet.has(note.date)) return false;
+    if (!reportEmployeeIdSet.has(note.emp_id)) return false;
+    if (indicatorTypeIdSet.size > 0 && !indicatorTypeIdSet.has(note.indicator_type_id))
+      return false;
+    if (focusAreaIdSet.size > 0) {
+      return note.focus_area_id != null && focusAreaIdSet.has(note.focus_area_id);
+    }
+    return true;
+  });
+
+  const shiftNotes: ShiftNotesReportRow[] = reportNotes
+    .map((note) => ({
+      employeeId: note.emp_id,
+      employeeName: employeeNameById.get(note.emp_id) ?? "Unknown employee",
+      date: note.date,
+      indicator: indicatorById.get(note.indicator_type_id) ?? "Unknown indicator",
+      focusArea:
+        note.focus_area_id == null
+          ? ""
+          : (focusAreaById.get(note.focus_area_id) ?? "Unknown focus area"),
+    }))
+    .sort(
+      (left, right) =>
+        left.date.localeCompare(right.date) ||
+        left.employeeName.localeCompare(right.employeeName) ||
+        left.indicator.localeCompare(right.indicator),
+    );
+
+  const indicatorBreakdownByEmployeeId = new Map<string, Map<string, { count: number }>>();
+  const noteLabelsByEmployeeDate = new Map<string, string[]>();
+  for (const note of shiftNotes) {
+    const breakdown = indicatorBreakdownByEmployeeId.get(note.employeeId) ?? new Map();
+    const current = breakdown.get(note.indicator) ?? { count: 0 };
+    current.count += 1;
+    breakdown.set(note.indicator, current);
+    indicatorBreakdownByEmployeeId.set(note.employeeId, breakdown);
+
+    const cellKey = `${note.employeeId}_${note.date}`;
+    const labels = noteLabelsByEmployeeDate.get(cellKey) ?? [];
+    labels.push(note.indicator);
+    noteLabelsByEmployeeDate.set(cellKey, labels);
+  }
+  const formatIndicatorBreakdown = (employeeId: string): string => {
+    const breakdown = indicatorBreakdownByEmployeeId.get(employeeId);
+    return breakdown ? formatBreakdown(breakdown) : "";
   };
 
   const employeeDirectory = rosterEmployees.map((employee) => ({
@@ -825,6 +913,7 @@ export function buildOperationsReportPayload(
       overtime: overtimeHours > 0,
       shiftBreakdown: formatBreakdown(shiftBreakdownValues),
       jobBreakdown: formatBreakdown(jobBreakdownValues),
+      indicatorBreakdown: formatIndicatorBreakdown(employee.id),
     };
   });
 
@@ -1102,6 +1191,7 @@ export function buildOperationsReportPayload(
         workedDays: staffHoursRow.workedDays,
         shiftBreakdown: staffHoursRow.shiftBreakdown,
         jobBreakdown: staffHoursRow.jobBreakdown,
+        indicatorBreakdown: staffHoursRow.indicatorBreakdown,
         publishedAbsenceDays: employeeAbsences.length,
         absenceBreakdown: formatBreakdown(absenceBreakdownValues),
         unscheduledDays: reportDates.filter((date) => !occupiedDates.has(date)).length,
@@ -1210,7 +1300,9 @@ export function buildOperationsReportPayload(
         const labels = entries
           .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
           .map((item) => item.entry.label);
-        cells[date] = labels.join(" / ");
+        // Shift labels lead so a cell stays readable when it carries no notes.
+        const noteLabels = noteLabelsByEmployeeDate.get(`${employee.id}_${date}`) ?? [];
+        cells[date] = [...labels, ...noteLabels].join(" / ");
       }
       return {
         employeeId: employee.id,
@@ -1250,6 +1342,7 @@ export function buildOperationsReportPayload(
       focusAreaIds: [...focusAreaIdSet],
       shiftCategoryIds: [...shiftCategoryIdSet],
       jobIds: [...jobIdSet],
+      indicatorTypeIds: [...indicatorTypeIdSet],
       dates: dates.length > 0 ? dates : [],
     },
     filterOptions,
@@ -1276,6 +1369,7 @@ export function buildOperationsReportPayload(
       certificationRoleMatrix,
       accountAccess,
       scheduleMatrix,
+      shiftNotes,
     },
   };
 }
@@ -2024,6 +2118,8 @@ export async function loadOperationsReport(
     shiftRequests,
     invitations,
     publishedRows,
+    indicatorTypes,
+    scheduleNotes,
   ] = await Promise.all([
     fetchTableRows<OrganizationRow>(
       serviceClient
@@ -2137,6 +2233,25 @@ export async function loadOperationsReport(
       endDate: input.range.endDate,
       orderAscending: true,
     }) as Promise<PublishedShiftReportRow[]>,
+    fetchTableRows<IndicatorTypeRow>(
+      serviceClient
+        .from("indicator_types")
+        .select("id, name")
+        .eq("org_id", input.orgId)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true }),
+    ),
+    // draft_deleted notes are still published until the next publish runs, so
+    // they belong in a published view of the schedule; plain drafts do not.
+    fetchTableRows<ScheduleNoteRow>(
+      serviceClient
+        .from("schedule_notes")
+        .select("emp_id, date, indicator_type_id, focus_area_id, status")
+        .eq("org_id", input.orgId)
+        .gte("date", input.range.startDate)
+        .lte("date", input.range.endDate)
+        .in("status", ["published", "draft_deleted"]),
+    ),
   ]);
 
   const org = orgRows[0];
@@ -2159,6 +2274,8 @@ export async function loadOperationsReport(
       jobs,
       shiftRequests,
       invitations,
+      indicatorTypes,
+      scheduleNotes,
       publishedRows,
     },
     input.range,

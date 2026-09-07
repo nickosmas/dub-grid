@@ -34,6 +34,7 @@ const ALL_PERMS: AdminPermissions = {
   canManageCoverageRequirements: true,
   canApproveShiftRequests: true,
   canViewDashboardAnalytics: true,
+  canViewReports: true,
 };
 
 export const READ_ONLY_PERMS: AdminPermissions = {
@@ -62,36 +63,61 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canManageCoverageRequirements: false,
   canApproveShiftRequests: false,
   canViewDashboardAnalytics: false,
+  canViewReports: false,
+};
+
+/**
+ * What an admin can do before a super admin configures anything: the core
+ * scheduling operations, and nothing in people management or administration.
+ * A stored set resolves against this, so a key it never mentions (one added
+ * after the row was written, or a row that was never configured) lands here
+ * rather than on the user baseline. The editor starts from the same set.
+ */
+export const ADMIN_DEFAULT_PERMS: AdminPermissions = {
+  ...READ_ONLY_PERMS,
+  canEditShifts: true,
+  canPublishSchedule: true,
+  canEditNotes: true,
+  canEditScheduleIndicators: true,
+  canViewRecurringShifts: true,
+  canManageRecurringShifts: true,
+  canApplyRecurringSchedule: true,
+  canManageShiftSeries: true,
+  canViewReports: true,
+};
+
+/**
+ * Every view permission and the keys that grant it on their own. This is the
+ * one place the rule lives: the resolver applies it, and the permissions
+ * editor reads it so a switch never appears live when the resolver would
+ * override it.
+ */
+export const VIEW_IMPLICATIONS: Partial<
+  Record<keyof AdminPermissions, readonly (keyof AdminPermissions)[]>
+> = {
+  canViewEmployeeDetails: ["canManageEmployees"],
+  canViewFocusAreas: ["canManageFocusAreas"],
+  canViewScheduleDefinitions: ["canManageScheduleDefinitions"],
+  canViewIndicatorTypes: ["canManageIndicatorTypes"],
+  canViewCoverageRequirements: ["canManageCoverageRequirements"],
+  canViewRecurringShifts: ["canManageRecurringShifts"],
+  canViewOrgLabels: ["canManageOrgLabels"],
+  canViewDashboardAnalytics: [
+    "canEditShifts",
+    "canManageEmployees",
+    "canPublishSchedule",
+    "canApproveShiftRequests",
+  ],
 };
 
 export function applyViewImplications(permissions: AdminPermissions): AdminPermissions {
   const result = { ...permissions };
-  result.canViewEmployeeDetails = result.canViewEmployeeDetails || result.canManageEmployees;
-  result.canViewFocusAreas = result.canViewFocusAreas || result.canManageFocusAreas;
-  result.canViewScheduleDefinitions =
-    result.canViewScheduleDefinitions || result.canManageScheduleDefinitions;
-  result.canViewIndicatorTypes = result.canViewIndicatorTypes || result.canManageIndicatorTypes;
-  result.canViewCoverageRequirements =
-    result.canViewCoverageRequirements || result.canManageCoverageRequirements;
-  result.canViewRecurringShifts = result.canViewRecurringShifts || result.canManageRecurringShifts;
-  result.canViewOrgLabels = result.canViewOrgLabels || result.canManageOrgLabels;
-  result.canViewDashboardAnalytics =
-    result.canViewDashboardAnalytics ||
-    result.canEditShifts ||
-    result.canManageEmployees ||
-    result.canPublishSchedule ||
-    result.canApproveShiftRequests;
-  return result;
-}
-
-export function unionPermissions(permissionSets: AdminPermissions[]): AdminPermissions {
-  const result: AdminPermissions = { ...READ_ONLY_PERMS };
-  for (const permissions of permissionSets) {
-    for (const key of Object.keys(result) as (keyof AdminPermissions)[]) {
-      result[key] = result[key] || Boolean(permissions[key]);
-    }
+  for (const [viewKey, impliedBy] of Object.entries(VIEW_IMPLICATIONS) as [
+    keyof AdminPermissions,
+    readonly (keyof AdminPermissions)[],
+  ][]) {
+    result[viewKey] = result[viewKey] || impliedBy.some((key) => result[key]);
   }
-  result.canManageOrgSettings = false;
   return result;
 }
 
@@ -164,30 +190,25 @@ export function buildPermissionContext(
   if (isGridmaster || isSuperAdmin) {
     permissions = ALL_PERMS;
   } else if (role === "admin" || role === "user") {
-    // READ_ONLY_PERMS is the base, not just the fallback: `adminPerms` is an
+    // The role baseline is the base, not just the fallback: `adminPerms` is an
     // unvalidated JSONB column (PUT /api/organizations/access accepts any
     // `z.record(z.string(), z.boolean())`), so a partial object would otherwise
-    // leave keys `undefined` rather than false. It also means a key added to
-    // AdminPermissions later resolves correctly against rows written before it
-    // existed, instead of reading `undefined` on every stored membership.
+    // leave keys `undefined` rather than a boolean. It also means a key added
+    // to AdminPermissions later resolves correctly against rows written before
+    // it existed. Admins land on ADMIN_DEFAULT_PERMS, users on READ_ONLY_PERMS.
     //
     // The three overrides restate guarantees the design gives regardless of
     // what is stored: canViewSchedule/canViewStaff are true for every
     // authenticated user, and canManageOrgSettings is super_admin-only and
-    // never delegatable. They were previously enforced for `user` but not for
-    // `admin`, and outside authz only by PermissionsEditor's
-    // buildInitialPermissions — so anything writing the column without going
-    // through that component could leave an admin unable to see the roster a
-    // Tier-0 user can see, or holding a permission the design reserves.
-    permissions = adminPerms
-      ? {
-          ...READ_ONLY_PERMS,
-          ...adminPerms,
-          canViewSchedule: true,
-          canViewStaff: true,
-          canManageOrgSettings: false,
-        }
-      : { ...READ_ONLY_PERMS };
+    // never delegatable.
+    const baseline = role === "admin" ? ADMIN_DEFAULT_PERMS : READ_ONLY_PERMS;
+    permissions = {
+      ...baseline,
+      ...(adminPerms ?? {}),
+      canViewSchedule: true,
+      canViewStaff: true,
+      canManageOrgSettings: false,
+    };
   } else {
     permissions = READ_ONLY_PERMS;
   }

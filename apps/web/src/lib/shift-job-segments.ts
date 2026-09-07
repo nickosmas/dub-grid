@@ -40,11 +40,14 @@ export function buildShiftJobPairKey(shiftId: number | null, jobId: number): str
 
 export function createAssignmentDefinitionIdByPairMap<T extends AssignmentDefinitionPairCompatible>(
   assignments: T[],
+  options?: { includeArchived?: boolean },
 ): Map<string, number> {
   const assignmentIdByPair = new Map<string, number>();
 
   for (const assignment of assignments) {
-    if ((assignment.archivedAt ?? assignment.archived_at) != null) continue;
+    if (!options?.includeArchived && (assignment.archivedAt ?? assignment.archived_at) != null) {
+      continue;
+    }
     const shiftId =
       assignment.shiftId ??
       assignment.shift_id ??

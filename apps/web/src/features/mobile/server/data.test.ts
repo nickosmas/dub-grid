@@ -21,6 +21,7 @@ function createThenableQuery(result: { data: unknown; error: unknown }) {
     lte: vi.fn(() => query),
     is: vi.fn(() => query),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
+    single: vi.fn(() => Promise.resolve(result)),
     or: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
@@ -182,6 +183,8 @@ function createServiceClientForSchedule(
       name: string;
       sortOrder: number;
     }>;
+    publishHistory?: unknown[];
+    scheduleCells?: unknown[];
   },
 ) {
   const assignments = options?.assignments ?? [
@@ -258,7 +261,7 @@ function createServiceClientForSchedule(
     error: null,
   });
   const publishHistoryQuery = createThenableQuery({
-    data: [
+    data: options?.publishHistory ?? [
       {
         published_by: "user-1",
         start_date: "2026-04-16",
@@ -279,7 +282,7 @@ function createServiceClientForSchedule(
     error: null,
   });
   const scheduleCellsQuery = createThenableQuery({
-    data: [
+    data: options?.scheduleCells ?? [
       {
         id: "cell-1",
         emp_id: "196d610f-2283-486c-a9e0-197852969a31",
@@ -324,12 +327,16 @@ function createServiceClientForSchedule(
     error: null,
   });
   const employeesQuery = createThenableQuery({
-    data: [
-      {
-        id: "196d610f-2283-486c-a9e0-197852969a31",
-        focus_area_ids: options?.employeeFocusAreaIds ?? [12],
-      },
-    ],
+    data:
+      employeeRelation && typeof employeeRelation === "object" && !Array.isArray(employeeRelation)
+        ? [
+            {
+              ...employeeRelation,
+              seniority: null,
+              focus_area_ids: options?.employeeFocusAreaIds ?? [12],
+            },
+          ]
+        : [],
     error: null,
   });
 
@@ -811,7 +818,7 @@ describe("fetchMobileScheduleEntries", () => {
   ])(
     "keeps published schedule entries when employees comes back as $name",
     async ({ employeeRelation }) => {
-      const serviceClient = createServiceClientForSchedule(employeeRelation);
+      const serviceClient = createServiceClientForSchedule(employeeRelation, { shiftIds: [101] });
 
       const entries = await fetchMobileScheduleEntries(serviceClient as never, {
         orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
@@ -829,7 +836,7 @@ describe("fetchMobileScheduleEntries", () => {
           kind: "worked",
           segments: [
             {
-              shiftId: null,
+              shiftId: 101,
               jobId: 91,
               position: 0,
             },
@@ -850,7 +857,7 @@ describe("fetchMobileScheduleEntries", () => {
           endTime: "15:00",
           segments: [
             {
-              shiftId: null,
+              shiftId: 101,
               jobId: 91,
               label: "D",
               shiftName: "Day Shift",
@@ -859,15 +866,450 @@ describe("fetchMobileScheduleEntries", () => {
               displayFocusAreaName: "Skilled Nursing",
             },
           ],
-          shiftColor: "#eff6ff",
-          shiftBorderColor: "#60a5fa",
-          shiftTextColor: "#1d4ed8",
+          shiftColor: "#EFF6FF",
+          shiftBorderColor: "rgba(0,45,102,0.35)",
+          shiftTextColor: "#002D66",
         },
         publishedAt: "2026-04-15T18:30:00.000Z",
         publishedByName: "Mina Diaz",
       });
     },
   );
+
+  it("uses the assigned shift focus area instead of a conflicting legacy cell focus area", async () => {
+    const serviceClient = createServiceClientForSchedule(
+      {
+        id: "196d610f-2283-486c-a9e0-197852969a31",
+        first_name: "Nic",
+        last_name: "Kosmas",
+        org_id: "org-1",
+      },
+      {
+        assignmentFocusAreaId: 12,
+        employeeFocusAreaIds: [12, 99],
+        shiftFocusAreaId: 99,
+        shiftIds: [101],
+      },
+    );
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "org-1",
+      startDate: "2026-04-18",
+      endDate: "2026-04-24",
+    });
+
+    expect(entries[0]?.presentation).toMatchObject({
+      focusAreaId: 12,
+      focusAreaName: "Skilled Nursing",
+      displayFocusAreaName: "Skilled Nursing",
+      segments: [
+        {
+          focusAreaId: 12,
+          displayFocusAreaName: "Skilled Nursing",
+        },
+      ],
+    });
+  });
+
+  it("returns published change kinds with the previous published presentation", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "org-1",
+    };
+    const snapshot = (
+      id: string,
+      snapshotKind: "draft" | "published",
+      stateKind: "worked" | "deleted",
+      shiftId = 101,
+    ) => ({
+      id,
+      cell_id: `cell-${id}`,
+      org_id: "org-1",
+      snapshot_kind: snapshotKind,
+      state_kind: stateKind,
+      absence_type_id: null,
+      custom_start_time: null,
+      custom_end_time: null,
+      segments:
+        stateKind === "deleted"
+          ? []
+          : [
+              {
+                id: `segment-${id}`,
+                snapshot_id: id,
+                org_id: "org-1",
+                position: 0,
+                shift_id: shiftId,
+                job_id: 91,
+                is_mentored: false,
+              },
+            ],
+    });
+    const scheduleCell = (id: string, date: string, snapshots: unknown[]) => ({
+      id,
+      emp_id: employee.id,
+      date,
+      org_id: "org-1",
+      focus_area_id: 12,
+      version: 1,
+      series_id: null,
+      from_recurring: false,
+      created_by: null,
+      updated_by: null,
+      created_at: null,
+      updated_at: null,
+      snapshots,
+      employees: employee,
+    });
+    const serviceClient = createServiceClientForSchedule(employee, {
+      assignments: [
+        {
+          id: 44,
+          label: "D",
+          name: "Day Shift",
+          shiftId: 101,
+          jobId: 91,
+          focusAreaId: 12,
+          defaultStartTime: "07:00:00",
+          defaultEndTime: "15:00:00",
+        },
+        {
+          id: 45,
+          label: "E",
+          name: "Evening Shift",
+          shiftId: 102,
+          jobId: 91,
+          focusAreaId: 12,
+          defaultStartTime: "15:00:00",
+          defaultEndTime: "23:00:00",
+        },
+      ],
+      scheduleCells: [
+        scheduleCell("unchanged", "2026-04-18", [
+          snapshot("unchanged-published", "published", "worked"),
+          snapshot("unchanged-draft", "draft", "worked", 102),
+        ]),
+        scheduleCell("new", "2026-04-19", [snapshot("new-published", "published", "worked", 102)]),
+        scheduleCell("modified", "2026-04-20", [
+          snapshot("modified-published", "published", "worked", 102),
+          snapshot("modified-draft", "draft", "worked"),
+        ]),
+        scheduleCell("deleted", "2026-04-21", [
+          snapshot("deleted-published", "published", "deleted"),
+        ]),
+      ],
+      publishHistory: [
+        {
+          published_by: "user-1",
+          start_date: "2026-04-18",
+          end_date: "2026-04-21",
+          published_at: "2026-04-18T18:30:00.000Z",
+          change_count: 3,
+          schedule_publish_changes: [
+            {
+              emp_id: employee.id,
+              date: "2026-04-19",
+              kind: "new",
+              from_state: null,
+              to_state: {
+                kind: "worked",
+                segments: [{ shiftId: 102, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+            },
+            {
+              emp_id: employee.id,
+              date: "2026-04-20",
+              kind: "modified",
+              from_state: {
+                kind: "worked",
+                segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: {
+                kind: "worked",
+                segments: [{ shiftId: 102, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+            },
+            {
+              emp_id: employee.id,
+              date: "2026-04-21",
+              kind: "deleted",
+              from_state: {
+                kind: "worked",
+                segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "org-1",
+      startDate: "2026-04-18",
+      endDate: "2026-04-21",
+    });
+    const byDate = new Map(entries.map((entry) => [entry.date, entry]));
+
+    expect(byDate.get("2026-04-18")?.change).toBeNull();
+    expect(byDate.get("2026-04-19")).toMatchObject({
+      state: { segments: [{ shiftId: 102 }] },
+      change: { kind: "new", previousPresentation: null },
+    });
+    expect(byDate.get("2026-04-20")).toMatchObject({
+      presentation: { shiftName: "Evening Shift" },
+      change: {
+        kind: "modified",
+        previousPresentation: { shiftName: "Day Shift", startTime: "07:00" },
+      },
+    });
+    expect(byDate.get("2026-04-21")).toMatchObject({
+      state: { segments: [{ shiftId: 101 }] },
+      change: {
+        kind: "deleted",
+        previousPresentation: { shiftName: "Day Shift", startTime: "07:00" },
+      },
+    });
+  });
+
+  it("returns deleted regular and absence entries when their schedule cells no longer exist", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "org-1",
+    };
+    const serviceClient = createServiceClientForSchedule(employee, {
+      assignmentFocusAreaId: 12,
+      scheduleCells: [],
+      shiftIds: [101],
+      publishHistory: [
+        {
+          published_by: "user-1",
+          start_date: "2026-04-21",
+          end_date: "2026-04-22",
+          published_at: "2026-04-21T18:30:00.000Z",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: employee.id,
+              date: "2026-04-21",
+              kind: "deleted",
+              from_state: {
+                kind: "absence",
+                segments: [],
+                absenceTypeId: 56,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: null,
+            },
+            {
+              emp_id: employee.id,
+              date: "2026-04-22",
+              kind: "deleted",
+              from_state: {
+                kind: "worked",
+                segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "org-1",
+      startDate: "2026-04-21",
+      endDate: "2026-04-22",
+      employeeId: employee.id,
+    });
+
+    expect(entries).toMatchObject([
+      {
+        employeeId: employee.id,
+        date: "2026-04-21",
+        state: { kind: "absence", absenceTypeId: 56 },
+        presentation: { shiftName: "Off" },
+        change: {
+          kind: "deleted",
+          previousPresentation: { shiftName: "Off" },
+        },
+      },
+      {
+        employeeId: employee.id,
+        date: "2026-04-22",
+        state: { kind: "worked", segments: [{ shiftId: 101, jobId: 91 }] },
+        presentation: {
+          shiftName: "Day Shift",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            shiftName: "Day Shift",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        },
+      },
+    ]);
+    expect(serviceClient.from).toHaveBeenCalledWith("employees");
+  });
+
+  it("keeps focus areas off absences and general segments while retaining them on regular segments", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "org-1",
+    };
+    const workedSnapshot = (
+      id: string,
+      segments: Array<{ shiftId: number | null; jobId: number }>,
+    ) => ({
+      id,
+      cell_id: `cell-${id}`,
+      org_id: "org-1",
+      snapshot_kind: "published" as const,
+      state_kind: "worked" as const,
+      absence_type_id: null,
+      custom_start_time: null,
+      custom_end_time: null,
+      segments: segments.map((segment, index) => ({
+        id: `segment-${id}-${index}`,
+        snapshot_id: id,
+        org_id: "org-1",
+        position: index,
+        shift_id: segment.shiftId,
+        job_id: segment.jobId,
+        is_mentored: false,
+      })),
+    });
+    const scheduleCell = (id: string, date: string, snapshots: unknown[]) => ({
+      id,
+      emp_id: employee.id,
+      date,
+      org_id: "org-1",
+      focus_area_id: 12,
+      version: 1,
+      series_id: null,
+      from_recurring: false,
+      created_by: null,
+      updated_by: null,
+      created_at: null,
+      updated_at: null,
+      snapshots,
+      employees: employee,
+    });
+    const absenceSnapshot = {
+      id: "absence-published",
+      cell_id: "cell-absence",
+      org_id: "org-1",
+      snapshot_kind: "published" as const,
+      state_kind: "absence" as const,
+      absence_type_id: 56,
+      custom_start_time: null,
+      custom_end_time: null,
+      segments: [],
+    };
+    const serviceClient = createServiceClientForSchedule(employee, {
+      assignments: [
+        {
+          id: 44,
+          label: "D",
+          name: "Day Shift",
+          shiftId: 101,
+          jobId: 91,
+          focusAreaId: 12,
+          defaultStartTime: "07:00:00",
+          defaultEndTime: "15:00:00",
+        },
+        {
+          id: 45,
+          label: "ADM",
+          name: "Admin",
+          shiftId: null,
+          jobId: 30,
+          focusAreaId: null,
+          defaultStartTime: "09:00:00",
+          defaultEndTime: "17:00:00",
+        },
+      ],
+      scheduleCells: [
+        scheduleCell("regular", "2026-04-18", [
+          workedSnapshot("regular-published", [{ shiftId: 101, jobId: 91 }]),
+        ]),
+        scheduleCell("general", "2026-04-19", [
+          workedSnapshot("general-published", [{ shiftId: null, jobId: 30 }]),
+        ]),
+        scheduleCell("mixed", "2026-04-20", [
+          workedSnapshot("mixed-published", [
+            { shiftId: null, jobId: 30 },
+            { shiftId: 101, jobId: 91 },
+          ]),
+        ]),
+        scheduleCell("absence", "2026-04-21", [absenceSnapshot]),
+      ],
+    });
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "org-1",
+      startDate: "2026-04-18",
+      endDate: "2026-04-21",
+    });
+    const byDate = new Map(entries.map((entry) => [entry.date, entry]));
+
+    expect(byDate.get("2026-04-18")?.presentation).toMatchObject({
+      displayFocusAreaName: "Skilled Nursing",
+      segments: [{ displayFocusAreaName: "Skilled Nursing" }],
+    });
+    expect(byDate.get("2026-04-19")?.presentation).toMatchObject({
+      focusAreaId: null,
+      focusAreaName: null,
+      displayFocusAreaName: null,
+      segments: [{ focusAreaId: null, displayFocusAreaName: null }],
+    });
+    expect(byDate.get("2026-04-20")?.presentation.segments).toMatchObject([
+      { focusAreaId: null, displayFocusAreaName: null },
+      { focusAreaId: 12, displayFocusAreaName: "Skilled Nursing" },
+    ]);
+    expect(byDate.get("2026-04-21")?.presentation).toMatchObject({
+      focusAreaId: null,
+      focusAreaName: null,
+      displayFocusAreaName: null,
+      segments: [{ displayFocusAreaName: null }],
+    });
+  });
 
   it("does not infer a focus area for general mobile entries when the row focus area is null", async () => {
     const serviceClient = createServiceClientForSchedule(

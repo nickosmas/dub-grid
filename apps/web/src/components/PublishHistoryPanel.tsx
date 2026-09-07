@@ -13,6 +13,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatRelativeTime } from "@/lib/utils";
 import type {
+  NotePublishChange,
   PublishHistoryEntryWithName,
   PublishChange,
   AbsenceType,
@@ -59,10 +60,17 @@ function formatDateRange(start: string, end: string): string {
   return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
-function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
+function ChangeBreakdown({
+  changes,
+  noteChanges,
+}: {
+  changes: PublishChange[];
+  noteChanges: NotePublishChange[];
+}) {
   const newCount = changes.filter((c) => c.kind === "new").length;
   const modCount = changes.filter((c) => c.kind === "modified").length;
   const delCount = changes.filter((c) => c.kind === "deleted").length;
+  const noteCount = noteChanges.length;
 
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -106,6 +114,21 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
           }}
         >
           {delCount} removed
+        </span>
+      )}
+      {/* Notes carry no grid tone, matching the draft banner's own note chip. */}
+      {noteCount > 0 && (
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            padding: "2px 6px",
+            borderRadius: "var(--dg-radius-xs)",
+            background: "var(--dg-color-surface-alt)",
+            color: "var(--dg-color-text-secondary)",
+            fontWeight: 600,
+          }}
+        >
+          {noteCount} note{noteCount !== 1 ? "s" : ""}
         </span>
       )}
     </div>
@@ -339,28 +362,84 @@ function ChangeRow({
   );
 }
 
+/** One published note, shown beside the cell changes for the same employee. */
+function NoteChangeRow({ change }: { change: NotePublishChange }) {
+  const dateStr = new Date(change.date + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return (
+    <div
+      style={{
+        fontSize: "var(--dg-fs-footnote)",
+        color: "var(--dg-color-text-secondary)",
+        display: "flex",
+        gap: 6,
+        alignItems: "center",
+      }}
+    >
+      {/* Hollow for a removal, the same way the grid draws a note it no longer
+          carries. */}
+      <span
+        aria-hidden="true"
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          flexShrink: 0,
+          boxSizing: "border-box",
+          background: change.kind === "deleted" ? "transparent" : change.indicatorColor,
+          border: change.kind === "deleted" ? `1.5px solid ${change.indicatorColor}` : undefined,
+        }}
+      />
+      <span style={{ minWidth: 100 }}>{dateStr}</span>
+      <span style={{ color: "var(--dg-color-text-muted)" }}>—</span>
+      <span>
+        {change.kind === "deleted" ? "Removed note" : "Added note"}: {change.indicatorName}
+      </span>
+    </div>
+  );
+}
+
+type GroupedChange =
+  | { type: "cell"; date: string; change: PublishChange }
+  | { type: "note"; date: string; change: NotePublishChange };
+
 /** Grouped expanded view: changes grouped by employee name */
 export function ExpandedChangesGrouped({
   changes,
+  noteChanges = [],
   assignmentIdByPair,
   assignmentLabelMap,
   empNameMap,
   absenceTypeMap,
 }: {
   changes: PublishChange[];
+  noteChanges?: NotePublishChange[];
   assignmentIdByPair: Map<string, number>;
   assignmentLabelMap: Map<number, string>;
   empNameMap: Map<string, string>;
   absenceTypeMap: Map<number, string>;
 }) {
-  if (changes.length === 0) return null;
+  if (changes.length === 0 && noteChanges.length === 0) return null;
 
-  // Group changes by empId
-  const grouped = new Map<string, PublishChange[]>();
+  // Group changes by empId. Notes join their employee's list rather than
+  // forming a section of their own: a publish is read per person, and a note
+  // change was invisible here while its count still inflated the header.
+  const grouped = new Map<string, GroupedChange[]>();
+  const addToGroup = (empId: string, item: GroupedChange) => {
+    const existing = grouped.get(empId);
+    if (existing) existing.push(item);
+    else grouped.set(empId, [item]);
+  };
   for (const c of changes) {
-    const existing = grouped.get(c.empId);
-    if (existing) existing.push(c);
-    else grouped.set(c.empId, [c]);
+    addToGroup(c.empId, { type: "cell", date: c.date, change: c });
+  }
+  for (const c of noteChanges) {
+    addToGroup(c.empId, { type: "note", date: c.date, change: c });
   }
 
   // Sort groups by employee name
@@ -396,15 +475,22 @@ export function ExpandedChangesGrouped({
               </span>
             </div>
             <div style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 2 }}>
-              {sorted.map((c) => (
-                <ChangeRow
-                  key={`${c.empId}-${c.date}-${c.kind}`}
-                  change={c}
-                  assignmentIdByPair={assignmentIdByPair}
-                  assignmentLabelMap={assignmentLabelMap}
-                  absenceTypeMap={absenceTypeMap}
-                />
-              ))}
+              {sorted.map((item) =>
+                item.type === "note" ? (
+                  <NoteChangeRow
+                    key={`note-${item.change.date}-${item.change.indicatorTypeId}-${item.change.kind}`}
+                    change={item.change}
+                  />
+                ) : (
+                  <ChangeRow
+                    key={`cell-${item.change.date}-${item.change.kind}`}
+                    change={item.change}
+                    assignmentIdByPair={assignmentIdByPair}
+                    assignmentLabelMap={assignmentLabelMap}
+                    absenceTypeMap={absenceTypeMap}
+                  />
+                ),
+              )}
             </div>
           </div>
         );
@@ -632,7 +718,12 @@ export default function PublishHistoryPanel({
 
           {entries.map((entry) => {
             const isExpanded = expandedId === entry.id;
-            const uniqueEmpCount = new Set(entry.changes.map((c) => c.empId)).size;
+            const entryNoteChanges = entry.noteChanges ?? [];
+            // A note-only publish still touched somebody's day, so its employee
+            // has to count here or the header reads "1 change for 0 employees".
+            const uniqueEmpCount = new Set(
+              [...entry.changes, ...entryNoteChanges].map((c) => c.empId),
+            ).size;
             return (
               <div
                 key={entry.id}
@@ -682,7 +773,7 @@ export default function PublishHistoryPanel({
                       {uniqueEmpCount !== 1 ? "s" : ""}
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      <ChangeBreakdown changes={entry.changes} />
+                      <ChangeBreakdown changes={entry.changes} noteChanges={entryNoteChanges} />
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -714,6 +805,7 @@ export default function PublishHistoryPanel({
                 {isExpanded && (
                   <ExpandedChangesGrouped
                     changes={entry.changes}
+                    noteChanges={entryNoteChanges}
                     assignmentIdByPair={assignmentIdByPair}
                     assignmentLabelMap={assignmentLabelMap}
                     empNameMap={empNameMap}

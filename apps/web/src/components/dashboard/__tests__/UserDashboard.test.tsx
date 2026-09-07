@@ -13,12 +13,7 @@ import {
   getDashboardRoleVariant,
   hasDashboardAdminCapability,
 } from "@/components/dashboard/DashboardView";
-import {
-  getDatesInRange,
-  getWeekStart,
-  type EmployeeHours,
-  type OpenShift,
-} from "@/lib/dashboard-stats";
+import { getDatesInRange, type EmployeeHours, type OpenShift } from "@/lib/dashboard-stats";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AssignmentDefinition,
@@ -300,6 +295,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
       } satisfies EmployeeHours,
     ],
     currentPeriodShifts: makeShiftMap(todayKey),
+    recentPublishedChanges: new Map(),
     draftDeletedCount: 0,
     draftModifiedCount: 0,
     draftNewCount: 0,
@@ -505,6 +501,68 @@ describe("UserDashboard", () => {
         1,
       );
     });
+  });
+
+  it("marks a recently published hero shift as edited", () => {
+    const todayKey = formatDateKey(new Date());
+    render(
+      <UserDashboard
+        {...makeProps({
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${todayKey}`,
+              {
+                empId: "emp-1",
+                date: todayKey,
+                kind: "modified" as const,
+                from: [101],
+              },
+            ],
+          ]),
+        })}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("user-dashboard-hero")).getByLabelText("Edited shift"),
+    ).toHaveAttribute("data-draft-badge", "modified");
+    expect(
+      within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
+        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
+      ),
+    ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
+  });
+
+  it("keeps a deleted published shift visible in Your Week history", () => {
+    const props = makeProps();
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                from: [101],
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getAllByText("Unscheduled")).not.toHaveLength(0);
+    expect(within(myWeek).queryByLabelText("deleted shift")).not.toBeInTheDocument();
+    expect(
+      within(myWeek).getByLabelText(
+        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
+      ),
+    ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
   });
 
   it("flows Working with and split follow-up shifts naturally instead of pinning to the hero bottom", () => {
@@ -1234,8 +1292,7 @@ describe("UserDashboard", () => {
   });
 
   it("does not repeat general or absence labels in Your Week rows", () => {
-    const periodStart = getWeekStart(new Date());
-    const periodDates = getDatesInRange(periodStart, 7);
+    const { periodDates } = makeProps();
     const generalDate = formatDateKey(periodDates[0] ?? new Date());
     const absenceDate = formatDateKey(periodDates[1] ?? periodDates[0] ?? new Date());
     const currentPeriodShifts: ShiftMap = {
@@ -1317,7 +1374,7 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
-  it("uses one empty-week message without repeating a blank Your Week card", () => {
+  it("keeps every date visible as unscheduled in a brand-new published week", () => {
     const props = makeProps();
 
     render(
@@ -1354,7 +1411,9 @@ describe("UserDashboard", () => {
     expect(emptyState).not.toHaveTextContent("No Shift");
     expect(emptyState).not.toHaveTextContent("No shift scheduled");
     expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getByText("Your Week")).toBeInTheDocument();
+    expect(within(myWeek).getAllByText("Unscheduled")).toHaveLength(props.periodDates.length);
     expect(screen.queryByText("No shifts this week")).not.toBeInTheDocument();
     expect(screen.queryByText("Published shifts will appear here.")).not.toBeInTheDocument();
   });

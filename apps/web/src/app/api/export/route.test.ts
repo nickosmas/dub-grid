@@ -95,4 +95,37 @@ describe("GET /api/export", () => {
     expect(orgIdFilters).not.toContain(REQUESTED_ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
   });
+
+  it("gates staff export on employee details and schedule export on shift editing", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
+    const { GET } = await import("./route");
+
+    await GET(makeRequest(REQUESTED_ORG_ID));
+    const staffAllowed = requireOrgPermissions.mock.calls[0][2];
+    expect(
+      staffAllowed({ isGridmaster: false, isSuperAdmin: false, canViewEmployeeDetails: true }),
+    ).toBe(true);
+    expect(
+      staffAllowed({ isGridmaster: false, isSuperAdmin: false, canViewEmployeeDetails: false }),
+    ).toBe(false);
+
+    const scheduleUrl = new URL("http://localhost/api/export");
+    scheduleUrl.searchParams.set("type", "schedule");
+    scheduleUrl.searchParams.set("orgId", REQUESTED_ORG_ID);
+    await GET(new NextRequest(scheduleUrl));
+    const scheduleAllowed = requireOrgPermissions.mock.calls[1][2];
+    expect(scheduleAllowed({ isGridmaster: false, isSuperAdmin: false, canEditShifts: true })).toBe(
+      true,
+    );
+    expect(
+      scheduleAllowed({
+        isGridmaster: false,
+        isSuperAdmin: false,
+        canEditShifts: false,
+        canViewSchedule: true,
+      }),
+    ).toBe(false);
+  });
 });

@@ -102,7 +102,6 @@ describe("settings help cleanup", () => {
         focusAreaLabel="Units"
         departmentLabel="Scheduled Departments"
         canManageFocusAreas
-        canManageOrgLabels
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />,

@@ -50,6 +50,11 @@ export default function DraggableShift({ id, data, disabled, children }: Draggab
       className={disabled ? undefined : "dg-draggable-shift"}
       style={{
         position: "absolute",
+        // A raised change chip may extend above its pill. Keep the entire
+        // draggable layer above the grid dividers and its neighbouring pills,
+        // rather than only giving the chip itself a z-index inside a lower
+        // stacking context.
+        zIndex: 4,
         top: 0,
         right: 0,
         bottom: 0,

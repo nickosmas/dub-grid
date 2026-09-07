@@ -18,7 +18,8 @@ export function DirectorySummaryCards({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <Card
         size="sm"
-        className="border-[var(--dg-color-brand-border)]"
+        data-stat-card
+        className="h-full border-[var(--dg-color-brand-border)]"
         aria-label="On schedule staff count"
       >
         <CardContent className="flex items-center justify-between">
@@ -50,7 +51,8 @@ export function DirectorySummaryCards({
       {showEmploymentCounts && (
         <Card
           size="sm"
-          className="border-[var(--dg-color-border-light)]"
+          data-stat-card
+          className="h-full border-[var(--dg-color-border-light)]"
           aria-label="Full-time staff count"
         >
           <CardContent className="flex items-center justify-between">
@@ -88,7 +90,8 @@ export function DirectorySummaryCards({
       {showEmploymentCounts && (
         <Card
           size="sm"
-          className="border-[var(--dg-color-border-light)]"
+          data-stat-card
+          className="h-full border-[var(--dg-color-border-light)]"
           aria-label="Part-time staff count"
         >
           <CardContent className="flex items-center justify-between">

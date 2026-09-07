@@ -30,7 +30,7 @@ function getIssueMessage(key: string, message: string): string {
 
   switch (key) {
     case "EXPO_PUBLIC_API_BASE_URL":
-      return "This build is missing a reachable DubGrid web connection.";
+      return "This build is missing a reachable web connection.";
     case "EXPO_PUBLIC_SUPABASE_URL":
     case "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY":
       return "This build is missing sign-in configuration.";
@@ -61,7 +61,7 @@ export function ConfigurationScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.eyebrow}>DubGrid Mobile Setup</Text>
+          <Text style={styles.eyebrow}>Mobile app setup</Text>
           <Text style={styles.title}>Mobile configuration needs attention</Text>
           <Text style={styles.body}>
             This Expo build does not have a phone-safe backend configuration yet. For a real phone,

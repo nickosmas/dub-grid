@@ -13,6 +13,7 @@ import {
   mobileProfilePhoneUpdateBodySchema,
   mobileProfileResponseSchema,
   mobileProfileSessionsResponseSchema,
+  mobileScheduleEntryChangeSchema,
   mobileScheduleEntrySchema,
   mobileScheduleQuerySchema,
   mobileNotificationReadResponseSchema,
@@ -887,9 +888,32 @@ describe("mobile contracts", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.data?.change).toBeNull();
     expect(result.data).not.toHaveProperty("shiftIds");
     expect(result.data).not.toHaveProperty("jobIds");
     expect(result.data).not.toHaveProperty("assignmentLabel");
+  });
+
+  it("accepts a typed previous presentation for edited mobile shifts", () => {
+    const result = mobileScheduleEntryChangeSchema.safeParse({
+      kind: "modified",
+      previousPresentation: {
+        label: "Nurse",
+        shiftName: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        displayFocusAreaName: "ICU",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({
+      kind: "modified",
+      previousPresentation: { shiftName: "Day Shift" },
+    });
   });
 
   it("keeps mobile shift requests canonical-only", () => {

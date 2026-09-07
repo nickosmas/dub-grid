@@ -126,7 +126,7 @@ describe("ForgotPasswordScreen", () => {
 
     expect(routerReplace).not.toHaveBeenCalled();
     expect(
-      screen.getByText("We couldn't reach DubGrid. Check your connection and try again."),
+      screen.getByText("We couldn't connect right now. Check your connection and try again."),
     ).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe("ForgotPasswordScreen", () => {
 
     expect(routerReplace).not.toHaveBeenCalled();
     expect(
-      screen.getByText("We couldn't reach DubGrid. Check your connection and try again."),
+      screen.getByText("We couldn't connect right now. Check your connection and try again."),
     ).toBeInTheDocument();
   });
 

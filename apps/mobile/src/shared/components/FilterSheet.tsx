@@ -1,3 +1,4 @@
+import { ActionButtons } from "./ActionButtons";
 import {
   Children,
   cloneElement,
@@ -12,7 +13,13 @@ import { Button } from "./Button";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../theme/tokens";
 
 /** How far a row's surface is inset inside its slot. Matches the org picker. */
 const SELECTION_ROW_INSET = 6;
@@ -38,12 +45,12 @@ export function FilterSheet({
   clearDisabled?: boolean;
   children: ReactNode;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <BottomSheetModal
       footer={
-        <>
+        <ActionButtons
+          primaryAction={<Button compact label="Done" tone="primary" onPress={onDone} />}
+        >
           {onClearAll ? (
             <Button
               compact
@@ -53,9 +60,7 @@ export function FilterSheet({
               onPress={onClearAll}
             />
           ) : null}
-          <View style={styles.footerSpacer} />
-          <Button compact label="Done" tone="primary" onPress={onDone} />
-        </>
+        </ActionButtons>
       }
       // The title lives in the sheet's drag region rather than the scrolling
       // body, so dragging anywhere on the header closes the sheet.
@@ -113,6 +118,7 @@ export function SelectionRow({
   detail,
   selected,
   showDivider = true,
+  disabled = false,
   onPress,
 }: {
   label: string;
@@ -120,6 +126,7 @@ export function SelectionRow({
   selected: boolean;
   /** Injected by `SelectionSection`; call sites don't set this. */
   showDivider?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -133,6 +140,7 @@ export function SelectionRow({
   return (
     <View style={[styles.selectionSlot, showDivider && styles.selectionDivider]}>
       <PressableRow
+        disabled={disabled}
         onPress={onPress}
         selected={selected}
         style={[styles.selectionRow, selected && styles.selectionRowSelected]}
@@ -160,13 +168,32 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Button
-      accessibilityLabel={accessibilityLabel}
+      // Recreate the native button when its tone changes: Android can retain
+      // the old background while updating the label, making it look disabled.
+      key={activeCount > 0 ? "active" : "inactive"}
+      accessibilityLabel={
+        activeCount > 0
+          ? `${accessibilityLabel}, ${activeCount} active ${activeCount === 1 ? "filter" : "filters"}`
+          : accessibilityLabel
+      }
       expanded={expanded}
       fullWidth
       icon="options-outline"
       label="Filter"
+      trailingAccessory={
+        activeCount > 0 ? (
+          <View style={styles.filterCountBadge}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.filterCountText}>
+              {activeCount}
+            </Text>
+          </View>
+        ) : null
+      }
       onPress={onPress}
       size="sm"
       // Promotes to a solid brand fill once any filter is on, so an active
@@ -178,6 +205,21 @@ export function FilterButton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    filterCountBadge: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      flexShrink: 0,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    filterCountText: {
+      ...mobileText.badge,
+      color: mobileColors.onBrandText,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
     section: {
       gap: 10,
     },
@@ -186,14 +228,16 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
       textTransform: "uppercase",
     },
-    footerSpacer: {
-      flex: 1,
-    },
     selectionList: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
+      // A hairline, not `cardBorder`. Cards on the page are drawn by their
+      // shadow, which is why `cardBorder` is transparent in light mode - but a
+      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
+      // no shadow to draw it there was no edge at all in light mode. Dark is
+      // unchanged: `cardBorder` already resolves to this token there.
+      borderColor: mobileColors.borderSubtle,
       overflow: "hidden",
     },
     /** The full-bleed box a row occupies. Carries the divider and nothing else. */

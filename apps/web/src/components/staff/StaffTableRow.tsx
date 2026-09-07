@@ -20,7 +20,7 @@ import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { MaybeHint } from "@/components/ui/hint";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
-import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
@@ -236,8 +236,8 @@ function StaffRowCells({
         <div className="flex items-center gap-1.5 min-w-0">
           <Avatar>
             <AvatarFallback
-              className="text-[length:var(--dg-type-badge-size)] font-semibold"
               style={{
+                ...getAvatarTypography(32),
                 background: avatarTone.backgroundColor,
                 color: avatarTone.textColor,
                 border: `1px solid ${avatarTone.borderColor}`,

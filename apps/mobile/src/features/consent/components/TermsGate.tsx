@@ -81,35 +81,41 @@ export function TermsGate({ children }: PropsWithChildren) {
           the outside tap and the Android back gesture in one place, so the only
           ways out are the two buttons below. */}
       <BottomSheetModal
+        presentationKind="gate"
         accessibilityRole="alert"
         dismissDisabled
+        footer={
+          <SheetActions
+            primaryAction={
+              <Button
+                label="Accept and continue"
+                loading={saving}
+                onPress={() => accept()}
+                tone="primary"
+              />
+            }
+          >
+            {/* Declining has to be possible. The sheet covers the whole app, so
+                without this a user who won't accept has no way out of the app at
+                all — not even to reach the profile screen to sign out. */}
+            <Button
+              disabled={saving}
+              label="Sign out"
+              onPress={() => handleExpiredMobileSession()}
+              tone="neutral"
+            />
+          </SheetActions>
+        }
         header={<SheetHeader title="We've updated our Terms" />}
         onDismiss={() => {}}
         visible={needsAcceptance}
       >
         <SheetCopy
-          body="Our Terms of Service have changed since you last accepted them. Please review and accept them to keep using DubGrid."
+          body="Our Terms of Service have changed since you last accepted them. Please review and accept them to keep using the app."
           error={error}
           linkLabel="Read the Terms of Service"
           onLinkPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
         />
-        <SheetActions>
-          <Button
-            label="Accept and continue"
-            loading={saving}
-            onPress={() => accept()}
-            tone="primary"
-          />
-          {/* Declining has to be possible. The sheet covers the whole app, so
-              without this a user who won't accept has no way out of the app at
-              all — not even to reach the profile screen to sign out. */}
-          <Button
-            disabled={saving}
-            label="Sign out"
-            onPress={() => handleExpiredMobileSession()}
-            tone="ghost"
-          />
-        </SheetActions>
       </BottomSheetModal>
     </>
   );

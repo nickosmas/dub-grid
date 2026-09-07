@@ -33,8 +33,9 @@ type ScheduleDraft = {
 
 /**
  * Put a management-only person onto the schedule by giving them the scheduling
- * attributes they never had. The mirror of "Remove from Schedule" in the edit
- * panel, and the same thing web's AddManagementUserToScheduleModal does.
+ * attributes they never had, the same thing web's
+ * AddManagementUserToScheduleModal does. Coming back off the schedule is the
+ * edit panel's job: clear every focus area there and save.
  *
  * A pushed screen rather than a sheet, for the same reason as management access:
  * it is a three-picker form, and stacking it over the person page put a third

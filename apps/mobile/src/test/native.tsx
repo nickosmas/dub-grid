@@ -65,7 +65,6 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderGrant" ||
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
-      key === "numberOfLines" ||
       key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
@@ -110,6 +109,26 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "testID") {
       output["data-testid"] = value;
+      continue;
+    }
+
+    if (key === "numberOfLines") {
+      output["data-number-of-lines"] = String(value);
+      continue;
+    }
+
+    if (key === "adjustsFontSizeToFit") {
+      output["data-adjusts-font-size-to-fit"] = String(value);
+      continue;
+    }
+
+    if (key === "minimumFontScale") {
+      output["data-minimum-font-scale"] = String(value);
+      continue;
+    }
+
+    if (key === "ellipsizeMode") {
+      output["data-ellipsize-mode"] = String(value);
       continue;
     }
 
@@ -495,6 +514,7 @@ export function createScreenModule(React: ReactModule) {
       subtitle,
       stickyHeader,
       renderOverlay,
+      footer,
       scrollViewRef,
       onScroll,
       children,
@@ -503,6 +523,7 @@ export function createScreenModule(React: ReactModule) {
       subtitle?: string;
       stickyHeader?: ReactType.ReactNode;
       renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactType.ReactNode;
+      footer?: ReactType.ReactNode;
       scrollViewRef?: { current: unknown } | null;
       onScroll?: (event: unknown) => void;
       children: ReactType.ReactNode;
@@ -533,6 +554,7 @@ export function createScreenModule(React: ReactModule) {
           stickyHeaderHeight: 0,
         }) ?? null,
         children,
+        footer ?? null,
       );
     },
     // Skeletons import these from the real Screen module so their placeholder

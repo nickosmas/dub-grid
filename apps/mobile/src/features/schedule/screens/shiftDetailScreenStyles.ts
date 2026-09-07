@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 import {
+  mobileAvatarText,
   mobileElevation,
   mobileRadii,
   mobileRadius,
@@ -38,6 +39,17 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
+    detailSummaryRow: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: 14,
+    },
+    detailSummaryContent: {
+      flex: 1,
+      minWidth: 0,
+      justifyContent: "center",
+      gap: mobileSpace.lg,
+    },
     detailHeroHeader: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -49,15 +61,50 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       minWidth: 0,
       gap: 7,
     },
+    detailHeroTitleRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
     detailHeroPillRow: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       flexWrap: "wrap",
       gap: 10,
     },
+    detailShiftChangeBadge: {
+      alignSelf: "flex-start",
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    detailShiftChangeBadgeNew: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+    },
+    detailShiftChangeBadgeModified: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    detailShiftChangeBadgeDeleted: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    detailShiftChangeBadgeText: {
+      ...mobileText.badge,
+      color: mobileColors.brand,
+      fontWeight: "700",
+      textTransform: "none",
+    },
     detailHeroTitle: {
-      ...mobileText.screenTitle,
+      ...mobileText.heroMetric,
       color: mobileColors.textPrimary,
+    },
+    detailHeroTitleInline: {
+      flexShrink: 1,
+      minWidth: 0,
     },
     detailEmployeeName: {
       ...mobileText.rowTitle,
@@ -67,7 +114,15 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     // reads as an eyebrow above the pill, not as the pill's own text.
     detailHeaderJobPillStack: {
       alignSelf: "flex-start",
+      maxWidth: "100%",
       gap: 4,
+    },
+    detailHeaderNameChip: {
+      maxWidth: "100%",
+    },
+    detailHeaderName: {
+      textTransform: "none",
+      flexShrink: 1,
     },
     detailHeaderJobPillEyebrow: {
       ...mobileText.rowTitle,
@@ -76,7 +131,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       color: mobileColors.textMuted,
     },
     detailInfoStack: {
-      gap: 14,
+      width: "100%",
+      gap: mobileSpace.sm,
     },
     detailSplitNotice: {
       ...mobileText.bodyStrong,
@@ -93,10 +149,29 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailPublishedFooter: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 16,
+      paddingTop: mobileSpace.md,
+      minHeight: 44,
       flexDirection: "row",
       alignItems: "center",
-      gap: 9,
+      gap: mobileSpace.sm,
+    },
+    detailPreviousShiftFooter: {
+      minHeight: 48,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      backgroundColor: "transparent",
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
+    },
+    detailPreviousShiftText: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
     },
     detailPublishedText: {
       flex: 1,
@@ -109,6 +184,10 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailPublishedName: {
       fontFamily: mobileTypography.fontFamily.semibold,
       color: mobileColors.textMuted,
+    },
+    detailPublicationSummary: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
     },
     detailInfoRow: {
       flexDirection: "row",
@@ -129,13 +208,37 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       gap: 2,
     },
     detailInfoLabel: {
-      // Sentence case, not all caps: a shouted label competes with the card
-      // title above it, and reads as chrome rather than as a heading.
       ...mobileText.label,
-      color: mobileColors.textSubtle,
+      color: mobileColors.textMuted,
     },
     detailInfoValue: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    detailTimeValue: {
       ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    previousShiftSheetDetails: {
+      gap: mobileSpace.md,
+    },
+    previousShiftSegmentList: {
+      gap: mobileSpace.sm,
+    },
+    previousShiftSegment: {
+      gap: 3,
+    },
+    previousShiftSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.md,
+    },
+    previousShiftSegmentTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    previousShiftSegmentMeta: {
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     detailGroup: {
@@ -143,8 +246,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "flex-start",
     },
     detailDateTile: {
-      width: 60,
-      minHeight: 68,
+      alignSelf: "center",
+      flexShrink: 0,
+      minWidth: 58,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
@@ -152,13 +256,12 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 4,
-      paddingHorizontal: 6,
+      paddingHorizontal: 10,
       paddingVertical: 8,
     },
     detailDateWeekday: {
-      ...mobileText.badge,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
+      ...mobileText.label,
+      color: mobileColors.textPrimary,
     },
     detailDateDay: {
       ...mobileText.heroMetric,
@@ -215,6 +318,13 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       textTransform: "uppercase",
     },
     detailJobChipMentoredText: {
+      textTransform: "none",
+    },
+    // The nested variant inherits the value text's metrics; this inline one is
+    // a sibling of the label, so it has to state them or it falls back to the
+    // system default size and sits off the label's baseline.
+    detailJobChipMentoredInlineText: {
+      ...mobileTextWeighted("badge", "medium"),
       textTransform: "none",
     },
     detailJobChipValueText: {
@@ -321,7 +431,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "center",
     },
     shiftmateAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(42),
     },
     shiftmateContent: {
       flex: 1,

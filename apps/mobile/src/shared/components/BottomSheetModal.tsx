@@ -1,13 +1,22 @@
+import { ActionButtons } from "./ActionButtons";
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
+import { createIconControlStyle, ICON_CONTROL_SIZE } from "./icon-control-style";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { trackSheetPresentation } from "../lib/modal-presentation";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import { registerModalPresentation } from "../lib/modal-presentation";
+import {
+  mobileElevation,
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 import { AppText } from "./AppText";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
@@ -71,6 +80,16 @@ const SHEET_TOP_GAP = mobileSpace.md;
  */
 const SHEET_CORNER_RADIUS = 40;
 
+/** Tap target for the close button, and the box centred on the title's line. */
+const CLOSE_BUTTON_SIZE = ICON_CONTROL_SIZE;
+
+/** What `SheetHeader` renders its title at, which is what the close button lines up with. */
+const SHEET_TITLE_LINE_HEIGHT = mobileText.screenTitle.lineHeight ?? 28;
+
+/** Centres the close button on the title's first line. */
+const CLOSE_BUTTON_TOP =
+  SHEET_CONTENT_TOP_PADDING + (SHEET_TITLE_LINE_HEIGHT - CLOSE_BUTTON_SIZE) / 2;
+
 export function BottomSheetModal({
   visible,
   onDismiss,
@@ -80,6 +99,7 @@ export function BottomSheetModal({
   accessibilityLabel = "Dismiss",
   accessibilityRole,
   debugName,
+  presentationKind = "sheet",
   header,
   footer,
   children,
@@ -110,6 +130,8 @@ export function BottomSheetModal({
    * report can only say "Dismiss", which is every sheet's backdrop label.
    */
   debugName?: string;
+  /** Only required consent and app-lock gates may interrupt another task. */
+  presentationKind?: "sheet" | "gate";
   /**
    * Rendered in the sheet's non-scrolling top region, which is also the drag
    * region. Put a sheet's title here rather than in `children` so the whole
@@ -160,9 +182,8 @@ export function BottomSheetModal({
   useEffect(() => {
     if (!visible) return;
     const name = presentationName.current;
-    trackSheetPresentation("show", name);
-    return () => trackSheetPresentation("hide", name);
-  }, [visible]);
+    return registerModalPresentation(presentationKind, name);
+  }, [visible, presentationKind]);
 
   const handleDismiss = () => {
     if (dismissDisabled) return;
@@ -239,7 +260,9 @@ export function BottomSheetModal({
                   a touch starting here can never be claimed by the scrolling
                   body, so the sheet always drags — without the user having to
                   hit the 40x4 handle itself. */}
-                <View style={styles.dragRegion}>
+                <View
+                  style={[styles.dragRegion, dismissDisabled ? null : styles.dragRegionWithClose]}
+                >
                   {/* Every sheet carries the handle, blocking ones included: it is
                     what marks the top of the sheet as the thing you grab, and a
                     blocking sheet answers that grab by following the finger a
@@ -247,6 +270,29 @@ export function BottomSheetModal({
                   <View style={styles.grabberArea}>
                     <View style={styles.grabber} />
                   </View>
+                  {/* The one *visible* way out. The drag, the outside tap and
+                    the Android back gesture all leave too, but a sheet holding
+                    unsaved input answers its own dismiss button with Discard,
+                    which resets rather than leaves — so without this there is
+                    no control on screen that closes it. Routed through
+                    `handleDismiss` like every other exit, so a guard still gets
+                    its say. Hidden when dismissal is disabled at all: a gate
+                    must not offer a way out it will refuse. */}
+                  {dismissDisabled ? null : (
+                    <Pressable
+                      accessibilityLabel="Close"
+                      accessibilityRole="button"
+                      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
+                      hitSlop={10}
+                      style={({ pressed }) => [
+                        styles.closeButton,
+                        pressed && styles.closeButtonPressed,
+                      ]}
+                      onPress={handleDismiss}
+                    >
+                      <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
+                    </Pressable>
+                  )}
                   {header ? <View style={styles.header}>{header}</View> : null}
                 </View>
                 {scrollable ? (
@@ -306,6 +352,36 @@ const createStyles = (
     dragRegion: {
       minHeight: 44,
       justifyContent: "center",
+    },
+    // The close button is absolutely positioned, so it adds no height of its
+    // own: on a sheet whose header is a single-line title it ends 8pt below
+    // that line, leaving the header's own `paddingBottom` as the only gap
+    // before the body and the button crowding whatever came next. This floors
+    // the region at the button's full extent plus real breathing room. A taller
+    // header (a subtitle, a wrapped title) already clears it and is unaffected.
+    dragRegionWithClose: {
+      minHeight: CLOSE_BUTTON_TOP + CLOSE_BUTTON_SIZE + mobileSpace.lg,
+    },
+    // Absolute so it can't push the title off-centre or add height to the drag
+    // region, and so a header that wraps to two lines keeps it pinned to the
+    // first line rather than drifting to the middle of the block.
+    closeButton: {
+      // The same outlined chrome as the schedule header's week chevrons and
+      // alerts bell, shared so the two cannot drift.
+      ...createIconControlStyle(mobileColors, isDark),
+      position: "absolute",
+      // Centred on the title's first line. The grabber area is exactly
+      // `SHEET_CONTENT_TOP_PADDING` tall and the header adds no padding of its
+      // own, so that is where the title starts; the rest centres this button's
+      // box on that line box rather than on the header as a whole.
+      top: CLOSE_BUTTON_TOP,
+      // Matches the header's own `paddingHorizontal`, so the gap to the right
+      // edge is the gap the title keeps from the left.
+      right: mobileSpace.xl,
+      zIndex: 1,
+    },
+    closeButtonPressed: {
+      transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
     header: {
       paddingHorizontal: mobileSpace.xl,
@@ -370,7 +446,7 @@ const createStyles = (
       paddingBottom: mobileSpace.lg,
     },
     footer: {
-      flexDirection: "row",
+      // Keep supporting errors and the action group at the full sheet width.
       gap: 12,
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -459,16 +535,16 @@ export function SheetCopy({
   );
 }
 
-/** Stacked full-width actions, primary first. */
-export function SheetActions({ children }: { children: ReactNode }) {
-  return <View style={sheetActionStyles.actions}>{children}</View>;
+/** Shared action layout for a sheet footer. */
+export function SheetActions({
+  children,
+  primaryAction,
+}: {
+  children?: ReactNode;
+  primaryAction?: ReactNode;
+}) {
+  return <ActionButtons primaryAction={primaryAction}>{children}</ActionButtons>;
 }
-
-const sheetActionStyles = StyleSheet.create({
-  actions: {
-    gap: mobileSpace.sm,
-  },
-});
 
 const createCopyStyles = (_mobileColors: MobileColors) =>
   StyleSheet.create({

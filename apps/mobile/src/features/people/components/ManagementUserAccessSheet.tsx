@@ -8,13 +8,11 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
-import {
-  SegmentedControl,
-  type SegmentedOption,
-} from "../../../shared/components/SegmentedControl";
+import { SectionNotice } from "./SectionNotice";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -22,19 +20,9 @@ import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
 
 type Draft = {
+  /** Rides along unchanged: the write that takes this draft needs the pair. */
   orgRole: ManagementAccessRole;
   managementDepartmentIds: number[];
-};
-
-const BASE_ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-];
-
-const ROLE_LABELS: Record<ManagementAccessRole, string> = {
-  user: "User",
-  admin: "Admin",
-  super_admin: "Super Admin",
 };
 
 function sameIds(left: number[], right: number[]): boolean {
@@ -45,10 +33,12 @@ function sameIds(left: number[], right: number[]): boolean {
 }
 
 /**
- * Edit an existing roster member's role and departments. The staff-side sheet
+ * Edit an existing roster member's departments. The staff-side sheet
  * (ManagementAccessSheet) works from a MobilePerson and can also grant access
  * for the first time; this one only ever edits someone already on the roster,
- * who may have no staff profile at all.
+ * who may have no staff profile at all. Their role is not here: the actions
+ * sheet has its own access-level action for that, so this is the same
+ * departments editor a person with a profile gets.
  */
 export function ManagementUserAccessSheet({
   visible,
@@ -57,6 +47,7 @@ export function ManagementUserAccessSheet({
   isPending,
   error,
   onDismiss,
+  onRemove,
   onSubmit,
 }: {
   visible: boolean;
@@ -69,6 +60,12 @@ export function ManagementUserAccessSheet({
    */
   error?: string | null;
   onDismiss: () => void;
+  /**
+   * Saving with no departments left. Handed up rather than confirmed here: the
+   * parent already owns the removal prompt and mutation for its own Remove
+   * button, and two copies of that prompt would be two copies of its wording.
+   */
+  onRemove: () => void;
   onSubmit: (draft: Draft) => Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
@@ -84,7 +81,6 @@ export function ManagementUserAccessSheet({
   const [baseline, setBaseline] = useState<Draft>(seed);
   const [draft, setDraft] = useState<Draft>(baseline);
   const [wasVisible, setWasVisible] = useState(visible);
-  const [pendingAccessChange, setPendingAccessChange] = useState<Draft | null>(null);
 
   // Reseeded on open, not on every roster refetch, so a background refresh
   // can't overwrite what the user is part-way through choosing.
@@ -97,21 +93,17 @@ export function ManagementUserAccessSheet({
     }
   }
 
-  // A pending invitation can still be re-pointed at Super Admin; an existing
-  // account's role change at that tier is a heavier operation than this sheet.
-  const roleOptions: SegmentedOption<ManagementAccessRole>[] =
-    managementUser.source === "pending_invite"
-      ? [...BASE_ROLE_OPTIONS, { value: "super_admin", label: "Super Admin" }]
-      : BASE_ROLE_OPTIONS;
-
-  const hasUnsavedChanges =
-    draft.orgRole !== baseline.orgRole ||
-    !sameIds(draft.managementDepartmentIds, baseline.managementDepartmentIds);
+  const hasUnsavedChanges = !sameIds(
+    draft.managementDepartmentIds,
+    baseline.managementDepartmentIds,
+  );
+  // No length floor: this sheet only ever edits someone already on the roster,
+  // so clearing every department is a legitimate save that means removal.
   // Dirtiness is part of it, not just validity: a Save that is live on an
   // untouched sheet invites a no-op write, and the same `hasUnsavedChanges`
   // already decides whether closing asks — so the button and the discard
   // prompt can never disagree about whether there is anything to save.
-  const canSubmit = !isPending && hasUnsavedChanges && draft.managementDepartmentIds.length > 0;
+  const canSubmit = !isPending && hasUnsavedChanges;
 
   // Every way out funnels through here, the Cancel button included — it used to
   // close straight through, so the one exit the user took deliberately was the
@@ -124,9 +116,20 @@ export function ManagementUserAccessSheet({
     onClose: onDismiss,
   });
 
+  const removalNotices =
+    draft.managementDepartmentIds.length === 0
+      ? [
+          managementUser.source === "pending_invite"
+            ? "Saving now revokes their pending management invitation."
+            : "Saving now takes them off the management roster.",
+        ]
+      : [];
+
   function submitDraft() {
-    if (managementUser.source === "pending_invite" && draft.orgRole !== baseline.orgRole) {
-      setPendingAccessChange(draft);
+    // Ahead of the role branch below: an empty save takes them off the roster
+    // outright, so whatever role it was being re-pointed at is moot.
+    if (draft.managementDepartmentIds.length === 0) {
+      onRemove();
       return;
     }
     return onSubmit(draft);
@@ -135,6 +138,32 @@ export function ManagementUserAccessSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions
+              primaryAction={
+                <Button
+                  disabled={!canSubmit}
+                  label="Save Access"
+                  loading={isPending}
+                  onPress={submitDraft}
+                  tone="primary"
+                />
+              }
+            >
+              <Button
+                disabled={isPending}
+                // Same tri-state web uses. Discard resets the draft and leaves
+                // the sheet open; dismissing with edits in hand is the drag or
+                // the backdrop, which this guard already confirms.
+                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+                onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
+                tone="neutral"
+              />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={
@@ -149,19 +178,9 @@ export function ManagementUserAccessSheet({
         onDismiss={guard.requestClose}
       >
         <View style={styles.body}>
-          <View style={styles.field}>
-            <AppText tone="secondary" variant="label">
-              Access level
-            </AppText>
-            <SegmentedControl
-              accessibilityLabel="Access level"
-              disabled={isPending}
-              onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-              options={roleOptions}
-              value={draft.orgRole}
-            />
-          </View>
-
+          {/* A consequence of the save, so it is raised once for the sheet
+              rather than sitting under the chips that produced it. */}
+          <SectionNotice messages={removalNotices} />
           <View style={styles.field}>
             <AppText tone="secondary" variant="label">
               {MANAGEMENT_DEPARTMENT_LABELS.plural}
@@ -185,43 +204,11 @@ export function ManagementUserAccessSheet({
                 />
               ))}
             </View>
-            {draft.managementDepartmentIds.length === 0 ? (
-              <AppText tone="danger" variant="meta">
-                {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}, or close this and use Remove from Management instead`}
-              </AppText>
-            ) : null}
           </View>
         </View>
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button
-            disabled={!canSubmit}
-            label="Save Access"
-            loading={isPending}
-            onPress={submitDraft}
-            tone="primary"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />
-      <ConfirmationModal
-        body={`Change access from ${ROLE_LABELS[baseline.orgRole]} to ${ROLE_LABELS[pendingAccessChange?.orgRole ?? baseline.orgRole]}? The current invitation will be revoked and a replacement will be sent to ${managementUser.email}.`}
-        confirmLabel="Revoke and resend"
-        confirmTone="danger"
-        loading={isPending}
-        onCancel={() => setPendingAccessChange(null)}
-        onConfirm={() => {
-          const next = pendingAccessChange;
-          setPendingAccessChange(null);
-          return next ? onSubmit(next) : undefined;
-        }}
-        title="Replace invitation access?"
-        visible={pendingAccessChange !== null}
-      />
     </>
   );
 }

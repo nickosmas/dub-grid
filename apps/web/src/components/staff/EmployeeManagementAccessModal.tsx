@@ -18,7 +18,7 @@ import { useIsInSandbox } from "@/hooks";
 import { toast } from "sonner";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { AccessStatusRow } from "@/components/staff/AccessStatusRow";
+import { SectionNotice } from "@/components/ui/SectionNotice";
 import CustomSelect from "@/components/CustomSelect";
 import type {
   AssignableOrganizationRole,
@@ -53,12 +53,14 @@ const INVITE_ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[
 ];
 
 /**
- * In-place editor shared by the staff slide-over and detail page. For an
- * existing membership, role changes live in MemberAccessControls, rendered
- * alongside this editor by the caller. There's no membership to patch for an
- * invitation, though, so this editor owns the role picker itself whenever it
- * is creating, updating, or revoking one (`!matchedUser`) - otherwise a
- * brand-new hire had no way to set the role they'd get once invited.
+ * In-place editor shared by every management-access popup. It edits
+ * management departments and nothing else: role and permissions are changed on
+ * the person's own surface (the slide-over header and body, the detail page's
+ * Access card), so the popup is the same popup wherever it is opened from.
+ *
+ * The one exception is a brand-new invitation. Nothing yet exists to hold a
+ * role for someone with no membership and no pending invite, so the picker
+ * appears here, once, to say what role the invitation will carry.
  */
 export const EmployeeManagementAccessEditor = forwardRef<
   EmployeeManagementAccessEditorHandle,
@@ -116,11 +118,14 @@ export const EmployeeManagementAccessEditor = forwardRef<
   // intentionally don't surface an "email-matches-another-user" sidecar
   // anymore — that path silently rewrote someone else's membership.
   const matchedUser = linkedUser;
-  // directoryPerson.orgRole is a prop, present on first render. matchedUser
-  // depends on fetchOrganizationUsers resolving, so gating the invite-only
-  // role picker on matchedUser alone let it flash in before that fetch
-  // finished for anyone who, in fact, already has a role.
-  const hasKnownOrgRole = Boolean(directoryPerson?.orgRole) || Boolean(matchedUser);
+  // Whether something already holds a role for this person: a membership, a
+  // linked account, or a pending invitation. If so, the role is changed where
+  // that thing is shown, never from here. directoryPerson.orgRole and
+  // pendingInvitation are props, present on first render; matchedUser depends
+  // on fetchOrganizationUsers resolving, so gating on it alone let the picker
+  // flash in before that fetch finished.
+  const hasKnownOrgRole =
+    Boolean(directoryPerson?.orgRole) || Boolean(matchedUser) || Boolean(pendingInvitation);
   // Same flash, different symptom: employee.userId is known synchronously
   // and, for a linked employee, always ends up resolving to a matchedUser
   // once fetchOrganizationUsers settles - so copy that reads the eventual
@@ -183,6 +188,16 @@ export const EmployeeManagementAccessEditor = forwardRef<
       : inviteSaveAction === "update"
         ? "Save Invitation"
         : "Send Invitation";
+  // Only ever a consequence of saving. The "select at least one" case is a
+  // missing answer, and stays as the field's own error under the tags.
+  const accessNotices =
+    hasExistingManagementAccess && managementDepartmentIds.length === 0
+      ? [
+          isRevokeOnSave
+            ? "Saving now revokes the pending invitation."
+            : "Saving now removes their management access. They'll stay on the schedule.",
+        ]
+      : [];
   const discardChanges = useCallback(() => {
     setRole(baseRole);
     setManagementDepartmentIds([...baseManagementDepartmentIds]);
@@ -348,6 +363,10 @@ export const EmployeeManagementAccessEditor = forwardRef<
         aria-label={isEditingExistingAccess ? "Edit management access" : "Add to management"}
         style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
+        {/* First thing in the editor, so in a popup it lands directly under the
+            title rather than partway down the body. */}
+        <SectionNotice messages={accessNotices} />
+
         {!hasKnownOrgRole && (
           <div>
             <label style={fieldLabelStyle}>Role</label>
@@ -359,34 +378,6 @@ export const EmployeeManagementAccessEditor = forwardRef<
               />
             </div>
           </div>
-        )}
-
-        {hasExistingManagementAccess && (
-          // Only meaningful once there's existing access to summarize or
-          // remove - on the create path this just repeated the empty state
-          // the required Management departments field below already shows.
-          <AccessStatusRow
-            label="Management access"
-            statusText={
-              managementDepartmentIds.length > 0
-                ? `Active: ${managementDepartmentIds.length} department${
-                    managementDepartmentIds.length === 1 ? "" : "s"
-                  }`
-                : "No management access"
-            }
-            tone={managementDepartmentIds.length > 0 ? "active" : "neutral"}
-            note={
-              managementDepartmentIds.length === 0
-                ? isRevokeOnSave
-                  ? "Saving now revokes the pending invitation."
-                  : "Saving now removes their management access. They'll stay on the schedule."
-                : undefined
-            }
-            actionLabel={managementDepartmentIds.length > 0 ? "Remove from Management" : undefined}
-            onAction={
-              managementDepartmentIds.length > 0 ? () => setManagementDepartmentIds([]) : undefined
-            }
-          />
         )}
 
         {!loadingUsers && !linkedUser && !effectiveEmail.trim() && (
@@ -425,6 +416,9 @@ export const EmployeeManagementAccessEditor = forwardRef<
                   </SelectableTag>
                 ))}
               </div>
+              {/* Only the validation half stays by the tags. The removal is a
+                  consequence of the save, so it is raised once at the top of
+                  the section instead. */}
               {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
                 <FieldError message="Select at least one management department" />
               )}

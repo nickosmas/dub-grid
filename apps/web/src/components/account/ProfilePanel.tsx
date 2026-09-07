@@ -621,7 +621,7 @@ export function ProfilePanel({
         orgRole={selfOrgRole}
         email={user?.email ?? employee?.email}
         phone={employee?.phone}
-        employmentType={employee?.employmentType}
+        employmentType={employee?.focusAreaIds.length ? employee.employmentType : undefined}
         employeeNumber={employee?.employeeNumber}
       />
 
@@ -795,6 +795,7 @@ export function ProfilePanel({
               onRoleChange={handleRoleChange}
               onPermissionsChange={handlePermissionsChange}
               isSelf
+              labels={{ focusAreaLabel, certificationLabel, roleLabel }}
             />
           ) : (
             <Field label="Role" value={ROLE_LABELS[role] ?? role} />
@@ -856,6 +857,7 @@ export function ProfilePanel({
           title={showManagementAccess ? "Edit management access" : "Add to management"}
           onClose={closeManagementAccessEditor}
           onRequestClose={requestManagementAccessClose}
+          className="dg-modal--tight-header"
           style={{ maxWidth: 560, width: "100%" }}
         >
           <EmployeeManagementAccessEditor

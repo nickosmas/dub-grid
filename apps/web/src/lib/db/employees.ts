@@ -17,15 +17,7 @@ import type { DbEmployee, DbInvitation, DbScheduleCell } from "./types";
 import { rowToEmployee, employeeToRow, rowToDepartment, rowToInvitation } from "./mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
-import type {
-  Employee,
-  Department,
-  ShiftMap,
-  Invitation,
-  AdminPermissions,
-  EmployeeStatus,
-  AuditLogEntry,
-} from "@/types";
+import type { Employee, Department, ShiftMap, Invitation, EmployeeStatus } from "@/types";
 
 export class EmployeeStatusConflictError extends Error {
   constructor(public readonly latestEmployee: Employee) {
@@ -134,22 +126,6 @@ export async function restoreDepartment(deptId: number, orgId: string): Promise<
   if (error) throw error;
   await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
   void logAudit("department.restored", "department", String(deptId), {}, orgId);
-}
-
-/** Update the permission template for a management department. */
-export async function updateDepartmentPermissions(
-  departmentId: number,
-  permissions: AdminPermissions,
-  orgId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from("departments")
-    .update({ permissions })
-    .eq("id", departmentId)
-    .eq("org_id", orgId);
-  if (error) throw error;
-  await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("department_permissions.updated", "department", String(departmentId), {}, orgId);
 }
 
 // ── Employees ────────────────────────────────────────────────────────────────
@@ -561,30 +537,6 @@ export async function fetchEmployeeShifts(
     }
   }
   return map;
-}
-
-// ── Employee Role Change History ──────────────────────────────────────────────
-
-export async function fetchEmployeeRoleHistory(userId: string): Promise<AuditLogEntry[]> {
-  const { data, error } = await supabase.rpc("get_audit_log", {
-    p_org_id: null,
-    p_limit: 50,
-    p_offset: 0,
-    p_target_user_id: userId,
-  });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    targetUserId: row.target_user_id as string,
-    targetEmail: (row.target_email as string | null) ?? null,
-    changedById: row.changed_by_id as string,
-    changedByEmail: (row.changed_by_email as string | null) ?? null,
-    fromRole: row.from_role as string,
-    toRole: row.to_role as string,
-    createdAt: row.created_at as string,
-    orgId: (row.org_id as string | null) ?? null,
-    orgName: (row.org_name as string | null) ?? null,
-  }));
 }
 
 // ── Employee Invitations ─────────────────────────────────────────────────────

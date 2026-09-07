@@ -8,7 +8,8 @@ import type { AdminPermissions, OrganizationRole } from "@/types";
 import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import PermissionsEditor from "@/components/PermissionsEditor";
+import PermissionsEditor, { type PermissionEditorLabels } from "@/components/PermissionsEditor";
+import { buildAdminPermissionChanges } from "@/lib/access-management";
 
 const ROLE_LABELS: Record<OrganizationRole, string> = {
   super_admin: "Super Admin",
@@ -42,6 +43,10 @@ export function MemberAccessControls({
   labelStyle,
   isSelf = false,
   pendingInvitationEmail,
+  labels,
+  showRole = true,
+  showPermissionControl = true,
+  permissionActionClassName,
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
@@ -50,6 +55,13 @@ export function MemberAccessControls({
   labelStyle?: CSSProperties;
   isSelf?: boolean;
   pendingInvitationEmail?: string;
+  /** Org terminology for the editor's row descriptions; defaults apply when absent. */
+  labels?: Partial<PermissionEditorLabels>;
+  /** Lets a panel place the role selector in its header and permissions in its body. */
+  showRole?: boolean;
+  showPermissionControl?: boolean;
+  /** Lets a panel place the access action in its shared action row. */
+  permissionActionClassName?: string;
 }) {
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
@@ -61,7 +73,7 @@ export function MemberAccessControls({
 
   return (
     <>
-      {onRoleChange && orgRole && isSelf && (
+      {showRole && onRoleChange && orgRole && isSelf && (
         <div>
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
@@ -83,7 +95,7 @@ export function MemberAccessControls({
           </p>
         </div>
       )}
-      {onRoleChange && orgRole && !isSelf && (
+      {showRole && onRoleChange && orgRole && !isSelf && (
         <div>
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
@@ -138,25 +150,34 @@ export function MemberAccessControls({
           )}
         </div>
       )}
-      {onPermissionsChange && orgRole === "admin" && (
-        <div>
-          <label style={fieldLabelStyle}>Permissions</label>
-          <div>
-            <Button
-              type="button"
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              onClick={() => setShowPermissions(true)}
-            >
-              Manage permissions
-            </Button>
-          </div>
+      {showPermissionControl && onPermissionsChange && orgRole === "admin" && (
+        <div className={permissionActionClassName}>
+          <Button
+            type="button"
+            className={`dg-btn dg-btn-secondary${permissionActionClassName ? " w-full" : " dg-btn-sm"}`}
+            onClick={() => setShowPermissions(true)}
+          >
+            Edit admin access
+          </Button>
           {showPermissions && (
             <PermissionsEditor
               title="Edit permissions"
               subtitle="Choose what this admin can view and manage."
               initialPermissions={adminPermissions}
               showPermissionCounter
-              lockedFalse={["canManageOrgSettings"]}
+              labels={labels}
+              buildReview={(perms, initial) => {
+                const changes = buildAdminPermissionChanges(initial, perms);
+                return changes.length > 0
+                  ? {
+                      title: "Review permission changes",
+                      description:
+                        "Review these changes before saving. They take effect for this admin right away.",
+                      changes,
+                      confirmLabel: "Confirm save",
+                    }
+                  : null;
+              }}
               onSave={async (perms) => {
                 await onPermissionsChange(perms);
                 setShowPermissions(false);

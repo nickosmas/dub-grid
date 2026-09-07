@@ -25,8 +25,11 @@ import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
+import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { StaffPanelFooter } from "./StaffPanelFooter";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
+import { hasSavedScheduleAssignment } from "./capability-state";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -250,7 +253,7 @@ export function ManagementStaffPanel({
   // first/last/dept editing if we keyed off `source === "employee"`. The
   // schedule grid + the People page roster both gate on focusAreaIds, so
   // use that as the source of truth here too.
-  const isEmployee = person.focusAreaIds.length > 0;
+  const isEmployee = hasSavedScheduleAssignment(person);
   const isOnSchedule = isEmployee;
   const isExpired = person.invitationStatus === "expired";
   // Every org member gets an `employees` row now (Flow B + seed backfill), so
@@ -264,6 +267,21 @@ export function ManagementStaffPanel({
         ? `/people/${person.employeeId}`
         : null
     : null;
+  const showAddToScheduleAction = Boolean(
+    canManageScheduleEmployees &&
+    !isOnSchedule &&
+    person.isManagementUser &&
+    person.userId &&
+    onAddToSchedule,
+  );
+  const showResendInvitationAction = Boolean(
+    canManageManagementAccess && isPending && !isExpired && onResendInvitation,
+  );
+  const showRevokeInvitationAction = Boolean(
+    canManageManagementAccess && isPending && onRevokeInvitation,
+  );
+  const showPersonActionFooter =
+    showAddToScheduleAction || showResendInvitationAction || showRevokeInvitationAction;
   const fieldErrors = useMemo(
     () => ({
       firstName:
@@ -435,15 +453,15 @@ export function ManagementStaffPanel({
   // Role + permission controls, the same ones StaffDetailPanel renders for
   // on-schedule staff. Self-gates on the callbacks, which the parent passes
   // only to managers.
+  const showBodyAccessControl = Boolean(onPermissionsChange && person.orgRole === "admin");
   const accessControls = (
     <MemberAccessControls
       orgRole={person.orgRole}
       adminPermissions={person.adminPermissions}
-      onRoleChange={onRoleChange}
       onPermissionsChange={onPermissionsChange}
       labelStyle={labelStyle}
       isSelf={isSelf}
-      pendingInvitationEmail={isPending ? effectiveEmail : undefined}
+      showRole={false}
     />
   );
 
@@ -475,6 +493,7 @@ export function ManagementStaffPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(44),
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
@@ -483,8 +502,6 @@ export function ManagementStaffPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--dg-color-border-light)"
@@ -597,6 +614,16 @@ export function ManagementStaffPanel({
                 </Link>
               )}
             </div>
+            {onRoleChange && person.orgRole ? (
+              <div data-slot="management-header-access" style={{ flexShrink: 0 }}>
+                <InlineRoleSelect
+                  orgRole={person.orgRole}
+                  onChange={onRoleChange}
+                  isSelf={isSelf}
+                  pendingInvitationEmail={isPending ? effectiveEmail : undefined}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -789,36 +816,9 @@ export function ManagementStaffPanel({
                 </div>
               )}
 
-              {accessControls}
-
-              <EditorActionRow
-                secondaryAction={
-                  <Button
-                    onClick={handleDismissClick}
-                    disabled={saving}
-                    className="dg-btn dg-btn-secondary"
-                  >
-                    {dismissLabel}
-                  </Button>
-                }
-                primaryAction={
-                  <Button
-                    onClick={handleSave}
-                    disabled={
-                      saving ||
-                      !hasChanges ||
-                      !currentDraft.firstName ||
-                      !currentDraft.lastName ||
-                      currentDraft.managementDepartmentIds.length === 0
-                    }
-                    className="dg-btn dg-btn-primary"
-                  >
-                    <ButtonLoading loading={saving} spinnerSize={16}>
-                      {EDITOR_ACTION_LABELS.save}
-                    </ButtonLoading>
-                  </Button>
-                }
-              />
+              {showBodyAccessControl && (
+                <div data-slot="management-body-access">{accessControls}</div>
+              )}
             </>
           )}
 
@@ -1034,30 +1034,19 @@ export function ManagementStaffPanel({
               )}
             </div>
           )}
+        </div>
 
-          {/* Actions section */}
-          {(canManageManagementAccess || canManageScheduleEmployees) && (
-            <div
-              style={{
-                borderTop: "1px solid var(--dg-color-border-light)",
-                paddingTop: 16,
-                marginTop: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              {/* Add to Schedule — show for any linked management user who
-                  isn't already on the schedule grid. The old `source ===
-                  "user_only"` check fell apart once every member got an
-                  employees row (Flow B + seed backfill); now we gate on the
-                  same "appears on schedule" signal used everywhere else
-                  (focusAreaIds). */}
-              {canManageScheduleEmployees &&
-                !isOnSchedule &&
-                person.isManagementUser &&
-                person.userId &&
-                onAddToSchedule && (
+        <StaffPanelFooter
+          actions={
+            showPersonActionFooter ? (
+              <div className="flex flex-col gap-2.5">
+                {/* Add to Schedule — show for any linked management user who
+                    isn't already on the schedule grid. The old `source ===
+                    "user_only"` check fell apart once every member got an
+                    employees row (Flow B + seed backfill); now we gate on the
+                    same "appears on schedule" signal used everywhere else
+                    (focusAreaIds). */}
+                {showAddToScheduleAction && onAddToSchedule && (
                   <Button
                     onClick={() => onAddToSchedule(person)}
                     className="dg-btn dg-btn-secondary"
@@ -1083,76 +1072,105 @@ export function ManagementStaffPanel({
                   </Button>
                 )}
 
-              {/* Resend invitation */}
-              {canManageManagementAccess && isPending && !isExpired && onResendInvitation && (
-                <Button
-                  onClick={handleResend}
-                  disabled={resending}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ width: "100%" }}
-                >
-                  <ButtonLoading loading={resending} spinnerSize={14}>
-                    Resend Invitation
-                  </ButtonLoading>
-                </Button>
-              )}
-
-              {/* Revoke invitation (pending invites only — app access revocation is in Settings > User Management) */}
-              {canManageManagementAccess &&
-                isPending &&
-                onRevokeInvitation &&
-                (!showRevokeConfirm ? (
+                {showResendInvitationAction && (
                   <Button
-                    onClick={() => setShowRevokeConfirm(true)}
-                    className="dg-btn dg-btn-ghost"
-                    style={{ width: "100%", color: "var(--dg-color-danger)" }}
+                    onClick={handleResend}
+                    disabled={resending}
+                    className="dg-btn dg-btn-secondary"
+                    style={{ width: "100%" }}
                   >
-                    Revoke Invitation
+                    <ButtonLoading loading={resending} spinnerSize={14}>
+                      Resend Invitation
+                    </ButtonLoading>
                   </Button>
-                ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      background: "var(--dg-color-danger-bg)",
-                      padding: "14px 16px",
-                      borderRadius: "var(--dg-radius-lg)",
-                      border: "1px solid var(--dg-color-danger-border)",
-                    }}
-                  >
-                    <span
+                )}
+
+                {showRevokeInvitationAction &&
+                  (!showRevokeConfirm ? (
+                    <Button
+                      onClick={() => setShowRevokeConfirm(true)}
+                      className="dg-btn dg-btn-ghost"
+                      style={{ width: "100%", color: "var(--dg-color-danger)" }}
+                    >
+                      Revoke Invitation
+                    </Button>
+                  ) : (
+                    <div
                       style={{
-                        fontSize: "var(--dg-fs-label)",
-                        fontWeight: 600,
-                        color: "var(--dg-color-danger-text)",
-                        lineHeight: 1.4,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        background: "var(--dg-color-danger-bg)",
+                        padding: "14px 16px",
+                        borderRadius: "var(--dg-radius-lg)",
+                        border: "1px solid var(--dg-color-danger-border)",
                       }}
                     >
-                      Revoke this invitation? The link will no longer work.
-                    </span>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <Button
-                        onClick={handleRevoke}
-                        disabled={revoking}
-                        className="dg-btn dg-btn-danger-filled"
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-danger-text)",
+                          lineHeight: 1.4,
+                        }}
                       >
-                        <ButtonLoading loading={revoking} spinnerSize={14}>
-                          Confirm
-                        </ButtonLoading>
-                      </Button>
-                      <Button
-                        onClick={() => setShowRevokeConfirm(false)}
-                        className="dg-btn dg-btn-secondary"
-                      >
-                        Cancel
-                      </Button>
+                        Revoke this invitation? The link will no longer work.
+                      </span>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Button
+                          onClick={() => setShowRevokeConfirm(false)}
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleRevoke}
+                          disabled={revoking}
+                          className="dg-btn dg-btn-danger-filled"
+                        >
+                          <ButtonLoading loading={revoking} spinnerSize={14}>
+                            Confirm
+                          </ButtonLoading>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
+                  ))}
+              </div>
+            ) : undefined
+          }
+          editorActions={
+            canManageManagementAccess ? (
+              <EditorActionRow
+                secondaryAction={
+                  <Button
+                    onClick={handleDismissClick}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary"
+                  >
+                    {dismissLabel}
+                  </Button>
+                }
+                primaryAction={
+                  <Button
+                    onClick={handleSave}
+                    disabled={
+                      saving ||
+                      !hasChanges ||
+                      !currentDraft.firstName ||
+                      !currentDraft.lastName ||
+                      currentDraft.managementDepartmentIds.length === 0
+                    }
+                    className="dg-btn dg-btn-primary"
+                  >
+                    <ButtonLoading loading={saving} spinnerSize={16}>
+                      {EDITOR_ACTION_LABELS.save}
+                    </ButtonLoading>
+                  </Button>
+                }
+              />
+            ) : undefined
+          }
+        />
 
         {unsavedChangesDialog}
         <ScrollOverflowCue />

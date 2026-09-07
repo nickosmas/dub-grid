@@ -755,10 +755,43 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Staffing")).toBeInTheDocument();
     expect(screen.getByText("Assignments")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
-    expect(screen.getByText("Discard")).toBeInTheDocument();
+    // Two buttons, and the dismiss one carries web's tri-state: nothing typed
+    // yet, so it reads Cancel. It becomes Discard once there is something to
+    // throw away, which the dedicated test below covers.
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
+    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
     expect(screen.getByText("Save changes")).toBeInTheDocument();
     expect(screen.queryByText("Call")).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
+  });
+
+  it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson() },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    const firstName = screen.getByDisplayValue("Mina");
+    fireEvent.change(firstName, { target: { value: "Minara" } });
+
+    expect(screen.getByText("Discard")).toBeInTheDocument();
+    expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Discard"));
+
+    // Reset in place: the field is back to its saved value, the panel is still
+    // open, and the button has gone back to Cancel. Leaving is the back
+    // gesture's job, which is guarded separately.
+    expect(screen.getByDisplayValue("Mina")).toBeInTheDocument();
+    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
+    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
   });
 
   it("hides an incompatible role while keeping a selected legacy role removable", () => {
@@ -890,7 +923,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
-    expect(screen.getByText("Account found")).toBeInTheDocument();
+    expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/)).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
@@ -919,7 +952,7 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  it("confirms before linking an exact existing account match", () => {
+  it("confirms before linking an exact existing account match", async () => {
     const mutationCalls: Array<{
       mutate: ReturnType<typeof vi.fn>;
       options: {
@@ -991,7 +1024,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Send invitation?")).toBeInTheDocument();
     confirmDialog("Send Invitation");
 
-    expect(screen.getByText("Account found")).toBeInTheDocument();
+    expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
@@ -1031,7 +1064,7 @@ describe("PersonDetailScreen", () => {
       renderWithStatusMutation();
 
       expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     });
 
@@ -1040,7 +1073,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
       expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
-      confirmDialog("Mark Inactive");
+      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
@@ -1053,13 +1086,14 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation();
 
       fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      const sheet = within(screen.getByRole("alert"));
+      expect(screen.queryByRole("alert")).toBeNull();
+      const sheet = screen;
       fireEvent.click(sheet.getByRole("button", { name: /Remove from staff/ }));
 
       // The primary action's verb follows the outcome, so the confirm always
       // says what it is about to do.
-      expect(sheet.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
-      confirmDialog("Remove");
+      expect(sheet.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "remove",
@@ -1075,7 +1109,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.change(screen.getByPlaceholderText(/Reason \(optional\)/), {
         target: { value: "  On leave until June  " },
       });
-      confirmDialog("Mark Inactive");
+      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
@@ -1346,11 +1380,18 @@ describe("PersonDetailScreen", () => {
 
   describe("schedule membership", () => {
     function renderForSchedule(person: Record<string, unknown>) {
-      const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
+      // `mutateAsync` as well as `mutate`: the edit panel's save awaits the
+      // promise, so a mock carrying only `mutate` makes a save look like a
+      // no-op rather than a failure.
+      const mutationCalls: Array<{
+        mutate: ReturnType<typeof vi.fn>;
+        mutateAsync: ReturnType<typeof vi.fn>;
+      }> = [];
       useMutation.mockImplementation(() => {
         const mutate = vi.fn();
-        mutationCalls.push({ mutate });
-        return { error: null, isPending: false, mutate };
+        const mutateAsync = vi.fn().mockResolvedValue(undefined);
+        mutationCalls.push({ mutate, mutateAsync });
+        return { error: null, isPending: false, mutate, mutateAsync };
       });
       useQuery.mockReturnValue({
         data: { person: makePerson(person) },
@@ -1364,41 +1405,52 @@ describe("PersonDetailScreen", () => {
       return mutationCalls;
     }
 
-    it("offers Remove from Schedule to someone with management access", () => {
-      renderForSchedule({ managementDepartmentIds: [9] });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-
-      expect(screen.getByRole("button", { name: "Remove from Schedule" })).toBeInTheDocument();
-    });
-
-    // Without management access the focus areas are the whole staff record, and
-    // clearing them is what Deactivate is for.
-    it("withholds Remove from Schedule from plain staff", () => {
-      renderForSchedule({ managementDepartmentIds: [] });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-
-      expect(
-        screen.queryByRole("button", { name: "Remove from Schedule" }),
-      ).not.toBeInTheDocument();
-    });
-
-    // The server allows the empty focus-area set only because they keep
-    // managing, so Save has to stay live once the row is cleared.
+    // Deselecting the focus areas is the removal path; there is no separate
+    // button. The server allows the empty set only because they keep managing,
+    // so Save has to stay live once the last chip comes off.
     it("clears the focus areas and keeps Save available", () => {
       renderForSchedule({ managementDepartmentIds: [9] });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Remove from Schedule" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
 
-      expect(screen.getByText("Not scheduled")).toBeInTheDocument();
       expect(
         screen.getByText(
           "Saving now removes them from the schedule. They'll keep management access.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    });
+
+    // The notice above the chips already says what saving does, so saving goes
+    // straight through. A confirmation here as well warned twice for one action.
+    it("saves an emptied schedule without a second confirmation", () => {
+      const mutationCalls = renderForSchedule({ managementDepartmentIds: [9] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(
+        mutationCalls.flatMap((call) => call.mutateAsync.mock.calls.map(([payload]) => payload)),
+      ).toContainEqual(expect.objectContaining({ focusAreaIds: [] }));
+    });
+
+    // Without management access the focus areas are the whole staff record, so
+    // clearing them is a validation error, not a removal. Deactivate is what
+    // takes plain staff off the grid.
+    it("withholds the removal note from plain staff", () => {
+      renderForSchedule({ managementDepartmentIds: [] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+
+      expect(
+        screen.queryByText(
+          "Saving now removes them from the schedule. They'll keep management access.",
+        ),
+      ).not.toBeInTheDocument();
     });
 
     it("offers Add to Schedule to someone who isn't on it", () => {

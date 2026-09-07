@@ -244,11 +244,22 @@ export default function DashboardHeader({
       }}
     >
       {/* LEFT ZONE: time navigation + mode selector */}
+      {/* Wraps and may shrink: this layout also renders for a frame at phone
+          widths, before the media query resolves, and a rigid row there pushes
+          its own controls off the side of the screen. */}
       <div
         data-tour="dashboard-period-nav"
-        style={{ display: "flex", alignItems: "center", gap: 8 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          rowGap: 8,
+          flexWrap: "wrap",
+          minWidth: 0,
+          maxWidth: "100%",
+        }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
             <Button
               onClick={onPrev}

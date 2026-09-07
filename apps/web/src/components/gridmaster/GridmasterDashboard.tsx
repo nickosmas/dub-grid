@@ -21,6 +21,7 @@ import { sectionStyle, thStyle } from "@/lib/styles";
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div
+      data-stat-card
       style={{
         ...sectionStyle,
         padding: "20px 24px",
@@ -74,7 +75,10 @@ function OversightCard({
           ? "var(--dg-color-success)"
           : "var(--dg-color-text-primary)";
   return (
-    <div style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}>
+    <div
+      data-stat-card
+      style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}
+    >
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",

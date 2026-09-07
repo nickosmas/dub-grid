@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -115,42 +115,48 @@ describe("ManagementAccessSheet", () => {
     renderSheet();
     expect(screen.getByText("Add to management")).toBeInTheDocument();
 
+    cleanup();
     renderSheet({ managementDepartmentIds: [9] });
     expect(screen.getByText("Edit management access")).toBeInTheDocument();
   });
 
   // The reported bug: `hasManagementAccess` also returned true for a plain app
   // invitation, which carries no departments, so someone merely invited to the
-  // app was offered "Edit"/"Remove" for management access they never had.
+  // app was offered an edit and a removal for access they never had.
   it("treats a plain staff invitation as no management access", () => {
     renderSheet({ pendingInvitation: STAFF_INVITATION });
 
     expect(screen.getByText("Add to management")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Remove from Management" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Select at least one management department")).toBeInTheDocument();
   });
 
-  it("offers no removal to someone not on the roster yet", () => {
+  // An empty selection means two different things either side of that line: a
+  // missing answer while granting, a removal while editing.
+  it("reads an empty selection as a missing answer for someone not on the roster yet", () => {
     renderSheet();
 
-    expect(
-      screen.queryByRole("button", { name: "Remove from Management" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Select at least one management department")).toBeInTheDocument();
+    expect(screen.queryByText(/Saving now removes/)).not.toBeInTheDocument();
   });
 
-  // The tier list used to depend on whether they had an account, so the same
-  // sheet showed three options for one person and two for another with nothing
-  // on screen saying why.
-  it("offers Super Admin to someone who already has an account", () => {
-    renderSheet({ userId: "user-1", managementDepartmentIds: [9] });
+  // Role changes belong to the access badge on the profile. This sheet asks
+  // for a role only when nothing exists yet to hold one.
+  it("keeps the access level off the sheet for someone who already has an account", () => {
+    renderSheet({ userId: "user-1", orgRole: "admin", managementDepartmentIds: [9] });
 
-    expect(screen.getByText("Super Admin")).toBeInTheDocument();
+    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
   });
 
-  it("offers Super Admin on the invitation path too", () => {
+  it("keeps the access level off the sheet for someone holding a pending invitation", () => {
+    renderSheet({ pendingInvitation: STAFF_INVITATION });
+
+    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+  });
+
+  it("asks for an access level only for a brand-new invitation", () => {
     renderSheet({ userId: null });
 
+    expect(screen.getByText("Access level")).toBeInTheDocument();
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
   });
 
@@ -209,25 +215,31 @@ describe("ManagementAccessSheet", () => {
     expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
   });
 
-  it("asks before replacing a pending invitation's access level", () => {
+  // Clearing every department is the removal path, so an empty draft has to
+  // keep Save live and say what saving it would do.
+  it("turns an emptied selection into a removal, behind the confirmation", () => {
     const mutationCalls = renderSheet({
-      managementDepartmentIds: [9],
-      pendingInvitation: { ...STAFF_INVITATION, roleToAssign: "user" },
-    });
-
-    fireEvent.click(screen.getByText("Admin"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
-
-    expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
-    expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
-
-    fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: "Revoke and resend" }),
-    );
-    expect(allMutatePayloads(mutationCalls)).toContainEqual({
       orgRole: "admin",
       managementDepartmentIds: [9],
+      userId: "user-1",
     });
+
+    fireEvent.click(screen.getByText("OPS"));
+
+    expect(
+      screen.getByText(
+        "Saving now removes their management access. Their staff profile stays as it is.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+    expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Remove Access" }),
+    );
+
+    expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
   });
 
   it("submits one removal when the destructive confirmation is pressed twice", () => {
@@ -237,7 +249,8 @@ describe("ManagementAccessSheet", () => {
       userId: "user-1",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove from Management" }));
+    fireEvent.click(screen.getByText("OPS"));
+    fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
     const confirm = within(screen.getByRole("alert")).getByRole("button", {
       name: "Remove Access",
     });

@@ -3,6 +3,7 @@ import { useTheme } from "next-themes";
 import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
@@ -17,6 +18,7 @@ import {
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
 import {
+  getAvatarTypography,
   getAvatarTone,
   getHeroGradientCss,
   heroGradientTokens,
@@ -35,6 +37,7 @@ import type {
   ShiftJobSegment,
   ShiftMap,
   ShiftRequest,
+  PublishChange,
 } from "@/types";
 
 type DashboardScheduleSegment = {
@@ -74,6 +77,10 @@ type DashboardScheduleItem = {
   key: string;
   segment: DashboardScheduleSegment;
   segmentIndex: number;
+  changeKind: PublishChange["kind"] | null;
+  isNewAddition: boolean;
+  isDeletedHistory: boolean;
+  previousLabel: string | null;
 };
 
 type HeroStatus = "active" | "upcoming" | "scheduled" | "away" | "empty";
@@ -157,6 +164,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     currentEmployee,
     currentHours,
     currentPeriodShifts,
+    recentPublishedChanges = new Map(),
     employees,
     focusAreas,
     isMobile,
@@ -201,6 +209,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         absenceTypeById,
         assignmentById,
         currentPeriodShifts,
+        recentPublishedChanges,
         employeeById,
         focusAreaById,
         jobById,
@@ -214,6 +223,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       employeeById,
       focusAreaById,
       jobById,
+      recentPublishedChanges,
       shiftById,
       isDarkTheme,
     ],
@@ -232,12 +242,13 @@ export default function UserDashboard(props: DashboardContentProps) {
         absenceTypeById,
         assignmentById,
         currentPeriodShifts: allShifts,
+        recentPublishedChanges,
         employeeById,
         focusAreaById,
         jobById,
         shiftById,
         isDarkTheme,
-      }).filter((item) => item.dateKey >= todayKey),
+      }).filter((item) => item.dateKey >= todayKey && !item.isDeletedHistory),
     [
       absenceTypeById,
       allShifts,
@@ -245,6 +256,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       employeeById,
       focusAreaById,
       jobById,
+      recentPublishedChanges,
       shiftById,
       todayKey,
       isDarkTheme,
@@ -435,6 +447,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     <MyWeekSection
       items={myScheduleItems}
       isTwoWeekView={isTwoWeekView}
+      periodDates={periodDates}
       todayKey={todayKey}
       weeklyHours={weeklyHours}
     />
@@ -476,7 +489,10 @@ export default function UserDashboard(props: DashboardContentProps) {
       }
     >
       {!hasScheduleItems ? (
-        <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
+        <>
+          <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
+          {myWeek}
+        </>
       ) : stackLayout ? (
         <div
           data-testid="user-dashboard-content-grid"
@@ -586,10 +602,28 @@ function buildScheduleItemsFromShiftMap(input: {
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
   isDarkTheme: boolean;
+  recentPublishedChanges: Map<string, PublishChange>;
 }): DashboardScheduleItem[] {
   const items: DashboardScheduleItem[] = [];
 
-  for (const [key, entry] of Object.entries(input.currentPeriodShifts)) {
+  const entries = new Map(Object.entries(input.currentPeriodShifts));
+  for (const [key, change] of input.recentPublishedChanges) {
+    if (change.kind !== "deleted" || entries.has(key)) continue;
+    entries.set(key, {
+      label: "",
+      assignmentIds: change.from ?? [],
+      isDraft: false,
+      draftKind: null,
+      publishedAssignmentDefinitionIds: [],
+      publishedLabel: "",
+      segments: change.fromSegments ?? [],
+      absenceTypeId: change.fromAbsenceTypeId ?? null,
+      customStartTime: change.fromCustomStart ?? null,
+      customEndTime: change.fromCustomEnd ?? null,
+    });
+  }
+
+  for (const [key, entry] of entries) {
     if (entry.isDelete) {
       continue;
     }
@@ -604,6 +638,17 @@ function buildScheduleItemsFromShiftMap(input: {
     const avatarSeed = employee ? resolveAvatarSeed(employee) : parsedKey.employeeId;
     const date = new Date(`${parsedKey.dateKey}T00:00:00`);
     const absenceTypeId = entry.absenceTypeId ?? null;
+    const changeKind = input.recentPublishedChanges.get(key)?.kind ?? null;
+    const publishedChange = input.recentPublishedChanges.get(key) ?? null;
+    const isNewAddition = publishedChange?.isNewAddition === true;
+    const previousLabel = getPreviousChangeSummary({
+      absenceTypeById: input.absenceTypeById,
+      assignmentById: input.assignmentById,
+      change: publishedChange,
+      focusAreaById: input.focusAreaById,
+      jobById: input.jobById,
+      shiftById: input.shiftById,
+    });
 
     if (absenceTypeId != null) {
       const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
@@ -617,6 +662,10 @@ function buildScheduleItemsFromShiftMap(input: {
         key: `${key}:absence`,
         segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
         segmentIndex: 0,
+        changeKind,
+        isNewAddition,
+        isDeletedHistory: changeKind === "deleted",
+        previousLabel,
       });
       continue;
     }
@@ -639,6 +688,7 @@ function buildScheduleItemsFromShiftMap(input: {
       if (!segment) {
         return;
       }
+      const segmentChangeKind = getSegmentChangeKind(publishedChange, rawSegment, segmentIndex);
 
       items.push({
         avatarSeed,
@@ -650,6 +700,10 @@ function buildScheduleItemsFromShiftMap(input: {
         key: `${key}:${segmentIndex}`,
         segment,
         segmentIndex,
+        changeKind: segmentChangeKind,
+        isNewAddition,
+        isDeletedHistory: changeKind === "deleted",
+        previousLabel,
       });
     });
   }
@@ -669,6 +723,42 @@ function parseShiftMapKey(key: string): { employeeId: string; dateKey: string } 
   };
 }
 
+function getPreviousChangeSummary(input: {
+  absenceTypeById: Map<number, AbsenceType>;
+  assignmentById: Map<number, AssignmentDefinition>;
+  change: PublishChange | null;
+  focusAreaById: Map<number, FocusArea>;
+  jobById: Map<number, JobDefinition>;
+  shiftById: Map<number, { abbr?: string | null; name: string }>;
+}): string | null {
+  const change = input.change;
+  if (!change || change.kind === "new") return null;
+  if (change.fromAbsenceTypeId != null) {
+    return input.absenceTypeById.get(change.fromAbsenceTypeId)?.name ?? "Away";
+  }
+
+  const summaries = (change.from ?? [])
+    .map((assignmentId) => input.assignmentById.get(assignmentId) ?? null)
+    .filter((assignment): assignment is AssignmentDefinition => assignment !== null)
+    .map((assignment) => {
+      const parts = [assignment.name, formatAssignmentTimeRange(assignment)];
+      if (!assignment.isGeneral && assignment.focusAreaId != null) {
+        parts.push(input.focusAreaById.get(assignment.focusAreaId)?.name ?? null);
+      }
+      return parts.filter((part): part is string => Boolean(part)).join(" · ");
+    });
+
+  if (summaries.length > 0) return summaries.join("; ");
+
+  const previousSegments = change.fromState?.segments ?? [];
+  const stateSummaries = previousSegments.map((segment) => {
+    const shift = segment.shiftId != null ? (input.shiftById.get(segment.shiftId) ?? null) : null;
+    const job = segment.jobId != null ? (input.jobById.get(segment.jobId) ?? null) : null;
+    return shift?.name ?? job?.name ?? "Shift";
+  });
+  return stateSummaries.length > 0 ? stateSummaries.join("; ") : null;
+}
+
 function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJobSegment>> {
   const explicitSegments = [...(entry.segments ?? [])].sort(
     (left, right) => (left.position ?? 0) - (right.position ?? 0),
@@ -682,6 +772,23 @@ function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJo
     assignmentId,
     position: index,
   }));
+}
+
+function getSegmentChangeKind(
+  change: PublishChange | null,
+  segment: Partial<ShiftJobSegment>,
+  segmentIndex: number,
+): PublishChange["kind"] | null {
+  if (!change || (change.kind === "new" && !change.isNewAddition)) return null;
+  if (change.kind !== "modified") return change.kind;
+
+  const previous = change.fromState?.segments[segmentIndex];
+  if (!previous) return "modified";
+  return previous.shiftId === segment.shiftId &&
+    previous.jobId === segment.jobId &&
+    Boolean(previous.isMentored) === Boolean(segment.isMentored)
+    ? null
+    : "modified";
 }
 
 function buildAbsenceSegment(
@@ -1609,6 +1716,20 @@ function MeHeroCard({
             >
               {item.segment.title}
             </h2>
+            {item.changeKind && (item.changeKind !== "new" || item.isNewAddition) ? (
+              <PublishDiffPill
+                aria-label={`${item.changeKind === "modified" ? "Edited" : item.changeKind} shift`}
+                data-draft-badge={item.changeKind}
+                kind={item.changeKind}
+                style={{ padding: "2px 6px" }}
+              >
+                {item.changeKind === "modified"
+                  ? "Edited"
+                  : item.changeKind === "deleted"
+                    ? "Deleted"
+                    : "New"}
+              </PublishDiffPill>
+            ) : null}
             {segmentCount > 1 ? (
               <SplitShiftBadge inverse label={`Shift ${item.segmentIndex + 1}`} />
             ) : null}
@@ -1662,10 +1783,18 @@ function MeHeroCard({
           minHeight: 0,
         }}
       >
+        <HeroPillRow segment={item.segment} inverse />
         {item.segment.focusAreaName ? (
           <HeroInfoRow icon={<MapPin size={18} />} text={item.segment.focusAreaName} />
         ) : null}
-        <HeroPillRow segment={item.segment} inverse />
+        {item.previousLabel && item.changeKind === "modified" ? (
+          <div
+            aria-label={`Previous shift: ${item.previousLabel}`}
+            style={{ color: "rgba(255,255,255,0.82)", fontSize: "var(--dg-type-metadata-size)" }}
+          >
+            Was {item.previousLabel}
+          </div>
+        ) : null}
         {formatSegmentTimeRange(item.segment) ? (
           <div
             style={{
@@ -2116,17 +2245,15 @@ function ShiftmatesRow({
                 <span
                   data-testid="user-dashboard-shiftmate-avatar"
                   style={{
+                    ...getAvatarTypography(38),
                     alignItems: "center",
                     background: avatarTone.backgroundColor,
                     border: `1px solid ${avatarTone.borderColor}`,
                     borderRadius: 19,
                     color: avatarTone.textColor,
                     display: "inline-flex",
-                    fontSize: 13,
-                    fontWeight: 600,
                     height: 38,
                     justifyContent: "center",
-                    lineHeight: "18px",
                     width: 38,
                   }}
                 >
@@ -2402,17 +2529,19 @@ function ActionRailSection({
 function MyWeekSection({
   items,
   isTwoWeekView = false,
+  periodDates,
   style,
   todayKey,
   weeklyHours,
 }: {
   items: DashboardScheduleItem[];
   isTwoWeekView?: boolean;
+  periodDates: Date[];
   style?: CSSProperties;
   todayKey: string;
   weeklyHours: number;
 }) {
-  const groups = groupScheduleItemsByDate(items);
+  const groups = groupScheduleItemsByDate(items, periodDates);
   const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const hoursLabel = weeklyHours > 0 ? `${formatHoursLabel(weeklyHours)}h ${periodLabel}` : null;
 
@@ -2433,6 +2562,8 @@ function MyWeekSection({
       <div className="dg-card-body" style={{ padding: 0 }}>
         {groups.map((group, index) => {
           const isToday = group.dateKey === todayKey;
+          const activeItems = group.items.filter((item) => !item.isDeletedHistory);
+          const deletedItems = group.items.filter((item) => item.isDeletedHistory);
           return (
             <div
               key={group.dateKey}
@@ -2452,14 +2583,34 @@ function MyWeekSection({
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: group.items.length > 1 ? 12 : 0,
+                  gap: activeItems.length > 1 ? 12 : 0,
                   minWidth: 0,
                 }}
               >
-                {group.items.map((item, itemIndex) => (
+                {activeItems.length === 0 ? (
+                  <div
+                    style={{ color: "var(--dg-color-text-muted)", fontSize: 15, fontWeight: 600 }}
+                  >
+                    Unscheduled
+                  </div>
+                ) : null}
+                {activeItems.map((item, itemIndex) => (
                   <div key={item.key}>
                     {itemIndex > 0 ? <DashedDivider /> : null}
                     <WeekShiftRow item={item} showSegmentLabel={group.items.length > 1} />
+                  </div>
+                ))}
+                {deletedItems.map((item) => (
+                  <div
+                    key={item.key}
+                    aria-label={`Previous shift: ${item.previousLabel ?? item.segment.title}`}
+                    style={{
+                      color: "var(--dg-color-text-muted)",
+                      fontSize: 12,
+                      marginTop: activeItems.length > 0 ? 8 : 4,
+                    }}
+                  >
+                    Was {item.previousLabel ?? item.segment.title}
                   </div>
                 ))}
               </div>
@@ -2790,6 +2941,20 @@ function WeekShiftRow({
                 ? (item.segment.typeLabel ?? item.segment.title)
                 : item.segment.title}
             </div>
+            {item.changeKind && (item.changeKind !== "new" || item.isNewAddition) ? (
+              <PublishDiffPill
+                aria-label={`${item.changeKind === "modified" ? "Edited" : item.changeKind} shift`}
+                data-draft-badge={item.changeKind}
+                kind={item.changeKind}
+                style={{ padding: "2px 6px" }}
+              >
+                {item.changeKind === "modified"
+                  ? "Edited"
+                  : item.changeKind === "deleted"
+                    ? "Deleted"
+                    : "New"}
+              </PublishDiffPill>
+            ) : null}
             {showSegmentLabel && !item.segment.isAbsence ? (
               <SplitShiftBadge label={`Shift ${item.segmentIndex + 1}`} />
             ) : null}
@@ -2811,6 +2976,7 @@ function WeekShiftRow({
             </div>
           ) : null}
         </div>
+        <WeekPillRow segment={item.segment} />
         {item.segment.focusAreaName ? (
           <div
             style={{
@@ -2822,7 +2988,14 @@ function WeekShiftRow({
             {item.segment.focusAreaName}
           </div>
         ) : null}
-        <WeekPillRow segment={item.segment} />
+        {item.previousLabel ? (
+          <div
+            aria-label={`Previous shift: ${item.previousLabel}`}
+            style={{ color: "var(--dg-color-text-muted)", fontSize: 12, marginTop: 4 }}
+          >
+            Was {item.previousLabel}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -2998,20 +3171,21 @@ function DashedDivider() {
   );
 }
 
-function groupScheduleItemsByDate(items: DashboardScheduleItem[]) {
-  return items.reduce<Array<{ date: Date; dateKey: string; items: DashboardScheduleItem[] }>>(
-    (groups, item) => {
-      const group = groups[groups.length - 1];
-      if (group?.dateKey === item.dateKey) {
-        group.items.push(item);
-        return groups;
-      }
+function groupScheduleItemsByDate(items: DashboardScheduleItem[], periodDates: Date[]) {
+  const itemsByDate = new Map<string, DashboardScheduleItem[]>();
+  for (const item of items) {
+    const dayItems = itemsByDate.get(item.dateKey) ?? [];
+    dayItems.push(item);
+    itemsByDate.set(item.dateKey, dayItems);
+  }
 
-      groups.push({ date: item.date, dateKey: item.dateKey, items: [item] });
-      return groups;
-    },
-    [],
-  );
+  // The published period determines the visible rows. A just-published period
+  // can have no cells at all, yet every date should still explicitly say
+  // "Unscheduled" rather than disappearing.
+  return periodDates.map((date) => {
+    const dateKey = formatDateKey(date);
+    return { date, dateKey, items: itemsByDate.get(dateKey) ?? [] };
+  });
 }
 
 function buildVolunteerInput(

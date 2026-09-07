@@ -3,8 +3,13 @@
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import dynamic from "next/dynamic";
+import {
+  LazyOverlayFallback,
+  LazyPrintFallback,
+  LazyProgressFallback,
+} from "@/components/ui/lazy-fallback";
 import Toolbar from "@/components/Toolbar";
 import TimeZoneClocks from "@/components/TimeZoneClocks";
 import ScheduleGrid, {
@@ -12,6 +17,7 @@ import ScheduleGrid, {
   type ScheduleGridHandlers,
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import PrintLegend from "@/components/PrintLegend";
@@ -44,12 +50,23 @@ import { X } from "lucide-react";
 
 const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
   ssr: false,
+  loading: LazyOverlayFallback,
 });
-const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), { ssr: false });
-const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), { ssr: false });
-const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), { ssr: false });
+const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
+  ssr: false,
+  loading: LazyOverlayFallback,
+});
+const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), {
+  ssr: false,
+  loading: LazyPrintFallback,
+});
+const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 
 import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
@@ -201,6 +218,8 @@ import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationB
 import { queryKeys } from "@/lib/query-keys";
 import {
   buildScheduleNoteMap,
+  removeScheduleNotesForCell,
+  buildScheduleNoteMarks,
   scheduleNoteKey,
   type ScheduleNoteMap,
 } from "./_lib/schedule-window";
@@ -225,6 +244,7 @@ import {
   SeriesFrequency,
   SeriesScope,
   DraftKind,
+  NotePublishChange,
   PublishChange,
   PublishHistoryEntry,
   GridOpenShift,
@@ -323,6 +343,9 @@ function SchedulerContent() {
   // tool, regardless of the org's openShiftVisibility setting or their own
   // personal eligibility for a given shift (see openShifts memo below).
   const canSeeAllOpenShifts = canEditShifts || canManageEmployees || isSuperAdmin || isGridmaster;
+  // Staff can inspect the current change chips, but only people who can publish
+  // schedules get the cross-publication history and acknowledgement workflow.
+  const canNavigatePublishHistory = canPublishSchedule || isSuperAdmin || isGridmaster;
   // Org-wide staffing shortfalls are a management view, not staff-facing. The
   // same flag gates /api/dashboard/analytics, and authz already derives it from
   // any scheduling capability, so regular staff (and benched accounts) lose the
@@ -511,6 +534,8 @@ function SchedulerContent() {
   const [showPublishHistory, setShowPublishHistory] = useState(false);
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const stickyChromeRef = useRef<HTMLDivElement>(null);
   const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
   const operationDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1116,11 +1141,17 @@ function SchedulerContent() {
         lastViewedRef.current = lastViewed;
         setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
 
-        // Fetch publish history since user's last view; if there's no last
-        // view yet (brand-new user), the API returns no entries.
-        const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(
-          () => [] as PublishHistoryEntry[],
-        );
+        // Staff always need the current window's chips, including on a first
+        // visit when no last-viewed baseline exists. Publish-capable users keep
+        // the existing acknowledgement/history workflow instead.
+        const recentPublishes = await fetchRecentPublishHistory(
+          orgId,
+          lastViewed,
+          !canNavigatePublishHistory,
+          !canNavigatePublishHistory
+            ? { startDate: defaultShiftFetchStart, endDate: defaultShiftFetchEnd }
+            : undefined,
+        ).catch(() => [] as PublishHistoryEntry[]);
 
         const noteMap = buildScheduleNoteMap(noteRows);
         setShifts(shiftData);
@@ -1384,6 +1415,7 @@ function SchedulerContent() {
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
   const needsAuditNames =
     publishHistory.length > 0 ||
+    publishedDateRanges.some((range) => !!range.publishedBy) ||
     (canRenderAuthorNames &&
       (showAudit ||
         Object.values(shifts).some(
@@ -1406,6 +1438,11 @@ function SchedulerContent() {
       for (const change of entry.changes) {
         if (change.updatedBy && !profileNameCache.current.has(change.updatedBy))
           uncached.add(change.updatedBy);
+      }
+    }
+    for (const range of publishedDateRanges) {
+      if (range.publishedBy && !profileNameCache.current.has(range.publishedBy)) {
+        uncached.add(range.publishedBy);
       }
     }
     if (uncached.size === 0) {
@@ -1439,7 +1476,7 @@ function SchedulerContent() {
     return () => {
       cancelled = true;
     };
-  }, [needsAuditNames, org?.id, publishHistory, shifts]);
+  }, [needsAuditNames, org?.id, publishHistory, publishedDateRanges, shifts]);
 
   // Split publish history by overlap with the currently visible window so
   // the banner, toggle, and overlay only describe publishes that touch
@@ -1479,11 +1516,7 @@ function SchedulerContent() {
         .map((group) => `${formatDateKey(group.periodStart)}:${group.count}`)
         .join("|"),
     );
-  const {
-    isDismissed: publishBannerDismissed,
-    dismiss: dismissPublishBanner,
-    reset: resetPublishBanner,
-  } = useDismissibleBanner(
+  const { isDismissed: publishBannerDismissed, reset: resetPublishBanner } = useDismissibleBanner(
     "schedule-publish",
     inWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
   );
@@ -1512,19 +1545,50 @@ function SchedulerContent() {
     return map;
   }, [inWindowPublishHistory]);
 
+  /**
+   * Published note changes, per cell and indicator.
+   *
+   * Notes are not part of a cell snapshot, so they arrive on their own list and
+   * key on the focus area too: the same indicator can sit on two focus-area
+   * sections of one employee's day.
+   */
+  const publishNoteChangesMap = useMemo(() => {
+    if (inWindowPublishHistory.length === 0) return null;
+    const map = new Map<string, Map<number, NotePublishChange>>();
+    for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
+      for (const change of inWindowPublishHistory[i].noteChanges ?? []) {
+        // A period's first publication is the baseline, not a set of additions.
+        // Marking its notes would ring every dot on a week whose shifts are all
+        // deliberately unmarked.
+        if (change.kind === "new" && change.isNewAddition === false) continue;
+        const key = scheduleNoteKey(change.empId, change.date, change.focusAreaId);
+        const byIndicator = map.get(key) ?? new Map<number, NotePublishChange>();
+        byIndicator.set(change.indicatorTypeId, change);
+        map.set(key, byIndicator);
+      }
+    }
+    return map.size > 0 ? map : null;
+  }, [inWindowPublishHistory]);
+
   // What the "Highlight Changes" toggle puts on the grid, counted by kind so
   // the banner can name and key each one. A publish can carry any mix of new,
   // edited and deleted cells.
   const publishChangeCounts = useMemo(() => {
-    const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0 };
+    const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0, notes: 0 };
+    for (const byIndicator of publishNoteChangesMap?.values() ?? []) {
+      counts.notes += byIndicator.size;
+    }
     if (!publishChangesMap) return counts;
     for (const change of publishChangesMap.values()) {
-      if (change.kind === "new") counts.newShifts += 1;
+      // A period's first publication has no prior published schedule for the
+      // viewer to compare against. Only later additions are meaningful "New"
+      // changes; the API marks initial-publication entries explicitly.
+      if (change.kind === "new" && change.isNewAddition !== false) counts.newShifts += 1;
       else if (change.kind === "deleted") counts.deletedShifts += 1;
       else counts.modifiedShifts += 1;
     }
     return counts;
-  }, [publishChangesMap]);
+  }, [publishChangesMap, publishNoteChangesMap]);
 
   // Dismissals persist for the tab session via useDismissibleBanner — no
   // auto-reset on data change. The X means "hide this for the rest of the
@@ -3154,9 +3218,46 @@ function SchedulerContent() {
       date: Date,
     ): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
-      return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
+      const change = publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
+      // Initial publication is the baseline, not an addition. Keep its audit
+      // record, but do not turn every populated cell into a green "New" chip.
+      return change?.kind === "new" && change.isNewAddition === false ? null : change;
     },
     [showPublishDiff, publishChangesMap],
+  );
+
+  // Regular shift hover cards need publication context too. This deliberately
+  // reads the selected period's history directly instead of the change-overlay
+  // map, so turning Highlight changes off never hides the date or author.
+  const publishedMetadataForKey = useCallback(
+    (
+      _empId: string,
+      date: Date,
+    ): {
+      publishedAt: string;
+      publishedBy: string;
+      timeZone?: string | null;
+    } | null => {
+      const dateKey = formatDateKey(date);
+      const matchingRanges = publishedDateRanges.filter(
+        (candidate) => candidate.startDate <= dateKey && candidate.endDate >= dateKey,
+      );
+      const latest = matchingRanges.reduce<(typeof matchingRanges)[number] | null>(
+        (current, candidate) =>
+          !current || (candidate.publishedAt ?? "") > (current.publishedAt ?? "")
+            ? candidate
+            : current,
+        null,
+      );
+      return latest?.publishedAt && latest.publishedBy
+        ? {
+            publishedAt: latest.publishedAt,
+            publishedBy: latest.publishedBy,
+            timeZone: org?.timezone ?? null,
+          }
+        : null;
+    },
+    [org?.timezone, publishedDateRanges],
   );
 
   const getCustomShiftTimes = useCallback(
@@ -3385,10 +3486,35 @@ function SchedulerContent() {
       const key =
         focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
       const noteList = notes[key] ?? [];
-      // Only return notes that aren't marked as deleted in draft
-      return noteList.filter((n) => n.status !== "draft_deleted").map((n) => n.indicatorTypeId);
+      // A note pending removal is still on the schedule, and one pending
+      // addition is not on it yet. Non-schedulers see neither draft state, the
+      // same way they never see draft shift state.
+      return noteList
+        .filter((n) => (isScheduleEditor ? n.status !== "draft_deleted" : n.status !== "draft"))
+        .map((n) => n.indicatorTypeId);
     },
-    [notes],
+    [isScheduleEditor, notes],
+  );
+
+  /**
+   * The grid's note dots, carrying each note's publication state.
+   *
+   * A note change never touches the cell snapshot, so nothing else in the cell
+   * moves when one is added or removed — without this the dot for an
+   * unpublished note is identical to a published one, and a note queued for
+   * removal simply disappears as though it were already gone.
+   */
+  const noteMarksForKey = useCallback(
+    (empId: string, date: Date, focusAreaId?: number): ScheduleNoteMark[] => {
+      const dateKey = formatDateKey(date);
+      const key = scheduleNoteKey(empId, dateKey, focusAreaId ?? null);
+      return buildScheduleNoteMarks({
+        notes: notes[key],
+        publishedChanges: showPublishDiff ? publishNoteChangesMap?.get(key) : undefined,
+        isScheduleEditor,
+      });
+    },
+    [isScheduleEditor, notes, publishNoteChangesMap, showPublishDiff],
   );
 
   const panelActiveIndicatorIds = useCallback(
@@ -3605,6 +3731,17 @@ function SchedulerContent() {
         return next;
       });
 
+      // The delete endpoints clear each cell's notes, so drop them here too
+      // rather than leave dots behind on a cell that no longer has a shift.
+      setNotes((prev) => {
+        let next = prev;
+        for (const update of updates) {
+          next = removeScheduleNotesForCell(next, update.empId, update.dateKey);
+        }
+        notesRef.current = next;
+        return next;
+      });
+
       if (options.broadcast) {
         const broadcastPayload: Record<string, ShiftMap[string] | null> = {};
         for (const update of updates) {
@@ -3676,7 +3813,14 @@ function SchedulerContent() {
   );
 
   const setShift = useCallback(
-    (empId: string, date: Date, entry: ScheduleCellInput | null): boolean => {
+    (
+      empId: string,
+      date: Date,
+      entry: ScheduleCellInput | null,
+      // A paste replaces the cell's shift, so its indicators described the
+      // shift being displaced and cannot carry over. An ordinary edit keeps them.
+      options: { replacesShift?: boolean } = {},
+    ): boolean => {
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
@@ -3772,9 +3916,22 @@ function SchedulerContent() {
         });
         if (!upsertValue) return false;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
+        if (options.replacesShift) {
+          const remainingNotes = removeScheduleNotesForCell(notesRef.current, empId, dateKey);
+          setNotes(remainingNotes);
+          notesRef.current = remainingNotes;
+        }
         void enqueueShiftWrite(key, async () => {
           try {
-            await upsertShift(empId, dateKey, normalizedEntry, orgId, existingVersion);
+            await upsertShift(
+              empId,
+              dateKey,
+              normalizedEntry,
+              orgId,
+              existingVersion,
+              undefined,
+              options.replacesShift,
+            );
           } catch (err) {
             if (err instanceof OptimisticLockError) {
               await handleShiftWriteConflict();
@@ -4734,6 +4891,18 @@ function SchedulerContent() {
         return next;
       });
 
+      // Mirror the note clearing the move endpoint performs, so the grid does
+      // not keep painting dots for a shift that is no longer in the cell. A
+      // copy leaves the source shift, and therefore its notes, alone.
+      setNotes((prev) => {
+        let next = removeScheduleNotesForCell(prev, targetCellId.empId, targetCellId.dateKey);
+        if (mode !== "copy") {
+          next = removeScheduleNotesForCell(next, sourceCellId.empId, sourceCellId.dateKey);
+        }
+        notesRef.current = next;
+        return next;
+      });
+
       broadcastDraftChanged({
         shifts: {
           [targetKey]: movedEntry,
@@ -4854,7 +5023,7 @@ function SchedulerContent() {
         return;
       }
 
-      if (setShift(empId, date, clipboard)) {
+      if (setShift(empId, date, clipboard, { replacesShift: true })) {
         toast.success("Entry pasted");
       }
     },
@@ -4964,72 +5133,81 @@ function SchedulerContent() {
     if (!org) return;
     const { startDate, endDate } = getAutoFillRange();
 
-    // Fetch fresh recurring shifts to get an accurate count
-    const freshRecurringShifts = await fetchRecurringShifts(
-      org.id,
-      undefined,
-      assignmentLabelMapRef.current,
-      false,
-      absenceTypeMapRef.current,
-    );
-    setRecurringShifts(freshRecurringShifts);
+    // The counting pass below fetches every recurring template and then walks
+    // the whole span, so this runs long before the confirm dialog it ends in.
+    // The toolbar's spinner reads this same flag; without setting it here the
+    // menu item sat inert for the entire wait.
+    setIsApplyingRecurring(true);
+    try {
+      // Fetch fresh recurring shifts to get an accurate count
+      const freshRecurringShifts = await fetchRecurringShifts(
+        org.id,
+        undefined,
+        assignmentLabelMapRef.current,
+        false,
+        absenceTypeMapRef.current,
+      );
+      setRecurringShifts(freshRecurringShifts);
 
-    // Count empty slots that would be filled (matches server-side RPC logic)
-    const byEmp: Record<string, RecurringShift[]> = {};
-    for (const rs of freshRecurringShifts) {
-      if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
-      byEmp[rs.empId].push(rs);
-    }
+      // Count empty slots that would be filled (matches server-side RPC logic)
+      const byEmp: Record<string, RecurringShift[]> = {};
+      for (const rs of freshRecurringShifts) {
+        if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
+        byEmp[rs.empId].push(rs);
+      }
 
-    let count = 0;
-    const cellKeys: string[] = [];
-    // DST-safe iteration using UTC arithmetic
-    for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
-      for (const [empId, empShifts] of Object.entries(byEmp)) {
-        if (hasVisibleGridShiftEntry(shifts[`${empId}_${dateKey}`])) continue;
-        // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
-        const candidates = empShifts
-          .filter((rs) => rs.dayOfWeek === dayOfWeek)
-          .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
-        const match = candidates.find((rs) => {
-          const from = rs.effectiveFrom;
-          const until = rs.effectiveUntil;
-          return from <= dateKey && (!until || until >= dateKey);
-        });
-        // Verify the canonical recurring state still references active schedule definitions.
-        if (match) {
-          if (match.input.kind === "worked") {
-            const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
-            const activeJobIds = new Set(jobs.map((job) => job.id));
-            const isActive = match.input.segments.every(
-              (segment) =>
-                activeJobIds.has(segment.jobId) &&
-                (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
-            );
-            if (isActive) {
+      let count = 0;
+      const cellKeys: string[] = [];
+      // DST-safe iteration using UTC arithmetic
+      for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
+        for (const [empId, empShifts] of Object.entries(byEmp)) {
+          if (hasVisibleGridShiftEntry(shifts[`${empId}_${dateKey}`])) continue;
+          // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
+          const candidates = empShifts
+            .filter((rs) => rs.dayOfWeek === dayOfWeek)
+            .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+          const match = candidates.find((rs) => {
+            const from = rs.effectiveFrom;
+            const until = rs.effectiveUntil;
+            return from <= dateKey && (!until || until >= dateKey);
+          });
+          // Verify the canonical recurring state still references active schedule definitions.
+          if (match) {
+            if (match.input.kind === "worked") {
+              const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
+              const activeJobIds = new Set(jobs.map((job) => job.id));
+              const isActive = match.input.segments.every(
+                (segment) =>
+                  activeJobIds.has(segment.jobId) &&
+                  (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
+              );
+              if (isActive) {
+                count++;
+                cellKeys.push(`${empId}_${dateKey}`);
+              }
+            } else if (
+              match.input.kind === "absence" &&
+              match.input.absenceTypeId != null &&
+              absenceTypes.some((at) => at.id === match.input.absenceTypeId)
+            ) {
               count++;
               cellKeys.push(`${empId}_${dateKey}`);
             }
-          } else if (
-            match.input.kind === "absence" &&
-            match.input.absenceTypeId != null &&
-            absenceTypes.some((at) => at.id === match.input.absenceTypeId)
-          ) {
-            count++;
-            cellKeys.push(`${empId}_${dateKey}`);
           }
         }
       }
-    }
 
-    if (count === 0) {
-      toast.info("No empty schedule slots matched recurring templates for this date range");
-      return;
-    }
+      if (count === 0) {
+        toast.info("No empty schedule slots matched recurring templates for this date range");
+        return;
+      }
 
-    const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
-    setAutoFillPreview({ count, dateRange, cellKeys });
-    setShowAutoFillConfirm(true);
+      const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+      setAutoFillPreview({ count, dateRange, cellKeys });
+      setShowAutoFillConfirm(true);
+    } finally {
+      setIsApplyingRecurring(false);
+    }
   }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs]);
 
   // Actually apply recurring schedules (called after confirmation)
@@ -5603,7 +5781,7 @@ function SchedulerContent() {
           segmentsForKey,
           publishedSegmentsForKey: getPublishedShiftSegments,
           getShiftStyle,
-          activeIndicatorIdsForKey,
+          noteMarksForKey,
           getCustomShiftTimes,
           getPublishedCustomShiftTimes,
           draftKindForKey,
@@ -5612,6 +5790,7 @@ function SchedulerContent() {
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
+          publishedMetadataForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
           activeRequestForKey,
@@ -5652,7 +5831,7 @@ function SchedulerContent() {
       segmentsForKey,
       getPublishedShiftSegments,
       getShiftStyle,
-      activeIndicatorIdsForKey,
+      noteMarksForKey,
       getCustomShiftTimes,
       getPublishedCustomShiftTimes,
       draftKindForKey,
@@ -5661,6 +5840,7 @@ function SchedulerContent() {
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
       publishDiffKindForKey,
+      publishedMetadataForKey,
       canRenderAuthorNames,
       createdByNameForKey,
       absenceTypeIdForKey,
@@ -6023,6 +6203,36 @@ function SchedulerContent() {
   // loading screen once the roster is here too — otherwise the grid would paint
   // with no rows and read as broken.
   const canPaintFromSnapshot = paintedFromSnapshot && employees.length > 0;
+  const isChromeMounted = !isLoading || canPaintFromSnapshot;
+
+  // The banners above the toolbar are conditional, so this block's height is
+  // not a constant. Publish it the way AppShell publishes its own, so the grid's
+  // date row knows where the sticky chrome ends and it can pin.
+  useLayoutEffect(() => {
+    const chrome = stickyChromeRef.current;
+    const root = pageRootRef.current;
+    if (!chrome || !root) return;
+
+    const setChromeHeight = () => {
+      root.style.setProperty(
+        "--dg-schedule-chrome-height",
+        `${chrome.getBoundingClientRect().height}px`,
+      );
+    };
+
+    setChromeHeight();
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        root.style.removeProperty("--dg-schedule-chrome-height");
+      };
+    }
+    const observer = new ResizeObserver(setChromeHeight);
+    observer.observe(chrome);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--dg-schedule-chrome-height");
+    };
+  }, [isChromeMounted]);
 
   if (orgLoading || (scheduleLoading && !org)) {
     return <ScheduleLoadingScreen />;
@@ -6038,6 +6248,7 @@ function SchedulerContent() {
 
   return (
     <div
+      ref={pageRootRef}
       style={{
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         background: "var(--dg-color-bg)",
@@ -6050,6 +6261,7 @@ function SchedulerContent() {
       {(!isLoading || canPaintFromSnapshot) && (
         <>
           <div
+            ref={stickyChromeRef}
             className="no-print"
             style={{
               position: "sticky",
@@ -6370,7 +6582,15 @@ function SchedulerContent() {
                       </span>
                     )}
                     <div className="dg-draft-banner-actions">
-                      {isMobile ? (
+                      {!canNavigatePublishHistory ? (
+                        <Button
+                          onClick={() => setShowPublishDiff((visible) => !visible)}
+                          className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                        >
+                          {showPublishDiff ? "Hide changes" : "Show changes"}
+                        </Button>
+                      ) : isMobile ? (
                         // Publish History's "Show on Grid" reaches the overlay
                         // on a phone too, so the way back out has to live here
                         // rather than only on the wide layout.
@@ -6441,24 +6661,10 @@ function SchedulerContent() {
                               padding: "5px 12px",
                             }}
                           >
-                            Mark as Seen
+                            Close
                           </Button>
                         </>
                       )}
-                      <Hint content={hint("Hide this notice and any highlights")} side="bottom">
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            // The banner hosts the only toggle for the
-                            // overlay, so it has to take the overlay with it.
-                            setShowPublishDiff(false);
-                            dismissPublishBanner();
-                          }}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          Close
-                        </Button>
-                      </Hint>
                     </div>
                   </div>
                 );
@@ -6551,7 +6757,7 @@ function SchedulerContent() {
                   <Button
                     type="button"
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => void refetchPublishedRanges()}
+                    onClick={() => refetchPublishedRanges()}
                   >
                     Try again
                   </Button>
@@ -6994,6 +7200,7 @@ function SchedulerContent() {
                       pendingPasteOver.empId,
                       pendingPasteOver.date,
                       pendingPasteOver.pasteEntry,
+                      { replacesShift: true },
                     )
                   ) {
                     setPendingPasteOver(null);
@@ -7444,7 +7651,7 @@ function SchedulerContent() {
               onClose={closeImportResults}
             />
           )}
-          {showPublishHistory && canEditShifts && org && (
+          {showPublishHistory && canNavigatePublishHistory && org && (
             <PublishHistoryPanel
               orgId={org.id}
               open={showPublishHistory}

@@ -1,9 +1,10 @@
 export {
+  ADMIN_DEFAULT_PERMS,
   applyViewImplications,
   buildPermissionContext,
   READ_ONLY_PERMS,
   ROLE_LEVEL,
-  unionPermissions,
+  VIEW_IMPLICATIONS,
 } from "./core";
 export type { PermissionContext } from "./core";
 export { buildPerms, getPermissionsFromSession } from "./shared";

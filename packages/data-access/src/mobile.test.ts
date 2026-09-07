@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
+  fetchMobilePublishHistoryRows,
   fetchMobileShiftRequestHistoryRows,
   insertMobileAuditLogEntry,
   type MobilePeopleQueryRow,
@@ -246,5 +247,70 @@ describe("insertMobileAuditLogEntry", () => {
       expect.objectContaining({ action: "employee.updated", orgId: "org-1" }),
     );
     errorSpy.mockRestore();
+  });
+});
+
+describe("fetchMobilePublishHistoryRows", () => {
+  function makeHistoryClient(changes: unknown[]) {
+    const order = vi.fn(async () => ({
+      data: [
+        {
+          published_by: "user-1",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          published_at: "2026-05-06T17:00:00.000Z",
+          change_count: changes.length,
+          schedule_publish_changes: changes,
+        },
+      ],
+      error: null,
+    }));
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      order,
+    };
+    return { from: vi.fn(() => chain) } as unknown as SupabaseClient;
+  }
+
+  // Notes share schedule_publish_changes with cells, and mobile has no note
+  // surface. Left in, a note row reaches the app as a "New" with no state.
+  it("drops published note changes", async () => {
+    const rows = await fetchMobilePublishHistoryRows(
+      makeHistoryClient([
+        {
+          emp_id: "emp-1",
+          date: "2026-05-04",
+          kind: "new",
+          from_state: null,
+          to_state: {
+            type: "note",
+            indicatorTypeId: 7,
+            focusAreaId: 3,
+            indicatorName: "Float",
+            indicatorColor: "#ff0000",
+          },
+        },
+        {
+          emp_id: "emp-2",
+          date: "2026-05-05",
+          kind: "modified",
+          from_state: null,
+          to_state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 2, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        },
+      ]),
+      "org-1",
+    );
+
+    expect(rows[0].changes).toHaveLength(1);
+    expect(rows[0].changes[0].empId).toBe("emp-2");
   });
 });

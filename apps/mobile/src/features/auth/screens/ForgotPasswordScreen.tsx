@@ -95,13 +95,16 @@ export default function ForgotPasswordScreen() {
           {error ? <AuthFieldError message={error} /> : null}
         </AuthFields>
 
-        <AuthActions>
-          <Button
-            label="Send reset code"
-            loading={submitting}
-            onPress={() => requestReset()}
-            size="lg"
-          />
+        <AuthActions
+          primaryAction={
+            <Button
+              label="Send reset code"
+              loading={submitting}
+              onPress={() => requestReset()}
+              size="lg"
+            />
+          }
+        >
           <Button
             disabled={submitting}
             label="Back to sign in"

@@ -22,7 +22,7 @@ import {
   pluralize,
   titleCase,
 } from "./details";
-import { permissionLabel } from "@/lib/permission-labels";
+import { diffPermissions, permissionLabel } from "@/lib/permission-labels";
 
 // ── Categories ───────────────────────────────────────────────────────────────
 
@@ -228,15 +228,50 @@ function fieldDiffRows(d: AuditDetails): DetailItem[] {
 
 /** Rows from the `{ field, label, from, to }` change array. */
 function changeRows(d: AuditDetails): DetailItem[] {
-  return d.changes().map((change) => {
+  return d.changes().flatMap((change) => {
     const label = change.label?.trim() || friendlyLabel(change.field);
+    const permissionRows = permissionChangeRows(label, change.from, change.to);
+    if (permissionRows) return permissionRows;
     const before = formatScalar(change.field, change.from);
     const after = formatScalar(change.field, change.to);
-    if (before && after) return { label, value: `${before} → ${after}` };
-    if (after) return { label, value: `Set to ${after}` };
-    if (before) return { label, value: `Cleared (was ${before})` };
-    return { label, value: "Updated" };
+    if (before && after) return [{ label, value: `${before} → ${after}` }];
+    if (after) return [{ label, value: `Set to ${after}` }];
+    if (before) return [{ label, value: `Cleared (was ${before})` }];
+    return [{ label, value: "Updated" }];
   });
+}
+
+/**
+ * A change whose sides are permission maps reads as the flags that flipped.
+ * "Updated" is the one thing an access audit row must never say, and a first
+ * grant (no previous map) lists only what it allowed.
+ */
+function permissionChangeRows(label: string, from: unknown, to: unknown): DetailItem[] | null {
+  const fromMap = permissionMap(from);
+  const toMap = permissionMap(to);
+  if (fromMap === undefined || toMap === undefined) return null;
+  if (!fromMap && !toMap) return null;
+
+  const diff = diffPermissions(fromMap, toMap);
+  const allowed = Object.keys(diff)
+    .filter((key) => diff[key])
+    .map(permissionLabel);
+  const revoked = Object.keys(diff)
+    .filter((key) => !diff[key])
+    .map(permissionLabel);
+  const rows: DetailItem[] = [];
+  if (allowed.length) rows.push({ label: "Allowed", value: allowed.join(", ") });
+  if (revoked.length) rows.push({ label: "Not allowed", value: revoked.join(", ") });
+  return rows.length ? rows : [{ label, value: "No effective change" }];
+}
+
+/** A boolean-valued record, `null` for an absent side, `undefined` for anything else. */
+function permissionMap(value: unknown): Record<string, boolean> | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0 || !entries.every(([, v]) => typeof v === "boolean")) return undefined;
+  return value as Record<string, boolean>;
 }
 
 /** Draft breakdown counts recorded on publish and discard. */
@@ -605,6 +640,15 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => {
       const target = d.text("email") ?? ctx.targetEmail ?? ctx.targetLabel;
       return target ? `Resent the invitation to ${target}` : "Resent an invitation";
+    },
+  },
+
+  "invitation.expired": {
+    category: "invitations",
+    severity: "warning",
+    headline: (d, ctx) => {
+      const target = d.text("email") ?? ctx.targetEmail ?? ctx.targetLabel;
+      return target ? `The invitation for ${target} expired` : "An invitation expired";
     },
   },
 
@@ -1052,6 +1096,40 @@ function buildCategoryOptions(): AuditCategoryOption[] {
 }
 
 export const AUDIT_CATEGORY_OPTIONS: AuditCategoryOption[] = buildCategoryOptions();
+
+/**
+ * The categories a view can actually return, so its filter never offers an
+ * option that can only ever come back empty.
+ */
+export function getAuditCategoryOptions(
+  categories: readonly AuditCategory[],
+): AuditCategoryOption[] {
+  const allowed = new Set<string>(categories);
+  return AUDIT_CATEGORY_OPTIONS.filter(
+    (option) => option.value === "all" || allowed.has(option.value),
+  );
+}
+
+/**
+ * A person's activity holds only what happened to them. The employee activity
+ * route filters its query to these same categories, so importing this rather
+ * than repeating the list keeps the filter and the data in step.
+ */
+export const PERSON_ACTIVITY_CATEGORIES: readonly AuditCategory[] = [
+  "people",
+  "access",
+  "invitations",
+];
+
+/**
+ * Everything an organization's log can hold. Platform rows (gridmaster
+ * accounts, platform feature flags) are written without an org id, so they
+ * never reach an org-scoped query. Impersonation does carry the org it entered,
+ * so it stays.
+ */
+export const ORG_ACTIVITY_CATEGORIES: readonly AuditCategory[] = (
+  Object.keys(AUDIT_CATEGORY_LABELS) as AuditCategory[]
+).filter((category) => category !== "platform");
 
 export function matchesAuditCategory(action: string, categoryValue: string): boolean {
   if (categoryValue === "all") return true;

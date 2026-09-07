@@ -26,6 +26,7 @@ const mockPermissions = {
   canEditShifts: true,
   canEditNotes: true,
   canViewStaff: true,
+  canViewReports: true,
   isOnSchedule: true,
   isManagementUser: false,
   atLeast: (r: string) => {
@@ -161,6 +162,7 @@ beforeEach(() => {
   mockPermissions.isUserViewActive = false;
   mockPermissions.canEditShifts = true;
   mockPermissions.canViewStaff = true;
+  mockPermissions.canViewReports = true;
   mockPermissions.canManageOrg = true;
   mockPermissions.canAccessSettings = true;
   mockPermissions.isOnSchedule = true;
@@ -257,6 +259,19 @@ describe("Header permission-based tab visibility", () => {
     expect(screen.queryByRole("link", { name: /People/i })).not.toBeInTheDocument();
   });
 
+  it("hides Reports tab from an admin without the reports permission", () => {
+    mockPermissions.canViewReports = false;
+    renderHeader(<Header />);
+    expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();
+  });
+
+  it("shows Reports tab to a super admin regardless of the reports permission", () => {
+    mockPermissions.canViewReports = false;
+    mockPermissions.isSuperAdmin = true;
+    renderHeader(<Header />);
+    expect(screen.getByRole("link", { name: /Reports/i })).toBeInTheDocument();
+  });
+
   it("hides Settings tab when user has no org management perms", () => {
     mockPermissions.canManageOrg = false;
     mockPermissions.canAccessSettings = false;
@@ -295,11 +310,14 @@ describe("Header permission-based tab visibility", () => {
   });
 
   it("hides Reports tab for regular users and user view", () => {
+    // A Tier 0 user resolves to the read-only baseline, so the key is never on.
     mockPermissions.role = "user";
+    mockPermissions.canViewReports = false;
     renderHeader(<Header />);
     expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();
 
     mockPermissions.role = "admin";
+    mockPermissions.canViewReports = true;
     mockPermissions.isUserViewActive = true;
     renderHeader(<Header />);
     expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();

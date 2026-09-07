@@ -185,7 +185,7 @@ describe("RootLayout", () => {
     expect(screen.getByText("Mobile configuration needs attention")).toBeInTheDocument();
     expect(screen.getByText("Mobile connection")).toBeInTheDocument();
     expect(
-      screen.getByText("This build is missing a reachable DubGrid web connection."),
+      screen.getByText("This build is missing a reachable web connection."),
     ).toBeInTheDocument();
   });
 

@@ -20,7 +20,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { AccessInsignia } from "./AccessInsignia";
-import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
 interface StaffReadOnlyDetailPanelProps {
   employee: Employee;
@@ -109,6 +109,7 @@ export function StaffReadOnlyDetailPanel({
   const certificationName =
     employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "—";
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const isOnSchedule = employee.focusAreaIds.length > 0;
   const displayName = getEmployeeDisplayName(employee);
   const initials = getInitials(displayName);
 
@@ -136,6 +137,7 @@ export function StaffReadOnlyDetailPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(56),
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
@@ -143,8 +145,6 @@ export function StaffReadOnlyDetailPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 18,
-                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `1px solid ${avatarTone.borderColor}`,
@@ -177,22 +177,24 @@ export function StaffReadOnlyDetailPanel({
                   {displayName}
                 </span>
                 <AccessInsignia orgRole={orgRole} size="md" />
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    padding: "3px 9px",
-                    borderRadius: 20,
-                    background: "var(--dg-color-bg-secondary)",
-                    color: "var(--dg-color-text-muted)",
-                    border: "1px solid var(--dg-color-border)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {employmentLabel}
-                </span>
+                {isOnSchedule && (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: "var(--dg-fs-footnote)",
+                      fontWeight: 600,
+                      padding: "3px 9px",
+                      borderRadius: 20,
+                      background: "var(--dg-color-bg-secondary)",
+                      color: "var(--dg-color-text-muted)",
+                      border: "1px solid var(--dg-color-border)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {employmentLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -225,28 +227,33 @@ export function StaffReadOnlyDetailPanel({
               icon={<UserCircle size={15} strokeWidth={1.8} />}
               label="Name"
               value={displayName}
+              isLast={!isOnSchedule}
             />
-            <ReadOnlyRow
-              icon={<Briefcase size={15} strokeWidth={1.8} />}
-              label="Employment"
-              value={employmentLabel}
-            />
-            <ReadOnlyRow
-              icon={<Tag size={15} strokeWidth={1.8} />}
-              label={roleLabel}
-              value={roleNames}
-            />
-            <ReadOnlyRow
-              icon={<Award size={15} strokeWidth={1.8} />}
-              label={certificationLabel}
-              value={certificationName}
-            />
-            <ReadOnlyRow
-              icon={<Layers size={15} strokeWidth={1.8} />}
-              label={focusAreaLabel}
-              value={focusAreaNames}
-              isLast
-            />
+            {isOnSchedule && (
+              <>
+                <ReadOnlyRow
+                  icon={<Briefcase size={15} strokeWidth={1.8} />}
+                  label="Employment"
+                  value={employmentLabel}
+                />
+                <ReadOnlyRow
+                  icon={<Tag size={15} strokeWidth={1.8} />}
+                  label={roleLabel}
+                  value={roleNames}
+                />
+                <ReadOnlyRow
+                  icon={<Award size={15} strokeWidth={1.8} />}
+                  label={certificationLabel}
+                  value={certificationName}
+                />
+                <ReadOnlyRow
+                  icon={<Layers size={15} strokeWidth={1.8} />}
+                  label={focusAreaLabel}
+                  value={focusAreaNames}
+                  isLast
+                />
+              </>
+            )}
           </ReadOnlySection>
 
           <ReadOnlySection title="Contact">

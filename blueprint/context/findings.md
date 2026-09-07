@@ -138,3 +138,78 @@ The remaining 52 are blocked on a contract decision, not effort. Neither `client
 **Why it matters:** `src/__tests__/typography-contract.test.ts` fails with `components/ScheduleGrid.tsx: expected 0, received 1`: a raw `fontSize: 9` introduced by commit `de79713a` ("fix(schedule): give the cell editor initials room inside the ring"). The suite has been red on `dev` since that commit, which masks any new typography regression behind an already-failing assertion.
 **Suggested fix:** Either replace the raw 9 with a token, or add `ScheduleGrid.tsx` to `documentedMicroTextCounts` if 9px is deliberate for that cell-editor affordance.
 **Resolution:** Fixed 2026-09-05 by documenting the exception. The 9px is deliberate and the code comment says why: two initials at badge size run wider than the 20px marker circle, so the marker sizes its text off the ring. Tokenising it would reintroduce the overflow, so `components/ScheduleGrid.tsx: 1` was added to `documentedMicroTextCounts` instead. The typography suite is green again.
+
+### F-55 [P2] open - Delete dependency checks read every schedule cell in the org
+
+**File:** apps/web/src/lib/db/config.ts:103-126
+**Found:** 2026-09-05 by /audit (scope: full; lens: performance)
+**Why it matters:** `loadActiveScheduleCellDependencies` selects every `schedule_cells` row for the org with nested `schedule_cell_snapshots` and `schedule_cell_segments`, no date filter and no count-only projection, then filters in JS. It backs the delete-dependency checks in Jobs, AbsenceTypes, and ShiftCategories settings, so answering "is this job used anywhere?" pulls a multi-MB payload for an org with a year of history. Surfaced while auditing action feedback (see [[F-54]]); those call sites do spin correctly, so this is cost rather than a missing signal.
+**Suggested fix:** Replace the row fetch with a count-only query or an RPC that answers existence server-side.
+
+### F-56 [P2] fixed - Web confirmations allow alternate dismissal while their action is pending
+
+**File:** apps/web/src/components/ConfirmDialog.tsx:78-88; apps/web/src/components/Modal.tsx:75-95; apps/web/src/components/Header.tsx:395-403
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** ConfirmDialog disables the Cancel and confirm buttons while either action is pending, but passes onCancel directly to Modal without its onRequestClose veto. Escape, the backdrop, and the X therefore still close callers such as the sandbox exit confirmation during the request. Closing the surface does not cancel that request. Mobile ConfirmationModal already blocks its alternate dismissal paths while busy.
+**Suggested fix:** Route every confirmation dismissal through the same pending-state guard, using Modal's existing veto, and cover Escape, backdrop, close icon, and Cancel during both primary and secondary requests. Preserve visible pending/error feedback until the action settles.
+**Resolution:** Fixed by the user-approved confirmation-surfaces implementation: all web confirmation exits share the pending guard, the redundant X is removed, and both primary and secondary async latches remain effective even if an external loading flag is false. Regression tests cover Escape, backdrop, Cancel, and dismissal after settlement.
+
+### F-57 [P2] fixed - Management confirmation failures render their error behind the active popup
+
+**File:** apps/mobile/src/features/people/components/ManagementUserActionsSheet.tsx:132-173; apps/mobile/src/features/people/components/ManagementUserActionsSheet.tsx:323-355
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** Remove-access and invitation mutations retain their confirmation on failure and set the shared error state. That error is rendered in the underlying actions/access/role sheet, but neither active ConfirmationModal receives its error prop. The top native modal stops spinning without explaining the failure on its own surface.
+**Suggested fix:** Pass the relevant error into the active confirmation, clear it when starting or canceling that action, and exercise rejected remove/reissue/revoke requests while asserting the message inside the visible confirmation. Preserve the existing stale-update and access safeguards.
+**Resolution:** Fixed: remove-access and invitation errors render in the active ManagementUserActionsSheet confirmation and clear on cancellation/retry. Three rejected-action tests assert the error within the visible alert and its reset on reopening. PersonDetail invitation/account-link errors also remain on the active surface; handoff uses the existing transition helper. Native visual validation remains outstanding.
+
+### F-58 [P2] fixed - Shared web Modal does not restore focus after closing
+
+**File:** apps/web/src/components/Modal.tsx:50-73
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** Modal moves focus into itself on mount, but never captures or restores the previously focused element. Closing a confirmation over an editor removes the focused control without returning keyboard focus to the invoking action. Its tests assert initial focus only. This is inconsistent with the modal focus lifecycle described by the WAI-ARIA dialog pattern.
+**Suggested fix:** Restore focus to a still-connected invoker or an intentional fallback, respecting the active modal layer. Prefer sharing the existing Base UI dialog focus/presentation infrastructure with sheets when that migration is separately scoped. Verify keyboard cancel and nested editor/confirmation flows in a browser.
+**Resolution:** Fixed: Modal now uses the installed Base UI Dialog focus, modal-layer, and scroll infrastructure. An explicit returnFocus target handles disappearing menu invokers; Header uses its surviving account/menu trigger. Unit tests cover invoker restoration, fallback targets, focus trapping, and nested cancellation. Authenticated Chrome confirmed Cancel initial focus, Tab containment, Escape, menu return focus, nested editor restoration, and restoration to the page after discarding a temporary draft. No changes were saved during the browser check.
+
+### F-59 [P2] fixed - Mobile overlay instructions contradict the current confirmation primitive
+
+**File:** apps/mobile/AGENTS.md:195-197; apps/mobile/AGENTS.md:239-243; apps/mobile/src/shared/components/ConfirmationModal.tsx:89-100
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lens: quality)
+**Why it matters:** Instructions mandate one modal design, forbid centered alert cards, and describe confirmation actions as vertically stacked. The current primitive intentionally renders a centered popup with a horizontal action row. Following the instructions would undo the implemented design; following the component would violate the instructions. This leaves no dependable rule for new callers.
+**Suggested fix:** After the presentation policy is selected, document confirmations as brief consequence decisions, sheets as selections or bounded tasks, and pages as long workflows. Specify dismissal, pending/error ownership, action order, and explicit blocking-gate exceptions. Keep implementation and instructions aligned.
+**Resolution:** Fixed: both app guides now describe consequence confirmations, task sheets, and page workflows, including pending/error ownership, action order, focus return, and explicit gate exceptions. Mobile confirmation motion and icon treatment are quieter, action layout adapts to narrow/enlarged text, status choices/reasons moved to a sheet, and ordinary profile saves no longer add a redundant confirmation.
+
+### F-60 [P2] fixed - The modal depth guard no longer enforces its documented sheet-plus-confirmation limit
+
+**File:** apps/mobile/src/shared/lib/modal-presentation.ts:22-23; apps/mobile/src/shared/components/BottomSheetModal.tsx:160-165; apps/mobile/src/shared/components/ConfirmationModal.tsx:89-100; apps/mobile/src/shared/components/BottomSheetModal.presentation.test.tsx:45-50
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lenses: quality, tests)
+**Why it matters:** The limit is documented as one sheet with one confirmation above it, but only BottomSheetModal registers. After confirmations became independent native modals, two task sheets plus one or more confirmations no longer violate the counter. The test named "allows a confirmation over the sheet it guards" renders two BottomSheetModal instances, so it does not cover the current composition. This confirms a guard gap, not a reproduced native stacking failure.
+**Suggested fix:** Track actual presented surfaces with their kind and owner, allow only the chosen task/confirmation composition, and test a real ConfirmationModal over a sheet. Keep handoff sequencing explicit and verify presentation/dismissal on iOS and Android; a fixed timer alone is not native transition evidence.
+**Resolution:** Fixed at the presentation-policy/test layer: both real primitives register typed presentations with identity-based cleanup. Duplicate task sheets and duplicate confirmations are diagnosed; explicit required gates are separate. Regression tests render the actual ConfirmationModal above a BottomSheetModal, reject invalid compositions, and cover cleanup/handoff. This remains a diagnostic guard, not a native modal coordinator; iOS/Android transition and gesture checks remain outstanding.
+
+### F-61 [P2] fixed - Confirmation dismissal test passes against a control name the component no longer uses
+
+**File:** apps/mobile/src/shared/components/ConfirmationModal.test.tsx:18-39; apps/mobile/src/shared/components/ConfirmationModal.tsx:196-223
+**Found:** 2026-09-05 by /audit (scope: web and mobile confirmation/sheet surfaces; lens: tests)
+**Why it matters:** The test claims an explicit Cancel or Confirm is required and only checks that "Dismiss confirmation" is absent. The component actually renders a backdrop button labeled "Dismiss" and calls onCancel from it when idle. The passing assertion therefore proves neither the claimed policy nor the real backdrop/back-button behavior.
+**Suggested fix:** Set the intended policy explicitly, test the actual dismissal controls and Android onRequestClose while idle and pending, and assert that dismiss never invokes the consequential action. Keep the native presentation test separate from jsdom shims.
+**Resolution:** Fixed: tests use the real Dismiss control and capture React Native Modal onRequestClose. Idle dismissal calls Cancel without invoking the action; pending backdrop, Cancel, Android back, and duplicate confirmation are covered. These are component tests with native shims, not device evidence.
+
+Audit validation for F-56 through F-61: focused quality/tests review of current dev checkout, including pre-existing uncommitted UI changes. Source inventory found 28 mobile ConfirmationModal uses, 17 mobile BottomSheetModal uses, and 79 web ConfirmDialog uses; counts exclude comments and tests. Reviewed shared primitives, dismissal/drag/handoff guards, and representative People, profile/session, request, filter, navigation, and change-review consumers. Dependency/generated/build output and backend security/performance were outside scope. This was not an exhaustive runtime audit of every caller.
+
+Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tests__/ConfirmDialog.test.tsx apps/web/src/__tests__/Modal.test.tsx apps/web/src/__tests__/useUnsavedChangesPrompt.test.tsx` collected the two existing suites, 18 passed. `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/components/ConfirmationModal.test.tsx apps/mobile/src/shared/components/BottomSheetModal.presentation.test.tsx apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.tsx apps/mobile/src/shared/hooks/useModalHandoff.test.tsx apps/mobile/src/features/profile/screens/ProfileSessionsScreen.test.tsx` collected three existing suites, 15 passed. The guard test actually has a `.test.ts` extension and was then run with `npx vitest run --config apps/mobile/vitest.config.mts apps/mobile/src/shared/hooks/useUnsavedChangesGuard.test.ts apps/mobile/src/shared/hooks/useSheetDragToDismiss.test.ts`, 25 passed. Total: 58 passed. The mobile session suite emits DOM-shim warnings for overScrollMode and onContentSizeChange. No skipped/focused test declarations found in these seven suites. No full suite, build, typecheck, authenticated browser, VoiceOver/TalkBack, keyboard-layout, or native gesture/presentation validation was performed. No prior findings were closed.
+
+### F-65 [P2] fixed - Sticky date row's ARIA rows and column headers have no owning grid
+
+**File:** apps/web/src/components/ScheduleGrid.tsx:1336-1346; apps/web/src/components/ScheduleGrid.tsx:1495-1510
+**Found:** 2026-09-07 by /audit (scope: changed; lens: quality)
+**Why it matters:** Moving the date row out of the body's horizontal scroller (required for native `position: sticky`) left its `role="row"` and `role="columnheader"` cells under a `role="presentation"` wrapper with no `grid` ancestor, while the body `role="grid"` now contains rows but no column headers. Screen readers lose the day-to-column association the grid had before this change, and the ARIA ownership is invalid.
+**Suggested fix:** Make the section wrapper the `role="grid"` with the section's `aria-label`, and mark the header and body containers `role="rowgroup"` (generic wrappers between them are transparent to the accessibility tree). Update the two tests that resolve the body scroller from `getByRole("grid")`.
+**Resolution:** Repaired 2026-09-07 in the same session: the section wrapper is now the `role="grid"` with the section label, and the header and body containers are `role="rowgroup"`. A grid test asserts one grid owns both rowgroups.
+
+### F-66 [P3] fixed - Search scroll margin hard-codes the sticky group's height
+
+**File:** apps/web/src/components/ScheduleGrid.tsx (employee row `scrollMarginTop`, `+ 80px`)
+**Found:** 2026-09-07 by /audit (scope: changed; lens: quality)
+**Why it matters:** The `80px` stands in for the label plus date-row height. At larger font settings or if the cap gains chrome, a searched-to row lands partly under the sticky group; nothing fails loudly.
+**Suggested fix:** Publish the measured group height as a CSS custom property from the existing geometry effect (it already measures the grid) and use it in the calc, or accept the constant and name it beside `CHIP_OVERHANG_PX`.
+**Resolution:** Repaired 2026-09-07 in the same session: the geometry effect publishes `--dg-grid-sticky-height` on the section and the row scroll margin reads it, keeping `80px` only as the fallback.

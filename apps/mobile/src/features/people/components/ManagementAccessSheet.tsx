@@ -11,6 +11,8 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { SectionNotice } from "./SectionNotice";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { InlineError } from "../../../shared/components/InlineError";
 import {
   SegmentedControl,
@@ -27,16 +29,12 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { hasManagementAccess, type ManagementAccessRole } from "../lib/managementAccess";
-import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 
 /**
- * Every tier, whether or not they already have an account.
- *
- * Super Admin used to be offered only on the invitation path, on the theory that
- * promoting a linked member was the access badge's job. That split was invisible
- * from here: the same sheet showed three tiers for one person and two for
- * another, with nothing on screen explaining why. Both paths reach the same
- * guarded write, so both offer the same choices.
+ * Every tier, for the one case this sheet asks about a role at all: a brand-new
+ * invitation, where nothing yet exists to hold one. Anyone with an account or a
+ * pending invitation changes their role from the access badge on their profile,
+ * and this sheet edits their departments and nothing else.
  */
 const ROLE_OPTIONS: SegmentedOption<ManagementAccessRole>[] = [
   { value: "user", label: "User" },
@@ -88,7 +86,6 @@ export function ManagementAccessSheet({
   const [wasVisible, setWasVisible] = useState(visible);
   const [error, setError] = useState<string | null>(null);
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
-  const [pendingRoleChange, setPendingRoleChange] = useState<ManagementAccessRole | null>(null);
 
   // Reseed on open rather than on every `person` identity change: a background
   // refetch hands down a new object, and keying off that would wipe whatever the
@@ -168,14 +165,30 @@ export function ManagementAccessSheet({
   });
 
   const isEditing = hasManagementAccess(person);
+  // A role is asked for here only when nothing exists yet to hold one. A member
+  // or an invitee changes theirs from the access badge, which is also where a
+  // change on an invitation is confirmed as a revoke-and-resend.
+  const needsRoleForInvite = !person.userId && !person.pendingInvitation;
+  // Clearing every department is how existing access is removed, so an empty
+  // draft is a valid save here - but only when there is access to remove. There
+  // is nothing to grant someone no departments of.
+  const isRemoval = isEditing && draft.managementDepartmentIds.length === 0;
   // Dirtiness is part of it, not just validity: a Save that is live on an
   // untouched sheet invites a no-op write, and the same value already decides
   // whether closing asks, so the button and the discard prompt cannot disagree.
   const canSubmit =
     !mutation.isPending &&
     hasUnsavedChanges &&
-    draft.managementDepartmentIds.length > 0 &&
+    (isRemoval || draft.managementDepartmentIds.length > 0) &&
     managementDepartments.length > 0;
+
+  const removalNotices = isRemoval
+    ? [
+        !person.userId && person.pendingInvitation
+          ? "Saving now revokes their pending management invitation."
+          : "Saving now removes their management access. Their staff profile stays as it is.",
+      ]
+    : [];
 
   function toggleDepartment(departmentId: number) {
     setDraft((current) => ({
@@ -187,10 +200,10 @@ export function ManagementAccessSheet({
   }
 
   function submit() {
-    // Changing the role on an invitation means revoking and reissuing it, which
-    // is worth saying out loud before it happens.
-    if (person.pendingInvitation && draft.orgRole !== baseline.orgRole) {
-      setPendingRoleChange(draft.orgRole);
+    // Ahead of the role branch below: an empty save revokes the invitation
+    // outright, so whatever role it was being re-pointed at is moot.
+    if (isRemoval) {
+      setShowRemoveConfirmation(true);
       return;
     }
     mutation.mutate(draft);
@@ -203,29 +216,27 @@ export function ManagementAccessSheet({
         footer={
           <>
             {error ? <InlineError message={error} /> : null}
-            <SheetActions>
+            <SheetActions
+              primaryAction={
+                <Button
+                  disabled={!canSubmit}
+                  label="Save Access"
+                  loading={mutation.isPending}
+                  onPress={submit}
+                  tone="primary"
+                />
+              }
+            >
               {/* One label for both branches, as on web. "Send Invitation" would
                   also collide with the staff-invitation action on the page behind
                   this sheet, which does something else entirely. */}
               <Button
-                disabled={!canSubmit}
-                label="Save Access"
-                loading={mutation.isPending}
-                onPress={submit}
-                tone="primary"
-              />
-              {isEditing ? (
-                <Button
-                  disabled={mutation.isPending}
-                  label="Remove from Management"
-                  onPress={() => setShowRemoveConfirmation(true)}
-                  tone="danger"
-                />
-              ) : null}
-              <Button
                 disabled={mutation.isPending}
-                label="Cancel"
-                onPress={guard.requestClose}
+                // Same tri-state web uses. Discard resets the draft and leaves
+                // the sheet open; dismissing with edits in hand is the drag or
+                // the backdrop, which this guard already confirms.
+                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+                onPress={hasUnsavedChanges ? guard.discard : guard.requestClose}
                 tone="neutral"
               />
             </SheetActions>
@@ -247,18 +258,21 @@ export function ManagementAccessSheet({
           </AppText>
         ) : (
           <View style={{ gap: mobileSpace.lg }}>
-            <View style={{ gap: mobileSpace.sm }}>
-              <AppText tone="secondary" variant="label">
-                Access level
-              </AppText>
-              <SegmentedControl
-                accessibilityLabel="Access level"
-                disabled={mutation.isPending}
-                onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
-                options={ROLE_OPTIONS}
-                value={draft.orgRole}
-              />
-            </View>
+            <SectionNotice messages={removalNotices} />
+            {needsRoleForInvite ? (
+              <View style={{ gap: mobileSpace.sm }}>
+                <AppText tone="secondary" variant="label">
+                  Access level
+                </AppText>
+                <SegmentedControl
+                  accessibilityLabel="Access level"
+                  disabled={mutation.isPending}
+                  onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
+                  options={ROLE_OPTIONS}
+                  value={draft.orgRole}
+                />
+              </View>
+            ) : null}
 
             <View style={{ gap: mobileSpace.sm }}>
               <AppText tone="secondary" variant="label">
@@ -274,7 +288,9 @@ export function ManagementAccessSheet({
                   />
                 ))}
               </View>
-              {draft.managementDepartmentIds.length === 0 ? (
+              {/* Only the missing answer stays by the chips. The removal is a
+                  consequence of the save, raised once at the top of the sheet. */}
+              {!isRemoval && draft.managementDepartmentIds.length === 0 ? (
                 <AppText tone="danger" variant="meta">
                   {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`}
                 </AppText>
@@ -293,21 +309,6 @@ export function ManagementAccessSheet({
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />
-
-      <ConfirmationModal
-        body={`Change access from ${ORG_ROLE_LABELS[baseline.orgRole]} to ${ORG_ROLE_LABELS[pendingRoleChange ?? baseline.orgRole]}? The current invitation will be revoked and a replacement will be sent to ${person.pendingInvitation?.email ?? person.email}.`}
-        confirmLabel="Revoke and resend"
-        confirmTone="danger"
-        loading={mutation.isPending}
-        onCancel={() => setPendingRoleChange(null)}
-        onConfirm={() => {
-          const orgRole = pendingRoleChange;
-          setPendingRoleChange(null);
-          if (orgRole) mutation.mutate({ ...draft, orgRole });
-        }}
-        title="Replace invitation access?"
-        visible={pendingRoleChange !== null}
-      />
 
       <ConfirmationModal
         body="They'll come off the management roster. Their staff profile and schedule stay exactly as they are."

@@ -255,16 +255,22 @@ function buildNewShiftBadge(label: string): ShiftDiffBadgeDescriptor {
   return {
     kind: "new",
     text: "New",
-    detail: `Added ${label}.`,
+    detail: isUnknownDiffLabel(label) ? "Added a shift." : `Added ${label}.`,
   };
 }
 
 function buildReplacementBadge(label: string): ShiftDiffBadgeDescriptor {
   return {
     kind: "modified",
-    text: `Was ${label}`,
-    detail: `Was ${label}.`,
+    // The old value belongs in the detail, not the compact status chip. Do
+    // not leak a storage fallback such as "?" to someone reading the grid.
+    text: "Edited",
+    detail: isUnknownDiffLabel(label) ? "Replaced a previous assignment." : `Was ${label}.`,
   };
+}
+
+function isUnknownDiffLabel(label: string | null | undefined): boolean {
+  return !label || label === "?" || label.startsWith("?");
 }
 
 export function expandDelimitedTimeRanges(
@@ -420,7 +426,9 @@ export function buildShiftDiffDescriptors(
         cellBadge: {
           kind: "new",
           text: "New",
-          detail: `Added ${input.resolveAbsenceLabel?.(afterAbsenceTypeId) ?? "?"}.`,
+          detail: input.resolveAbsenceLabel?.(afterAbsenceTypeId)
+            ? `Added ${input.resolveAbsenceLabel(afterAbsenceTypeId)}.`
+            : "Added an absence.",
         },
       };
     }
@@ -474,16 +482,17 @@ export function buildShiftDiffDescriptors(
     );
     for (let index = 0; index < beforeAssignmentDefinitionIds.length; index += 1) {
       if (survivingBeforeIndices.has(index)) continue;
+      const removedLabel =
+        resolveShiftLabelAtIndex({
+          assignmentIds: beforeAssignmentDefinitionIds,
+          shiftLabels: input.beforeShiftLabels,
+          index,
+          resolveAssignmentDefinitionLabel: (assignmentId) => resolveDiffLabel(input, assignmentId),
+        }) ?? resolveDiffLabel(input, beforeAssignmentDefinitionIds[index]!);
       removedDetails.push(
-        `Removed ${
-          resolveShiftLabelAtIndex({
-            assignmentIds: beforeAssignmentDefinitionIds,
-            shiftLabels: input.beforeShiftLabels,
-            index,
-            resolveAssignmentDefinitionLabel: (assignmentId) =>
-              resolveDiffLabel(input, assignmentId),
-          }) ?? resolveDiffLabel(input, beforeAssignmentDefinitionIds[index]!)
-        }.`,
+        isUnknownDiffLabel(removedLabel)
+          ? "A previous assignment was deleted."
+          : `Was ${removedLabel}.`,
       );
     }
   }
@@ -492,6 +501,22 @@ export function buildShiftDiffDescriptors(
     return {
       pillDiffs,
       cellBadge: null,
+    };
+  }
+
+  // A removed segment has no after-side pill to carry its own marker. It is a
+  // deletion, not an edit to the surviving sibling, so give the cell a
+  // cell-level edit marker and name the former segment in its detail. The grid
+  // deliberately renders this compact marker as "Edited" like every other
+  // published change.
+  if (removedDetails.length > 0) {
+    return {
+      pillDiffs,
+      cellBadge: {
+        kind: "modified",
+        text: "Changed",
+        detail: [...removedDetails, ...visibleActions.map((action) => action.detail)].join(" "),
+      },
     };
   }
 

@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -211,16 +212,13 @@ export default function ProfileNotificationsScreen() {
                     {push.isSupported
                       ? push.permissionState === "denied"
                         ? "Permission was denied. Enable it from your device settings."
-                        : "Receive critical updates instantly even when DubGrid isn't open."
+                        : "Receive critical updates instantly even when the app isn't open."
                       : "Push notifications are not supported on this device."}
                   </Text>
                 </View>
-                <Switch
+                <AppSwitch
                   accessibilityLabel="Push notifications"
                   disabled={!pushSwitchEnabled || push.permissionState === "denied"}
-                  ios_backgroundColor={mobileColors.border}
-                  thumbColor={mobileColors.surface}
-                  trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                   value={push.permissionState === "granted"}
                   onValueChange={() => {
                     void togglePush();

@@ -8,6 +8,8 @@ import ScheduleGrid, {
 } from "@/components/ScheduleGrid";
 import { getReadableTextOnSurface } from "@/lib/colors";
 import { REQUEST_FOLD_CLEARANCE, REQUEST_FOLD_SIZE } from "@/components/schedule-grid/badges";
+import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
@@ -231,6 +233,7 @@ interface RenderGridOptions {
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   getCustomShiftTimes?: (
     empId: string,
@@ -275,6 +278,10 @@ interface RenderGridOptions {
     publishedAt: string;
     publishedBy: string;
   } | null;
+  publishedMetadataForKey?: (
+    empId: string,
+    date: Date,
+  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
   cellEditors?: Map<string, { userId: string; userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
@@ -301,6 +308,16 @@ interface RenderGridOptions {
   onClearCell?: NonNullable<ScheduleGridHandlers["onClearCell"]>;
   onToggleBulkDeleteCell?: NonNullable<ScheduleGridHandlers["onToggleBulkDeleteCell"]>;
   onClaimOpenShift?: NonNullable<ScheduleGridHandlers["onClaimOpenShift"]>;
+}
+
+/** The rowgroup that holds a section's staff rows (the other holds the date row). */
+function getGridBody(name: string): HTMLElement {
+  const grid = screen.getByRole("grid", { name });
+  const body = within(grid)
+    .getAllByRole("rowgroup")
+    .find((group) => group.querySelector('[role="gridcell"]'));
+  if (!body) throw new Error(`No body rowgroup in ${name}`);
+  return body;
 }
 
 function renderGrid(options: RenderGridOptions = {}) {
@@ -342,7 +359,17 @@ function renderGrid(options: RenderGridOptions = {}) {
       segmentsForKey: options.segmentsForKey,
       publishedSegmentsForKey: options.publishedSegmentsForKey,
       getShiftStyle: options.getShiftStyle ?? getShiftStyleFromCodes(resolvedAssignmentDefinitions),
-      activeIndicatorIdsForKey: options.activeIndicatorIdsForKey,
+      noteMarksForKey:
+        options.noteMarksForKey ??
+        (options.activeIndicatorIdsForKey
+          ? (empId: string, date: Date, focusAreaId?: number) =>
+              options.activeIndicatorIdsForKey!(empId, date, focusAreaId).map(
+                (indicatorTypeId) => ({
+                  indicatorTypeId,
+                  state: "published" as const,
+                }),
+              )
+          : undefined),
       getCustomShiftTimes: options.getCustomShiftTimes,
       getPublishedCustomShiftTimes: options.getPublishedCustomShiftTimes,
       draftKindForKey: options.draftKindForKey,
@@ -350,6 +377,7 @@ function renderGrid(options: RenderGridOptions = {}) {
       publishedAssignmentIdsForKey: options.publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey: options.publishedAbsenceTypeIdForKey,
       publishDiffForKey: options.publishDiffForKey as any,
+      publishedMetadataForKey: options.publishedMetadataForKey,
       createdByNameForKey: options.createdByNameForKey,
       absenceTypeIdForKey: options.absenceTypeIdForKey,
       activeRequestForKey: options.activeRequestForKey,
@@ -390,6 +418,15 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
+    const body = getGridBody("North schedule grid");
+    // The fitted grid does not scroll, so neither container may crop a chip
+    // that deliberately crosses the shift pill's top edge.
+    const scroller = body.parentElement as HTMLElement | null;
+    expect(scroller?.style.overflowX).toBe("visible");
+    expect(scroller?.style.overflowY).toBe("visible");
+    expect((body.parentElement?.parentElement as HTMLElement | null)?.style.overflow).toBe(
+      "visible",
+    );
   });
 
   it("preserves the staff column width when navigating to an empty 2-week grid", () => {
@@ -417,6 +454,7 @@ describe("ScheduleGrid", () => {
     expect(draggable?.style.right).toBe("0px");
     expect(draggable?.style.bottom).toBe("0px");
     expect(draggable?.style.left).toBe("0px");
+    expect(draggable?.style.zIndex).toBe("4");
   });
 
   it("marks mentored single-shift pills without changing the shift label", () => {
@@ -605,7 +643,7 @@ describe("ScheduleGrid", () => {
     expect(within(firstCell).queryByText(/^SSTA$/)).not.toBeInTheDocument();
   });
 
-  it("keeps publish diff overlays layout-stable and moves prior labels into the tooltip", () => {
+  it("keeps publish diff overlays layout-stable and details the prior value in the shift hover card", async () => {
     observedWidth = 1600;
 
     const localAssignmentDefinitions: AssignmentDefinition[] = [
@@ -674,9 +712,12 @@ describe("ScheduleGrid", () => {
     expect(firstCell.style.zIndex).toBe("8");
     expect(cellContent?.style.zIndex).toBe("4");
     expect(pill?.style.justifyContent).toBe("center");
+    // A two-pixel shadow paints outside the existing pill border without
+    // changing its box-model dimensions.
+    expect(pill?.style.boxShadow).toMatch(/^0 0 0 2px /);
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
     expect(badge).not.toBeNull();
-    expect(badge?.textContent).toBe("Was N");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
@@ -685,10 +726,18 @@ describe("ScheduleGrid", () => {
       Number.parseFloat(pill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
-    expect(badge?.style.top).toBe("-8px");
+    expect(badge?.style.top).toBe("0px");
+    expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
+    expect(badge?.style.zIndex).toBe("10");
 
-    expect(badge?.getAttribute("aria-label")).toContain("Was N.");
+    expect(badge?.getAttribute("aria-label")).toContain("Was Night Shift.");
+
+    fireEvent.mouseEnter(pill!);
+    await waitFor(() => {
+      expect(screen.getByText(/Was Night Shift\./)).toBeInTheDocument();
+      expect(screen.getByText(/Published .*by Mina\./)).toBeInTheDocument();
+    });
   });
 
   it("shows publish diffs when only the publish-diff overlay is enabled", () => {
@@ -749,7 +798,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(firstCell.style.background).toBe("var(--dg-color-surface)");
-    expect(badge?.textContent).toBe("Was N");
+    expect(badge?.textContent).toBe("Edited");
   });
 
   it("rings side-by-side pills inward so two shifts in one cell never overlap", () => {
@@ -806,11 +855,10 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement[];
 
     expect(pills.length).toBe(2);
-    // An outward ring spreads past the pill's box without reserving layout
-    // space, so adjacent pills draw over each other. Every ring must be inset.
+    // A two-pixel ring sits outside the box without changing either pill's
+    // layout dimensions.
     for (const pill of pills) {
-      expect(pill.style.boxShadow).toContain("inset");
-      expect(pill.style.boxShadow).not.toMatch(/(^|,)\s*0 0 0/);
+      expect(pill.style.boxShadow).toMatch(/^0 0 0 2px /);
     }
   });
 
@@ -865,7 +913,7 @@ describe("ScheduleGrid", () => {
     expect(
       within(firstCell).queryByText(/Edited time|Added time|Time removed/),
     ).not.toBeInTheDocument();
-    expect(badge?.textContent).toBe("Time");
+    expect(badge?.textContent).toBe("Edited");
 
     expect(badge?.getAttribute("aria-label")).toContain(
       "Changed custom time 07:00-15:00 to 08:00-16:00.",
@@ -913,11 +961,12 @@ describe("ScheduleGrid", () => {
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
-    expect(badge?.textContent).toBe("Was N");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
-    expect(badge?.style.top).toBe("-8px");
+    expect(badge?.style.top).toBe("0px");
+    expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
     expect(badge?.getAttribute("aria-label")).toContain("Was N.");
   });
@@ -950,7 +999,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was N");
+    expect(badge?.textContent).toBe("Edited");
     expect(pill).toHaveStyle({
       borderStyle: "dashed",
       borderWidth: "2px",
@@ -1059,7 +1108,7 @@ describe("ScheduleGrid", () => {
     // The mentored pill says so — a dashed border with nothing naming the edit
     // left the reader guessing which of the two shifts had changed.
     expect(firstCell.querySelectorAll("[data-draft-badge]")).toHaveLength(1);
-    expect(badge?.textContent).toBe("+ Mentored");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toBe("Marked mentored for N.");
     expect(pills[1].contains(badge)).toBe(true);
     expect(pills[0]).toHaveStyle({
@@ -1073,7 +1122,7 @@ describe("ScheduleGrid", () => {
     expect(pills[1]?.style.borderColor).toBe("rgb(217, 119, 6)");
     expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
     const splitPillContainer = pills[0]?.parentElement?.parentElement as HTMLElement | null;
-    expect(splitPillContainer?.style.top).toBe("10px");
+    expect(splitPillContainer?.style.top).toBe("3px");
     expect(
       Number.parseFloat(splitPillContainer?.style.top ?? "0") +
         Number.parseFloat(badge?.style.top ?? "0"),
@@ -1122,7 +1171,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D · Supv");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
@@ -1179,12 +1228,15 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
+    const badge = Array.from(firstCell.querySelectorAll('[data-draft-badge="modified"]')).find(
+      (candidate) => (candidate as HTMLElement).style.left !== "",
+    ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Changed");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.style.borderRadius).toBe("3px");
-    expect(badge?.style.top).toBe("-8px");
-    expect(badge?.style.right).toBe("3px");
+    expect(badge?.style.top).toBe("0px");
+    expect(badge?.style.transform).toBe("translateY(-50%)");
+    expect(badge?.style.left).toBe("4px");
   });
 
   it("rings a reordered pair without claiming either pill was something else", () => {
@@ -1204,7 +1256,7 @@ describe("ScheduleGrid", () => {
     expect(firstCell.querySelector("[data-draft-badge]")).toBeNull();
   });
 
-  it("names the shift a draft dropped when it was not the last one", () => {
+  it("marks a removed split-shift segment as Edited and names its former value", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -1217,10 +1269,73 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
+    const badge = Array.from(firstCell.querySelectorAll('[data-draft-badge="modified"]')).find(
+      (candidate) => (candidate as HTMLElement).style.left !== "",
+    ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Changed");
-    expect(badge?.getAttribute("aria-label")).toBe("Removed D.");
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.getAttribute("aria-label")).toBe("Was D.");
+    expect(
+      (badge?.closest('[data-shift-pill="single"]') as HTMLElement | null)?.style.overflow,
+    ).toBe("visible");
+  });
+
+  it("names an archived published segment in its Was detail", () => {
+    observedWidth = 1600;
+
+    const currentDay = {
+      ...assignments[0],
+      jobId: 101,
+    };
+    const archivedEvening = {
+      ...twoPillAssignmentDefinitions[2],
+      name: "Evening Shift · Supervisor",
+      jobId: 103,
+      archivedAt: "2024-01-08T00:00:00.000Z",
+    };
+    renderGrid({
+      assignments: [currentDay],
+      historicalAssignments: [archivedEvening],
+      jobs: [{ id: 103, name: "Supervisor" } as JobDefinition],
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        fromState: {
+          kind: "worked",
+          segments: [
+            { shiftId: 1, jobId: 101, position: 0 },
+            { shiftId: 1, jobId: 103, position: 1 },
+          ],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        toState: {
+          kind: "worked",
+          segments: [{ shiftId: 1, jobId: 101, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+    });
+
+    const badge = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
+
+    expect(badge?.getAttribute("aria-label")).toContain("Was Evening Shift · Supervisor.");
+    expect(badge?.getAttribute("aria-label")).not.toContain("Supervisor · Supervisor");
   });
 
   it("renders cross-focus initials in a left-side strip for a single shift card", () => {
@@ -1265,7 +1380,7 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.paddingLeft).toBe("24px");
     expect(initialsBadge.style.position).toBe("absolute");
     expect(initialsBadge.style.left).toBe("0px");
-    expect(initialsBadge.style.borderRadius).toBe("2px 0 0 2px");
+    expect(initialsBadge.style.borderRadius).toBe("7px 0 0 7px");
     expect(initialsBadge).toHaveStyle({
       background: "#DBEAFE",
       color: "#1E3A8A",
@@ -1315,7 +1430,7 @@ describe("ScheduleGrid", () => {
     expect(crossPill?.style.paddingLeft).toBe("20px");
     expect(initialsBadge.style.position).toBe("absolute");
     expect(initialsBadge.style.left).toBe("0px");
-    expect(initialsBadge.style.borderRadius).toBe("2px 0 0 2px");
+    expect(initialsBadge.style.borderRadius).toBe("5px 0 0 5px");
     expect(initialsBadge).toHaveStyle({
       background: "#DBEAFE",
       color: "#1E3A8A",
@@ -1616,7 +1731,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.textContent).toBe("Edited");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -1651,7 +1766,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toBe("Was D.");
   });
 
@@ -1704,14 +1819,13 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const badge = Array.from(firstCell.querySelectorAll('[data-draft-badge="modified"]')).find(
+      (candidate) => (candidate as HTMLElement).style.left !== "",
+    ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Changed");
+    expect(badge?.textContent).toBe("Edited");
     expect(firstCell.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
-    // The "M" sits at right 0.5 and is 16 wide, so a badge anchored at right 4
-    // would land on top of it.
-    expect(Number.parseFloat(badge?.style.right ?? "0")).toBeGreaterThanOrEqual(16.5);
-    expect(badge?.style.maxWidth).toBe("calc(100% - 25px)");
+    expect(badge?.style.left).toBe("4px");
   });
 
   it("keeps an unmentored cell badge in the corner", () => {
@@ -1732,10 +1846,10 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Changed");
-    expect(badge?.style.right).toBe("4px");
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.style.left).toBe("4px");
   });
 
   it("stacks the split-shift corner so notes, the mentored circle and the badge do not pile up", () => {
@@ -1760,13 +1874,13 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const badge = Array.from(firstCell.querySelectorAll("[data-draft-badge]")).find(
+      (candidate) => (candidate as HTMLElement).style.left !== "",
+    ) as HTMLElement | undefined;
     const dots = firstCell.querySelector('[data-mentored-badge="true"]')?.parentElement;
 
-    expect(badge?.textContent).toBe("Changed");
-    // Mentored circle ends at 16.5; two 10px dots with a 2px gap start past it
-    // and run to 43; the badge starts past those.
-    expect(badge?.style.right).toBe("47px");
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.style.left).toBe("4px");
     expect(dots).not.toBeNull();
   });
 
@@ -1786,6 +1900,50 @@ describe("ScheduleGrid", () => {
 
     expect(firstCell.querySelector('[data-shift-pill="deleted"]')).not.toBeNull();
     expect(firstCell.querySelectorAll('div[style*="border-radius: 50%"]')).toHaveLength(1);
+  });
+
+  it("marks an added and a removed note that have not been published", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      indicatorTypes: [
+        { id: 1, orgId: "org-1", name: "Flag", color: "#ff0000", sortOrder: 1 },
+        { id: 2, orgId: "org-1", name: "Float", color: "#00ff00", sortOrder: 2 },
+      ],
+      noteMarksForKey: () => [
+        { indicatorTypeId: 1, state: "draft_added" },
+        { indicatorTypeId: 2, state: "draft_removed" },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const added = firstCell.querySelector('[data-note-dot="draft_added"]') as HTMLElement;
+    const removed = firstCell.querySelector('[data-note-dot="draft_removed"]') as HTMLElement;
+
+    expect(added?.getAttribute("aria-label")).toBe("Flag · Added, not published");
+    expect(removed?.getAttribute("aria-label")).toBe("Float · Removed, not published");
+    // The removal is still pending, so its dot stays visible as an outline
+    // rather than disappearing as though it had already published.
+    expect(removed?.style.background).toBe("transparent");
+  });
+
+  it("renders a note removed by the last publish from its change record", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      indicatorTypes: [],
+      noteMarksForKey: () => [
+        { indicatorTypeId: 9, state: "published_removed", name: "Gone", color: "#0000ff" },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const removed = firstCell.querySelector('[data-note-dot="published_removed"]') as HTMLElement;
+
+    // Its schedule_notes row is gone, so the name and colour can only come from
+    // the publish record.
+    expect(removed?.getAttribute("aria-label")).toBe("Gone · Removed in the last publish");
+    expect(removed?.style.border).toContain("rgb(0, 0, 255)");
   });
 
   it("folds the corner of a shift with an open request", () => {
@@ -1842,9 +2000,8 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was N");
-    // The badge starts just past the fold, with the shared breathing room.
-    expect(Number.parseFloat(badge?.style.left ?? "0")).toBe(REQUEST_FOLD_CLEARANCE);
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.style.left).toBe("4px");
   });
 
   it("moves the mentored circle clear of the lock avatar holding the cell", () => {
@@ -1898,10 +2055,14 @@ describe("ScheduleGrid", () => {
 
     expect(deletedPill).not.toBeNull();
     expect(deletedPill.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
-    expect(within(deletedPill).getByText("SW")).toBeInTheDocument();
+    const wing = within(deletedPill).getByText("SW") as HTMLElement;
+    expect(wing).toHaveStyle({
+      top: "0px",
+      borderRadius: "6px 0 0 6px",
+    });
   });
 
-  it("yields the cross-focus strip's top corner to a left-anchored badge", () => {
+  it("keeps the cross-focus wing curved beneath a left-anchored badge", () => {
     observedWidth = 1600;
 
     const localFocusAreas: FocusArea[] = [
@@ -1935,7 +2096,8 @@ describe("ScheduleGrid", () => {
       "S",
     ) as HTMLElement;
 
-    expect(strip.style.top).toBe("8px");
+    expect(strip.style.top).toBe("0px");
+    expect(strip.style.borderRadius).toBe("6px 0 0 6px");
     withBadge.unmount();
 
     renderGrid({ focusAreas: localFocusAreas, assignments: crossAssignments });
@@ -1944,6 +2106,7 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement;
 
     expect(cleanStrip.style.top).toBe("0px");
+    expect(cleanStrip.style.borderRadius).toBe("7px 0 0 7px");
   });
 
   it("keeps a brand-new shift with custom time badge-free", () => {
@@ -2003,7 +2166,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.textContent).toBe("Edited");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -2156,7 +2319,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D · Supv");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
@@ -2259,7 +2422,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.textContent).toBe("Edited");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -2302,7 +2465,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was VAC");
+    expect(badge?.textContent).toBe("Edited");
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
   });
 
@@ -2347,8 +2510,8 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Was D");
-    expect(badge?.getAttribute("aria-label")).toContain("Was D.");
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.getAttribute("aria-label")).toContain("Was Day Shift.");
     expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
 
@@ -2401,11 +2564,12 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
-    expect(badge?.textContent).toBe("+ Time");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
-    expect(badge?.style.top).toBe("-8px");
+    expect(badge?.style.top).toBe("0px");
+    expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
     expect(badge?.getAttribute("aria-label")).toContain("Added custom time 08:00-16:00.");
   });
@@ -2452,7 +2616,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Time");
+    expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toContain(
       "Changed custom time for D 07:00-15:00 to 08:00-16:00.",
     );
@@ -2524,6 +2688,7 @@ describe("ScheduleGrid", () => {
       background: "rgba(220, 38, 38, 0.94)",
     });
     expect(deletedPill?.style.overflow).toBe("visible");
+    expect(deletedPill?.style.boxShadow).toMatch(/^0 0 0 2px /);
     expect(
       Number.parseFloat(deletedPill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
@@ -2920,6 +3085,55 @@ describe("ScheduleGrid", () => {
     const visibleShiftLabel = within(firstCell).getByText("Day");
     fireEvent.mouseEnter(visibleShiftLabel);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("shows the publication date and author on a regular shift hover card", async () => {
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      publishedMetadataForKey: () => ({
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector('[data-shift-pill="single"]') as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Published .*by Mina\./)).toBeInTheDocument();
+    });
+  });
+
+  it("shows the organization timezone in published metadata", () => {
+    expect(
+      formatPublishedMetadata({
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+        resolvePublisherName: () => "Mina",
+        timeZone: "UTC",
+      }),
+    ).toBe("Published Jan 7, 2024, 12:00 PM UTC by Mina.");
+  });
+
+  it("uses the change tooltip when shift detail hover cards are disabled", async () => {
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      showShiftDetailHoverCards: false,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement;
+
+    fireEvent.mouseEnter(badge);
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent("Was N.");
+    });
   });
 
   it("shows full qualifications when hovering a staff role or certification", async () => {
@@ -3817,5 +4031,79 @@ describe("ScheduleGrid", () => {
       (span) => span.textContent === "D",
     ) as HTMLElement;
     expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+  });
+
+  describe("pinned date row", () => {
+    const makeRoster = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        ...employees[0],
+        id: `emp-${index + 1}`,
+        firstName: `Staff${index + 1}`,
+        seniority: index + 1,
+      }));
+
+    it("marks the fifth-from-last staff row as the release anchor", () => {
+      const roster = makeRoster(7);
+      const { container } = renderGrid({
+        filteredEmployees: roster,
+        allEmployees: roster,
+      });
+
+      const anchors = container.querySelectorAll('[data-sticky-release="true"]');
+      expect(anchors).toHaveLength(1);
+      // Seven staff, five kept clear: the anchor is the third row.
+      expect(anchors[0].textContent).toContain("Staff3");
+    });
+
+    it("anchors a short section on its first row so the date row never pins", () => {
+      const roster = makeRoster(3);
+      const { container } = renderGrid({
+        filteredEmployees: roster,
+        allEmployees: roster,
+      });
+
+      const anchors = container.querySelectorAll('[data-sticky-release="true"]');
+      expect(anchors).toHaveLength(1);
+      expect(anchors[0].textContent).toContain("Staff1");
+    });
+
+    it("keeps the focus-area label and the date row in one native sticky group", () => {
+      const { container } = renderGrid();
+
+      const group = container.querySelector(".dg-grid-sticky-group") as HTMLElement;
+      const label = group.querySelector(".dg-grid-section-label") as HTMLElement;
+      const headerRow = group.querySelector(".dg-grid-header-row") as HTMLElement;
+      expect(label).not.toBeNull();
+      expect(headerRow).not.toBeNull();
+      expect(headerRow.querySelectorAll('[role="columnheader"]')).toHaveLength(15);
+      // Padding, not margin: rows would otherwise scroll through the gap
+      // between the label and the date row while the group is stuck.
+      expect(label).toHaveStyle({ padding: "2px 0 12px" });
+      expect(label.style.marginBottom).toBe("");
+      // Nothing is driven by scroll position; layering waits on `data-stuck`.
+      expect(group.style.transform).toBe("");
+      expect(group.dataset.stuck).toBeUndefined();
+    });
+
+    it("scrolls the date row in a mirror of the body scroller", () => {
+      const { container } = renderGrid();
+
+      const body = getGridBody("North schedule grid");
+      const headerRow = container.querySelector(".dg-grid-header-row") as HTMLElement;
+      // The header cannot live inside the body's horizontal scroller, which
+      // would become its scrollport and defeat the vertical stick.
+      expect(body.contains(headerRow)).toBe(false);
+      expect(body.querySelector('[role="columnheader"]')).toBeNull();
+    });
+
+    it("keeps the header and body rows under one grid for assistive tech", () => {
+      renderGrid();
+
+      const grid = screen.getByRole("grid", { name: "North schedule grid" });
+      const rowgroups = within(grid).getAllByRole("rowgroup");
+      expect(rowgroups).toHaveLength(2);
+      expect(within(rowgroups[0]).getAllByRole("columnheader").length).toBeGreaterThan(0);
+      expect(within(rowgroups[1]).getAllByRole("gridcell").length).toBeGreaterThan(0);
+    });
   });
 });

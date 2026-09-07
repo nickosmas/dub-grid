@@ -135,6 +135,12 @@ const requestSchema = z.discriminatedUnion("action", [
     input: scheduleCellStateSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
     echo: cellEchoSchema.optional(),
+    /**
+     * Set when the write replaces the cell's shift wholesale rather than
+     * editing it, which a paste does. An ordinary edit keeps its indicators;
+     * a replacement cannot, because they described the shift being displaced.
+     */
+    clearNotes: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("importPreviousSchedule"),
@@ -615,6 +621,66 @@ async function fetchScheduleCellSnapshotPayload(
   return rows[0] ?? null;
 }
 
+/**
+ * An indicator describes a shift, so a cell has to be carrying one before it
+ * can be tagged. A draft shift counts: schedulers tag while they build.
+ */
+async function cellHasWorkedShift(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+): Promise<boolean> {
+  const [draftPayload, publishedPayload] = await Promise.all([
+    fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "draft"),
+    fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "published"),
+  ]);
+  // A draft supersedes the published cell, including a draft that clears it.
+  return draftPayload
+    ? draftPayload.state_kind === "worked"
+    : publishedPayload?.state_kind === "worked";
+}
+
+/**
+ * Notes cannot outlive the shift they describe, so removing or relocating a
+ * cell's shift takes its notes with it. This follows the rule a single note
+ * delete uses: a draft row disappears outright, while a published one becomes
+ * draft_deleted so the next publish finalises it and discarding drafts
+ * restores it. schedule_notes has no foreign key to the cell, so nothing in
+ * the database does this for us.
+ */
+async function clearScheduleNotesForCells(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  cells: Array<{ employeeId: string; date: string }>,
+): Promise<void> {
+  await Promise.all(
+    cells.map(async ({ employeeId, date }) => {
+      const { error: draftError } = await serviceClient
+        .from("schedule_notes")
+        .delete()
+        .eq("org_id", orgId)
+        .eq("emp_id", employeeId)
+        .eq("date", date)
+        .eq("status", "draft");
+      if (draftError) {
+        throw draftError;
+      }
+
+      const { error: publishedError } = await serviceClient
+        .from("schedule_notes")
+        .update({ status: "draft_deleted" })
+        .eq("org_id", orgId)
+        .eq("emp_id", employeeId)
+        .eq("date", date)
+        .eq("status", "published");
+      if (publishedError) {
+        throw publishedError;
+      }
+    }),
+  );
+}
+
 function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
   const snapshots = cell.snapshots ?? [];
   // Any draft blocks the fill, including an explicit delete — a manager who
@@ -929,6 +995,11 @@ export async function POST(req: NextRequest) {
           state: data.input,
           expectedVersion: data.expectedVersion,
         });
+        if (data.clearNotes) {
+          await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+            { employeeId: data.employeeId, date: data.date },
+          ]);
+        }
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
           actorId: auth.actor.id,
@@ -1010,6 +1081,9 @@ export async function POST(req: NextRequest) {
           date: data.date,
           expectedVersion: data.expectedVersion,
         });
+        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+          { employeeId: data.employeeId, date: data.date },
+        ]);
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
           actorId: auth.actor.id,
@@ -1058,6 +1132,9 @@ export async function POST(req: NextRequest) {
               date: shift.date,
               expectedVersion: shift.expectedVersion,
             });
+            await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+              { employeeId: shift.employeeId, date: shift.date },
+            ]);
             logScheduleAudit(auth.serviceClient, {
               orgId: data.orgId,
               actorId: auth.actor.id,
@@ -1206,6 +1283,20 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        // Indicators describe the shift that was sitting in a cell, so they
+        // never travel with it and never outlive it. The target is always
+        // cleared: whatever it holds now, it is not the shift its old notes
+        // described, and the arriving shift brings none of its own. The source
+        // is cleared only when the shift actually leaves it, which a copy does
+        // not do. A swap is a move onto an occupied target, so both ends clear.
+        // move_shift itself never touches schedule_notes.
+        await clearScheduleNotesForCells(auth.serviceClient, data.orgId, [
+          ...(data.dragMode === "copy"
+            ? []
+            : [{ employeeId: data.sourceEmpId, date: data.sourceDate }]),
+          { employeeId: data.targetEmpId, date: data.targetDate },
+        ]);
+
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
           actorId: auth.actor.id,
@@ -1229,7 +1320,7 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
@@ -1321,7 +1412,7 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
@@ -1372,11 +1463,23 @@ export async function POST(req: NextRequest) {
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canManageShiftSeries,
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
           { actor },
         );
         if ("response" in auth) {
           return auth.response;
+        }
+
+        // Read the series' cells before the RPC removes the rows that identify
+        // them, so their notes can be cleared afterwards. delete_shift_series
+        // returns only a count, and the echo covers a single cell.
+        const { data: seriesCells, error: seriesCellsError } = await auth.serviceClient
+          .from("schedule_cells")
+          .select("emp_id, date")
+          .eq("org_id", data.orgId)
+          .eq("series_id", data.seriesId);
+        if (seriesCellsError) {
+          throw seriesCellsError;
         }
 
         const { data: deletedCount, error } = await auth.userClient.rpc("delete_shift_series", {
@@ -1386,6 +1489,15 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        await clearScheduleNotesForCells(
+          auth.serviceClient,
+          data.orgId,
+          ((seriesCells ?? []) as Array<{ emp_id: string; date: string }>).map((cell) => ({
+            employeeId: cell.emp_id,
+            date: cell.date,
+          })),
+        );
 
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
@@ -1418,13 +1530,16 @@ export async function POST(req: NextRequest) {
       }
 
       case "applyRecurringSchedules": {
+        // Series and recurring applies write grid cells, so they need Schedule
+        // edit as well as their own key. The toolbar already requires both;
+        // without this the API alone let a recurring-only admin fill the grid.
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
           (permissions) =>
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
-            permissions.canApplyRecurringSchedule,
+            (permissions.canEditShifts && permissions.canApplyRecurringSchedule),
           { actor },
         );
         if ("response" in auth) {
@@ -1605,15 +1720,29 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertScheduleNote": {
+        // A schedule note is an indicator on a cell, so writing one needs the
+        // indicators key as well as notes. The cell editor gates the picker on
+        // indicators; this keeps the API in step with it.
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
           { actor },
         );
         if ("response" in auth) {
           return auth.response;
+        }
+
+        if (
+          !(await cellHasWorkedShift(auth.serviceClient, data.orgId, data.employeeId, data.date))
+        ) {
+          return NextResponse.json(
+            { error: "Cannot add an indicator to a cell without a shift" },
+            { status: 400 },
+          );
         }
 
         const status = data.existingStatus === "draft_deleted" ? "published" : "draft";
@@ -1662,7 +1791,9 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditNotes && permissions.canEditScheduleIndicators),
           { actor },
         );
         if ("response" in auth) {

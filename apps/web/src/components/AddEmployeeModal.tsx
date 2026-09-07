@@ -226,6 +226,75 @@ export default function AddEmployeeModal({
           width: isMobile ? "calc(100vw - 32px)" : "min(1080px, calc(100vw - 48px))",
           maxHeight: isMobile ? "calc(100dvh - 24px)" : "calc(100vh - 40px)",
         }}
+        footer={
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: isMobile ? "stretch" : "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
+              {validRows.length === 0
+                ? "Complete the fields marked with * to create a profile."
+                : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.`}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                width: isMobile ? "100%" : undefined,
+                justifyContent: isMobile ? "stretch" : "flex-end",
+              }}
+            >
+              <Button
+                onClick={addRow}
+                className="dg-btn dg-btn-secondary"
+                style={{
+                  flex: isMobile ? 1 : undefined,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add Another Person
+              </Button>
+              <Button
+                onClick={handleRequestClose}
+                className="dg-btn dg-btn-secondary"
+                style={{ flex: isMobile ? 1 : undefined }}
+              >
+                {EDITOR_ACTION_LABELS.close}
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                className="dg-btn dg-btn-primary"
+                disabled={validRows.length === 0}
+                style={{ flex: isMobile ? 1 : undefined }}
+              >
+                Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
+                {validRows.length !== 1 ? "s" : ""}
+              </Button>
+            </div>
+          </div>
+        }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
           <p
@@ -538,77 +607,6 @@ export default function AddEmployeeModal({
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: isMobile ? "stretch" : "center",
-              gap: 12,
-              marginTop: 4,
-              paddingTop: 16,
-              borderTop: "1px solid var(--dg-color-border-light)",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
-              {validRows.length === 0
-                ? "Complete the fields marked with * to create a profile."
-                : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.`}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                width: isMobile ? "100%" : undefined,
-                justifyContent: isMobile ? "stretch" : "flex-end",
-              }}
-            >
-              <Button
-                onClick={addRow}
-                className="dg-btn dg-btn-secondary"
-                style={{
-                  flex: isMobile ? 1 : undefined,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Add Another Person
-              </Button>
-              <Button
-                onClick={handleRequestClose}
-                className="dg-btn dg-btn-ghost"
-                style={{ flex: isMobile ? 1 : undefined }}
-              >
-                {EDITOR_ACTION_LABELS.close}
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                className="dg-btn dg-btn-primary"
-                disabled={validRows.length === 0}
-                style={{ flex: isMobile ? 1 : undefined }}
-              >
-                Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
-                {validRows.length !== 1 ? "s" : ""}
-              </Button>
             </div>
           </div>
         </div>

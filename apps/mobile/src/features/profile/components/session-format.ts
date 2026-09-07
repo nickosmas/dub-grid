@@ -31,7 +31,7 @@ export function formatSessionClient(session: MobileProfileSession): string {
     return [session.browserName, session.browserVersion].filter(Boolean).join(" ") || "Web browser";
   }
 
-  return ["DubGrid Mobile", session.appVersion].filter(Boolean).join(" ");
+  return ["Mobile app", session.appVersion].filter(Boolean).join(" ");
 }
 
 export function formatSessionLocation(session: MobileProfileSession): string {

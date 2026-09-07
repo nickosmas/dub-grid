@@ -67,7 +67,7 @@ export function BillingMetric({
           : "var(--dg-color-text-primary)";
 
   return (
-    <div style={{ ...sectionStyle, padding: "14px 16px" }}>
+    <div data-stat-card style={{ ...sectionStyle, padding: "14px 16px" }}>
       <div
         style={{
           fontSize: "var(--dg-fs-card-title)",
@@ -524,6 +524,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
         orgId={organization.id}
         title="Billing Activity"
         initialActionFilter="billing"
+        timeZone={organization.timezone ?? null}
       />
       <BillingConfirmDialog
         action={confirmAction}

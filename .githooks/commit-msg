@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# Strip AI attribution trailers from the commit message.
+#
+# blueprint/context/ai-interaction.md bans them, but an agent's own session
+# instructions can independently tell it to add one, and an agent that hits
+# that contradiction may resolve it the wrong way without flagging it. This is
+# the one point every tool passes through, so the rule is settled here instead
+# of depending on each agent noticing: Claude Code, Codex, Copilot, OpenCode.
+#
+# Bypass with `git commit --no-verify` when you genuinely want an attribution.
+
+set -e
+
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+
+CLEANED=$(mktemp)
+trap 'rm -f "$CLEANED"' EXIT
+
+# Scoped to Anthropic and Claude specifically: a human co-author must survive.
+grep -viE \
+  -e '^[[:space:]]*co-authored-by:[[:space:]]*claude([[:space:]]|<)' \
+  -e '^[[:space:]]*co-authored-by:.*<[^>]*@anthropic\.com>' \
+  -e 'generated with \[claude code\]' \
+  "$MSG_FILE" > "$CLEANED" || true
+
+# A removed trailer leaves the blank line that separated it, so drop anything
+# blank past the last real content.
+awk '
+  { line[NR] = $0; if ($0 ~ /[^[:space:]]/) last = NR }
+  END { for (i = 1; i <= last; i++) print line[i] }
+' "$CLEANED" > "$MSG_FILE"
+
+exit 0

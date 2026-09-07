@@ -1,5 +1,7 @@
 "use client";
 
+import { getAvatarTypography } from "@dubgrid/design-tokens";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { OnlineUser } from "@/hooks/useSchedulePresence";
@@ -40,6 +42,7 @@ function Avatar({
   return (
     <div
       style={{
+        ...getAvatarTypography(size),
         position: "relative",
         width: size,
         height: size,
@@ -50,8 +53,6 @@ function Avatar({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 700,
         color: tone.textColor,
         flexShrink: 0,
       }}

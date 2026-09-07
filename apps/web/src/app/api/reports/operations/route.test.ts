@@ -77,7 +77,14 @@ describe("reports operations API", () => {
       generatedAt: "2026-05-05T00:00:00.000Z",
       range: { startDate: "2026-05-03", endDate: "2026-05-09" },
       payPeriodStartDate: null,
-      filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
+      filters: {
+        employeeIds: [],
+        focusAreaIds: [],
+        dates: [],
+        jobIds: [],
+        indicatorTypeIds: [],
+        shiftCategoryIds: [],
+      },
       filterOptions: { employees: [], focusAreas: [], dates: [] },
       metrics: [],
       reports: {
@@ -132,7 +139,7 @@ describe("reports operations API", () => {
     expect(requireOrgPermissions).not.toHaveBeenCalled();
   });
 
-  it("authorizes organization admins and super admins only", async () => {
+  it("authorizes the reports permission and super admins only", async () => {
     await GET_REPORT(makeReportRequest());
 
     expect(requireOrgPermissions).toHaveBeenCalledWith(
@@ -141,15 +148,25 @@ describe("reports operations API", () => {
       expect.any(Function),
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
-    expect(isAllowed({ role: "admin", isSuperAdmin: false })).toBe(true);
-    expect(isAllowed({ role: "user", isSuperAdmin: true })).toBe(true);
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: true })).toBe(true);
+    expect(isAllowed({ role: "user", isSuperAdmin: true, canViewReports: false })).toBe(true);
+    // Being an admin is no longer enough on its own, nor is any other view key.
     expect(
       isAllowed({
-        role: "user",
+        role: "admin",
         isSuperAdmin: false,
+        canViewReports: false,
         canViewDashboardAnalytics: true,
       }),
     ).toBe(false);
+  });
+
+  it("gates exports on the same permission as the report itself", async () => {
+    await GET_EXPORT(makeExportRequest());
+
+    const isAllowed = requireOrgPermissions.mock.calls[0][2];
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: true })).toBe(true);
+    expect(isAllowed({ role: "admin", isSuperAdmin: false, canViewReports: false })).toBe(false);
   });
 
   it("returns the operations report as no-store JSON", async () => {
@@ -166,6 +183,7 @@ describe("reports operations API", () => {
         focusAreaIds: [],
         dates: [],
         jobIds: [],
+        indicatorTypeIds: [],
         shiftCategoryIds: [],
       },
     });
@@ -187,6 +205,7 @@ describe("reports operations API", () => {
         focusAreaIds: [10, 11],
         dates: ["2026-05-03", "2026-05-06"],
         jobIds: [],
+        indicatorTypeIds: [],
         shiftCategoryIds: [],
       },
     });
@@ -199,6 +218,33 @@ describe("reports operations API", () => {
 
     expect(response.status).toBe(400);
     expect(loadOperationsReport).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-numeric indicator filters", async () => {
+    const response = await GET_REPORT(
+      makeReportRequest(
+        `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&indicatorTypeIds=late`,
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(loadOperationsReport).not.toHaveBeenCalled();
+  });
+
+  it("passes indicator filters into report loading", async () => {
+    const response = await GET_REPORT(
+      makeReportRequest(
+        `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&indicatorTypeIds=80,81`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(loadOperationsReport).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        filters: expect.objectContaining({ indicatorTypeIds: [80, 81] }),
+      }),
+    );
   });
 
   it("passes through unauthenticated or forbidden permission responses", async () => {
@@ -233,7 +279,14 @@ describe("reports operations API", () => {
         type: "reports.operations",
         report: "staff-hours",
         format: "csv",
-        filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
+        filters: {
+          employeeIds: [],
+          focusAreaIds: [],
+          dates: [],
+          jobIds: [],
+          indicatorTypeIds: [],
+          shiftCategoryIds: [],
+        },
         startDate: "2026-05-03",
         endDate: "2026-05-09",
       },
@@ -266,7 +319,14 @@ describe("reports operations API", () => {
         type: "reports.operations",
         report: "staff-hours",
         format: "pdf",
-        filters: { employeeIds: [], focusAreaIds: [], dates: [], jobIds: [], shiftCategoryIds: [] },
+        filters: {
+          employeeIds: [],
+          focusAreaIds: [],
+          dates: [],
+          jobIds: [],
+          indicatorTypeIds: [],
+          shiftCategoryIds: [],
+        },
         startDate: "2026-05-03",
         endDate: "2026-05-09",
       },

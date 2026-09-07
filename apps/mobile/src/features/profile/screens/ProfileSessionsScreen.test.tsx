@@ -136,14 +136,14 @@ describe("ProfileSessionsScreen", () => {
 
     expect(screen.getByText("Mina's iPhone")).toBeInTheDocument();
     expect(screen.getByText("This device")).toBeInTheDocument();
-    expect(screen.getByText("DubGrid Mobile 1.3.9")).toBeInTheDocument();
+    expect(screen.getByText("Mobile app 1.3.9")).toBeInTheDocument();
     expect(screen.getByText("198.51.100.4 (Nairobi, Kenya)")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Pixel 8" }));
 
     expect(screen.getAllByText("198.51.100.4 (Nairobi, Kenya)")).toHaveLength(2);
-    expect(screen.getAllByText("DubGrid Mobile 1.3.9")).toHaveLength(2);
+    expect(screen.getAllByText("Mobile app 1.3.9")).toHaveLength(2);
     expect(screen.getByText("First signed in")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out this device" })).toBeInTheDocument();
   });
@@ -171,7 +171,7 @@ describe("ProfileSessionsScreen", () => {
     expect(screen.getByText("Pixel 8 will lose access immediately.")).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     expect(mutateAsync).toHaveBeenCalledWith("hash-other");
@@ -198,7 +198,7 @@ describe("ProfileSessionsScreen", () => {
     expect(screen.getByText("Sign out all devices?")).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     await waitFor(() => {
@@ -219,7 +219,7 @@ describe("ProfileSessionsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign Out" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
     await waitFor(() => {

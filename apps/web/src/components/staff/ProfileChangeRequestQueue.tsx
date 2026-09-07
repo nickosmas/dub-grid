@@ -393,18 +393,18 @@ export function ProfileChangeRequestQueue({
                 <Button
                   type="button"
                   disabled={resolvingId === request.id}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
-                  onClick={() => setPendingResolution({ request, action: "approve" })}
-                >
-                  <ButtonLoading loading={resolvingId === request.id}>Approve</ButtonLoading>
-                </Button>
-                <Button
-                  type="button"
-                  disabled={resolvingId === request.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                   onClick={() => setPendingResolution({ request, action: "reject" })}
                 >
                   Reject
+                </Button>
+                <Button
+                  type="button"
+                  disabled={resolvingId === request.id}
+                  className="dg-btn dg-btn-primary dg-btn-sm"
+                  onClick={() => setPendingResolution({ request, action: "approve" })}
+                >
+                  <ButtonLoading loading={resolvingId === request.id}>Approve</ButtonLoading>
                 </Button>
               </div>
             </div>

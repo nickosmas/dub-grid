@@ -18,6 +18,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen } from "../../../shared/components/Screen";
@@ -61,6 +62,7 @@ import {
   buildScheduleShiftGroups,
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   formatCompactScheduleDate,
+  formatScheduleTimeRange,
   getCompactScheduleDateParts,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
@@ -71,12 +73,14 @@ import {
   getScheduleEntryTimeRange,
   getScheduleEntryStartTime,
   getScheduleEntryAbsenceTypeId,
-  getScheduleEntryDisplayFocusAreaName,
+  getMobileScheduleEntryDisplayFocusAreaName,
+  getMobileScheduleEntrySegmentFocusAreaName,
   getScheduleWeekStartDate,
   getSplitShiftSegmentsForEntry,
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
+import { getScheduleEntrySegmentChange } from "../lib/scheduleScreenChips";
 import {
   addDaysIso,
   buildShiftmateSegmentGroups,
@@ -684,6 +688,7 @@ export default function ShiftDetailScreen() {
     shiftEntry &&
     linkedEmployeeId &&
     shiftEntry.employeeId === linkedEmployeeId &&
+    shiftEntry.change?.kind !== "deleted" &&
     hasAnyRequestableScheduleEntrySegment(shiftEntry, timeZone) &&
     getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
     hasWorkedAssignment(shiftEntry) &&
@@ -748,23 +753,22 @@ export default function ShiftDetailScreen() {
   const publishedSummary = shiftEntry
     ? formatPublishedSummary(shiftEntry.publishedByName, publishedAtLabel)
     : null;
-  const focusAreaName = shiftEntry ? getScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
+  const focusAreaName = shiftEntry ? getMobileScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
   const jobChip = shiftEntry ? getEntryJobChip(mobileColors, isDark, shiftEntry) : null;
-  let detailCardTitle = shiftEntry ? getScheduleEntryTitle(shiftEntry) : "";
-
-  if (hasSplitShift) {
-    detailCardTitle = "Multiple Shifts";
-  } else if (hasMultipleSegments) {
-    detailCardTitle = "Shifts";
-  }
+  const detailCardTitle = hasSplitShift
+    ? "Multiple Shifts"
+    : shiftEntry
+      ? getScheduleEntryTitle(shiftEntry)
+      : "";
   const isViewingOtherEmployee = Boolean(shiftEntry && shiftEntry.employeeId !== linkedEmployeeId);
   const detailTitleChip = !hasMultipleSegments ? jobChip : null;
   // Same rule the home card applies: when the chip already names the thing (an
   // absence type, a general shift), the heading above it would only repeat the
   // word, so the eyebrow and the pill carry it alone.
-  const shouldShowDetailTitle = shouldShowMePrimaryTitle(detailCardTitle, detailTitleChip);
+  const shouldShowDetailTitle =
+    hasSplitShift || shouldShowMePrimaryTitle(detailCardTitle, detailTitleChip);
   const shouldRenderTitlePills = Boolean(
-    hasSplitShift || detailTitleChip || primarySegment?.isMentored,
+    !hasSplitShift && (detailTitleChip || primarySegment?.isMentored),
   );
 
   const shouldShowShiftmates = Boolean(
@@ -1008,28 +1012,42 @@ export default function ShiftDetailScreen() {
       ) : (
         <>
           <View style={styles.shiftDetailCard} testID="shift-detail-card">
-            <View style={styles.detailHeroHeader}>
-              <View style={styles.detailHeroCopy}>
-                {shouldShowDetailTitle ? (
-                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailHeroTitle}>
-                    {detailCardTitle}
-                  </Text>
-                ) : null}
-                {shouldRenderTitlePills ? (
-                  <View style={styles.detailHeroPillRow}>
-                    {hasSplitShift ? (
-                      <SplitShiftBadge count={splitSegments.length} compact />
-                    ) : detailTitleChip || primarySegment?.isMentored ? (
-                      <DetailHeaderJobPill
-                        chip={detailTitleChip}
-                        isMentored={primarySegment?.isMentored === true}
-                      />
+            <View style={styles.detailSummaryRow}>
+              <View style={styles.detailSummaryContent}>
+                <View style={styles.detailHeroHeader}>
+                  <View style={styles.detailHeroCopy}>
+                    {shouldShowDetailTitle ? (
+                      <View style={styles.detailHeroTitleRow}>
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          numberOfLines={1}
+                          style={[styles.detailHeroTitle, styles.detailHeroTitleInline]}
+                        >
+                          {detailCardTitle}
+                        </Text>
+                        <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
+                      </View>
+                    ) : null}
+                    {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
+                      <View style={styles.detailHeroPillRow}>
+                        {detailTitleChip || primarySegment?.isMentored ? (
+                          <DetailHeaderJobPill
+                            chip={detailTitleChip}
+                            isMentored={primarySegment?.isMentored === true}
+                          />
+                        ) : null}
+                        {!shouldShowDetailTitle ? (
+                          <DetailShiftChangeBadge
+                            change={hasSplitShift ? null : shiftEntry.change}
+                          />
+                        ) : null}
+                      </View>
+                    ) : null}
+                    {isViewingOtherEmployee && shiftEntry.employeeName ? (
+                      <Text style={styles.detailEmployeeName}>{shiftEntry.employeeName}</Text>
                     ) : null}
                   </View>
-                ) : null}
-                {isViewingOtherEmployee && shiftEntry.employeeName ? (
-                  <Text style={styles.detailEmployeeName}>{shiftEntry.employeeName}</Text>
-                ) : null}
+                </View>
               </View>
               <DetailDateTile date={shiftEntry.date} />
             </View>
@@ -1039,6 +1057,7 @@ export default function ShiftDetailScreen() {
                 <ShiftEntrySegmentList
                   entry={shiftEntry}
                   showSegmentLabels={false}
+                  suppressCountAccessibilityLabel
                   variant="detail"
                 />
               ) : null}
@@ -1047,6 +1066,14 @@ export default function ShiftDetailScreen() {
                   Drop and swap actions apply to the shift you choose.
                 </Text>
               ) : null}
+              {!hasMultipleSegments && timeRange ? (
+                <DetailInfoRow
+                  iconName="time-outline"
+                  label="Shift time"
+                  value={timeRange}
+                  prominent
+                />
+              ) : null}
               {!hasMultipleSegments && focusAreaName ? (
                 <DetailInfoRow
                   iconName="location-outline"
@@ -1054,41 +1081,42 @@ export default function ShiftDetailScreen() {
                   value={focusAreaName}
                 />
               ) : null}
-              {!hasMultipleSegments && timeRange ? (
-                <DetailInfoRow iconName="time-outline" label="Shift time" value={timeRange} />
-              ) : null}
             </View>
 
             {canCreateRequestsForShift ? (
               <View style={styles.detailActionsRow}>
-                {canCreateSwapForShift ? (
-                  <View style={styles.detailActionButtonWrap}>
-                    <Button
-                      disabled={createRequestMutation.isPending}
-                      fullWidth
-                      icon="swap-horizontal-outline"
-                      label="Swap"
-                      onPress={() => resetRequestMode("swap")}
-                      shape="squircle"
-                      size="lg"
-                      tone="primary"
-                    />
-                  </View>
-                ) : null}
                 <View style={styles.detailActionButtonWrap}>
                   <Button
+                    accessibilityLabel="Drop shift"
                     disabled={createRequestMutation.isPending}
                     fullWidth
                     icon="exit-outline"
                     label="Drop shift"
                     onPress={() => resetRequestMode("coverage")}
-                    shape="squircle"
-                    size="lg"
+                    shape="pill"
+                    size="md"
                     tone="neutral"
                   />
                 </View>
+                {canCreateSwapForShift ? (
+                  <View style={styles.detailActionButtonWrap}>
+                    <Button
+                      accessibilityLabel="Swap"
+                      disabled={createRequestMutation.isPending}
+                      fullWidth
+                      icon="swap-horizontal-outline"
+                      label="Swap"
+                      onPress={() => resetRequestMode("swap")}
+                      shape="pill"
+                      size="md"
+                      tone="primary"
+                    />
+                  </View>
+                ) : null}
               </View>
             ) : null}
+
+            <PreviousShiftFooter change={shiftEntry.change} />
 
             {publishedSummary ? (
               <DetailPublishedFooter
@@ -1149,6 +1177,81 @@ export default function ShiftDetailScreen() {
         // A request in flight can't be dragged, tapped or backed away from —
         // the same rule the old close button enforced on its own.
         dismissDisabled={createRequestMutation.isPending}
+        footer={
+          <>
+            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
+              <SheetActions
+                primaryAction={
+                  <Button
+                    disabled={!canSubmitRequest || createRequestMutation.isPending}
+                    label="Submit"
+                    loading={createRequestMutation.isPending}
+                    onPress={handleSubmitRequest}
+                  />
+                }
+              >
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => {
+                    setSelectedSwapDate(selectedTargetEntry.date);
+                    setSelectedTargetShift(null);
+                  }}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "pickup" &&
+            selectedTargetedPickupEntry &&
+            shiftEntry ? (
+              <SheetActions
+                primaryAction={
+                  <Button
+                    label="Submit"
+                    loading={createRequestMutation.isPending}
+                    onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
+                  />
+                }
+              >
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "calloff" &&
+            selectedCalloffAbsenceType &&
+            shiftEntry ? (
+              <SheetActions
+                primaryAction={
+                  <Button
+                    label="Submit"
+                    loading={createRequestMutation.isPending}
+                    onPress={() =>
+                      confirmCoverageRequest("calloff", {
+                        absenceTypeId: selectedCalloffAbsenceType.id,
+                        absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
+                      })
+                    }
+                  />
+                }
+              >
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+                  tone="neutral"
+                />
+              </SheetActions>
+            ) : null}
+          </>
+        }
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
         scrollable
         visible={requestMode != null}
@@ -1473,69 +1576,6 @@ export default function ShiftDetailScreen() {
               )}
             </View>
           ) : null}
-
-          {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
-            <SheetActions>
-              <Button
-                disabled={!canSubmitRequest || createRequestMutation.isPending}
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={handleSubmitRequest}
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => {
-                  setSelectedSwapDate(selectedTargetEntry.date);
-                  setSelectedTargetShift(null);
-                }}
-                tone="neutral"
-              />
-            </SheetActions>
-          ) : null}
-
-          {requestMode === "coverage" &&
-          coverageRequestType === "pickup" &&
-          selectedTargetedPickupEntry &&
-          shiftEntry ? (
-            <SheetActions>
-              <Button
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => setSelectedTargetedPickupEmployeeId(null)}
-                tone="neutral"
-              />
-            </SheetActions>
-          ) : null}
-
-          {requestMode === "coverage" &&
-          coverageRequestType === "calloff" &&
-          selectedCalloffAbsenceType &&
-          shiftEntry ? (
-            <SheetActions>
-              <Button
-                label="Submit"
-                loading={createRequestMutation.isPending}
-                onPress={() =>
-                  confirmCoverageRequest("calloff", {
-                    absenceTypeId: selectedCalloffAbsenceType.id,
-                    absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
-                  })
-                }
-              />
-              <Button
-                disabled={createRequestMutation.isPending}
-                label="Back"
-                onPress={() => setSelectedCalloffAbsenceTypeId(null)}
-                tone="neutral"
-              />
-            </SheetActions>
-          ) : null}
         </View>
       </BottomSheetModal>
       <ConfirmationModal
@@ -1575,8 +1615,12 @@ function DetailDateTile({ date }: { date: string }) {
 
   return (
     <View accessibilityLabel={dateLabel} style={styles.detailDateTile}>
-      <Text style={styles.detailDateWeekday}>{dateParts.weekdayLabel}</Text>
-      <Text style={styles.detailDateDay}>{dateParts.dayLabel}</Text>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateWeekday}>
+        {dateParts.weekdayLabel}
+      </Text>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailDateDay}>
+        {dateParts.dayLabel}
+      </Text>
     </View>
   );
 }
@@ -1596,20 +1640,26 @@ function DetailHeaderJobPill({
     return isMentored ? <MentoredPill /> : null;
   }
 
-  // Same shape as the home card's MeTypePill: the kind ("Absence", "General
-  // shift") is an eyebrow above the pill, and the pill itself carries the
-  // name. This header used to render `eyebrowLabel ?? label`, so an absence
-  // showed a pill reading "Absence" and never named the absence type.
+  // Absences use the category as the main heading and keep the specific
+  // absence name in its compact pill. General shifts emphasize their name.
   if (!chip.eyebrowLabel) {
     return <DetailJobPill chip={chip} isMentored={isMentored} />;
   }
 
   return (
     <View style={styles.detailHeaderJobPillStack}>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailHeaderJobPillEyebrow}>
+      <Text
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        style={chip.kind === "absence" ? styles.detailHeroTitle : styles.detailHeaderJobPillEyebrow}
+      >
         {chip.eyebrowLabel}
       </Text>
-      <DetailJobPill chip={chip} eyebrowDisplay="outside" isMentored={isMentored} />
+      <DetailJobPill
+        chip={chip}
+        eyebrowDisplay="outside"
+        isMentored={isMentored}
+        prominent={chip.kind !== "absence"}
+      />
     </View>
   );
 }
@@ -1618,10 +1668,12 @@ function DetailInfoRow({
   iconName,
   label,
   value,
+  prominent = false,
 }: {
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  prominent?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -1635,11 +1687,168 @@ function DetailInfoRow({
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoLabel}>
           {label}
         </Text>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailInfoValue}>
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          style={[styles.detailInfoValue, prominent && styles.detailTimeValue]}
+        >
           {value}
         </Text>
       </View>
     </View>
+  );
+}
+
+function getPreviousPresentationTitle(
+  presentation: NonNullable<MobileScheduleEntry["change"]>["previousPresentation"],
+): string {
+  return presentation?.shiftName?.trim() || presentation?.label?.trim() || "Shift";
+}
+
+const DETAIL_SHIFT_CHANGE_LABELS = {
+  deleted: "Deleted",
+  modified: "Edited",
+  new: "New",
+} as const;
+
+function DetailShiftChangeBadge({ change }: { change: MobileScheduleEntry["change"] }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  if (!change || (change.kind === "new" && !change.isNewAddition)) {
+    return null;
+  }
+
+  return (
+    <View
+      accessibilityLabel={`Shift ${DETAIL_SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
+      style={[
+        styles.detailShiftChangeBadge,
+        change.kind === "modified" && styles.detailShiftChangeBadgeModified,
+        change.kind === "deleted" && styles.detailShiftChangeBadgeDeleted,
+      ]}
+    >
+      <Text style={styles.detailShiftChangeBadgeText}>
+        {DETAIL_SHIFT_CHANGE_LABELS[change.kind]}
+      </Text>
+    </View>
+  );
+}
+
+function getPreviousSegmentTitle(segment: MobileScheduleEntrySegment): string {
+  return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
+}
+
+function getPreviousPresentationFocusAreaName(
+  presentation: NonNullable<MobileScheduleEntry["change"]>["previousPresentation"],
+): string | null {
+  if (!presentation) {
+    return null;
+  }
+
+  // A general-shift segment deliberately has no focus area. Keeping this
+  // guard at the display boundary prevents an older cached payload from
+  // putting the focus "wings" back on a general shift in the history sheet.
+  const hasRegularSegment = presentation.segments.some((segment) => segment.shiftId !== null);
+  if (presentation.segments.length > 0 && !hasRegularSegment) {
+    return null;
+  }
+
+  return presentation.displayFocusAreaName?.trim() || null;
+}
+
+function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"] }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const [showPreviousShift, setShowPreviousShift] = useState(false);
+  const previous = change?.previousPresentation ?? null;
+
+  if (!previous) {
+    return null;
+  }
+
+  const previousSegments = previous.segments;
+  const hasMultiplePreviousSegments = previousSegments.length > 1;
+  const previousTimeRange = formatScheduleTimeRange(previous.startTime, previous.endTime);
+  const previousFocusAreaName = getPreviousPresentationFocusAreaName(previous);
+
+  return (
+    <>
+      <PressableRow
+        accessibilityLabel="View previous shift"
+        onPress={() => setShowPreviousShift(true)}
+        style={styles.detailPreviousShiftFooter}
+      >
+        <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailPreviousShiftText}>
+          View previous shift
+        </Text>
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
+      </PressableRow>
+      <BottomSheetModal
+        accessibilityLabel="Dismiss previous shift details"
+        debugName="Previous shift details"
+        header={
+          <SheetHeader title={hasMultiplePreviousSegments ? "Previous shifts" : "Previous shift"} />
+        }
+        visible={showPreviousShift}
+        onDismiss={() => setShowPreviousShift(false)}
+      >
+        {hasMultiplePreviousSegments ? (
+          <View style={styles.previousShiftSegmentList}>
+            {previousSegments.map((segment, index) => {
+              const segmentTimeRange = formatScheduleTimeRange(segment.startTime, segment.endTime);
+              const segmentFocusAreaName =
+                segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
+              const detailParts = [segmentTimeRange, segmentFocusAreaName].filter(
+                (part): part is string => Boolean(part),
+              );
+
+              return (
+                <View
+                  key={`${index}-${segment.shiftName ?? segment.label ?? "shift"}`}
+                  accessibilityLabel={`Previous shift ${getPreviousSegmentTitle(segment)}`}
+                  style={[
+                    styles.previousShiftSegment,
+                    index > 0 && styles.previousShiftSegmentDivider,
+                  ]}
+                >
+                  <Text
+                    maxFontSizeMultiplier={MAX_FONT_SCALE}
+                    style={styles.previousShiftSegmentTitle}
+                  >
+                    {getPreviousSegmentTitle(segment)}
+                  </Text>
+                  {detailParts.length > 0 ? (
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      style={styles.previousShiftSegmentMeta}
+                    >
+                      {detailParts.join(" · ")}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.previousShiftSheetDetails}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.previousShiftSegmentTitle}>
+              {getPreviousPresentationTitle(previous)}
+            </Text>
+            {previousTimeRange ? (
+              <DetailInfoRow iconName="time-outline" label="Shift time" value={previousTimeRange} />
+            ) : null}
+            {previousFocusAreaName ? (
+              <DetailInfoRow
+                iconName="location-outline"
+                label="Focus area"
+                value={previousFocusAreaName}
+              />
+            ) : null}
+          </View>
+        )}
+      </BottomSheetModal>
+    </>
   );
 }
 
@@ -1654,20 +1863,39 @@ function DetailPublishedFooter({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const [showPublication, setShowPublication] = useState(false);
 
   return (
-    <View style={styles.detailPublishedFooter}>
-      <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={18} />
-      <Text accessibilityLabel={summary} style={styles.detailPublishedText}>
-        {publishedAtLabel ? `Published ${publishedAtLabel}` : "Published"}
-        {publishedByName ? (
-          <>
-            {" by "}
-            <Text style={styles.detailPublishedName}>{publishedByName}</Text>
-          </>
-        ) : null}
-      </Text>
-    </View>
+    <>
+      <PressableRow
+        accessibilityLabel={summary}
+        onPress={() => setShowPublication(true)}
+        style={styles.detailPublishedFooter}
+      >
+        <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={16} />
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          style={styles.detailPublishedText}
+        >
+          {publishedAtLabel ? `Published ${publishedAtLabel}` : "Published"}
+          {publishedByName ? (
+            <>
+              {" by "}
+              <Text style={styles.detailPublishedName}>{publishedByName}</Text>
+            </>
+          ) : null}
+        </Text>
+      </PressableRow>
+      <BottomSheetModal
+        visible={showPublication}
+        onDismiss={() => setShowPublication(false)}
+        header={<SheetHeader title="Publication details" />}
+      >
+        <Text style={styles.detailPublicationSummary}>{summary}</Text>
+      </BottomSheetModal>
+    </>
   );
 }
 
@@ -1720,10 +1948,12 @@ function DetailJobPill({
   chip,
   eyebrowDisplay = "inside",
   isMentored = false,
+  prominent = false,
 }: {
   chip: JobChip | null;
   eyebrowDisplay?: EyebrowDisplay;
   isMentored?: boolean;
+  prominent?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -1745,6 +1975,7 @@ function DetailJobPill({
       accessibilityLabel={accessibilityLabel}
       style={[
         styles.detailJobChip,
+        prominent && styles.detailHeaderNameChip,
         {
           backgroundColor: chip.backgroundColor,
           borderColor: chipBorderColor,
@@ -1753,9 +1984,19 @@ function DetailJobPill({
     >
       {shouldRenderSingleLinePill ? (
         <View style={styles.detailJobChipInlineTextRow}>
-          <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>{chip.label}</Text>
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={[
+              styles.detailJobChipText,
+              prominent && styles.detailHeroTitle,
+              prominent && styles.detailHeaderName,
+              { color: chip.textColor },
+            ]}
+          >
+            {chip.label}
+          </Text>
           {isMentored ? (
-            <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
+            <Text style={[styles.detailJobChipMentoredInlineText, { color: chip.textColor }]}>
               (Mentored)
             </Text>
           ) : null}
@@ -1855,7 +2096,7 @@ function ShiftmateRow({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
   const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
-  const displayName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
+  const displayName = entry.employeeId === linkedEmployeeId ? "You" : entry.employeeName;
   const jobChip = matchedSegment
     ? buildSegmentJobChip(mobileColors, resolvedTheme === "dark", matchedSegment)
     : getEntryJobChip(mobileColors, resolvedTheme === "dark", entry);
@@ -1863,8 +2104,8 @@ function ShiftmateRow({
     ? getScheduleEntrySegmentTimeRange(matchedSegment)
     : getScheduleEntryTimeRange(entry);
   const entryFocusAreaName = matchedSegment
-    ? (matchedSegment.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry))
-    : getScheduleEntryDisplayFocusAreaName(entry);
+    ? getMobileScheduleEntrySegmentFocusAreaName(entry, matchedSegment)
+    : getMobileScheduleEntryDisplayFocusAreaName(entry);
   const segments = getScheduleEntrySegments(entry);
   const shouldShowSegments = !matchedSegment && segments.length > 1;
   const isMentored = matchedSegment
@@ -1887,6 +2128,8 @@ function ShiftmateRow({
         ]}
       >
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
         >
@@ -2050,8 +2293,9 @@ function SwapSummaryCard({
     ? getScheduleEntrySegmentTimeRange(primarySegment)
     : null;
   const timeRange = getScheduleEntryTimeRange(entry);
-  const focusAreaName =
-    primarySegment?.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry);
+  const focusAreaName = primarySegment
+    ? getMobileScheduleEntrySegmentFocusAreaName(entry, primarySegment)
+    : getMobileScheduleEntryDisplayFocusAreaName(entry);
   const jobChip = getEntryJobChip(mobileColors, isDark, entry);
   const summaryMeta = [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
     .filter(Boolean)
@@ -2179,10 +2423,12 @@ function SwapOptionCard({
 function ShiftEntrySegmentList({
   entry,
   showSegmentLabels = true,
+  suppressCountAccessibilityLabel = false,
   variant,
 }: {
   entry: MobileScheduleEntry;
   showSegmentLabels?: boolean;
+  suppressCountAccessibilityLabel?: boolean;
   variant: "detail" | "supporting";
 }) {
   const mobileColors = useMobileColors();
@@ -2191,6 +2437,11 @@ function ShiftEntrySegmentList({
 
   return (
     <SplitShiftSegmentList
+      getSegmentStatusLabel={(segment) => {
+        const change = getScheduleEntrySegmentChange(entry, segment);
+        return change ? DETAIL_SHIFT_CHANGE_LABELS[change.kind] : null;
+      }}
+      includeSegmentLabelInStatus={variant === "supporting"}
       renderSegmentChip={(segment) => (
         <DetailJobPill
           chip={buildSegmentJobChip(mobileColors, isDark, segment)}
@@ -2200,6 +2451,7 @@ function ShiftEntrySegmentList({
       segments={segments}
       showSegmentLabels={showSegmentLabels}
       showWhenSingle={variant === "supporting"}
+      suppressCountAccessibilityLabel={suppressCountAccessibilityLabel}
       variant={variant}
     />
   );

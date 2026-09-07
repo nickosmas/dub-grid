@@ -5,8 +5,10 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import {
+  fetchPendingNotePublishChanges,
   fetchScheduleDraftBreakdown,
   publishScheduleDirect,
+  recordNotePublishChanges,
 } from "@/lib/server/schedule-draft-safety";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -85,14 +87,42 @@ export async function POST(req: NextRequest) {
       serviceClient,
     });
 
+    // Same reason as the breakdown above: the RPC promotes draft notes and
+    // deletes the removed ones, so the note history has to be read first.
+    const pendingNoteChanges = await fetchPendingNotePublishChanges({
+      orgId,
+      startDate,
+      endDate,
+      serviceClient,
+    });
+
     // ── Execute publish ─────────────────────────────────────────────
-    await publishScheduleDirect({
+    const publishHistoryId = await publishScheduleDirect({
       orgId,
       startDate,
       endDate,
       actorId: user.id,
       client: serviceClient,
     });
+
+    // Note history is written here rather than in publish_schedule: an RPC edit
+    // never reaches a provisioned database without a full reset. A failure to
+    // record it must not fail a publish that already committed.
+    if (publishHistoryId) {
+      try {
+        await recordNotePublishChanges({
+          orgId,
+          publishHistoryId,
+          changes: pendingNoteChanges,
+          serviceClient,
+        });
+      } catch (noteHistoryError) {
+        Sentry.captureException(noteHistoryError, {
+          extra: { context: "shifts/publish/noteHistory", orgId },
+        });
+        logger.error({ error: noteHistoryError, orgId }, "Publishing note history failed");
+      }
+    }
 
     await serviceClient.from("audit_log").insert({
       org_id: orgId,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +8,7 @@ import {
   normalizeOptionalStaffEmail,
   normalizeStaffName,
 } from "@dubgrid/contracts";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
@@ -229,6 +230,24 @@ export default function AddPersonScreen() {
   });
   useNavigationDiscardGuard(guard);
 
+  /**
+   * Back to the empty form the screen opened with.
+   *
+   * Wired to the Discard button rather than the guard's `onDiscard`, which runs
+   * on every exit through the guard: this screen unmounts when it is left, so
+   * clearing there would only risk the fields being seen emptying on the way
+   * out.
+   */
+  function resetDraft() {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setEmploymentType("full_time");
+    setCertificationId(null);
+    setFocusAreaIds([]);
+    setServerFieldErrors({});
+  }
+
   /** A server verdict only holds for the value it was given. */
   function retireServerError(field: MobileStaffField) {
     setServerFieldErrors((current) =>
@@ -276,7 +295,36 @@ export default function AddPersonScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed">
+    <Screen
+      bottomPaddingMode="tabbed"
+      footer={
+        <View style={styles.actionsRow}>
+          <View style={styles.actionButton}>
+            <Button
+              disabled={createMutation.isPending}
+              // Same tri-state the edit surfaces use. Discard empties the form
+              // and stays put; leaving with details filled in is the back
+              // gesture, which `useNavigationDiscardGuard` already confirms.
+              label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+              onPress={hasUnsavedChanges ? resetDraft : () => router.back()}
+              tone="neutral"
+            />
+          </View>
+          <View style={styles.actionButton}>
+            <Button
+              disabled={!canSubmit || createMutation.isPending}
+              label="Add person"
+              loading={createMutation.isPending}
+              onPress={() =>
+                new Promise<void>((resolve) => {
+                  createMutation.mutate(undefined, { onSettled: () => resolve() });
+                })
+              }
+            />
+          </View>
+        </View>
+      }
+    >
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput
@@ -371,26 +419,17 @@ export default function AddPersonScreen() {
         </ProfilePanel>
       </ProfileSection>
 
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <Button
-          disabled={!canSubmit || createMutation.isPending}
-          label="Add person"
-          loading={createMutation.isPending}
-          onPress={() =>
-            new Promise<void>((resolve) => {
-              createMutation.mutate(undefined, { onSettled: () => resolve() });
-            })
-          }
-        />
-        <Button
-          disabled={createMutation.isPending}
-          label="Cancel"
-          onPress={() => router.back()}
-          tone="neutral"
-        />
-      </View>
-
       <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+  },
+});

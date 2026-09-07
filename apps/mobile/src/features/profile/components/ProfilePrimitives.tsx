@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Children,
@@ -25,6 +26,7 @@ import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
   mobileRadii,
@@ -180,6 +182,8 @@ export function ProfileHero({
             {initials ? (
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   maxFontSizeMultiplier={MAX_FONT_SCALE}
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >
@@ -604,16 +608,12 @@ export function ProfileQuickActions({ children }: { children: ReactNode }) {
   return <View style={personLayoutStyles.quickActions}>{children}</View>;
 }
 
-/** The column of management actions at the foot of a person page. */
+/** Management actions at the foot of a person page. */
 export function ProfileActionStack({ children }: { children: ReactNode }) {
-  return <View style={personLayoutStyles.actionStack}>{children}</View>;
+  return <ActionButtons style={personLayoutStyles.actionStack}>{children}</ActionButtons>;
 }
 
-/**
- * Two actions sharing a line inside a `ProfileActionStack`, each taking an
- * equal share of the width. Sized by their share rather than by their labels,
- * so a short verb beside a long one doesn't read as the lesser action.
- */
+/** Compatibility wrapper for existing two-action profile rows. */
 export function ProfileActionRow({ children }: { children: ReactNode }) {
   return (
     <View style={personLayoutStyles.actionRow}>
@@ -675,15 +675,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 96,
     },
     avatarText: {
-      ...mobileText.heroMetric,
+      ...mobileAvatarText(64),
       color: mobileColors.textInverse,
     },
-    // Size only: the weight rides on `heroMetric`'s family, and naming a
-    // fontWeight next to it would send Android hunting for a bold face this
-    // single-weight family hasn't got.
     avatarTextLarge: {
-      fontSize: 32,
-      lineHeight: 40,
+      ...mobileAvatarText(96),
     },
     heroCopy: {
       flex: 1,
@@ -808,11 +804,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textMuted,
       marginTop: -4,
     },
-    // Cancels the card shadow when this is rendered inside a sheet.
+    // Cancels the card shadow when this is rendered inside a sheet, and hands
+    // the edge to a hairline instead. On the page the shadow is the whole edge,
+    // which is why `cardBorder` is transparent in light mode; dropping the
+    // shadow here without putting something back left these with no edge at all
+    // there. Dark is unchanged, since `cardBorder` already resolves to
+    // `borderSubtle`.
     flatInSheet: {
       boxShadow: undefined,
       shadowOpacity: 0,
       elevation: 0,
+      borderColor: mobileColors.borderSubtle,
     },
     panel: {
       backgroundColor: mobileColors.surface,

@@ -388,7 +388,7 @@ function MetricCard({
 }) {
   const palette = METRIC_CARD_TONES[tone];
   return (
-    <Card size="sm">
+    <Card size="sm" data-stat-card className="h-full">
       <CardContent className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="dg-type-field-title truncate">{label}</p>

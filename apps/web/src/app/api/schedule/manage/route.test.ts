@@ -4,7 +4,52 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireOrgPermissions = vi.fn();
 const userRpc = vi.fn();
 const serviceFrom = vi.fn();
+const serviceRpc = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
+
+/** Answers the cell-snapshot lookup that gates indicator writes. */
+function stubCellSnapshot(stateKind: "worked" | "absence" | "deleted" | null) {
+  serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+    if (fn !== "get_schedule_cell_snapshot_payload") return { data: null, error: null };
+    // Only the draft is answered, which is the snapshot the guard prefers.
+    if (args.p_snapshot_kind !== "draft" || stateKind == null) return { data: [], error: null };
+    return { data: [{ state_kind: stateKind, shift_ids: [1], job_ids: [1] }], error: null };
+  });
+}
+
+/**
+ * Records the writes clearScheduleNotesForCells makes, so a test can assert
+ * which cells were cleared without standing up a real query builder.
+ */
+function captureNoteClearing() {
+  const deleted: Array<Record<string, unknown>> = [];
+  const softDeleted: Array<Record<string, unknown>> = [];
+
+  function chain(record: Record<string, unknown>, sink: Array<Record<string, unknown>>) {
+    const builder = {
+      eq(column: string, value: unknown) {
+        record[column] = value;
+        return builder;
+      },
+      then(resolve: (value: { error: null }) => unknown) {
+        sink.push(record);
+        return Promise.resolve({ error: null } as const).then(resolve);
+      },
+    };
+    return builder;
+  }
+
+  serviceFrom.mockImplementation((table: string) =>
+    table === "schedule_notes"
+      ? {
+          delete: () => chain({}, deleted),
+          update: (payload: Record<string, unknown>) => chain({ ...payload }, softDeleted),
+        }
+      : { insert: vi.fn(async () => ({ error: null })) },
+  );
+
+  return { deleted, softDeleted };
+}
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
@@ -51,7 +96,7 @@ describe("POST /api/schedule/manage", () => {
     resolveEffectiveOrgId.mockImplementation((_req, _userId, orgId) => Promise.resolve(orgId));
     requireOrgPermissions.mockImplementation(async (_req, orgId) => ({
       userClient: { rpc: userRpc },
-      serviceClient: { from: serviceFrom },
+      serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
       orgId,
       permissions: { canEditShifts: true },
@@ -217,7 +262,9 @@ describe("POST /api/schedule/manage", () => {
     const firstEmployeeId = "22222222-2222-4222-8222-222222222222";
     const secondEmployeeId = "33333333-3333-4333-8333-333333333333";
 
-    serviceFrom.mockReturnValue({ insert: vi.fn(async () => ({ error: null })) });
+    // A bulk delete also clears each cell's notes, so the stub has to answer
+    // schedule_notes as well as the audit insert.
+    const { deleted } = captureNoteClearing();
 
     const response = await POST(
       makeRequest({
@@ -244,6 +291,9 @@ describe("POST /api/schedule/manage", () => {
       count: 2,
     });
     expect(requireOrgPermissions).toHaveBeenCalledTimes(1);
+    expect(deleted.map((row) => row.emp_id).sort()).toEqual(
+      [firstEmployeeId, secondEmployeeId].sort(),
+    );
     expect(userRpc).toHaveBeenCalledTimes(2);
     expect(userRpc).toHaveBeenNthCalledWith(
       1,
@@ -395,7 +445,7 @@ describe("POST /api/schedule/manage", () => {
 
     requireOrgPermissions.mockImplementation(async (_req, id) => ({
       userClient: { rpc: userRpc },
-      serviceClient: { from: serviceFrom },
+      serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
       orgId: id,
       permissions: { canEditShifts: false },
@@ -626,5 +676,297 @@ describe("POST /api/schedule/manage", () => {
         }),
       );
     });
+  });
+});
+
+describe("POST /api/schedule/manage permission gates", () => {
+  const orgId = "11111111-1111-4111-8111-111111111111";
+  const employeeId = "22222222-2222-4222-8222-222222222222";
+
+  // Runs the route's own predicate against a fixed permission set, the way
+  // the real helper would, so a 403 here means the gate itself refused.
+  function grant(permissions: Record<string, boolean>) {
+    requireOrgPermissions.mockImplementation(
+      async (_req, requestedOrgId, isAllowed: (p: Record<string, boolean>) => boolean) =>
+        isAllowed(permissions)
+          ? {
+              userClient: { rpc: userRpc },
+              serviceClient: { from: serviceFrom, rpc: serviceRpc },
+              actor: { id: "actor-user" },
+              orgId: requestedOrgId,
+              permissions,
+            }
+          : { response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }) },
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveEffectiveOrgId.mockImplementation((_req, _userId, requestedOrgId) =>
+      Promise.resolve(requestedOrgId),
+    );
+  });
+
+  it("refuses a recurring apply without schedule edit, even with the recurring key", async () => {
+    grant({ canApplyRecurringSchedule: true, canEditShifts: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "applyRecurringSchedules",
+        orgId,
+        startDate: "2026-08-03",
+        endDate: "2026-08-09",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("refuses a series change without schedule edit, even with the series key", async () => {
+    grant({ canManageShiftSeries: true, canEditShifts: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a schedule note without the indicators key, even with notes", async () => {
+    grant({ canEditNotes: true, canEditScheduleIndicators: false });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("refuses an indicator on a cell that carries no shift", async () => {
+    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    stubCellSnapshot(null);
+    captureNoteClearing();
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Cannot add an indicator to a cell without a shift",
+    });
+    expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
+  });
+
+  it("refuses an indicator on an absence, which is not a shift", async () => {
+    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    stubCellSnapshot("absence");
+    captureNoteClearing();
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
+  });
+
+  it("admits an indicator on a drafted shift, since schedulers tag as they build", async () => {
+    grant({ canEditNotes: true, canEditScheduleIndicators: true });
+    stubCellSnapshot("worked");
+    const upsert = vi.fn(async () => ({ error: null }));
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_notes" ? { upsert } : { insert: vi.fn(async () => ({ error: null })) },
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ emp_id: employeeId, indicator_type_id: 1, status: "draft" }),
+      expect.anything(),
+    );
+  });
+
+  it("drops a cell's notes when its shift is deleted", async () => {
+    grant({ canEditShifts: true });
+    const { deleted, softDeleted } = captureNoteClearing();
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShift",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        expectedVersion: 3,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    // A draft note goes outright; a published one is marked for the next publish.
+    expect(deleted).toEqual([
+      { org_id: orgId, emp_id: employeeId, date: "2026-08-03", status: "draft" },
+    ]);
+    expect(softDeleted).toEqual([
+      {
+        status: "published",
+        org_id: orgId,
+        emp_id: employeeId,
+        date: "2026-08-03",
+      },
+    ]);
+  });
+
+  it("drops notes from both cells on a move but only the target on a copy", async () => {
+    const targetEmployeeId = "44444444-4444-4444-8444-444444444444";
+    const moveBody = {
+      action: "moveShift",
+      orgId,
+      sourceEmpId: employeeId,
+      sourceDate: "2026-08-03",
+      targetEmpId: targetEmployeeId,
+      targetDate: "2026-08-04",
+      input: { kind: "absence", segments: [], absenceTypeId: 7 },
+    };
+
+    grant({ canEditShifts: true });
+    const moved = captureNoteClearing();
+    expect((await POST(makeRequest({ ...moveBody, dragMode: "move" }))).status).toBe(200);
+    expect(moved.deleted.map((row) => row.emp_id)).toEqual([employeeId, targetEmployeeId]);
+
+    grant({ canEditShifts: true });
+    const copied = captureNoteClearing();
+    expect((await POST(makeRequest({ ...moveBody, dragMode: "copy" }))).status).toBe(200);
+    // The copy leaves the source shift in place, so its notes stay with it.
+    expect(copied.deleted.map((row) => row.emp_id)).toEqual([targetEmployeeId]);
+  });
+
+  it("drops the target's notes only when a write replaces the shift", async () => {
+    const input = { kind: "absence", segments: [], absenceTypeId: 7 };
+
+    grant({ canEditShifts: true });
+    const edited = captureNoteClearing();
+    expect(
+      (
+        await POST(
+          makeRequest({ action: "upsertShift", orgId, employeeId, date: "2026-08-03", input }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(edited.deleted).toEqual([]);
+
+    grant({ canEditShifts: true });
+    const pasted = captureNoteClearing();
+    expect(
+      (
+        await POST(
+          makeRequest({
+            action: "upsertShift",
+            orgId,
+            employeeId,
+            date: "2026-08-03",
+            input,
+            clearNotes: true,
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(pasted.deleted.map((row) => row.emp_id)).toEqual([employeeId]);
+  });
+
+  it("drops notes across every cell a deleted series covered", async () => {
+    const secondEmployeeId = "55555555-5555-4555-8555-555555555555";
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+
+    const notes = captureNoteClearing();
+    // schedule_cells is read before the RPC, since the delete clears the link.
+    const previousFrom = serviceFrom.getMockImplementation()!;
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_cells"
+        ? {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({
+                  data: [
+                    { emp_id: employeeId, date: "2026-08-03" },
+                    { emp_id: secondEmployeeId, date: "2026-08-10" },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        : previousFrom(table),
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(notes.deleted.map((row) => `${row.emp_id}_${row.date}`).sort()).toEqual([
+      `${employeeId}_2026-08-03`,
+      `${secondEmployeeId}_2026-08-10`,
+    ]);
+  });
+
+  it("still admits the schedule editor who holds both halves of each pair", async () => {
+    grant({ canEditShifts: true, canApplyRecurringSchedule: true });
+    serviceFrom.mockImplementation(() => {
+      throw new Error("reached the handler");
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "applyRecurringSchedules",
+        orgId,
+        startDate: "2026-08-03",
+        endDate: "2026-08-09",
+      }),
+    );
+
+    expect(response.status).not.toBe(403);
+    expect(serviceFrom).toHaveBeenCalled();
   });
 });

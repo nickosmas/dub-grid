@@ -23,6 +23,7 @@ import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { ManagementUserAccessSheet } from "./ManagementUserAccessSheet";
+import { OrgRoleSheet } from "./OrgRoleSheet";
 
 type InvitationConfirmAction = "resend" | "revoke" | null;
 
@@ -63,6 +64,7 @@ export function ManagementUserActionsSheet({
   const { pushToast } = useToast();
   const handoff = useModalHandoff();
   const [showAccessSheet, setShowAccessSheet] = useState(false);
+  const [showRoleSheet, setShowRoleSheet] = useState(false);
   const [isActionsHidden, setIsActionsHidden] = useState(false);
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
   const [invitationConfirmAction, setInvitationConfirmAction] =
@@ -84,6 +86,7 @@ export function ManagementUserActionsSheet({
     // on the actions list rather than wherever the last one left off.
     setIsActionsHidden(false);
     setShowAccessSheet(false);
+    setShowRoleSheet(false);
     setError(null);
   }, [managementUser]);
 
@@ -99,6 +102,7 @@ export function ManagementUserActionsSheet({
     // commit is the case iOS drops, which left the actions sheet on screen with
     // a live backdrop after a successful save.
     setShowAccessSheet(false);
+    setShowRoleSheet(false);
     setShowRemoveConfirmation(false);
     setInvitationConfirmAction(null);
     handoff(onDismiss);
@@ -134,18 +138,26 @@ export function ManagementUserActionsSheet({
       );
     },
     onMutate: () => setError(null),
-    onSuccess: async (result) => {
+    onSuccess: async (result, input) => {
       // Closed either way: the roster behind this sheet is what shows the
       // result, and a sheet left open over it would be showing the old row.
       closeEverything();
       await invalidateRoster();
+      // The same write carries a department edit and an access-level change,
+      // so the input is what says which one just happened.
+      const roleChanged =
+        !("remove" in input) && managementUser != null && input.orgRole !== managementUser.orgRole;
       pushToast({
         tone: "success",
         title:
           result.result === "access_removed"
             ? "Management access removed"
-            : "Management access updated",
-        message: "Their management access was updated.",
+            : roleChanged
+              ? "Access level updated"
+              : "Management access updated",
+        message: roleChanged
+          ? "Their access level was updated."
+          : "Their management access was updated.",
       });
     },
   });
@@ -191,6 +203,54 @@ export function ManagementUserActionsSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error && !showAccessSheet && !showRoleSheet ? <InlineError message={error} /> : null}
+            <SheetActions>
+              {isPendingInvite ? (
+                <Button
+                  disabled={isPending}
+                  label="Reinvite"
+                  loading={invitationMutation.isPending}
+                  onPress={() => setInvitationConfirmAction("resend")}
+                  tone="secondary"
+                />
+              ) : null}
+              <Button
+                disabled={isPending}
+                label="Edit Management Access"
+                // Sequenced, not swapped: presenting the access sheet in the same
+                // commit that dismisses this one is the case iOS refuses, and the
+                // access sheet could come up unreachable behind a dead backdrop.
+                onPress={() => {
+                  setIsActionsHidden(true);
+                  handoff(() => setShowAccessSheet(true));
+                }}
+                tone="secondary"
+              />
+              <Button
+                disabled={isPending}
+                label="Change Access Level"
+                onPress={() => {
+                  setIsActionsHidden(true);
+                  handoff(() => setShowRoleSheet(true));
+                }}
+                tone="secondary"
+              />
+              <Button
+                disabled={isPending}
+                label={isPendingInvite ? "Revoke Invitation" : "Remove from Management"}
+                onPress={() =>
+                  isPendingInvite
+                    ? setInvitationConfirmAction("revoke")
+                    : setShowRemoveConfirmation(true)
+                }
+                tone="danger"
+              />
+              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle={
@@ -212,43 +272,6 @@ export function ManagementUserActionsSheet({
           </AppText>
           <AppText tone="muted">{departmentNames.join(", ") || "None"}</AppText>
         </View>
-
-        {error && !showAccessSheet ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          {isPendingInvite ? (
-            <Button
-              disabled={isPending}
-              label="Reinvite"
-              loading={invitationMutation.isPending}
-              onPress={() => setInvitationConfirmAction("resend")}
-              tone="primary"
-            />
-          ) : null}
-          <Button
-            disabled={isPending}
-            label="Edit Management Access"
-            // Sequenced, not swapped: presenting the access sheet in the same
-            // commit that dismisses this one is the case iOS refuses, and the
-            // access sheet could come up unreachable behind a dead backdrop.
-            onPress={() => {
-              setIsActionsHidden(true);
-              handoff(() => setShowAccessSheet(true));
-            }}
-            tone="secondary"
-          />
-          <Button
-            disabled={isPending}
-            label={isPendingInvite ? "Revoke Invitation" : "Remove from Management"}
-            onPress={() =>
-              isPendingInvite
-                ? setInvitationConfirmAction("revoke")
-                : setShowRemoveConfirmation(true)
-            }
-            tone="danger"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ManagementUserAccessSheet
@@ -262,6 +285,13 @@ export function ManagementUserActionsSheet({
           setShowAccessSheet(false);
           handoff(() => setIsActionsHidden(false));
         }}
+        // Saving with no departments left means the same thing the Remove
+        // button below means, so it raises the same prompt and the same
+        // mutation rather than a second copy of either. Safe on top of the
+        // access sheet, while the actions sheet underneath is hidden.
+        onRemove={() =>
+          isPendingInvite ? setInvitationConfirmAction("revoke") : setShowRemoveConfirmation(true)
+        }
         onSubmit={(draft) =>
           new Promise<void>((resolve) => {
             accessMutation.mutate(draft, { onSettled: () => resolve() });
@@ -270,12 +300,43 @@ export function ManagementUserActionsSheet({
         visible={showAccessSheet}
       />
 
+      {/* The role lives here rather than in the access sheet, so that sheet is
+          the same departments editor a person with a profile gets. Someone on
+          the roster with no profile has no badge to change it from, so this is
+          their one route to it. */}
+      <OrgRoleSheet
+        error={showRoleSheet ? error : null}
+        isPending={accessMutation.isPending}
+        subject={{
+          currentRole: displayed.orgRole ?? "user",
+          invitationEmail: isPendingInvite ? displayed.email : null,
+          displayName: fullName,
+        }}
+        visible={showRoleSheet}
+        onDismiss={() => {
+          setShowRoleSheet(false);
+          handoff(() => setIsActionsHidden(false));
+        }}
+        onSubmit={(orgRole) =>
+          new Promise<void>((resolve) => {
+            accessMutation.mutate(
+              { orgRole, managementDepartmentIds: displayed.managementDepartmentIds },
+              { onSettled: () => resolve() },
+            );
+          })
+        }
+      />
+
       <ConfirmationModal
         body="They'll come off the management roster."
-        confirmLabel="Remove Access"
+        confirmLabel="Remove access"
+        error={error}
         confirmTone="danger"
         loading={accessMutation.isPending}
-        onCancel={() => setShowRemoveConfirmation(false)}
+        onCancel={() => {
+          setError(null);
+          setShowRemoveConfirmation(false);
+        }}
         onConfirm={() =>
           new Promise<void>((resolve) => {
             accessMutation.mutate({ remove: true }, { onSettled: () => resolve() });
@@ -295,8 +356,12 @@ export function ManagementUserActionsSheet({
           invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
         }
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
+        error={error}
         loading={invitationMutation.isPending}
-        onCancel={() => setInvitationConfirmAction(null)}
+        onCancel={() => {
+          setError(null);
+          setInvitationConfirmAction(null);
+        }}
         onConfirm={() => {
           if (invitationConfirmAction)
             return invitationMutation.mutateAsync(invitationConfirmAction);

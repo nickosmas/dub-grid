@@ -172,13 +172,16 @@ export default function ResetPasswordScreen() {
             {error ? <AuthFieldError message={error} /> : null}
           </AuthFields>
 
-          <AuthActions>
-            <Button
-              label="Verify code"
-              loading={submitting}
-              onPress={() => verifyCode()}
-              size="lg"
-            />
+          <AuthActions
+            primaryAction={
+              <Button
+                label="Verify code"
+                loading={submitting}
+                onPress={() => verifyCode()}
+                size="lg"
+              />
+            }
+          >
             <Button
               disabled={cooldown > 0 || submitting}
               label={cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}

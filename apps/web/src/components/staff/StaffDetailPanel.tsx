@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import type { OrganizationRole } from "@/types";
+import type { AdminPermissions, OrganizationRole } from "@/types";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
@@ -19,10 +19,12 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
+import { StaffPanelFooter } from "./StaffPanelFooter";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
-import { getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
 
 interface StaffDetailPanelProps {
@@ -53,6 +55,9 @@ interface StaffDetailPanelProps {
   /** Org access tier, matching the directory table's Access column. */
   orgRole?: OrganizationRole | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  /** The permission set behind an admin's `orgRole`, for the on-panel launcher. */
+  adminPermissions?: AdminPermissions | null;
+  onPermissionsChange?: (permissions: AdminPermissions) => Promise<void>;
   canManageManagementAccess?: boolean;
   hasManagementAccess?: boolean;
   hasPendingManagementInvite?: boolean;
@@ -82,6 +87,8 @@ export function StaffDetailPanel({
   onInvite,
   orgRole,
   onRoleChange,
+  adminPermissions,
+  onPermissionsChange,
   canManageManagementAccess,
   hasManagementAccess,
   hasPendingManagementInvite,
@@ -114,10 +121,17 @@ export function StaffDetailPanel({
   );
   const showSendInviteAction = showInviteActions && !pendingInvitation;
   const showEmploymentStatusActions = canManageEmployees && !isSelf;
-  // Access, management access, and the status action read as one row of things
-  // you do to this person, so they sit side by side rather than stacked. The
-  // access slot is always present: "no app access" is itself the answer for
-  // someone with no login, and a missing control reads as a broken row.
+  const showPendingInvitationActions = Boolean(pendingInvitation && onRevoke);
+  const showPermissionsAction = Boolean(onPermissionsChange && orgRole === "admin");
+  const showPersonActionFooter =
+    showPendingInvitationActions ||
+    showPermissionsAction ||
+    showSendInviteAction ||
+    showManagementAccessAction ||
+    showEmploymentStatusActions;
+  // Person actions are a single, predictable two-column grid. The final action
+  // spans both columns when the count is odd, so buttons remain symmetrical
+  // whether an organization exposes one, two, three, or more actions.
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
   // Only staff managers can open the full /people/[id] page (mirrors the
   // table's name-link gate); the self link just goes to /profile.
@@ -173,9 +187,10 @@ export function StaffDetailPanel({
     }
   }, [canEditEmployee, hasUnsavedChanges, handleRequestClose]);
 
-  const handleFooterSave = useCallback(() => {
-    editorRef.current?.save();
-  }, []);
+  // Returns the save promise so the footer button latches on it. The editor's
+  // own inline Save passes its handler straight through and always spun; this
+  // one dropped the promise, so the same operation had two different buttons.
+  const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
 
   return (
     <Sheet
@@ -204,6 +219,7 @@ export function StaffDetailPanel({
           >
             <div
               style={{
+                ...getAvatarTypography(44),
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
@@ -211,8 +227,6 @@ export function StaffDetailPanel({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
                 color: avatarTone.textColor,
                 flexShrink: 0,
                 border: `1px solid ${avatarTone.borderColor}`,
@@ -311,7 +325,10 @@ export function StaffDetailPanel({
         </div>
 
         {/* Editable body - nothing commits until the owning editor saves. */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
+        <div
+          ref={scrollRef}
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 20 }}
+        >
           <InlineEditEmployee
             employee={employee}
             orgId={orgId}
@@ -333,133 +350,136 @@ export function StaffDetailPanel({
             pendingInvitation={pendingInvitation}
             onSaveWithReinvite={onSaveWithReinvite}
           />
-          <div
-            style={{
-              padding: "16px 24px 20px",
-              borderTop: "1px solid var(--dg-color-border-light)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {pendingInvitation && onRevoke && (
-              <PendingInvitationBanner
-                pendingInvitation={pendingInvitation}
-                onReinvite={handleReinvite}
-                onRevoke={onRevoke}
-                isInSandbox={isInSandbox}
-              />
-            )}
-            {(showSendInviteAction ||
-              showManagementAccessAction ||
-              showEmploymentStatusActions) && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "stretch",
-                  flexWrap: "wrap",
-                  gap: 8,
-                }}
-              >
-                {showSendInviteAction && onInvite && (
-                  <Button
-                    onClick={() => onInvite(employee)}
-                    disabled={isInSandbox}
-                    className="dg-btn dg-btn-secondary flex-1 basis-[150px]"
-                    title={
-                      isInSandbox
-                        ? "Sending invitations isn't available in sandbox mode."
-                        : undefined
-                    }
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    Send Invitation
-                  </Button>
+        </div>
+
+        <StaffPanelFooter
+          actions={
+            showPersonActionFooter ? (
+              <div className="flex flex-col gap-3">
+                {pendingInvitation && onRevoke && (
+                  <PendingInvitationBanner
+                    pendingInvitation={pendingInvitation}
+                    onReinvite={handleReinvite}
+                    onRevoke={onRevoke}
+                    isInSandbox={isInSandbox}
+                  />
                 )}
-                {showManagementAccessAction && onManageManagementAccess && (
-                  <Button
-                    onClick={() => onManageManagementAccess(employee)}
-                    className="dg-btn dg-btn-secondary flex-1 basis-[150px]"
+                {/* Permissions belong to the person, not to the management-access
+                popup: that popup edits departments and nothing else, on every
+                surface, so it is the same popup wherever it opens from. Role
+                already lives in the header's inline select, so this renders
+                only the permissions launcher. */}
+                {(showPermissionsAction ||
+                  showSendInviteAction ||
+                  showManagementAccessAction ||
+                  showEmploymentStatusActions) && (
+                  <div
+                    data-slot="staff-person-actions"
+                    className="grid grid-cols-2 items-stretch gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
                   >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    {hasManagementAccess || hasPendingManagementInvite
-                      ? "Edit Management Access"
-                      : "Add to Management"}
-                  </Button>
-                )}
-                {showEmploymentStatusActions && (
-                  <div className="flex-1 basis-[150px]">
-                    <EmployeeStatusActions
-                      employee={employee}
-                      canEdit={canManageEmployees}
-                      isSelf={false}
-                      onDeactivate={onDeactivate}
-                      onActivate={onActivate}
-                      onRemove={onRemove}
-                      variant="page"
-                      fillWidth
-                    />
+                    {showPermissionsAction && (
+                      <MemberAccessControls
+                        orgRole={orgRole}
+                        adminPermissions={adminPermissions}
+                        onPermissionsChange={onPermissionsChange}
+                        labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+                        permissionActionClassName="w-full"
+                      />
+                    )}
+                    {showSendInviteAction && onInvite && (
+                      <Button
+                        onClick={() => onInvite(employee)}
+                        disabled={isInSandbox}
+                        className="dg-btn dg-btn-secondary w-full"
+                        title={
+                          isInSandbox
+                            ? "Sending invitations isn't available in sandbox mode."
+                            : undefined
+                        }
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                          <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        Send Invitation
+                      </Button>
+                    )}
+                    {showManagementAccessAction && onManageManagementAccess && (
+                      <Button
+                        onClick={() => onManageManagementAccess(employee)}
+                        className="dg-btn dg-btn-secondary w-full"
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                        {hasManagementAccess || hasPendingManagementInvite
+                          ? "Edit Management Access"
+                          : "Add to Management"}
+                      </Button>
+                    )}
+                    {showEmploymentStatusActions && (
+                      <div className="w-full">
+                        <EmployeeStatusActions
+                          employee={employee}
+                          canEdit={canManageEmployees}
+                          isSelf={false}
+                          onDeactivate={onDeactivate}
+                          onActivate={onActivate}
+                          onRemove={onRemove}
+                          variant="page"
+                          fillWidth
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          style={{
-            flexShrink: 0,
-            padding: "16px 24px",
-            borderTop: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <EditorActionRow
-            secondaryAction={
-              <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
-                {canEditEmployee
-                  ? getEditorDismissLabel({ hasUnsavedChanges })
-                  : EDITOR_ACTION_LABELS.close}
-              </Button>
-            }
-            primaryAction={
-              canEditEmployee ? (
-                <Button
-                  onClick={handleFooterSave}
-                  disabled={!hasUnsavedChanges || isEditorSaveBlocked}
-                  className="dg-btn dg-btn-primary"
-                >
-                  {EDITOR_ACTION_LABELS.save}
+            ) : undefined
+          }
+          editorActions={
+            <EditorActionRow
+              secondaryAction={
+                <Button onClick={handleFooterDismiss} className="dg-btn dg-btn-secondary">
+                  {canEditEmployee
+                    ? getEditorDismissLabel({ hasUnsavedChanges })
+                    : EDITOR_ACTION_LABELS.close}
                 </Button>
-              ) : undefined
-            }
-          />
-        </div>
+              }
+              primaryAction={
+                canEditEmployee ? (
+                  <Button
+                    onClick={handleFooterSave}
+                    disabled={!hasUnsavedChanges || isEditorSaveBlocked}
+                    className="dg-btn dg-btn-primary"
+                  >
+                    {EDITOR_ACTION_LABELS.save}
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
+        />
       </SheetContent>
       {unsavedChangesDialog}
     </Sheet>

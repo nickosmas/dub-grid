@@ -14,7 +14,7 @@ import {
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryBaseTimeRange,
   getScheduleEntryCustomTimeRange,
-  getScheduleEntrySegmentFocusAreaName,
+  getMobileScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
   getScheduleEntryTitle,
@@ -64,6 +64,39 @@ export function getScheduleItemShiftName(item: FeaturedMeScheduleSegment["item"]
   return item.segment.shiftName || getScheduleEntryTitle(item.entry);
 }
 
+function areScheduleSegmentsEqual(
+  current: MobileScheduleEntrySegment,
+  previous: MobileScheduleEntrySegment,
+): boolean {
+  return (
+    current.shiftId === previous.shiftId &&
+    current.jobId === previous.jobId &&
+    current.label === previous.label &&
+    current.shiftName === previous.shiftName &&
+    current.jobName === previous.jobName &&
+    current.startTime === previous.startTime &&
+    current.endTime === previous.endTime &&
+    current.focusAreaId === previous.focusAreaId &&
+    current.displayFocusAreaName === previous.displayFocusAreaName &&
+    current.isMentored === previous.isMentored
+  );
+}
+
+export function getScheduleEntrySegmentChange(
+  entry: MobileScheduleEntry,
+  segment: MobileScheduleEntrySegment,
+): MobileScheduleEntry["change"] {
+  const change = entry.change;
+  if (!change || change.kind !== "modified") {
+    return change;
+  }
+
+  const segmentIndex = getScheduleEntrySegments(entry).indexOf(segment);
+  const previousSegment = change.previousPresentation?.segments[segmentIndex] ?? null;
+
+  return previousSegment && areScheduleSegmentsEqual(segment, previousSegment) ? null : change;
+}
+
 export function getScheduleItemJobName(item: FeaturedMeScheduleSegment["item"]): string | null {
   if (!item || getScheduleEntryAbsenceTypeId(item.entry) != null) {
     return null;
@@ -73,11 +106,15 @@ export function getScheduleItemJobName(item: FeaturedMeScheduleSegment["item"]):
 }
 
 export function getScheduleItemFocusArea(item: FeaturedMeScheduleSegment["item"]): string | null {
-  if (!item) {
+  if (
+    !item ||
+    getScheduleEntryAbsenceTypeId(item.entry) != null ||
+    isGeneralShiftSegment(item.segment)
+  ) {
     return null;
   }
 
-  return getScheduleEntrySegmentFocusAreaName(item.entry, item.segment);
+  return getMobileScheduleEntrySegmentFocusAreaName(item.entry, item.segment);
 }
 
 export type JobChip = AvatarTone & {

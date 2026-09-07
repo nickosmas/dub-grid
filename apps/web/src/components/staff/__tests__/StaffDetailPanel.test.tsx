@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StaffDetailPanel } from "@/components/staff/StaffDetailPanel";
 import type { Employee, Invitation } from "@/types";
@@ -77,6 +77,28 @@ function renderPanel(props: Partial<React.ComponentProps<typeof StaffDetailPanel
   );
 }
 
+function getPanelStructureContract() {
+  const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
+  const editorFooter = document.querySelector<HTMLElement>(
+    '[data-slot="staff-panel-editor-actions"]',
+  );
+
+  expect(actionFooter).not.toBeNull();
+  expect(editorFooter).not.toBeNull();
+
+  return {
+    actionFooterClass: actionFooter?.className,
+    editorFooterClass: editorFooter?.className,
+    paneClass: actionFooter?.parentElement?.className,
+    actionLabels: Array.from(actionFooter?.querySelectorAll("button") ?? []).map(
+      (button) => button.textContent,
+    ),
+    editorLabels: Array.from(editorFooter?.querySelectorAll("button") ?? []).map(
+      (button) => button.textContent,
+    ),
+  };
+}
+
 describe("StaffDetailPanel access controls", () => {
   it("renders an editable role dropdown when the viewer can change access", () => {
     renderPanel({ orgRole: "user", onRoleChange: vi.fn() });
@@ -141,5 +163,80 @@ describe("StaffDetailPanel access controls", () => {
     const manageButton = screen.getByRole("button", { name: /Add to Management/ });
     const inviteButton = screen.getByRole("button", { name: /Send Invitation/ });
     expect(inviteButton.parentElement).toBe(manageButton.parentElement);
+  });
+
+  it("keeps person actions outside the scrolling form and immediately above editor actions", () => {
+    renderPanel({
+      canManageManagementAccess: true,
+      onManageManagementAccess: vi.fn(),
+    });
+
+    const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
+    const editorFooter = document.querySelector<HTMLElement>(
+      '[data-slot="staff-panel-editor-actions"]',
+    );
+    const scrollRegion = screen.getByTestId("edit-employee-panel").parentElement;
+
+    expect(actionFooter).not.toBeNull();
+    expect(editorFooter).not.toBeNull();
+    expect(scrollRegion).not.toContainElement(actionFooter);
+    expect(actionFooter?.nextElementSibling).toBe(editorFooter);
+  });
+
+  it("keeps the footer structure identical for equivalent records in distinct organizations", () => {
+    renderPanel({
+      orgId: "calm-haven",
+      focusAreaLabel: "Wings",
+      certificationLabel: "Credentials",
+    });
+    const calmHavenContract = getPanelStructureContract();
+
+    cleanup();
+
+    renderPanel({
+      orgId: "arden-wood",
+      focusAreaLabel: "Focus areas",
+      certificationLabel: "Certifications",
+    });
+
+    expect(getPanelStructureContract()).toEqual(calmHavenContract);
+  });
+
+  it("uses the shared two-column grid for person actions", () => {
+    renderPanel({
+      employee: { ...employee, userId: null, email: "pat@example.com" },
+      canManageManagementAccess: true,
+      onManageManagementAccess: vi.fn(),
+      onInvite: vi.fn(),
+    });
+
+    const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
+    const inviteButton = screen.getByRole("button", { name: /send invitation/i });
+    const managementButton = screen.getByRole("button", { name: /add to management/i });
+
+    const personActions = document.querySelector<HTMLElement>('[data-slot="staff-person-actions"]');
+
+    expect(actionFooter).toContainElement(inviteButton);
+    expect(inviteButton.parentElement).toBe(managementButton.parentElement);
+    expect(personActions).toContainElement(inviteButton);
+    expect(personActions).toHaveClass(
+      "grid",
+      "grid-cols-2",
+      "[&>:last-child:nth-child(odd)]:col-span-2",
+    );
+  });
+  // Permissions were only reachable from inside the management-access popup,
+  // which now edits departments and nothing else. The launcher lives on the
+  // panel instead, and this is the panel's only route to it.
+  it("offers a self-descriptive admin-access action for an editable admin", () => {
+    renderPanel({ orgRole: "admin", onPermissionsChange: vi.fn() });
+
+    expect(screen.getByRole("button", { name: "Edit admin access" })).toBeInTheDocument();
+  });
+
+  it("withholds the admin-access action when the role carries no permission set", () => {
+    renderPanel({ orgRole: "user", onPermissionsChange: vi.fn() });
+
+    expect(screen.queryByRole("button", { name: "Edit admin access" })).not.toBeInTheDocument();
   });
 });

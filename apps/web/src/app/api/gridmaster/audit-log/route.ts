@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       entries: (data ?? []).map((row: Record<string, unknown>) => ({
         id: row.id as string,
-        targetUserId: row.target_user_id as string,
+        // NULL once the target auth user is deleted; the ledger row stays.
+        targetUserId: (row.target_user_id as string | null) ?? null,
         targetEmail: (row.target_email as string | null) ?? null,
         changedById: row.changed_by_id as string,
         changedByEmail: (row.changed_by_email as string | null) ?? null,

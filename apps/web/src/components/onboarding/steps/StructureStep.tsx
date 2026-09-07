@@ -115,7 +115,6 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
             focusAreaLabel={focusLabel}
             departmentLabel={deptLabel}
             canManageFocusAreas={true}
-            canManageOrgLabels={true}
             onDepartmentsChange={setDepartments}
             onFocusAreasChange={setFocusAreas}
           />

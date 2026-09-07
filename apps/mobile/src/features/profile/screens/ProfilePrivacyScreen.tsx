@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
@@ -61,24 +62,21 @@ export default function ProfilePrivacyScreen() {
           still has a home below, under Policies, because it documents the site. */}
       <ProfileSection
         title="Analytics"
-        description="Essential data keeps DubGrid working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
+        description="Essential data keeps the app working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
       >
         <ProfilePanel>
           <View style={styles.toggleRow}>
             <View style={styles.toggleCopy}>
               <Text style={styles.toggleLabel}>Analytics</Text>
               <Text style={styles.toggleDescription}>
-                Share anonymous usage data to help us improve DubGrid.
+                Share anonymous usage data to help us improve the app.
               </Text>
             </View>
-            <Switch
+            <AppSwitch
               accessibilityLabel="Analytics consent"
               disabled={saving || analytics === null}
-              ios_backgroundColor={mobileColors.border}
-              onValueChange={(next) => void handleToggle(next)}
-              thumbColor={mobileColors.surface}
-              trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
               value={analytics ?? false}
+              onValueChange={(next) => void handleToggle(next)}
             />
           </View>
         </ProfilePanel>
@@ -89,18 +87,18 @@ export default function ProfilePrivacyScreen() {
           <ProfileNavRow
             iconName="lock-closed-outline"
             label="Privacy policy"
-            onPress={() => void openInAppBrowser(getLegalUrls().privacy, mobileColors)}
+            onPress={() => openInAppBrowser(getLegalUrls().privacy, mobileColors)}
           />
           <ProfileNavRow
             iconName="document-text-outline"
             label="Terms of service"
-            onPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
+            onPress={() => openInAppBrowser(getLegalUrls().terms, mobileColors)}
           />
           <ProfileNavRow
             iconName="information-circle-outline"
             isLast
             label="Cookie policy"
-            onPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
+            onPress={() => openInAppBrowser(getLegalUrls().cookies, mobileColors)}
           />
         </ProfileList>
       </ProfileSection>

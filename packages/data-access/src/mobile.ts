@@ -5,6 +5,7 @@ import type {
   MobileShiftRequestHistoryCursor,
   ScheduleCellState,
 } from "@dubgrid/contracts";
+import { isNotePublishChangeState, scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { AdminPermissions, PlatformRole } from "@dubgrid/domain";
 import type {
   DbAbsenceType,
@@ -104,6 +105,8 @@ export interface MobilePublishChange {
   empId: string;
   date: string;
   kind: "new" | "modified" | "deleted";
+  fromState: ScheduleCellState | null;
+  toState: ScheduleCellState | null;
 }
 
 export interface MobilePublishHistoryRow {
@@ -157,6 +160,19 @@ export interface MobilePublishedScheduleRow {
   date: string;
   focus_area_id: number | null;
   state: ScheduleCellState;
+  employees: MobileEmbeddedEmployeeRow;
+}
+
+// Both snapshots are deliberately retained here so the mobile API can present
+// a draft change alongside the last published shift without reimplementing a
+// schedule-cells query in the web app.
+export interface MobileScheduleComparisonRow {
+  emp_id: string;
+  date: string;
+  focus_area_id: number | null;
+  draftState: ScheduleCellState | null;
+  draftDeleted: boolean;
+  publishedState: ScheduleCellState | null;
   employees: MobileEmbeddedEmployeeRow;
 }
 
@@ -406,6 +422,39 @@ function normalizeEffectiveScheduleRow(
     date: row.date,
     focus_area_id: row.focus_area_id ?? null,
     state: buildStateFromSnapshot(effectiveSnapshot),
+    employees: employee,
+  };
+}
+
+function normalizeMobileScheduleComparisonRow(
+  row: MobileScheduleCellQueryRow,
+): MobileScheduleComparisonRow | null {
+  const snapshots = row.snapshots ?? [];
+  const draftSnapshot = snapshots.find(
+    (snapshot: DbScheduleCellSnapshot) => snapshot.snapshot_kind === "draft",
+  );
+  const publishedSnapshot = snapshots.find(
+    (snapshot: DbScheduleCellSnapshot) => snapshot.snapshot_kind === "published",
+  );
+  const employee = normalizeEmbeddedEmployee(row.employees);
+
+  if (!employee || (!draftSnapshot && !publishedSnapshot)) {
+    return null;
+  }
+
+  return {
+    emp_id: row.emp_id,
+    date: row.date,
+    focus_area_id: row.focus_area_id ?? null,
+    draftState:
+      draftSnapshot && draftSnapshot.state_kind !== "deleted"
+        ? buildStateFromSnapshot(draftSnapshot)
+        : null,
+    draftDeleted: draftSnapshot?.state_kind === "deleted",
+    publishedState:
+      publishedSnapshot && publishedSnapshot.state_kind !== "deleted"
+        ? buildStateFromSnapshot(publishedSnapshot)
+        : null,
     employees: employee,
   };
 }
@@ -823,7 +872,7 @@ export async function fetchMobilePublishHistoryRows(
   let query = serviceClient
     .from("publish_history")
     .select(
-      "published_by, start_date, end_date, published_at, change_count, schedule_publish_changes(emp_id, date, kind)",
+      "published_by, start_date, end_date, published_at, change_count, schedule_publish_changes(emp_id, date, kind, from_state, to_state)",
     )
     .eq("org_id", orgId)
     .order("published_at", { ascending: false });
@@ -840,16 +889,31 @@ export async function fetchMobilePublishHistoryRows(
   if (error) throw error;
 
   const rows = (data ?? []) as (Omit<MobilePublishHistoryRow, "changes"> & {
-    schedule_publish_changes: { emp_id: string; date: string; kind: string }[];
+    schedule_publish_changes: {
+      emp_id: string;
+      date: string;
+      kind: string;
+      from_state: unknown;
+      to_state: unknown;
+    }[];
   })[];
 
   return rows.map(({ schedule_publish_changes, ...row }) => ({
     ...row,
-    changes: (schedule_publish_changes ?? []).map((c) => ({
-      empId: c.emp_id,
-      date: c.date,
-      kind: c.kind as MobilePublishChange["kind"],
-    })),
+    // Published note changes share this table with cell changes and mobile has
+    // no note surface. Left in, their payload fails the cell-state schema and
+    // the row would reach the app as a "New" with no states at all.
+    changes: (schedule_publish_changes ?? [])
+      .filter(
+        (c) => !isNotePublishChangeState(c.to_state) && !isNotePublishChangeState(c.from_state),
+      )
+      .map((c) => ({
+        empId: c.emp_id,
+        date: c.date,
+        kind: c.kind as MobilePublishChange["kind"],
+        fromState: scheduleCellStateSchema.safeParse(c.from_state).data ?? null,
+        toState: scheduleCellStateSchema.safeParse(c.to_state).data ?? null,
+      })),
   }));
 }
 
@@ -947,6 +1011,22 @@ export async function fetchPublishedMobileScheduleRows(
   return rows
     .map((row) => normalizePublishedScheduleRow(row))
     .filter((row): row is MobilePublishedScheduleRow => row != null);
+}
+
+export async function fetchMobileScheduleComparisonRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+): Promise<MobileScheduleComparisonRow[]> {
+  const rows = await fetchScheduleCellQueryRows(serviceClient, input);
+
+  return rows
+    .map((row) => normalizeMobileScheduleComparisonRow(row))
+    .filter((row): row is MobileScheduleComparisonRow => row != null);
 }
 
 // Draft-preferred variant of fetchPublishedMobileScheduleRows — see
@@ -1226,6 +1306,27 @@ export async function fetchMobileEmployeeRowById(
   }
 
   return data as DbEmployee;
+}
+
+export async function fetchMobileEmployeeRowsByIds(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employeeIds: readonly string[],
+): Promise<DbEmployee[]> {
+  const uniqueEmployeeIds = [...new Set(employeeIds)];
+  if (uniqueEmployeeIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select(EMPLOYEE_COLS)
+    .eq("org_id", orgId)
+    .in("id", uniqueEmployeeIds);
+
+  if (error) throw error;
+
+  return (data ?? []) as DbEmployee[];
 }
 
 export async function updateMobileEmployeeStatusRow(

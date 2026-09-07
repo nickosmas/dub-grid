@@ -131,10 +131,21 @@ Use `dev` for every feature, fix, rollback, and checkpoint. Never create a
 development branch or work on `main`. `main` is reserved for an explicitly
 requested release PR from `dev`.
 
+In a terminal session, do the work in a throwaway detached worktree rather than
+in the shared checkout, and push from there with `HEAD:dev`. This creates no
+branch, so the rule above is unaffected. An editor-embedded agent stays in the
+workspace, since the user is watching it. See "Several agents share this
+checkout" in `AGENTS.md`.
+
 ## Commits
 
 - Ask before committing, except for checkpoint and feature-lifecycle commits
   explicitly authorized by `/autopilot` or `/continuous`
+- Commit from the worktree, whose index is yours alone. If you ever commit from
+  the shared checkout instead, stage and commit in a single invocation and
+  assert the staged file count first: another session can mutate the index
+  between a `git add` and a `git commit`, taking files you did not stage and
+  dropping ones you did
 - Use conventional commit messages (feat:, fix:, chore:, etc.)
 - Keep commits focused (one feature/fix per commit)
 - Never put "Generated with Claude" or any AI attribution in commit messages

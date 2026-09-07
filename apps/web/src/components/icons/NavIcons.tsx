@@ -65,6 +65,31 @@ export const IndicatorIcon = makeIcon(Flag, 16);
 export const ActivityIcon = makeIcon(Zap, 16);
 export const DangerIcon = makeIcon(TriangleAlert, 16);
 
+/**
+ * The solid twin of `DangerIcon`, for notices rather than navigation.
+ *
+ * Drawn by hand against the house rule of taking icons from lucide, because
+ * lucide is a stroke set and ships no solid variant of anything - a 1.5px
+ * outline reads as a thin scribble against a filled notice, where the glyph
+ * has to carry as much weight as the fill behind it. `DangerIcon` stays the
+ * outline: it sits in the settings sidebar beside a column of other outlines,
+ * and a solid one there would be the odd one out.
+ *
+ * The bar and dot are cut out of the triangle by `evenodd` rather than painted
+ * over it, so the glyph reads on any fill it is placed on.
+ */
+export function DangerIconSolid({ size = 16 }: NavIconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+      />
+    </svg>
+  );
+}
+
 /* ── Account sidebar (default size 16) ────────────────────── */
 export const ProfileIcon = makeIcon(CircleUserRound, 16);
 export const NotificationsIcon = makeIcon(Bell, 16);

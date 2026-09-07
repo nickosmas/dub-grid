@@ -355,6 +355,8 @@ export default function DashboardMockup() {
                   border: "1px solid var(--dg-color-border)",
                   borderRadius: "var(--dg-radius-lg)",
                   padding: "12px 14px",
+                  height: "100%",
+                  boxSizing: "border-box",
                 }}
               >
                 <div

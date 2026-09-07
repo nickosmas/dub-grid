@@ -1,3 +1,4 @@
+import { getAvatarTypography } from "@dubgrid/design-tokens";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
@@ -175,14 +176,13 @@ export default function ExpandedStaffHours({
                   {/* Avatar */}
                   <div
                     style={{
+                      ...getAvatarTypography(34),
                       width: 34,
                       height: 34,
                       borderRadius: "var(--dg-radius-md)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "var(--dg-type-badge-size)",
-                      fontWeight: 600,
                       flexShrink: 0,
                       background: h.isOvertime
                         ? "var(--dg-color-danger-bg)"

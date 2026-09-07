@@ -154,6 +154,24 @@ describe("getFeaturedMeScheduleSegment", () => {
     expect(result.status).toBe("empty");
     expect(result.item).toBeNull();
   });
+
+  it("does not feature a future deleted publication as an upcoming shift", () => {
+    const result = getFeaturedMeScheduleSegment({
+      currentTime: "20:06",
+      entries: [
+        {
+          ...endedTodayEntry,
+          date: "2026-05-16",
+          change: { kind: "deleted", previousPresentation: null },
+        },
+      ],
+      rangeStartDate: "2026-05-10",
+      selectedDate: todayDate,
+      todayDate,
+    });
+
+    expect(result).toEqual({ status: "empty", item: null });
+  });
 });
 
 describe("getScheduleMonthWeekIndexForDate", () => {

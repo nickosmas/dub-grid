@@ -32,7 +32,7 @@ import {
   isSelfAction,
   summarizeStaffByCredential,
 } from "@dubgrid/domain";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -73,8 +73,8 @@ import { BulkImportModal } from "./BulkImportModal";
 import { DirectoryCertificationCards } from "./DirectoryCertificationCards";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessEditor } from "./EmployeeManagementAccessModal";
-import { MemberAccessControls } from "./MemberAccessControls";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
+import { hasSavedScheduleAssignment } from "./capability-state";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
@@ -810,6 +810,7 @@ export function MembersSection({
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      toast.success("Staff data exported");
     } catch {
       toast.error("Export failed");
     }
@@ -1087,10 +1088,11 @@ export function MembersSection({
     selectedEmployeeDirectoryPerson.membershipUpdatedAt,
   );
 
-  // Access writes for whoever's detail panel is open, so the slide-over and the
-  // management-access modal share one handler instead of each carrying a copy.
-  // Someone with no login yet holds their access on the pending invitation, so
-  // that branch replaces the invite rather than patching a membership.
+  // Access writes for whoever's detail panel is open: the slide-over's header
+  // role select and its on-panel permissions launcher. The management-access
+  // popup gets neither, since it edits departments and nothing else. Someone
+  // with no login yet holds their access on the pending invitation, so that
+  // branch replaces the invite rather than patching a membership.
   const selectedEmployeeRoleChange = !canManageManagementAccess
     ? undefined
     : canWriteSelectedMembership
@@ -1536,7 +1538,7 @@ export function MembersSection({
                 </MaybeHint>
               )}
 
-              {!showManagement && canViewManagementUsers && orgId && !isMobile && (
+              {!showManagement && canViewEmployeeDetails && orgId && !isMobile && (
                 <MaybeHint
                   content={
                     !featureFlags.csvExport
@@ -2008,7 +2010,7 @@ export function MembersSection({
                       // people and pending invites still use the lighter
                       // ManagementStaffPanel via expandedPersonId.
                       const isOnScheduleMember =
-                        person.focusAreaIds.length > 0 && person.employeeId;
+                        hasSavedScheduleAssignment(person) && person.employeeId;
                       const isExpanded = isOnScheduleMember
                         ? person.employeeId === expandedEmpId
                         : person.personId === expandedPersonId;
@@ -2082,8 +2084,9 @@ export function MembersSection({
                           <TableCell className="border-r border-[var(--dg-color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-1.5">
                               <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--dg-type-badge-size)] font-semibold"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                                 style={{
+                                  ...getAvatarTypography(32),
                                   background: isPending
                                     ? "var(--dg-color-surface)"
                                     : avatarTone.backgroundColor,
@@ -2141,7 +2144,7 @@ export function MembersSection({
                                       `employees` filter). `source === "employee"`
                                       is no longer a valid signal — every member
                                       has an employees row post-Flow-B. */}
-                                  {person.focusAreaIds.length > 0 && (
+                                  {hasSavedScheduleAssignment(person) && (
                                     <span
                                       className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
                                       style={{
@@ -2342,6 +2345,8 @@ export function MembersSection({
           }
           orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           onRoleChange={selectedEmployeeRoleChange}
+          adminPermissions={selectedEmployeeDirectoryPerson?.adminPermissions}
+          onPermissionsChange={selectedEmployeePermissionsChange}
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={selectedEmployeeHasPendingManagementInvite}
@@ -2362,47 +2367,34 @@ export function MembersSection({
           }
           onClose={closeManagementAccessPopup}
           onRequestClose={requestManagementAccessClose}
+          className="dg-modal--tight-header"
           style={{ maxWidth: 560, width: "100%" }}
         >
-          <div className="flex flex-col gap-6">
-            {selectedEmployeeDirectoryPerson?.orgRole ? (
-              <MemberAccessControls
-                orgRole={selectedEmployeeDirectoryPerson.orgRole}
-                adminPermissions={selectedEmployeeDirectoryPerson.adminPermissions}
-                isSelf={isSelfAction(currentUserId, managementAccessEmployee.userId)}
-                pendingInvitationEmail={
-                  pendingInviteByEmployeeId.get(managementAccessEmployee.id)?.email
-                }
-                onRoleChange={selectedEmployeeRoleChange}
-                onPermissionsChange={selectedEmployeePermissionsChange}
-              />
-            ) : null}
-            <EmployeeManagementAccessEditor
-              employee={managementAccessEmployee}
-              orgId={orgId}
-              orgName={orgName || "your organization"}
-              managementDepartments={managementDepts}
-              directoryPerson={selectedEmployeeDirectoryPerson}
-              pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
-              onDirtyChange={setManagementAccessDirty}
-              onClose={closeManagementAccessPopup}
-              onCompleted={async (updatedEmployee) => {
-                syncExistingEmployeeInCaches(updatedEmployee);
-                await refreshInvitations();
-                await Promise.all([
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.directory(orgId),
-                  }),
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.org.users(orgId),
-                  }),
-                  queryClient.invalidateQueries({
-                    queryKey: queryKeys.employees.all(orgId),
-                  }),
-                ]);
-              }}
-            />
-          </div>
+          <EmployeeManagementAccessEditor
+            employee={managementAccessEmployee}
+            orgId={orgId}
+            orgName={orgName || "your organization"}
+            managementDepartments={managementDepts}
+            directoryPerson={selectedEmployeeDirectoryPerson}
+            pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
+            onDirtyChange={setManagementAccessDirty}
+            onClose={closeManagementAccessPopup}
+            onCompleted={async (updatedEmployee) => {
+              syncExistingEmployeeInCaches(updatedEmployee);
+              await refreshInvitations();
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.org.directory(orgId),
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.org.users(orgId),
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.employees.all(orgId),
+                }),
+              ]);
+            }}
+          />
         </Modal>
       )}
       {managementAccessUnsavedChangesDialog}
@@ -2684,9 +2676,15 @@ export function MembersSection({
           message="Export the current staff directory data as a downloadable file?"
           confirmLabel="Export"
           variant="info"
-          onConfirm={() => {
-            setExportConfirm(false);
-            return handleExport();
+          // Closing first unmounted the dialog before the export started, so
+          // its confirm button never got to spin. Let the latch hold the
+          // dialog open for the request and close once it settles.
+          onConfirm={async () => {
+            try {
+              await handleExport();
+            } finally {
+              setExportConfirm(false);
+            }
           }}
           onCancel={() => setExportConfirm(false)}
         />

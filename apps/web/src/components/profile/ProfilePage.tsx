@@ -93,7 +93,7 @@ export function ProfilePage() {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
         <p className="m-0 text-[var(--dg-color-text-muted)]">{profileError}</p>
-        <Button className="dg-btn dg-btn-secondary" onClick={() => void refetchProfile()}>
+        <Button className="dg-btn dg-btn-secondary" onClick={() => refetchProfile()}>
           Try again
         </Button>
       </div>

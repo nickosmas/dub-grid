@@ -1,7 +1,12 @@
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import { buildPublishedDateSet, getPublishedWindowState } from "@/lib/schedule-logic";
 
-export type PublicationDateRange = { startDate: string; endDate: string };
+export type PublicationDateRange = {
+  startDate: string;
+  endDate: string;
+  publishedAt?: string;
+  publishedBy?: string;
+};
 
 export type PublicationRangeLoadState =
   | { status: "loading"; ranges: PublicationDateRange[] }

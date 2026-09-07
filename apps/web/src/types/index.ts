@@ -313,6 +313,8 @@ export interface PublishChange {
   empId: string;
   date: string;
   kind: "new" | "modified" | "deleted";
+  /** True when this `new` change was added after an earlier publication covered its date. */
+  isNewAddition?: boolean;
   from?: number[];
   to?: number[];
   fromState?: ScheduleCellState | null;
@@ -328,6 +330,24 @@ export interface PublishChange {
   toCustomEnd?: string | null;
 }
 
+/**
+ * A note added or removed by one publication. Carries the indicator's name and
+ * colour because a removed note has no `schedule_notes` row left to read them
+ * from.
+ */
+export interface NotePublishChange {
+  empId: string;
+  date: string;
+  kind: "new" | "deleted";
+  /** False when this note rode along on the date's first publication. */
+  isNewAddition?: boolean;
+  indicatorTypeId: number;
+  focusAreaId: number | null;
+  indicatorName: string;
+  indicatorColor: string;
+  updatedBy?: string | null;
+}
+
 export interface PublishHistoryEntry {
   id: string;
   publishedBy: string;
@@ -335,6 +355,7 @@ export interface PublishHistoryEntry {
   endDate: string;
   changeCount: number;
   changes: PublishChange[];
+  noteChanges?: NotePublishChange[];
   publishedAt: string;
 }
 
@@ -1111,7 +1132,8 @@ export interface GridmasterAuditExportResult {
 /** An audit log entry from the role_change_log table, denormalized with user emails. */
 export interface AuditLogEntry {
   id: string;
-  targetUserId: string;
+  /** Null once the target auth user has been deleted; the row stays as history. */
+  targetUserId: string | null;
   targetEmail: string | null;
   changedById: string;
   changedByEmail: string | null;
@@ -1138,6 +1160,12 @@ export interface FullAuditLogEntry {
   details: Record<string, unknown>;
   createdAt: string;
 }
+
+/**
+ * One row of a person's activity timeline. Ids are strings because the
+ * timeline merges audit rows with synthesized ledger and invitation events.
+ */
+export type EmployeeActivityEntry = Omit<FullAuditLogEntry, "id"> & { id: string };
 
 /** An organization membership row with denormalized user info for display. */
 export interface OrganizationMembership {

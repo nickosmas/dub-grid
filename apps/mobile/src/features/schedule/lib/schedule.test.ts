@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import {
   addMonthsToIsoDate,
   buildAvailableOpenShiftFeed,
@@ -23,6 +24,8 @@ import {
   getScheduleEntryBaseTimeRange,
   getScheduleEntryCustomTimeRange,
   getScheduleEntryMemberTimeRange,
+  getMobileScheduleEntryDisplayFocusAreaName,
+  getMobileScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegmentShiftTimeRange,
   getScheduleEntrySegmentTimeRange,
@@ -42,6 +45,95 @@ import {
 } from "./schedule";
 
 describe("mobile schedule helpers", () => {
+  it("only exposes focus areas for regular shift segments", () => {
+    const generalEntry: MobileScheduleEntry = {
+      employeeId: "00000000-0000-0000-0000-000000000001",
+      employeeName: "Alex Kim",
+      employeeFocusAreaIds: [1, 2],
+      date: "2026-04-16",
+      state: {
+        kind: "worked",
+        segments: [{ shiftId: null, jobId: 30, position: 0 }],
+        absenceTypeId: null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      presentation: {
+        label: "ADM",
+        shiftName: "Admin",
+        focusAreaId: null,
+        focusAreaName: null,
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "09:00:00",
+        endTime: "17:00:00",
+        segments: [
+          {
+            shiftId: null,
+            jobId: 30,
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+          },
+        ],
+      },
+      change: null,
+      publishedAt: null,
+      publishedByName: null,
+    };
+    const mixedEntry: MobileScheduleEntry = {
+      ...generalEntry,
+      state: {
+        ...generalEntry.state,
+        segments: [
+          { shiftId: null, jobId: 30, position: 0 },
+          { shiftId: 101, jobId: 91, position: 1 },
+        ],
+      },
+      presentation: {
+        ...generalEntry.presentation,
+        displayFocusAreaName: "Skilled Nursing",
+        segments: [
+          {
+            shiftId: null,
+            jobId: 30,
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+          },
+          {
+            shiftId: 101,
+            jobId: 91,
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+          },
+        ],
+      },
+    };
+    const absenceEntry: MobileScheduleEntry = {
+      ...generalEntry,
+      state: { ...generalEntry.state, kind: "absence", absenceTypeId: 1 },
+    };
+
+    expect(getMobileScheduleEntryDisplayFocusAreaName(generalEntry)).toBeNull();
+    expect(
+      getMobileScheduleEntrySegmentFocusAreaName(
+        generalEntry,
+        generalEntry.presentation.segments[0],
+      ),
+    ).toBeNull();
+    expect(getMobileScheduleEntryDisplayFocusAreaName(mixedEntry)).toBe("Skilled Nursing");
+    expect(
+      getMobileScheduleEntrySegmentFocusAreaName(mixedEntry, mixedEntry.presentation.segments[0]),
+    ).toBeNull();
+    expect(
+      getMobileScheduleEntrySegmentFocusAreaName(mixedEntry, mixedEntry.presentation.segments[1]),
+    ).toBe("Skilled Nursing");
+    expect(getMobileScheduleEntryDisplayFocusAreaName(absenceEntry)).toBeNull();
+  });
+
   it("builds a sunday-first 7-day range from the current anchor week offset", () => {
     expect(getScheduleRange(0, undefined, new Date(2026, 3, 16))).toEqual({
       startDate: "2026-04-12",
@@ -905,6 +997,97 @@ describe("mobile schedule helpers", () => {
     ).toHaveLength(3);
     expect(filterTeamScheduleEntriesByFocusArea(entries, "focus-area:2")).toEqual([entries[0]]);
     expect(filterTeamScheduleEntriesByFocusArea(entries, "focus-area:3")).toEqual([]);
+  });
+
+  it("filters a multi-focus-area employee by the focus area assigned to the shift", () => {
+    const scheduledInSkilledNursing = {
+      employeeId: "00000000-0000-0000-0000-000000000001",
+      employeeName: "Alex Kim",
+      employeeFocusAreaIds: [1, 2],
+      date: "2026-04-16",
+      focusAreaId: 2,
+      focusAreaName: "Skilled Nursing",
+      presentation: {
+        label: "D",
+        shiftName: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "Skilled Nursing",
+        displayFocusAreaName: "Skilled Nursing",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 91,
+            focusAreaId: 2,
+            displayFocusAreaName: "Skilled Nursing",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+          },
+        ],
+      },
+    };
+
+    expect(
+      filterTeamScheduleEntriesByFocusArea([scheduledInSkilledNursing], "focus-area:1"),
+    ).toEqual([]);
+    expect(
+      filterTeamScheduleEntriesByFocusArea([scheduledInSkilledNursing], "focus-area:2"),
+    ).toEqual([scheduledInSkilledNursing]);
+  });
+
+  it("adds a General shifts tab only for general assignments and filters it separately", () => {
+    const generalEntry = {
+      employeeId: "00000000-0000-0000-0000-000000000001",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      absenceTypeId: null,
+      focusAreaId: null,
+      focusAreaName: null,
+      segments: [
+        {
+          shiftId: null,
+          jobId: 30,
+          shiftName: "Admin",
+          startTime: "09:00:00",
+          endTime: "17:00:00",
+          displayFocusAreaName: null,
+        },
+      ],
+    };
+    const regularEntry = {
+      ...generalEntry,
+      employeeId: "00000000-0000-0000-0000-000000000002",
+      employeeName: "Bri Shaw",
+      focusAreaId: 2,
+      focusAreaName: "Skilled Nursing",
+      segments: [
+        {
+          shiftId: 1,
+          jobId: 91,
+          shiftName: "Day Shift",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+      ],
+    };
+    const absenceEntry = {
+      ...generalEntry,
+      employeeId: "00000000-0000-0000-0000-000000000003",
+      absenceTypeId: 1,
+      segments: [],
+    };
+    const entries = [generalEntry, regularEntry, absenceEntry];
+    const tabs = buildTeamScheduleFocusAreaTabs([{ id: 2, name: "Skilled Nursing" }], entries);
+
+    expect(tabs.at(-1)).toEqual({
+      key: "general",
+      label: "General shifts",
+      count: 1,
+      focusAreaId: "general",
+    });
+    expect(filterTeamScheduleEntriesByFocusArea(entries, "general")).toEqual([generalEntry]);
   });
 
   it("builds team focus area tabs from entries when bootstrap focus areas are missing", () => {
@@ -2629,6 +2812,64 @@ describe("mobile schedule helpers", () => {
       progress: 0.4,
       statusLabel: "Needs attention",
     });
+  });
+
+  it("excludes deleted publications from weekly scheduled hours", () => {
+    const summary = buildWeeklyHoursSummary([
+      {
+        employeeId: "emp-1",
+        employeeName: "Alex Kim",
+        date: "2026-04-16",
+        shiftIds: [1],
+        jobIds: [10],
+        shiftLabel: "D",
+        assignmentLabel: "D",
+        shiftName: "Day Shift",
+        absenceTypeId: null,
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        customStartTime: null,
+        customEndTime: null,
+        publishedAt: null,
+        publishedByName: null,
+      },
+      {
+        employeeId: "emp-1",
+        employeeName: "Alex Kim",
+        date: "2026-04-17",
+        shiftIds: [],
+        jobIds: [],
+        shiftLabel: "",
+        assignmentLabel: null,
+        shiftName: "",
+        absenceTypeId: null,
+        focusAreaId: null,
+        focusAreaName: null,
+        startTime: null,
+        endTime: null,
+        customStartTime: null,
+        customEndTime: null,
+        publishedAt: null,
+        publishedByName: null,
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            label: "E",
+            shiftName: "Evening Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            segments: [],
+          },
+        },
+      },
+    ]);
+
+    expect(summary.scheduledHours).toBe(8);
   });
 
   it("counts custom, split, and duration-only jobs in weekly hours", () => {

@@ -4,17 +4,20 @@ import { useTheme } from "next-themes";
 import { CalendarDays } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { filterShiftsByWeek, getDatesInRange } from "@/lib/dashboard-stats";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import type {
   AbsenceType,
   AssignmentDefinition,
   JobDefinition,
+  DraftKind,
   ScheduleCellStateEntry,
   ShiftCategory,
+  PublishChange,
   ShiftJobSegment,
   ShiftMap,
 } from "@/types";
@@ -25,6 +28,20 @@ const DAY_BOX_MIN_HEIGHT = 86;
 const DAY_GAP = 10;
 const SCROLL_CONTROL_SLOT_WIDTH = 32;
 const SHIFT_PILL_MIN_HEIGHT = 62;
+// Day name line, its margin, and the shift stack's own offset: how far the
+// first card sits below the top of the strip.
+const FIRST_CARD_OFFSET = 26;
+// Room for the widest change pill ("Deleted") plus its inset.
+const CHANGE_PILL_RESERVE = 56;
+const DAY_BOX_PADDING_X = 20;
+const SHIFT_PILL_PADDING_X = 18;
+// Rough advance width of the semibold badge-size name text, used only to decide
+// whether a name still clears the change pill on both sides.
+const APPROX_NAME_CHAR_WIDTH = 6.6;
+// An admin-entered shift or absence name has no server-side length limit, and a
+// runaway one would push the whole day strip taller. Roughly four wrapped lines
+// in a week-sized cell; the cell links through to the schedule for the full value.
+const MAX_SHIFT_TEXT_LENGTH = 64;
 
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
@@ -44,6 +61,7 @@ type MyScheduleRowProps = Pick<
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
   isManagementOnly?: boolean;
+  recentPublishedChanges?: Map<string, PublishChange>;
 };
 
 type MyScheduleShift = {
@@ -53,7 +71,22 @@ type MyScheduleShift = {
   background: string;
   border: string;
   textColor: string;
+  draftKind: DraftKind;
+  isDraft: boolean;
+  isNewAddition: boolean;
 };
+
+const DRAFT_LABELS: Record<NonNullable<DraftKind>, string> = {
+  deleted: "Deleted",
+  modified: "Edited",
+  new: "New",
+};
+
+function capShiftText(value: string): string {
+  return value.length > MAX_SHIFT_TEXT_LENGTH
+    ? `${value.slice(0, MAX_SHIFT_TEXT_LENGTH - 1).trimEnd()}\u2026`
+    : value;
+}
 
 function normalizeLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -181,6 +214,9 @@ function buildWorkedShifts(input: {
       background: resolved?.color ?? "var(--dg-color-bg-secondary)",
       border: resolved?.border ?? "var(--dg-color-border)",
       textColor: resolved?.text ?? "var(--dg-color-text-primary)",
+      draftKind: entry.draftKind,
+      isDraft: entry.isDraft,
+      isNewAddition: false,
     });
   });
 
@@ -188,6 +224,7 @@ function buildWorkedShifts(input: {
 }
 
 function buildMyScheduleDay(input: {
+  currentEmpId: string;
   date: Date;
   entry: ShiftMap[string] | undefined;
   assignmentById: Map<number, AssignmentDefinition>;
@@ -195,16 +232,45 @@ function buildMyScheduleDay(input: {
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
   isDarkTheme: boolean;
+  recentPublishedChanges: Map<string, PublishChange>;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
 
-  if (!entry || entry.isDelete) {
+  const publishedChange = input.recentPublishedChanges.get(`${input.currentEmpId}_${dateKey}`);
+  if (!entry && !publishedChange) {
     return { key: dateKey, dateKey, date: input.date, shifts: [] };
   }
 
-  if (entry.absenceTypeId != null) {
-    const absence = input.absenceTypeById.get(entry.absenceTypeId) ?? null;
+  // A deleted draft is still a meaningful scheduled shift in the grid. Show
+  // its last published presentation here too, so its deleted indication has a
+  // pill to attach to rather than disappearing as an empty dashboard day.
+  const displayEntry: ScheduleCellStateEntry =
+    entry && entry.isDelete
+      ? {
+          ...entry,
+          assignmentIds: entry.publishedAssignmentDefinitionIds,
+          absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+          customStartTime: entry.publishedCustomStartTime ?? null,
+          customEndTime: entry.publishedCustomEndTime ?? null,
+          label: entry.publishedLabel,
+          segments: entry.publishedSegments ?? [],
+        }
+      : (entry ?? {
+          label: "",
+          assignmentIds: publishedChange?.from ?? [],
+          isDraft: false,
+          draftKind: null,
+          segments: publishedChange?.fromSegments ?? [],
+          absenceTypeId: publishedChange?.fromAbsenceTypeId ?? null,
+          customStartTime: publishedChange?.fromCustomStart ?? null,
+          customEndTime: publishedChange?.fromCustomEnd ?? null,
+          publishedAssignmentDefinitionIds: [],
+          publishedLabel: "",
+        });
+
+  if (displayEntry.absenceTypeId != null) {
+    const absence = input.absenceTypeById.get(displayEntry.absenceTypeId) ?? null;
     const resolved = absence
       ? resolveShiftPillColors(
           { color: absence.color, text: absence.text, border: absence.border },
@@ -217,12 +283,15 @@ function buildMyScheduleDay(input: {
       date: input.date,
       shifts: [
         {
-          label: absence?.name ?? entry.label ?? "Away",
+          label: absence?.name ?? displayEntry.label ?? "Away",
           jobName: null,
           timeRange: null,
           background: resolved?.color ?? "var(--dg-color-bg-secondary)",
           border: resolved?.border ?? "var(--dg-color-border)",
           textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
+          draftKind: publishedChange?.kind ?? entry?.draftKind ?? null,
+          isDraft: entry?.isDraft ?? false,
+          isNewAddition: publishedChange?.isNewAddition === true,
         },
       ],
     };
@@ -233,11 +302,26 @@ function buildMyScheduleDay(input: {
     dateKey,
     date: input.date,
     shifts: buildWorkedShifts({
-      entry,
+      entry: displayEntry,
       assignmentById: input.assignmentById,
       jobById: input.jobById,
       shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
+    }).map((shift, index) => {
+      const previous = publishedChange?.fromState?.segments[index];
+      const publishedKind =
+        publishedChange?.kind === "modified" &&
+        previous &&
+        previous.shiftId === displayEntry.segments?.[index]?.shiftId &&
+        previous.jobId === displayEntry.segments?.[index]?.jobId &&
+        Boolean(previous.isMentored) === Boolean(displayEntry.segments?.[index]?.isMentored)
+          ? null
+          : (publishedChange?.kind ?? shift.draftKind);
+      return {
+        ...shift,
+        draftKind: publishedKind,
+        isNewAddition: publishedChange?.isNewAddition === true,
+      };
     }),
   };
 }
@@ -251,9 +335,11 @@ function buildMyScheduleDays(input: {
   shiftById: Map<number, ShiftCategory>;
   periodDates: Date[];
   isDarkTheme: boolean;
+  recentPublishedChanges: Map<string, PublishChange>;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
+      currentEmpId: input.currentEmpId,
       date,
       entry: input.currentPeriodShifts[`${input.currentEmpId}_${formatDateKey(date)}`],
       assignmentById: input.assignmentById,
@@ -261,6 +347,7 @@ function buildMyScheduleDays(input: {
       jobById: input.jobById,
       shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
+      recentPublishedChanges: input.recentPublishedChanges,
     }),
   );
 }
@@ -269,12 +356,21 @@ function useHorizontalScrollState(dependency: unknown) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  // A scrolling period (2 weeks) should still show week-sized cells, so the
+  // visible cell width is derived from what one week would occupy here.
+  const [cellWidth, setCellWidth] = useState(DAY_BOX_WIDTH);
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 4);
     setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+    const viewportWidth = el.clientWidth;
+    setCellWidth(
+      viewportWidth > 0
+        ? Math.max(DAY_BOX_WIDTH, Math.floor((viewportWidth - DAY_GAP * 6) / 7))
+        : DAY_BOX_WIDTH,
+    );
   }, []);
 
   useEffect(() => {
@@ -293,15 +389,18 @@ function useHorizontalScrollState(dependency: unknown) {
     };
   }, [updateScrollState, dependency]);
 
-  const scrollByPage = useCallback((direction: 1 | -1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const cellStride = DAY_BOX_WIDTH + DAY_GAP;
-    const visibleCellCount = Math.max(1, Math.floor((el.clientWidth + DAY_GAP) / cellStride));
-    el.scrollBy({ left: direction * visibleCellCount * cellStride, behavior: "smooth" });
-  }, []);
+  const scrollByPage = useCallback(
+    (direction: 1 | -1) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const cellStride = cellWidth + DAY_GAP;
+      const visibleCellCount = Math.max(1, Math.floor((el.clientWidth + DAY_GAP) / cellStride));
+      el.scrollBy({ left: direction * visibleCellCount * cellStride, behavior: "smooth" });
+    },
+    [cellWidth],
+  );
 
-  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage };
+  return { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth };
 }
 
 function ScrollCue({
@@ -318,7 +417,9 @@ function ScrollCue({
       data-testid={`schedule-scroll-slot-${direction}`}
       style={{
         position: "absolute",
-        top: "calc(50% + 13px)",
+        // Anchored to the first card rather than the strip, whose height varies
+        // with the tallest day.
+        top: FIRST_CARD_OFFSET + SHIFT_PILL_MIN_HEIGHT / 2,
         [direction]: 12,
         transform: "translateY(-50%)",
         zIndex: 1,
@@ -339,22 +440,48 @@ function ScrollCue({
   );
 }
 
-function ShiftPill({ shift }: { shift: MyScheduleShift }) {
+function resolveDraftLabel(shift: MyScheduleShift): string | null {
+  return shift.draftKind && (shift.draftKind !== "new" || shift.isNewAddition)
+    ? DRAFT_LABELS[shift.draftKind]
+    : null;
+}
+
+// Only the name line can run under the change pill, so it alone decides the
+// layout. Centering it between two reserved gutters can starve it down to a
+// one-character-per-line column, so the symmetric reserve only holds while the
+// name still clears the pill on its own.
+function isCrowdedByPill(shift: MyScheduleShift, cellWidth: number): boolean {
+  if (!resolveDraftLabel(shift)) return false;
+  const textWidth = cellWidth - DAY_BOX_PADDING_X - SHIFT_PILL_PADDING_X;
+  return (
+    capShiftText(shift.label).length * APPROX_NAME_CHAR_WIDTH > textWidth - CHANGE_PILL_RESERVE * 2
+  );
+}
+
+function ShiftPill({ shift, alignLeft }: { shift: MyScheduleShift; alignLeft: boolean }) {
+  const draftLabel = resolveDraftLabel(shift);
+  const label = capShiftText(shift.label);
+  const jobName = shift.jobName ? capShiftText(shift.jobName) : null;
+
   return (
     <div
       style={{
         minHeight: SHIFT_PILL_MIN_HEIGHT,
-        flex: 1,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
+        textAlign: alignLeft ? "left" : undefined,
         padding: "8px",
         borderRadius: "var(--dg-radius-sm, 6px)",
-        border: `1px solid ${shift.border}`,
+        border:
+          shift.isDraft && shift.draftKind
+            ? `2px dashed ${DRAFT_BORDER_COLORS[shift.draftKind]}`
+            : `1px solid ${shift.border}`,
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
         overflowWrap: "anywhere",
+        position: "relative",
       }}
     >
       <div
@@ -363,12 +490,24 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           fontWeight: 600,
           lineHeight: 1.25,
           overflowWrap: "anywhere",
+          paddingLeft: draftLabel && !alignLeft ? CHANGE_PILL_RESERVE : 0,
+          paddingRight: draftLabel ? CHANGE_PILL_RESERVE : 0,
         }}
       >
-        {shift.label}
+        {label}
       </div>
+      {shift.draftKind && draftLabel ? (
+        <PublishDiffPill
+          aria-label={`${draftLabel} shift`}
+          data-draft-badge={shift.draftKind}
+          kind={shift.draftKind}
+          style={{ position: "absolute", top: 6, right: 6, padding: "1px 4px" }}
+        >
+          {draftLabel}
+        </PublishDiffPill>
+      ) : null}
       <div
-        aria-hidden={!shift.jobName}
+        aria-hidden={!jobName}
         style={{
           fontSize: "var(--dg-type-metadata-size)",
           fontWeight: 500,
@@ -376,10 +515,10 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
           opacity: 0.8,
           lineHeight: 1.25,
           overflowWrap: "anywhere",
-          visibility: shift.jobName ? "visible" : "hidden",
+          visibility: jobName ? "visible" : "hidden",
         }}
       >
-        {shift.jobName ?? " "}
+        {jobName ?? " "}
       </div>
       <div
         aria-hidden={!shift.timeRange}
@@ -402,7 +541,6 @@ function EmptyDayPlaceholder() {
     <div
       style={{
         minHeight: SHIFT_PILL_MIN_HEIGHT,
-        flex: 1,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -418,7 +556,19 @@ function EmptyDayPlaceholder() {
   );
 }
 
-function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailableWidth: boolean }) {
+function DayBox({
+  day,
+  fillAvailableWidth,
+  cellWidth,
+}: {
+  day: MyScheduleDay;
+  fillAvailableWidth: boolean;
+  cellWidth: number;
+}) {
+  // A day's cards share one alignment: once any of them has to move left to
+  // clear its change pill, the ones stacked with it follow.
+  const alignLeft = day.shifts.some((shift) => isCrowdedByPill(shift, cellWidth));
+
   return (
     <Link
       href="/schedule"
@@ -438,7 +588,7 @@ function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailable
     >
       <div
         style={{
-          width: fillAvailableWidth ? "100%" : DAY_BOX_WIDTH,
+          width: fillAvailableWidth ? "100%" : cellWidth,
           minHeight: DAY_BOX_MIN_HEIGHT,
           flex: 1,
           display: "flex",
@@ -472,7 +622,9 @@ function DayBox({ day, fillAvailableWidth }: { day: MyScheduleDay; fillAvailable
           {day.shifts.length === 0 ? (
             <EmptyDayPlaceholder />
           ) : (
-            day.shifts.map((shift, index) => <ShiftPill key={index} shift={shift} />)
+            day.shifts.map((shift, index) => (
+              <ShiftPill key={index} shift={shift} alignLeft={alignLeft} />
+            ))
           )}
         </div>
       </div>
@@ -493,6 +645,7 @@ export default function MyScheduleRow({
   periodDates,
   periodLabel,
   isManagementOnly = false,
+  recentPublishedChanges = new Map(),
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -530,6 +683,7 @@ export default function MyScheduleRow({
             shiftById,
             periodDates: displayDates,
             isDarkTheme,
+            recentPublishedChanges,
           })
         : [],
     [
@@ -541,13 +695,13 @@ export default function MyScheduleRow({
       shiftById,
       displayDates,
       isDarkTheme,
+      recentPublishedChanges,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
   const fillsWithoutScrolling = days.length <= 7 && !isMobile;
-  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(
-    days.length,
-  );
+  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage, cellWidth } =
+    useHorizontalScrollState(days.length);
 
   if (!currentEmpId || isManagementOnly) return null;
 
@@ -589,7 +743,12 @@ export default function MyScheduleRow({
               }}
             >
               {days.map((day) => (
-                <DayBox key={day.key} day={day} fillAvailableWidth={fillsWithoutScrolling} />
+                <DayBox
+                  key={day.key}
+                  day={day}
+                  fillAvailableWidth={fillsWithoutScrolling}
+                  cellWidth={isMobile ? DAY_BOX_WIDTH : cellWidth}
+                />
               ))}
             </div>
             <ScrollCue direction="right" visible={canScrollRight} onClick={() => scrollByPage(1)} />

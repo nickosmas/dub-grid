@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import {
   Fragment,
   useCallback,
@@ -109,6 +110,7 @@ import {
   getScheduleEntrySegments,
   getScheduleEntryStartTime,
   getScheduleEntryTitle,
+  isGeneralScheduleEntrySegment,
   getScheduleMonthStartDate,
   getScheduleMonthWeekIndexForDate,
   getScheduleRangeForDate,
@@ -123,6 +125,19 @@ import {
   type MobileScheduleWeekDay,
   type WeeklyHoursSummary,
 } from "../lib/schedule";
+import {
+  HERO_CARD_BACKGROUND_DARK,
+  HERO_CARD_BACKGROUND_LIGHT,
+  HERO_CARD_GRADIENT_DARK,
+  HERO_CARD_GRADIENT_END,
+  HERO_CARD_GRADIENT_LIGHT,
+  HERO_CARD_GRADIENT_LOCATIONS,
+  HERO_CARD_GRADIENT_START,
+  HERO_CARD_SHADOW_DARK,
+  HERO_CARD_SHADOW_LIGHT,
+  HERO_COLLABORATOR_BACKGROUND_DARK,
+  HERO_COLLABORATOR_BACKGROUND_LIGHT,
+} from "../lib/heroCardTheme";
 import {
   WEEK_SWIPE_FALLBACK_WIDTH,
   getCurrentTimeValue,
@@ -144,6 +159,7 @@ import {
   getMeHeroShiftmates,
   getMeHeroSupplementalSplitSegments,
   getRequestDateLabel,
+  getScheduleEntrySegmentChange,
   getScheduleItemFocusArea,
   getScheduleItemShiftName,
   getScheduleItemSplitShiftLabel,
@@ -194,19 +210,6 @@ const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
 };
-const ME_HERO_CARD_BACKGROUND_LIGHT = "#2946C7";
-const ME_HERO_CARD_BACKGROUND_DARK = "#152238";
-const ME_HERO_COLLABORATOR_BACKGROUND_LIGHT = "#3A55CB";
-const ME_HERO_COLLABORATOR_BACKGROUND_DARK = "#1E2F66";
-// Matches the web hero gradient: dark bottom-left → light top-right. The
-// dark-mode variant keeps the same dark navy start but ends in the app's
-// own vivid dark-mode brand blue instead of a pale periwinkle, which would
-// read as a washed-out pastel blob against a near-black page.
-const ME_HERO_CARD_GRADIENT_LIGHT = ["#142579", "#2C49CC", "#6E90FF"] as const;
-const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
-const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
-const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
-const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
 /**
  * Week/month swipe springs, named so the two feels are legible and so the
  * schedule shares the app's motion vocabulary.
@@ -218,9 +221,6 @@ const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
  */
 const SWIPE_CANCEL_SPRING = mobileMotion.spring.gentle;
 const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
-
-const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
-const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 // `setLayoutAnimationEnabledExperimental` used to be the Android opt-in for
 // `LayoutAnimation`. Under the New Architecture it does nothing but warn on
@@ -571,9 +571,14 @@ function getRequestFocusAreaName(
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): string | null {
+  if (getRequestAbsenceTypeId(request, which) != null) {
+    return null;
+  }
+
   return (
-    getRequestSegments(request, which).find((segment) => segment.displayFocusAreaName)
-      ?.displayFocusAreaName ?? null
+    getRequestSegments(request, which).find(
+      (segment) => !isGeneralScheduleEntrySegment(segment) && segment.displayFocusAreaName,
+    )?.displayFocusAreaName ?? null
   );
 }
 
@@ -1736,7 +1741,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
               }
             />
-            {isMeScheduleEmpty ? null : (
+            {!isMeScheduleEmpty ? (
               <>
                 <ShiftCoverRequestsSection
                   linkedEmployeeId={linkedEmployee?.id ?? null}
@@ -1790,14 +1795,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                   timeZone={timeZone}
                   openShiftVisibility={openShiftVisibility}
                 />
-                <UpcomingShiftsSection
-                  items={meUpcomingItems}
-                  onPressEntry={handleOpenShiftDetail}
-                  summary={meWeeklyHours}
-                  todayDate={todayDate}
-                />
               </>
-            )}
+            ) : null}
+            <UpcomingShiftsSection
+              items={meUpcomingItems}
+              onPressEntry={handleOpenShiftDetail}
+              summary={meWeeklyHours}
+              todayDate={todayDate}
+              weekDays={weekDays}
+            />
           </View>
         ) : shiftGroups.length === 0 ? (
           <EmptyStateCard
@@ -2116,7 +2122,15 @@ function JobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>(Mentored)</Text>
+            <Text
+              style={[
+                styles.jobPillMentoredInlineText,
+                compact && styles.jobPillMentoredInlineTextCompact,
+                { color: chip.textColor },
+              ]}
+            >
+              (Mentored)
+            </Text>
           ) : null}
         </View>
       ) : (
@@ -2194,6 +2208,164 @@ function MeTypePill({
   );
 }
 
+const SHIFT_CHANGE_LABELS = {
+  deleted: "Deleted",
+  modified: "Edited",
+  new: "New",
+} as const;
+
+function getShiftChangeLabel(change: MobileScheduleEntry["change"]): string | null {
+  return change && (change.kind !== "new" || change.isNewAddition)
+    ? SHIFT_CHANGE_LABELS[change.kind]
+    : null;
+}
+
+function getPreviousShiftSummary(
+  change: MobileScheduleEntry["change"],
+  entry?: MobileScheduleEntry,
+  segment?: MobileScheduleEntrySegment | null,
+): string | null {
+  // A first publication has no earlier published state. Keep the underlying
+  // change type for reconciliation, but never imply history in the UI.
+  if (change?.kind === "new") {
+    return null;
+  }
+  const previous = change?.previousPresentation;
+  if (!previous) {
+    return null;
+  }
+
+  if (change?.kind === "deleted" && !segment && previous.segments.length > 1) {
+    const summaries = previous.segments.map((previousSegment) => {
+      const title = previousSegment.shiftName?.trim() || previousSegment.label?.trim() || "Shift";
+      const timeRange = formatScheduleTimeRange(previousSegment.startTime, previousSegment.endTime);
+      const focusAreaName =
+        previousSegment.shiftId === null
+          ? null
+          : previousSegment.displayFocusAreaName?.trim() || null;
+
+      return [title, timeRange, focusAreaName]
+        .filter((part): part is string => Boolean(part && part.trim()))
+        .join(" · ");
+    });
+
+    return summaries.join("; ");
+  }
+
+  const segmentIndex = segment && entry ? getScheduleEntrySegments(entry).indexOf(segment) : -1;
+  const previousSegment =
+    change?.kind === "modified" && previous.segments.length > 1 && segmentIndex >= 0
+      ? (previous.segments[segmentIndex] ?? null)
+      : null;
+  const title =
+    previousSegment?.shiftName?.trim() ||
+    previousSegment?.label?.trim() ||
+    previous.shiftName?.trim() ||
+    previous.label?.trim() ||
+    null;
+  const timeRange = formatScheduleTimeRange(
+    previousSegment?.startTime ?? previous.startTime,
+    previousSegment?.endTime ?? previous.endTime,
+  );
+  const focusAreaName =
+    previousSegment?.shiftId === null
+      ? null
+      : previousSegment?.displayFocusAreaName?.trim() ||
+        previous.displayFocusAreaName?.trim() ||
+        null;
+  const parts = [title, timeRange, focusAreaName].filter((part): part is string =>
+    Boolean(part && part.trim()),
+  );
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function ShiftChangeBadge({
+  change,
+  compactSegment = false,
+  inverse = false,
+}: {
+  change: MobileScheduleEntry["change"];
+  compactSegment?: boolean;
+  inverse?: boolean;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+
+  if (!change || (change.kind === "new" && !change.isNewAddition)) {
+    return null;
+  }
+
+  return (
+    <View
+      accessibilityLabel={`Shift ${SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
+      style={
+        // The inverse chip replaces the base styling outright rather than
+        // layering onto it: `shiftChangeBadgeText` carries a numeric
+        // `fontWeight`, which would send the bold DM Sans face to Android's
+        // system-font fallback once the inverse style names that family.
+        inverse
+          ? styles.shiftChangeBadgeInverse
+          : [
+              styles.shiftChangeBadge,
+              change.kind === "modified" && styles.shiftChangeBadgeModified,
+              change.kind === "deleted" && styles.shiftChangeBadgeDeleted,
+              compactSegment && styles.shiftChangeBadgeCompactSegment,
+            ]
+      }
+    >
+      <Text
+        style={
+          inverse
+            ? styles.shiftChangeBadgeTextInverse
+            : [
+                styles.shiftChangeBadgeText,
+                compactSegment && styles.shiftChangeBadgeTextCompactSegment,
+              ]
+        }
+      >
+        {SHIFT_CHANGE_LABELS[change.kind]}
+      </Text>
+    </View>
+  );
+}
+
+function PreviousShiftRow({
+  change,
+  entry,
+  inverse = false,
+  segment,
+}: {
+  change: MobileScheduleEntry["change"];
+  entry?: MobileScheduleEntry;
+  inverse?: boolean;
+  segment?: MobileScheduleEntrySegment | null;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const summary = getPreviousShiftSummary(change, entry, segment);
+  const prefix = "Was";
+
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <View accessibilityLabel={`Previous shift: ${summary}`} style={styles.previousShiftRow}>
+      <Ionicons
+        color={inverse ? "rgba(255, 255, 255, 0.74)" : mobileColors.textSubtle}
+        name="arrow-undo-outline"
+        size={14}
+      />
+      <Text style={[styles.previousShiftText, inverse && styles.previousShiftTextInverse]}>
+        {prefix} {summary}
+      </Text>
+    </View>
+  );
+}
+
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -2207,8 +2379,8 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const overflowCount = entries.length - visibleEntries.length;
   const collaboratorBackground = {
     backgroundColor: isDark
-      ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
-      : ME_HERO_COLLABORATOR_BACKGROUND_LIGHT,
+      ? HERO_COLLABORATOR_BACKGROUND_DARK
+      : HERO_COLLABORATOR_BACKGROUND_LIGHT,
   };
 
   return (
@@ -2240,6 +2412,8 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
                 ]}
               >
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={[styles.meHeroCollaboratorAvatarText, { color: avatarTone.textColor }]}
                 >
                   {getInitials(entry.employeeName)}
@@ -2315,12 +2489,13 @@ function MeHeroCard({
   const heroDateLabel = formatCompactScheduleDate(featuredItem.date);
   const heroDateParts = getCompactScheduleDateParts(featuredItem.date);
   const shiftName = getScheduleItemShiftName(featuredItem);
+  const change = getScheduleEntrySegmentChange(featuredItem.entry, featuredItem.segment);
   const typeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
-  const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const timeRange = getScheduleItemTimeRange(featuredItem);
   const splitSegments = featuredItem ? getSplitShiftSegmentsForEntry(featuredItem.entry) : [];
   const splitShiftCount = splitSegments.length;
+  const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const heroSplitSegments = getMeHeroSupplementalSplitSegments(
     featuredItem,
     splitSegments,
@@ -2329,6 +2504,9 @@ function MeHeroCard({
   );
   const heroSplitShiftLabel = getScheduleItemSplitShiftLabel(featuredItem);
   const shouldShowHeroSplitBadge = splitShiftCount > 1 && heroSplitSegments.segments.length > 0;
+  const heroSplitChangeLabel = splitShiftCount > 1 ? getShiftChangeLabel(change) : null;
+  const heroChange = splitShiftCount > 1 ? null : change;
+  const heroChangeLabel = getShiftChangeLabel(heroChange);
   const badgeDotStyle =
     status === "active"
       ? styles.meHeroBadgeDotActive
@@ -2342,18 +2520,48 @@ function MeHeroCard({
         <View style={styles.meHeroHeader}>
           <View style={styles.meHeroHeaderCopy}>
             {badgeLabel ? (
-              <View style={styles.meHeroBadge}>
-                <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
-                <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+              <View style={styles.meHeroBadgeRow}>
+                <View style={styles.meHeroBadge}>
+                  <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
+                  <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+                </View>
               </View>
             ) : null}
-            {shouldShowShiftName || shouldShowHeroSplitBadge ? (
+            {shouldShowShiftName || shouldShowHeroSplitBadge || heroChangeLabel ? (
               <View style={styles.meHeroTitleRow}>
                 {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {heroChangeLabel ? (
+                  <View style={styles.meHeroTitleBadgeSlot}>
+                    <ShiftChangeBadge change={heroChange} inverse />
+                  </View>
+                ) : null}
                 {shouldShowHeroSplitBadge ? (
-                  <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
+                  <View style={styles.meHeroTitleBadgeSlot}>
+                    <SplitShiftBadge
+                      count={splitShiftCount}
+                      inverse
+                      label={
+                        heroSplitChangeLabel
+                          ? `${heroSplitShiftLabel ?? "Shift"} · ${heroSplitChangeLabel}`
+                          : heroSplitShiftLabel
+                      }
+                    />
+                  </View>
                 ) : null}
               </View>
+            ) : null}
+            {typeChip ? (
+              <View style={styles.meHeroRoleRow}>
+                <MeTypePill
+                  chip={typeChip}
+                  compact
+                  inverseLabel
+                  isMentored={featuredItem.segment.isMentored === true}
+                  titleScale="hero"
+                />
+              </View>
+            ) : featuredItem.segment.isMentored ? (
+              <MentoredPill />
             ) : null}
           </View>
           {heroDateParts ? (
@@ -2364,42 +2572,33 @@ function MeHeroCard({
           ) : null}
         </View>
       ) : null}
-      {focusAreaName ? (
-        <View style={styles.meHeroAreaRow}>
-          <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
-          <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
-        </View>
-      ) : null}
-      {typeChip ? (
-        <View style={styles.meHeroRoleRow}>
-          <MeTypePill
-            chip={typeChip}
-            compact
-            inverseLabel
-            isMentored={featuredItem.segment.isMentored === true}
-            titleScale="hero"
-          />
-        </View>
-      ) : featuredItem.segment.isMentored ? (
-        <MentoredPill />
-      ) : null}
-      {timeRange ? (
-        <View style={styles.meHeroScheduleRow}>
-          <View style={styles.meHeroTimeRow}>
-            <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
-            <Text style={styles.meHeroTimeText}>{timeRange}</Text>
-          </View>
-          {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
-        </View>
-      ) : null}
-      {timing?.progress != null ? (
-        <View style={styles.meHeroProgressTrack}>
-          <View
-            style={[
-              styles.meHeroProgressFill,
-              { width: `${Math.max(timing.progress, 0.08) * 100}%` },
-            ]}
-          />
+      {focusAreaName || timeRange || timing?.progress != null ? (
+        <View style={styles.meHeroContextGroup}>
+          {focusAreaName ? (
+            <View style={styles.meHeroAreaRow}>
+              <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
+              <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
+            </View>
+          ) : null}
+          {timeRange ? (
+            <View style={styles.meHeroScheduleRow}>
+              <View style={styles.meHeroTimeRow}>
+                <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
+                <Text style={styles.meHeroTimeText}>{timeRange}</Text>
+              </View>
+              {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
+            </View>
+          ) : null}
+          {timing?.progress != null ? (
+            <View style={styles.meHeroProgressTrack}>
+              <View
+                style={[
+                  styles.meHeroProgressFill,
+                  { width: `${Math.max(timing.progress, 0.08) * 100}%` },
+                ]}
+              />
+            </View>
+          ) : null}
         </View>
       ) : null}
       <MeHeroShiftmates entries={shiftmates} />
@@ -2426,6 +2625,9 @@ function MeHeroCard({
               currentTime,
             )?.label ?? null
           }
+          getSegmentStatusLabel={(segment) =>
+            getShiftChangeLabel(getScheduleEntrySegmentChange(featuredItem.entry, segment))
+          }
           segmentLabelIndices={heroSplitSegments.segmentLabelIndices}
           segmentLabelTotalCount={splitShiftCount}
           segments={heroSplitSegments.segments}
@@ -2439,17 +2641,17 @@ function MeHeroCard({
 
   const heroGradient = (
     <LinearGradient
-      colors={isDark ? ME_HERO_CARD_GRADIENT_DARK : ME_HERO_CARD_GRADIENT_LIGHT}
-      locations={ME_HERO_CARD_GRADIENT_LOCATIONS}
-      start={ME_HERO_CARD_GRADIENT_START}
-      end={ME_HERO_CARD_GRADIENT_END}
+      colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
+      locations={HERO_CARD_GRADIENT_LOCATIONS}
+      start={HERO_CARD_GRADIENT_START}
+      end={HERO_CARD_GRADIENT_END}
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
     />
   );
   const heroCardThemeStyle = {
-    backgroundColor: isDark ? ME_HERO_CARD_BACKGROUND_DARK : ME_HERO_CARD_BACKGROUND_LIGHT,
-    shadowColor: isDark ? ME_HERO_CARD_SHADOW_DARK : ME_HERO_CARD_SHADOW_LIGHT,
+    backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,
   };
 
   return (
@@ -2483,17 +2685,19 @@ function UpcomingShiftsSection({
   onPressEntry,
   summary,
   todayDate,
+  weekDays,
 }: {
   items: Array<NonNullable<FeaturedMeScheduleSegment["item"]>>;
   onPressEntry: (entry: MobileScheduleEntry) => void;
   summary: WeeklyHoursSummary | null;
   todayDate: string;
+  weekDays: MobileScheduleWeekDay[];
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
-  if (items.length === 0) {
+  if (weekDays.length === 0) {
     return null;
   }
 
@@ -2501,25 +2705,28 @@ function UpcomingShiftsSection({
     summary && summary.scheduledHours > 0
       ? `${formatHoursValue(summary.scheduledHours)}h this week`
       : null;
-  const groupedItems = items.reduce<
-    Array<{
-      date: string;
-      items: Array<NonNullable<FeaturedMeScheduleSegment["item"]>>;
-    }>
-  >((groups, item) => {
-    const currentGroup = groups[groups.length - 1];
-
-    if (currentGroup?.date === item.date) {
-      currentGroup.items.push(item);
-      return groups;
+  const itemsByDate = new Map<string, Array<NonNullable<FeaturedMeScheduleSegment["item"]>>>();
+  const deletedEntriesByDate = new Map<string, MobileScheduleEntry[]>();
+  items.forEach((item) => {
+    const isDeleted = getScheduleEntrySegmentChange(item.entry, item.segment)?.kind === "deleted";
+    if (isDeleted) {
+      const deletedEntries = deletedEntriesByDate.get(item.date) ?? [];
+      if (!deletedEntries.includes(item.entry)) {
+        deletedEntries.push(item.entry);
+        deletedEntriesByDate.set(item.date, deletedEntries);
+      }
+      return;
     }
 
-    groups.push({
-      date: item.date,
-      items: [item],
-    });
-    return groups;
-  }, []);
+    const dateItems = itemsByDate.get(item.date) ?? [];
+    dateItems.push(item);
+    itemsByDate.set(item.date, dateItems);
+  });
+  const groupedItems = weekDays.map((day) => ({
+    date: day.date,
+    items: itemsByDate.get(day.date) ?? [],
+    deletedEntries: deletedEntriesByDate.get(day.date) ?? [],
+  }));
 
   return (
     <View style={styles.upcomingSectionBlock}>
@@ -2538,7 +2745,7 @@ function UpcomingShiftsSection({
           const isToday = group.date === todayDate;
           return (
             <View
-              key={`${group.date}-${groupIndex}`}
+              key={group.date}
               style={[
                 styles.upcomingDateGroup,
                 groupIndex > 0 && styles.upcomingShiftRowBorder,
@@ -2569,57 +2776,100 @@ function UpcomingShiftsSection({
               </View>
 
               <View style={styles.upcomingDateShiftStack}>
-                {group.items.map((item, itemIndex) => {
-                  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
-                  const shiftName = getScheduleItemShiftName(item);
-                  const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
-                  const focusAreaName = getScheduleItemFocusArea(item);
-                  const timeRange = getScheduleItemTimeRange(item);
-                  const splitSegments = getSplitShiftSegmentsForEntry(item.entry);
-                  const splitShiftLabel = getScheduleItemSplitShiftLabel(item);
+                {group.items.length === 0 ? (
+                  <View
+                    accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
+                    style={styles.upcomingUnscheduledRow}
+                    testID={`upcoming-unscheduled-row-${group.date}`}
+                  >
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      style={styles.upcomingUnscheduledTitle}
+                    >
+                      Unscheduled
+                    </Text>
+                    {group.deletedEntries.map((entry) => (
+                      <PreviousShiftRow
+                        key={`${entry.employeeId}:${entry.date}`}
+                        change={entry.change}
+                        entry={entry}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <>
+                    {group.items.map((item, itemIndex) => {
+                      const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
+                      const change = getScheduleEntrySegmentChange(item.entry, item.segment);
+                      const shiftName = getScheduleItemShiftName(item);
+                      const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
+                      const focusAreaName = getScheduleItemFocusArea(item);
+                      const timeRange = getScheduleItemTimeRange(item);
+                      const splitSegments = getSplitShiftSegmentsForEntry(item.entry);
+                      const splitShiftLabel = getScheduleItemSplitShiftLabel(item);
+                      const splitChangeLabel =
+                        splitSegments.length > 1 ? getShiftChangeLabel(change) : null;
 
-                  return (
-                    <Fragment key={item.key}>
-                      {itemIndex > 0 ? <UpcomingShiftDashedDivider /> : null}
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => onPressEntry(item.entry)}
-                        style={styles.upcomingShiftRow}
-                      >
-                        <View style={styles.upcomingShiftCopy}>
-                          {/* Title and time stack rather than sitting in two
+                      return (
+                        <Fragment key={item.key}>
+                          {itemIndex > 0 ? <UpcomingShiftDashedDivider /> : null}
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => onPressEntry(item.entry)}
+                            style={styles.upcomingShiftRow}
+                          >
+                            <View style={styles.upcomingShiftCopy}>
+                              {/* Title and time stack rather than sitting in two
                               columns. Side by side, the time never gave width
                               back, so at a raised OS text size the name was
                               squeezed into a column narrow enough to break
                               mid-word ("Visitin / g Nursin / g"). */}
-                          {shouldShowShiftName || splitSegments.length > 1 || timeRange ? (
-                            <View style={styles.upcomingShiftHeading}>
-                              {shouldShowShiftName || splitSegments.length > 1 ? (
-                                <View style={styles.upcomingShiftTitleMeta}>
-                                  {shouldShowShiftName ? (
-                                    <Text
-                                      maxFontSizeMultiplier={MAX_FONT_SCALE}
-                                      style={styles.upcomingShiftTitle}
-                                    >
-                                      {shiftName}
-                                    </Text>
-                                  ) : null}
-                                  {splitSegments.length > 1 ? (
-                                    <SplitShiftBadge
-                                      count={splitSegments.length}
-                                      compact
-                                      label={splitShiftLabel}
-                                    />
+                              {shouldShowShiftName || splitSegments.length > 1 || timeRange ? (
+                                <View style={styles.upcomingShiftHeading}>
+                                  {shouldShowShiftName || splitSegments.length > 1 || change ? (
+                                    <View style={styles.upcomingShiftTitleMeta}>
+                                      {shouldShowShiftName ? (
+                                        <Text
+                                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                          style={styles.upcomingShiftTitle}
+                                        >
+                                          {shiftName}
+                                        </Text>
+                                      ) : null}
+                                      {splitSegments.length > 1 ? (
+                                        <SplitShiftBadge
+                                          count={splitSegments.length}
+                                          compact
+                                          label={
+                                            splitChangeLabel
+                                              ? `${splitShiftLabel ?? "Shift"} · ${splitChangeLabel}`
+                                              : splitShiftLabel
+                                          }
+                                        />
+                                      ) : null}
+                                      <ShiftChangeBadge
+                                        change={splitSegments.length > 1 ? null : change}
+                                        compactSegment={change?.kind === "modified"}
+                                      />
+                                    </View>
                                   ) : null}
                                 </View>
                               ) : null}
+                              <MeTypePill
+                                chip={typeChip}
+                                compact
+                                isMentored={item.segment.isMentored === true}
+                              />
+                              {focusAreaName ? (
+                                <Text
+                                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                  style={styles.upcomingShiftArea}
+                                >
+                                  {focusAreaName}
+                                </Text>
+                              ) : null}
                               {timeRange ? (
                                 <View style={styles.upcomingShiftTime}>
-                                  <Ionicons
-                                    color={mobileColors.textMuted}
-                                    name="time-outline"
-                                    size={14}
-                                  />
                                   <Text
                                     maxFontSizeMultiplier={MAX_FONT_SCALE}
                                     style={styles.upcomingShiftTimeText}
@@ -2628,34 +2878,26 @@ function UpcomingShiftsSection({
                                   </Text>
                                 </View>
                               ) : null}
+                              <PreviousShiftRow
+                                change={change}
+                                entry={item.entry}
+                                segment={item.segment}
+                              />
                             </View>
-                          ) : null}
-                          {focusAreaName ? (
-                            <Text
-                              maxFontSizeMultiplier={MAX_FONT_SCALE}
-                              style={styles.upcomingShiftArea}
-                            >
-                              {focusAreaName}
-                            </Text>
-                          ) : null}
-                          <MeTypePill
-                            chip={typeChip}
-                            compact
-                            isMentored={item.segment.isMentored === true}
-                          />
+                          </Pressable>
+                        </Fragment>
+                      );
+                    })}
+                    {group.deletedEntries.map((entry) => (
+                      <Fragment key={`${entry.employeeId}:${entry.date}`}>
+                        <UpcomingShiftDashedDivider />
+                        <View style={styles.upcomingDeletedHistoryRow}>
+                          <PreviousShiftRow change={entry.change} entry={entry} />
                         </View>
-
-                        <View style={styles.upcomingShiftAction}>
-                          <Ionicons
-                            color={mobileColors.textMuted}
-                            name="chevron-forward"
-                            size={22}
-                          />
-                        </View>
-                      </Pressable>
-                    </Fragment>
-                  );
-                })}
+                      </Fragment>
+                    ))}
+                  </>
+                )}
               </View>
             </View>
           );
@@ -3166,6 +3408,8 @@ function ShiftCoverRequestsSection({
                     ]}
                   >
                     <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
                       maxFontSizeMultiplier={MAX_FONT_SCALE}
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
@@ -3198,13 +3442,17 @@ function ShiftCoverRequestsSection({
                 </View>
               ) : null}
 
-              <View style={styles.requestActions}>
-                <Button
-                  disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                  label="Accept"
-                  loading={isAcceptLoading}
-                  onPress={() => onRespond(request.id, true)}
-                />
+              <ActionButtons
+                primaryAction={
+                  <Button
+                    disabled={Boolean(pendingAction) || !linkedEmployeeId}
+                    label="Accept"
+                    loading={isAcceptLoading}
+                    onPress={() => onRespond(request.id, true)}
+                  />
+                }
+                style={styles.requestActions}
+              >
                 <Button
                   disabled={Boolean(pendingAction) || !linkedEmployeeId}
                   label="Decline"
@@ -3212,7 +3460,7 @@ function ShiftCoverRequestsSection({
                   onPress={() => onRespond(request.id, false)}
                   tone="neutral"
                 />
-              </View>
+              </ActionButtons>
             </View>
           );
         })}
@@ -3239,10 +3487,11 @@ function TeamShiftMemberRow({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { entry, segment } = row;
   const avatarTone = getAvatarTone(entry.employeeId, isDark);
-  const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
+  const memberName = entry.employeeId === linkedEmployeeId ? "You" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
   const roleChip = getTeamMemberRoleChip(mobileColors, isDark, entry, segment);
+  const change = segment ? getScheduleEntrySegmentChange(entry, segment) : entry.change;
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -3263,6 +3512,8 @@ function TeamShiftMemberRow({
         ]}
       >
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
         >
@@ -3273,8 +3524,10 @@ function TeamShiftMemberRow({
         <View style={styles.teamMemberCopy}>
           <View style={styles.teamMemberNameRow}>
             <Text style={styles.teamMemberName}>{memberName}</Text>
+            <ShiftChangeBadge change={change} />
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
+          <PreviousShiftRow change={change} entry={entry} segment={segment} />
           {alternateShiftLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>
               <SplitShiftBadge

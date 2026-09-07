@@ -45,7 +45,8 @@ import {
 } from "@/features/reports/shared/table";
 
 type QuickRange = "current-week" | "pay-period" | "custom";
-type ReportTargetControl = "people" | "focusAreas" | "shiftCategories" | "jobs" | "dates";
+type ReportTargetControl =
+  "people" | "focusAreas" | "shiftCategories" | "jobs" | "indicators" | "dates";
 type ReportUiMetadata = {
   usesDateRange: boolean;
   targetControls: ReportTargetControl[];
@@ -76,11 +77,11 @@ const REPORT_UI_METADATA: Record<OperationsReportType, ReportUiMetadata> = {
   },
   "staff-hours": {
     usesDateRange: true,
-    targetControls: ["people", "focusAreas", "shiftCategories", "jobs"],
+    targetControls: ["people", "focusAreas", "shiftCategories", "jobs", "indicators"],
   },
   "staff-activity": {
     usesDateRange: true,
-    targetControls: ["people", "focusAreas", "shiftCategories", "jobs"],
+    targetControls: ["people", "focusAreas", "shiftCategories", "jobs", "indicators"],
   },
   "mentoring-hours": {
     usesDateRange: true,
@@ -120,7 +121,11 @@ const REPORT_UI_METADATA: Record<OperationsReportType, ReportUiMetadata> = {
   },
   "schedule-matrix": {
     usesDateRange: true,
-    targetControls: ["people", "focusAreas"],
+    targetControls: ["people", "focusAreas", "indicators"],
+  },
+  "shift-notes": {
+    usesDateRange: true,
+    targetControls: ["people", "focusAreas", "indicators", "dates"],
   },
 };
 
@@ -271,6 +276,7 @@ function serializeFilters(filters: OperationsReportFilters): string {
     focusAreaIds: [...(filters.focusAreaIds ?? [])].sort((left, right) => left - right),
     shiftCategoryIds: [...(filters.shiftCategoryIds ?? [])].sort((left, right) => left - right),
     jobIds: [...(filters.jobIds ?? [])].sort((left, right) => left - right),
+    indicatorTypeIds: [...(filters.indicatorTypeIds ?? [])].sort((left, right) => left - right),
     dates: [...(filters.dates ?? [])].sort(),
   });
 }
@@ -567,6 +573,10 @@ function ExportMenu({
         className="dg-btn dg-btn-primary"
         disabled={disabled}
         icon={<Upload size={16} />}
+        // Selecting a format closes the popover, so the spinner on the menu
+        // items below never gets to render. The trigger is what stays on
+        // screen for the export, so it carries the pending state.
+        loading={exportingFormat != null}
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
@@ -622,7 +632,7 @@ function ReportsContent() {
   });
   const hasReportsPermission =
     !permissions.isUserViewActive &&
-    (permissions.role === "admin" || permissions.isSuperAdmin === true);
+    (permissions.isSuperAdmin === true || permissions.canViewReports === true);
   const canAccessReports = hasReportsPermission && featureFlags.reports;
   const orgId = permissions.orgId ?? org?.id ?? null;
   const [report, setReport] = useState<OperationsReportType>("staff-hours");
@@ -633,6 +643,7 @@ function ReportsContent() {
   const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<number[]>([]);
   const [selectedShiftCategoryIds, setSelectedShiftCategoryIds] = useState<number[]>([]);
   const [selectedJobIds, setSelectedJobIds] = useState<number[]>([]);
+  const [selectedIndicatorTypeIds, setSelectedIndicatorTypeIds] = useState<number[]>([]);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [appliedRequest, setAppliedRequest] = useState<{
     range: OperationsReportRange;
@@ -645,6 +656,7 @@ function ReportsContent() {
   const showsFocusAreaTarget = reportMetadata.targetControls.includes("focusAreas");
   const showsShiftCategoryTarget = reportMetadata.targetControls.includes("shiftCategories");
   const showsJobTarget = reportMetadata.targetControls.includes("jobs");
+  const showsIndicatorTarget = reportMetadata.targetControls.includes("indicators");
   const showsDatesTarget = reportMetadata.targetControls.includes("dates");
   const reportFilters = useMemo<OperationsReportFilters>(
     () => ({
@@ -655,16 +667,22 @@ function ReportsContent() {
           ? selectedShiftCategoryIds
           : undefined,
       jobIds: showsJobTarget && selectedJobIds.length > 0 ? selectedJobIds : undefined,
+      indicatorTypeIds:
+        showsIndicatorTarget && selectedIndicatorTypeIds.length > 0
+          ? selectedIndicatorTypeIds
+          : undefined,
       dates: showsDatesTarget ? selectedDates : [],
     }),
     [
       selectedDates,
       selectedEmployeeIds,
       selectedFocusAreaIds,
+      selectedIndicatorTypeIds,
       selectedJobIds,
       selectedShiftCategoryIds,
       showsDatesTarget,
       showsFocusAreaTarget,
+      showsIndicatorTarget,
       showsJobTarget,
       showsPeopleTarget,
       showsShiftCategoryTarget,
@@ -681,7 +699,7 @@ function ReportsContent() {
   useEffect(() => {
     if (permissions.isLoading) return;
     if (!hasReportsPermission) {
-      toast.info("Reports are available to admins and super admins.");
+      toast.info("Reports aren't included in your permissions.");
       router.replace("/dashboard");
     } else if (!featureFlags.reports) {
       toast.info("Reports are unavailable right now. Try again in a moment.");
@@ -735,6 +753,9 @@ function ReportsContent() {
     }
     if (!nextMetadata.targetControls.includes("jobs")) {
       setSelectedJobIds([]);
+    }
+    if (!nextMetadata.targetControls.includes("indicators")) {
+      setSelectedIndicatorTypeIds([]);
     }
     if (!nextMetadata.targetControls.includes("dates")) {
       setSelectedDates([]);
@@ -795,6 +816,7 @@ function ReportsContent() {
   const focusAreaOptions = optionsPayload?.filterOptions.focusAreas ?? [];
   const shiftCategoryOptions = optionsPayload?.filterOptions.shiftCategories ?? [];
   const jobOptions = optionsPayload?.filterOptions.jobs ?? [];
+  const indicatorOptions = optionsPayload?.filterOptions.indicators ?? [];
   const dateOptions = optionsPayload?.filterOptions.dates ?? [];
   const visibleEmployeeOptions = useMemo(
     () =>
@@ -817,6 +839,10 @@ function ReportsContent() {
       : `${selectedShiftCategoryIds.length} selected`;
   const jobsSummary =
     selectedJobIds.length === 0 ? "All jobs" : `${selectedJobIds.length} selected`;
+  const indicatorSummary =
+    selectedIndicatorTypeIds.length === 0
+      ? "All indicators"
+      : `${selectedIndicatorTypeIds.length} selected`;
 
   if (permissions.isLoading || !canAccessReports) {
     return <ProgressBar loading />;
@@ -1143,6 +1169,44 @@ function ReportsContent() {
                 </div>
               </TargetDropdown>
             ) : null}
+            {showsIndicatorTarget ? (
+              <TargetDropdown
+                clearDisabled={selectedIndicatorTypeIds.length === 0}
+                onClear={() => {
+                  setSelectedIndicatorTypeIds([]);
+                  resetAppliedReport();
+                }}
+                summary={indicatorSummary}
+                title="Indicators"
+              >
+                <div style={targetListStyle}>
+                  {indicatorOptions.length === 0 ? (
+                    <div style={targetEmptyStyle}>No indicators</div>
+                  ) : (
+                    indicatorOptions.map((option) => {
+                      const id = Number(option.id);
+                      return (
+                        <label key={option.id} style={targetCheckStyle}>
+                          <input
+                            checked={selectedIndicatorTypeIds.includes(id)}
+                            onChange={(event) => {
+                              resetAppliedReport();
+                              setSelectedIndicatorTypeIds((current) =>
+                                event.target.checked
+                                  ? [...current, id]
+                                  : current.filter((value) => value !== id),
+                              );
+                            }}
+                            type="checkbox"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </TargetDropdown>
+            ) : null}
             {showsDatesTarget ? (
               <TargetDropdown
                 clearDisabled={selectedDates.length === 0}
@@ -1198,7 +1262,7 @@ function ReportsContent() {
             }}
           >
             {metrics.map((metric) => (
-              <div key={metric.label} style={metricStyle}>
+              <div key={metric.label} data-stat-card style={metricStyle}>
                 <div style={metricLabelStyle}>{metric.label}</div>
                 <div style={metricValueStyle}>{metric.value}</div>
               </div>

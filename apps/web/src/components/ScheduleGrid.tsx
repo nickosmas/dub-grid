@@ -33,6 +33,11 @@ import {
 } from "@/lib/schedule-logic";
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
+  CHIP_OVERHANG_PX,
+  STICKY_RELEASE_ROWS,
+  computeStickyReleaseInset,
+} from "@/lib/schedule-grid-sticky";
+import {
   Employee,
   GridCellId,
   ShiftCategory,
@@ -78,7 +83,12 @@ import {
   visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
-import { lightColorTokens, darkColorTokens, getAvatarTone } from "@dubgrid/design-tokens";
+import {
+  getAvatarTypography,
+  lightColorTokens,
+  darkColorTokens,
+  getAvatarTone,
+} from "@dubgrid/design-tokens";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import {
   buildShiftJobPairKey,
@@ -92,23 +102,20 @@ import {
   shouldUseShiftColorForDiffState,
   GridDiffBadge,
   MentoredShiftBadge,
-  MENTORED_CORNER_CLEARANCE,
   LOCK_CORNER_CLEARANCE,
-  REQUEST_FOLD_CLEARANCE,
   RequestCornerFold,
   NOTE_DOT_GAP,
   NOTE_DOT_SIZE,
-  noteDotsWidth,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
+import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import {
   getFocusAreaInitials,
   getCrossFocusBadgePalette,
   isOvernightTimes,
   getDraftBorder,
-  getPublishDiffBoxShadow,
-  getPublishDiffInsetRing,
+  getPublishDiffRing,
   joinBoxShadows,
   areGridCellIdsEqual,
   getGridCellKey,
@@ -117,6 +124,7 @@ import {
   cellShowsDraftDiffBadge,
   formatActiveRequestLabel,
   buildPublishTooltip,
+  formatPublishedMetadata,
   timeRangesFromCustomTimes,
   splitShiftLabelParts,
   assignmentIdsFromPublishState,
@@ -124,7 +132,6 @@ import {
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
   MULTI_SHIFT_PILL_RADIUS,
-  RAISED_DIFF_BADGE_TOP_INSET,
   SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
   MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
 } from "./schedule-grid/gridHelpers";
@@ -174,7 +181,7 @@ interface LegacyScheduleGridProps {
   isCellInteractive?: boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
   canDragShifts?: boolean;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
@@ -205,6 +212,10 @@ interface LegacyScheduleGridProps {
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  publishedMetadataForKey?: (
+    empId: string,
+    date: Date,
+  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
   /** Purely informational: who else currently has each cell open. Never blocks. */
   cellEditors?: Map<string, { userId: string; userName: string }>;
@@ -283,7 +294,7 @@ interface SectionBlockProps {
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
   canDragShifts?: boolean;
-  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
+  noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,
@@ -310,6 +321,10 @@ interface SectionBlockProps {
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
+  publishedMetadataForKey?: (
+    empId: string,
+    date: Date,
+  ) => { publishedAt: string; publishedBy: string; timeZone?: string | null } | null;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   /** Purely informational: who else currently has each cell open. Never blocks. */
@@ -467,6 +482,8 @@ function ShiftDetailHoverCard({
   indicators,
   requestLabel,
   status,
+  changeDetails,
+  publicationLabel,
   children,
 }: {
   enabled: boolean;
@@ -476,6 +493,9 @@ function ShiftDetailHoverCard({
   indicators: string[];
   requestLabel: string | null;
   status: string | null;
+  /** Per-cell change explanations, already scoped to the affected segment(s). */
+  changeDetails: string[];
+  publicationLabel: string | null;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
   >;
@@ -612,7 +632,11 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
-              {(indicators.length > 0 || requestLabel || status) && (
+              {(indicators.length > 0 ||
+                requestLabel ||
+                status ||
+                changeDetails.length > 0 ||
+                publicationLabel) && (
                 <div
                   style={{
                     paddingTop: 10,
@@ -624,9 +648,21 @@ function ShiftDetailHoverCard({
                     color: "var(--dg-color-text-muted)",
                   }}
                 >
-                  {indicators.length > 0 ? <div>Indicators: {indicators.join(", ")}</div> : null}
-                  {requestLabel ? <div>Request: {requestLabel}</div> : null}
-                  {status ? <div>Status: {status}</div> : null}
+                  {changeDetails.length === 0 && indicators.length > 0 ? (
+                    <div>Indicators: {indicators.join(", ")}</div>
+                  ) : null}
+                  {changeDetails.length === 0 && requestLabel ? (
+                    <div>Request: {requestLabel}</div>
+                  ) : null}
+                  {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
+                  {changeDetails.map((detail) => (
+                    <div key={detail} style={{ whiteSpace: "pre-line" }}>
+                      {detail}
+                    </div>
+                  ))}
+                  {changeDetails.length === 0 && publicationLabel ? (
+                    <div>{publicationLabel}</div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -661,7 +697,7 @@ const SectionBlock = memo(function SectionBlock({
   indicatorTypes,
   isCellInteractive,
   canDragShifts = isCellInteractive,
-  activeIndicatorIdsForKey,
+  noteMarksForKey,
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
@@ -671,6 +707,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
+  publishedMetadataForKey,
   certifications,
   orgRoles,
   cellEditors,
@@ -702,6 +739,11 @@ const SectionBlock = memo(function SectionBlock({
   const themeSurface = isDarkTheme ? darkColorTokens.surface : lightColorTokens.surface;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
+  const stickyGroupRef = useRef<HTMLDivElement>(null);
+  const headerScrollerRef = useRef<HTMLDivElement>(null);
+  const cardBodyRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [activeOutlineRect, setActiveOutlineRect] = useState<ActiveOutlineRect | null>(null);
@@ -738,6 +780,99 @@ const SectionBlock = memo(function SectionBlock({
       ro.disconnect();
     };
   }, [fitToContainer, updateScrollButtons, weekDates.length, employees.length]);
+
+  // The date row sits in its own scroller above the card body so the sticky
+  // group can pin against the page; mirror the body's horizontal position.
+  useEffect(() => {
+    const body = scrollContainerRef.current;
+    const header = headerScrollerRef.current;
+    if (!body || !header || fitToContainer) return;
+    const sync = () => {
+      header.scrollLeft = body.scrollLeft;
+    };
+    sync();
+    body.addEventListener("scroll", sync, { passive: true });
+    return () => body.removeEventListener("scroll", sync);
+  }, [fitToContainer, weekDates.length]);
+
+  // Everything the sticky group needs beyond CSS is discrete state measured when
+  // layout changes, never per scroll frame: the header grid's width, the early
+  // release inset, and whether the group is currently stuck (it must layer above
+  // the rows only then, so the first row's chip can still hang over it at rest).
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const group = stickyGroupRef.current;
+    const sentinel = stickySentinelRef.current;
+    const cardBody = cardBodyRef.current;
+    const gridEl = gridRef.current;
+    if (!section || !group || !sentinel || !cardBody || !gridEl) return;
+    if (typeof ResizeObserver === "undefined" || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const readPx = (styles: CSSStyleDeclaration, name: string) => {
+      const value = Number.parseFloat(styles.getPropertyValue(name));
+      return Number.isFinite(value) ? value : 0;
+    };
+
+    const measure = () => {
+      group.style.setProperty("--dg-grid-body-width", `${gridEl.getBoundingClientRect().width}px`);
+      section.style.setProperty(
+        "--dg-grid-sticky-height",
+        `${group.getBoundingClientRect().height}px`,
+      );
+      const releaseRow = gridEl.querySelector<HTMLElement>('[data-sticky-release="true"]');
+      const inset = computeStickyReleaseInset({
+        cardBottom: cardBody.getBoundingClientRect().bottom,
+        releaseRowTop: releaseRow ? releaseRow.getBoundingClientRect().top : null,
+      });
+      section.style.setProperty("--dg-grid-release-inset", `${inset}px`);
+    };
+
+    let stickyTop = -1;
+    let stuckObserver: IntersectionObserver | null = null;
+    const watchStuck = () => {
+      const styles = window.getComputedStyle(group);
+      const next =
+        readPx(styles, "--dg-app-shell-header-height") +
+        readPx(styles, "--dg-schedule-chrome-height");
+      if (next === stickyTop) return;
+      stickyTop = next;
+      stuckObserver?.disconnect();
+      // The sentinel marks the group's resting position. The observed root
+      // runs from the sticky line down without limit, so the sentinel counts
+      // as intersecting anywhere below the line, including off-screen. That
+      // makes every crossing of the line a state change; with a viewport-sized
+      // root, a fast fling or a jump could carry the sentinel from below to
+      // above the root in one frame and never fire at all.
+      stuckObserver = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) delete group.dataset.stuck;
+          else group.dataset.stuck = "true";
+        },
+        { rootMargin: `-${stickyTop}px 0px 100000px 0px`, threshold: 0 },
+      );
+      stuckObserver.observe(sentinel);
+    };
+
+    measure();
+    watchStuck();
+    const gridObserver = new ResizeObserver(measure);
+    gridObserver.observe(gridEl);
+    // A banner opening above the grid changes the sticky line without touching
+    // the grid itself.
+    const chromeObserver = new ResizeObserver(watchStuck);
+    chromeObserver.observe(document.body);
+    return () => {
+      gridObserver.disconnect();
+      chromeObserver.disconnect();
+      stuckObserver?.disconnect();
+      group.style.removeProperty("--dg-grid-body-width");
+      section.style.removeProperty("--dg-grid-sticky-height");
+      section.style.removeProperty("--dg-grid-release-inset");
+      delete group.dataset.stuck;
+    };
+  }, [employees.length, weekDates.length, fitToContainer]);
 
   useLayoutEffect(() => {
     const gridEl = gridRef.current;
@@ -838,6 +973,16 @@ const SectionBlock = memo(function SectionBlock({
   }, [historicalAssignments, assignments]);
   const assignmentIdByPair = useMemo(
     () => createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments]),
+    [historicalAssignments, assignments],
+  );
+  // A published snapshot may refer to an assignment that has since been
+  // archived. Current scheduling must ignore it, but history must still be
+  // able to name it in a `Was …` explanation.
+  const publishedAssignmentIdByPair = useMemo(
+    () =>
+      createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments], {
+        includeArchived: true,
+      }),
     [historicalAssignments, assignments],
   );
 
@@ -1083,97 +1228,255 @@ const SectionBlock = memo(function SectionBlock({
     gridTemplateColumns: "subgrid",
   };
 
+  // A section this short lands on row 0, so its date row never pins. That is
+  // the right outcome: there is nothing to scroll past.
+  const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
+
   return (
-    <div style={{ marginBottom: 24, marginTop: 8 }}>
-      {/* Section label */}
-      <div
-        style={{
-          fontSize: "var(--dg-fs-section-title)",
-          fontWeight: 600,
-          color: "var(--dg-color-text-primary)",
-          marginBottom: 10,
-          padding: "2px 0",
-        }}
-      >
-        {sectionName}
+    <div
+      ref={sectionRef}
+      // The grid role lives here so the sticky header rowgroup and the body
+      // rowgroup share one owner; the wrappers between are transparent.
+      role="grid"
+      aria-label={`${sectionName} schedule grid`}
+      style={{
+        marginBottom: 24,
+        marginTop: 8,
+        // The label and date row form a native sticky group whose containing
+        // block is this wrapper. A sticky element is confined to its containing
+        // block's content box, so padding the wrapper by the height of the last
+        // rows (and pulling the card body back up by the same amount, so
+        // nothing moves) releases the group that early.
+        paddingBottom: "var(--dg-grid-release-inset, 0px)",
+      }}
+    >
+      {/* Marks the group's resting position for the stuck-state observer. */}
+      <div ref={stickySentinelRef} aria-hidden="true" style={{ height: 1, marginBottom: -1 }} />
+      <div ref={stickyGroupRef} className="dg-grid-sticky-group">
+        {/* Section label. Its gap down to the card is padding, not margin, so
+            rows cannot scroll through the space while the group is stuck. */}
+        <div
+          className="dg-grid-section-label"
+          style={{
+            fontSize: "var(--dg-fs-section-title)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+            padding: "2px 0 12px",
+          }}
+        >
+          {sectionName}
+        </div>
+
+        {/* Header cap: the top of the card, carrying the date row. */}
+        <div
+          style={{
+            position: "relative",
+            background: "var(--dg-color-surface)",
+            borderRadius: "var(--dg-radius-md) var(--dg-radius-md) 0 0",
+            border: "1px solid var(--dg-color-border)",
+            borderBottom: 0,
+            overflow: "clip",
+            // A change chip hangs above its row. Overlap the body's matching
+            // top padding so the first row's chip has room to paint over this
+            // cap while the group is at rest.
+            marginBottom: -CHIP_OVERHANG_PX,
+          }}
+        >
+          {!fitToContainer && canScrollRight && (
+            <Button
+              type="button"
+              onClick={() => scrollDays("right")}
+              aria-label={`Scroll ${sectionName} schedule right`}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid var(--dg-color-brand)",
+                background: "var(--dg-color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              More days
+              <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
+            </Button>
+          )}
+          {!fitToContainer && canScrollLeft && (
+            <Button
+              type="button"
+              onClick={() => scrollDays("left")}
+              aria-label={`Scroll ${sectionName} schedule left`}
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                zIndex: 6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid var(--dg-color-brand)",
+                background: "var(--dg-color-brand)",
+                color: "var(--dg-color-text-inverse)",
+                boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
+              Earlier days
+            </Button>
+          )}
+          <div ref={headerScrollerRef} style={{ overflow: "hidden" }}>
+            <div
+              role="rowgroup"
+              style={{
+                display: "grid",
+                gridTemplateColumns: gridTemplate,
+                // Same total width as the body grid, so its equal fr tracks
+                // resolve to identical columns.
+                width: "var(--dg-grid-body-width, 100%)",
+              }}
+            >
+              <div role="row" className="dg-grid-header-row" style={rowGrid}>
+                <div
+                  role="columnheader"
+                  style={{
+                    position: "sticky",
+                    left: 0,
+                    // Frozen name column: above all scrolling day cells (max 8).
+                    zIndex: 10,
+                    background: "var(--dg-color-bg)",
+                    padding: "10px var(--dg-space-md)",
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--dg-color-text-subtle)",
+                    letterSpacing: "0.04em",
+                    // The bottom divider is a background-image, not a box-shadow
+                    // line, because Chromium clips box-shadow/border decorations
+                    // on position:sticky elements at sub-100% browser zoom (see
+                    // the same fix on the Open Shifts label cell below).
+                    backgroundImage:
+                      "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
+                    backgroundPosition: "0 100%",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: "100% 1px",
+                    boxShadow: joinBoxShadows(
+                      "1px 0 0 0 var(--dg-color-border-light)",
+                      "2px 0 4px rgba(0,0,0,0.02)",
+                    ),
+                  }}
+                >
+                  Staff
+                </div>
+                {weekDates.map((date, index) => {
+                  const key = formatDateKey(date);
+                  const isToday = key === todayKey;
+                  return (
+                    <div
+                      key={key}
+                      role="columnheader"
+                      className="dg-grid-slot dg-grid-slot--header"
+                      data-leading-divider={
+                        index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
+                      }
+                      data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
+                      data-today={isToday ? "true" : undefined}
+                      style={{
+                        position: "relative",
+                        zIndex: 2,
+                        textAlign: "center",
+                        padding: "8px 0",
+                        // background-image (not box-shadow) so this lines up
+                        // exactly with the Staff cell's bottom divider — a
+                        // "0 1px 0 0" box-shadow draws 1px below the box's own
+                        // edge, while this draws flush at it, so mixing the two
+                        // techniques put them a pixel apart vertically.
+                        backgroundImage:
+                          "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
+                        backgroundPosition: "0 100%",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "100% 1px",
+                      }}
+                    >
+                      <div className="dg-grid-slot__chrome" aria-hidden="true" />
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: isToday
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-subtle)",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {DAY_LABELS[date.getDay()]}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-title)",
+                          fontWeight: 700,
+                          color: isToday
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-secondary)",
+                          lineHeight: "var(--dg-lh-tight)",
+                          marginTop: 1,
+                        }}
+                      >
+                        {date.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div
+        ref={cardBodyRef}
         style={{
-          position: "relative",
           background: "var(--dg-color-surface)",
-          borderRadius: "var(--dg-radius-md)",
+          borderRadius: "0 0 var(--dg-radius-md) var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
-          overflow: "hidden",
+          borderTop: 0,
+          // Change chips intentionally cross the top edge of a shift pill.
+          // The card cannot clip that layer; horizontal clipping belongs only
+          // to the scrollable narrow-grid path below.
+          overflow: fitToContainer ? "visible" : "clip",
           boxShadow: BOX_SHADOW_CARD,
+          marginBottom: "calc(-1 * var(--dg-grid-release-inset, 0px))",
         }}
       >
-        {!fitToContainer && canScrollRight && (
-          <Button
-            type="button"
-            onClick={() => scrollDays("right")}
-            aria-label={`Scroll ${sectionName} schedule right`}
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              zIndex: 6,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 10px",
-              borderRadius: 999,
-              border: "1px solid var(--dg-color-brand)",
-              background: "var(--dg-color-brand)",
-              color: "var(--dg-color-text-inverse)",
-              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            More days
-            <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" />
-          </Button>
-        )}
-        {!fitToContainer && canScrollLeft && (
-          <Button
-            type="button"
-            onClick={() => scrollDays("left")}
-            aria-label={`Scroll ${sectionName} schedule left`}
-            style={{
-              position: "absolute",
-              top: 12,
-              left: 12,
-              zIndex: 6,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 10px",
-              borderRadius: 999,
-              border: "1px solid var(--dg-color-brand)",
-              background: "var(--dg-color-brand)",
-              color: "var(--dg-color-text-inverse)",
-              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            <ChevronLeft size={12} strokeWidth={2.5} aria-hidden="true" />
-            Earlier days
-          </Button>
-        )}
         <div
           ref={scrollContainerRef}
           style={{
-            overflowX: fitToContainer ? "hidden" : "auto",
+            // `overflow-x: hidden` also creates a vertical clipping context in
+            // Chromium. At the fitted desktop width there is nothing to scroll,
+            // so leave both axes visible and let the edge-overlaid chips paint
+            // above the preceding row. The narrow scrollable grid still clips
+            // horizontally as before.
+            overflowX: fitToContainer ? "visible" : "auto",
+            overflowY: fitToContainer ? "visible" : "hidden",
+            // Room for the first row's chip; the header cap overlaps it.
+            paddingTop: CHIP_OVERHANG_PX,
           }}
         >
           <div
             ref={gridRef}
-            role="grid"
-            aria-label={`${sectionName} schedule grid`}
+            role="rowgroup"
             style={{
               position: "relative",
               // Own stacking context so cell z-indexes (incl. diff tint) stay
@@ -1185,99 +1488,6 @@ const SectionBlock = memo(function SectionBlock({
               width: fitToContainer ? "100%" : undefined,
             }}
           >
-            {/* Header row */}
-            <div role="row" style={rowGrid}>
-              <div
-                role="columnheader"
-                style={{
-                  position: "sticky",
-                  left: 0,
-                  // Frozen name column: above all scrolling day cells (max 8).
-                  zIndex: 10,
-                  background: "var(--dg-color-bg)",
-                  padding: "10px var(--dg-space-md)",
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-subtle)",
-                  letterSpacing: "0.04em",
-                  // The bottom divider is a background-image, not a box-shadow
-                  // line, because Chromium clips box-shadow/border decorations
-                  // on position:sticky elements at sub-100% browser zoom (see
-                  // the same fix on the Open Shifts label cell below).
-                  backgroundImage:
-                    "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
-                  backgroundPosition: "0 100%",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "100% 1px",
-                  boxShadow: joinBoxShadows(
-                    "1px 0 0 0 var(--dg-color-border-light)",
-                    "2px 0 4px rgba(0,0,0,0.02)",
-                  ),
-                }}
-              >
-                Staff
-              </div>
-              {weekDates.map((date, index) => {
-                const key = formatDateKey(date);
-                const isToday = key === todayKey;
-                return (
-                  <div
-                    key={key}
-                    role="columnheader"
-                    className="dg-grid-slot dg-grid-slot--header"
-                    data-leading-divider={
-                      index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
-                    }
-                    data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
-                    data-today={isToday ? "true" : undefined}
-                    style={{
-                      position: "relative",
-                      zIndex: 2,
-                      textAlign: "center",
-                      padding: "8px 0",
-                      // background-image (not box-shadow) so this lines up
-                      // exactly with the Staff cell's bottom divider — a
-                      // "0 1px 0 0" box-shadow draws 1px below the box's own
-                      // edge, while this draws flush at it, so mixing the two
-                      // techniques put them a pixel apart vertically.
-                      backgroundImage:
-                        "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
-                      backgroundPosition: "0 100%",
-                      backgroundRepeat: "no-repeat",
-                      backgroundSize: "100% 1px",
-                    }}
-                  >
-                    <div className="dg-grid-slot__chrome" aria-hidden="true" />
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 600,
-                        color: isToday
-                          ? "var(--dg-color-today-text)"
-                          : "var(--dg-color-text-subtle)",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      {DAY_LABELS[date.getDay()]}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-title)",
-                        fontWeight: 700,
-                        color: isToday
-                          ? "var(--dg-color-today-text)"
-                          : "var(--dg-color-text-secondary)",
-                        lineHeight: "var(--dg-lh-tight)",
-                        marginTop: 1,
-                      }}
-                    >
-                      {date.getDate()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
             {/* Open shifts row */}
             {openShifts && openShifts.length > 0 && (
               <div
@@ -1529,12 +1739,24 @@ const SectionBlock = memo(function SectionBlock({
                   role="row"
                   className="dg-row-enter"
                   data-search-highlight={hasHighlightedSearch && isHighlighted ? "true" : undefined}
+                  // Where the pinned date row starts sliding away, so the last
+                  // staff rows and the tallies below them are never covered.
+                  data-sticky-release={ri === releaseRowIndex ? "true" : undefined}
                   style={{
                     ...rowGrid,
+                    // A chip deliberately hangs into the row above its shift
+                    // card. Give the whole staff row a layer above header and
+                    // open-shift cells; a child z-index cannot escape a lower
+                    // grid-item stacking context on its own.
+                    position: "relative",
+                    zIndex: 4,
                     background: rowBg,
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
+                    // Keep a searched-to row clear of the sticky label and date row.
+                    scrollMarginTop:
+                      "calc(var(--dg-app-shell-header-height, 56px) + var(--dg-schedule-chrome-height, 0px) + var(--dg-grid-sticky-height, 80px))",
                   }}
                 >
                   {/* Name cell */}
@@ -1650,14 +1872,28 @@ const SectionBlock = memo(function SectionBlock({
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                       const fromRecurring = fromRecurringForKey?.(emp.id, date) ?? false;
                       const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
+                      const publishedMetadata =
+                        publishedMetadataForKey?.(emp.id, date) ??
+                        (publishDiff
+                          ? {
+                              publishedAt: publishDiff.publishedAt,
+                              publishedBy: publishDiff.publishedBy,
+                            }
+                          : null);
+                      const publicationLabel = publishedMetadata
+                        ? formatPublishedMetadata({
+                            ...publishedMetadata,
+                            resolvePublisherName,
+                          })
+                        : null;
+                      const publicationTimeZone = publishedMetadata?.timeZone ?? null;
                       const showsPublishDiff = !!(showPublishDiffOverlay && publishDiff);
                       const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                       const publishedCodeIds = publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
                       const publishedSegments = publishedSegmentsForKey?.(emp.id, date) ?? [];
                       const publishedCustomTimes =
                         getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
-                      const noteTypes =
-                        activeIndicatorIdsForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
+                      const noteMarks = noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
                       const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
                       const cellEditor = cellEditors?.get(cellKey);
                       const hasPeerEditor = !!cellEditor;
@@ -1744,7 +1980,14 @@ const SectionBlock = memo(function SectionBlock({
                             };
                           });
                       const hoverIndicatorNames = indicatorTypes
-                        .filter((indicator) => noteTypes.includes(indicator.id))
+                        .filter((indicator) =>
+                          noteMarks.some(
+                            (mark) =>
+                              mark.indicatorTypeId === indicator.id &&
+                              mark.state !== "draft_removed" &&
+                              mark.state !== "published_removed",
+                          ),
+                        )
                         .map((indicator) => indicator.name);
                       const hoverStatus = draftKind
                         ? draftKind === "new"
@@ -1959,21 +2202,45 @@ const SectionBlock = memo(function SectionBlock({
                                   const labels = cellAbsenceType
                                     ? [shiftLabel]
                                     : shiftLabel.split("/");
-                                  const isPubDiff = showsPublishDiff ? publishDiff : null;
+                                  // A first publication is the baseline. The
+                                  // page client normally filters it already,
+                                  // but keep the grid safe for direct callers
+                                  // and historical test fixtures as well.
+                                  const isMeaningfulPublishNew =
+                                    publishDiff?.kind !== "new" ||
+                                    publishDiff.isNewAddition !== false;
+                                  const isPubDiff =
+                                    showsPublishDiff && isMeaningfulPublishNew ? publishDiff : null;
                                   const publishFrom =
                                     publishDiff?.from ??
                                     assignmentIdsFromPublishState(
                                       publishDiff?.fromState,
-                                      assignmentIdByPair,
+                                      publishedAssignmentIdByPair,
                                     );
                                   const publishTo =
                                     publishDiff?.to ??
                                     assignmentIdsFromPublishState(
                                       publishDiff?.toState,
-                                      assignmentIdByPair,
+                                      publishedAssignmentIdByPair,
                                     );
                                   const currentShiftLabels = splitShiftLabelParts(shiftLabel);
                                   const publishedShiftLabels = splitShiftLabelParts(publishedLabel);
+                                  // Persisted segment snapshots carry stable IDs, not presentation
+                                  // labels. Treat an absent label as absent — passing `?` here masks
+                                  // the current/published label fallback and produced `Added ?`.
+                                  const snapshotLabels = (
+                                    segments: PublishChange["fromSegments"],
+                                  ): Array<string | null> | undefined => {
+                                    const labels = segments?.map((segment) => {
+                                      const label = (segment as { label?: unknown }).label;
+                                      return typeof label === "string" && label.trim()
+                                        ? label
+                                        : null;
+                                    });
+                                    return labels?.some((label) => label != null)
+                                      ? labels
+                                      : undefined;
+                                  };
                                   const resolveGridShiftLabel = (assignmentId: number) => {
                                     const assignmentEntry = assignmentById.get(assignmentId);
                                     if (!assignmentEntry) return "?";
@@ -1988,6 +2255,43 @@ const SectionBlock = memo(function SectionBlock({
                                       ? absenceType.name || absenceType.label
                                       : absenceType.label;
                                   };
+                                  // History is explanatory, not compact grid chrome. Always spell
+                                  // out both the shift and job so `Was …` remains meaningful when
+                                  // the grid is configured to show short codes.
+                                  const resolveHistoryShiftLabel = (assignmentId: number) => {
+                                    const assignmentEntry = assignmentById.get(assignmentId);
+                                    if (!assignmentEntry) return "?";
+                                    const category =
+                                      assignmentEntry.categoryId != null
+                                        ? categoryById.get(assignmentEntry.categoryId)
+                                        : null;
+                                    const job =
+                                      assignmentEntry.jobId != null
+                                        ? jobById.get(assignmentEntry.jobId)
+                                        : null;
+                                    const isGeneral =
+                                      assignmentEntry.isGeneral === true ||
+                                      (assignmentEntry.focusAreaId == null &&
+                                        assignmentEntry.shiftId == null &&
+                                        assignmentEntry.categoryId == null);
+                                    const shiftName = isGeneral
+                                      ? (job?.name ?? assignmentEntry.name ?? assignmentEntry.label)
+                                      : (assignmentEntry.name ??
+                                        category?.name ??
+                                        assignmentEntry.label);
+                                    const shiftNameAlreadyIncludesJob =
+                                      !!job?.name &&
+                                      shiftName
+                                        .toLocaleLowerCase()
+                                        .includes(job.name.toLocaleLowerCase());
+                                    return !isGeneral && job?.name && !shiftNameAlreadyIncludesJob
+                                      ? `${shiftName} · ${job.name}`
+                                      : shiftName;
+                                  };
+                                  const currentHistoryLabels =
+                                    cellCodeIds.map(resolveHistoryShiftLabel);
+                                  const publishedHistoryLabels =
+                                    publishFrom.map(resolveHistoryShiftLabel);
                                   const draftDiff = shouldComputeDraftDiff
                                     ? buildShiftDiffDescriptors({
                                         before: {
@@ -2044,20 +2348,26 @@ const SectionBlock = memo(function SectionBlock({
                                             publishTo.length,
                                           ),
                                         },
-                                        beforeShiftLabels: publishDiff?.fromSegments?.map(
-                                          (segment) => segment.label ?? "?",
-                                        ),
+                                        beforeShiftLabels:
+                                          snapshotLabels(publishDiff?.fromSegments) ??
+                                          publishedHistoryLabels ??
+                                          publishedShiftLabels,
                                         afterShiftLabels:
-                                          publishDiff?.toSegments?.map(
-                                            (segment) => segment.label ?? "?",
-                                          ) ?? currentShiftLabels,
-                                        resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
-                                        resolveAbsenceLabel: resolveGridAbsenceLabel,
+                                          snapshotLabels(publishDiff?.toSegments) ??
+                                          currentHistoryLabels ??
+                                          currentShiftLabels,
+                                        resolveAssignmentDefinitionLabel: resolveHistoryShiftLabel,
+                                        resolveAbsenceLabel: (absenceTypeId) =>
+                                          absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
                                       })
                                     : null;
 
                                   const publishCellBadge = isPubDiff
-                                    ? cellLevelDiffBadge(publishDiffSummary)
+                                    ? (cellLevelDiffBadge(publishDiffSummary) ??
+                                      (publishDiffSummary?.cellBadge?.kind === "new" &&
+                                      publishDiff?.isNewAddition !== false
+                                        ? publishDiffSummary.cellBadge
+                                        : null))
                                     : null;
                                   const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
                                     ? {
@@ -2068,6 +2378,7 @@ const SectionBlock = memo(function SectionBlock({
                                           publishDiff: publishDiff!,
                                           resolvePublisherName,
                                           detail: publishCellBadge.detail,
+                                          timeZone: publicationTimeZone,
                                         }),
                                       }
                                     : null;
@@ -2109,7 +2420,9 @@ const SectionBlock = memo(function SectionBlock({
                                     const { source, descriptor } = args;
                                     if (
                                       !descriptor ||
-                                      (descriptor.kind === "new" && descriptor.text === "New")
+                                      (descriptor.kind === "new" &&
+                                        (source === "draft" ||
+                                          publishDiff?.isNewAddition === false))
                                     ) {
                                       return null;
                                     }
@@ -2124,6 +2437,7 @@ const SectionBlock = memo(function SectionBlock({
                                               publishDiff,
                                               resolvePublisherName,
                                               detail: descriptor.detail,
+                                              timeZone: publicationTimeZone,
                                             })
                                           : descriptor.detail,
                                     };
@@ -2210,32 +2524,51 @@ const SectionBlock = memo(function SectionBlock({
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)
                                       : absenceBorder;
                                     const singlePillBadge =
-                                      (showsDraftBadge && draftBadge == null
+                                      (showsDraftBadge &&
+                                      (draftBadge == null || draftBadge.text === "Changed")
                                         ? buildPillBadge({
                                             source: "draft",
                                             descriptor: draftDiff?.pillDiffs[0]?.badge,
                                           })
                                         : null) ??
-                                      (publishBadge == null
+                                      (publishBadge == null || publishBadge.text === "Changed"
                                         ? buildPillBadge({
                                             source: "publish",
                                             descriptor: publishDiffSummary?.pillDiffs[0]?.badge,
                                           })
                                         : null);
-                                    const singleHasRaisedDiffBadge = !!(
+                                    // A cell-level badge is still rendered inside this card (for
+                                    // example, when the second segment of a former double shift
+                                    // was removed). It must be treated as a foreground overlay too;
+                                    // otherwise the card's own `overflow: hidden` cuts the chip in
+                                    // half at exactly the top edge it is meant to straddle.
+                                    const singleHasChangeBadge = !!(
                                       singlePillBadge ||
                                       draftBadge ||
                                       publishBadge
                                     );
-                                    const singleTopInset = singleHasRaisedDiffBadge
-                                      ? RAISED_DIFF_BADGE_TOP_INSET
-                                      : customTimes
-                                        ? 3
-                                        : 4;
+                                    const singleHoverChangeDetails = Array.from(
+                                      new Set(
+                                        [
+                                          singlePillBadge?.tooltip,
+                                          draftBadge?.tooltip,
+                                          publishBadge?.tooltip,
+                                        ].filter((detail): detail is string => !!detail),
+                                      ),
+                                    );
+                                    // A change chip is an overlay, never a
+                                    // layout reservation: active pills keep
+                                    // their normal height and vertical origin.
+                                    const singleTopInset = customTimes ? 3 : 4;
                                     const singleSideInset = 4;
                                     const singleBottomInset = customTimes ? 3 : 4;
                                     const singleCrossFocusPill =
                                       isCross && crossHomeFa ? crossHomeFa : null;
+                                    // The focus wing sits inside the pill's border, so its curve
+                                    // uses the inner radius. Matching the outer radius left a
+                                    // hairline wedge of the pill showing at each corner.
+                                    const singleCrossFocusWingRadius =
+                                      SINGLE_SHIFT_PILL_RADIUS - (singleDraftBorderKind ? 2 : 1);
                                     const singleCrossFocusPalette = getCrossFocusBadgePalette({
                                       color: effectiveColor,
                                       text: effectiveText,
@@ -2280,6 +2613,8 @@ const SectionBlock = memo(function SectionBlock({
                                           indicators={hoverIndicatorNames}
                                           requestLabel={activeRequestLabel}
                                           status={hoverStatus}
+                                          changeDetails={singleHoverChangeDetails}
+                                          publicationLabel={publicationLabel}
                                         >
                                           <div
                                             data-shift-pill="single"
@@ -2296,10 +2631,11 @@ const SectionBlock = memo(function SectionBlock({
                                               border: effectiveBorder,
                                               borderRadius: SINGLE_SHIFT_PILL_RADIUS,
                                               color: singleForegroundColor,
+                                              zIndex: singleHasChangeBadge ? 2 : 1,
                                               boxShadow:
                                                 singlePublishRingKind === "new" ||
                                                 singlePublishRingKind === "modified"
-                                                  ? getPublishDiffBoxShadow(
+                                                  ? getPublishDiffRing(
                                                       singlePublishRingKind,
                                                       borderColor(singleForegroundColor),
                                                     )
@@ -2317,7 +2653,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   ? 6
                                                   : 3,
                                               paddingRight: isNameMode ? 6 : 3,
-                                              overflow: singlePillBadge ? "visible" : "hidden",
+                                              overflow: singleHasChangeBadge ? "visible" : "hidden",
                                               textDecoration:
                                                 draftKind === "deleted" ? "line-through" : "none",
                                             }}
@@ -2332,10 +2668,13 @@ const SectionBlock = memo(function SectionBlock({
                                               <GridDiffBadge
                                                 badge={{
                                                   ...singlePillBadge,
-                                                  topOffset: -8,
-                                                  leftOffset: activeRequest
-                                                    ? REQUEST_FOLD_CLEARANCE
-                                                    : 4,
+                                                  // Every status chip overlaps the same top-left
+                                                  // pill edge. It is a paint-only overlay: the
+                                                  // active pill remains in its normal grid slot.
+                                                  topOffset: 0,
+                                                  leftOffset: 4,
+                                                  overlapPillEdge: true,
+                                                  showChangeTooltip: !showShiftDetailHoverCards,
                                                 }}
                                               />
                                             )}
@@ -2343,13 +2682,11 @@ const SectionBlock = memo(function SectionBlock({
                                               <span
                                                 style={{
                                                   position: "absolute",
-                                                  // Yields its top corner to a
-                                                  // left-anchored badge, which
-                                                  // hangs 8px into the pill. The
-                                                  // initials stay centred in what
-                                                  // is left, so the overlap reads
-                                                  // as layering, not clipping.
-                                                  top: singlePillBadge ? 8 : 0,
+                                                  // The focus wing is part of the
+                                                  // pill, not a smaller chip. It
+                                                  // keeps the parent corner curve
+                                                  // while a change badge overlaps it.
+                                                  top: 0,
                                                   bottom: 0,
                                                   left: 0,
                                                   display: "flex",
@@ -2359,9 +2696,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   lineHeight: 1,
                                                   background: singleCrossFocusPalette.background,
                                                   color: singleCrossFocusPalette.color,
-                                                  borderRadius: singlePillBadge
-                                                    ? "0 0 0 2px"
-                                                    : "2px 0 0 2px",
+                                                  borderRadius: `${singleCrossFocusWingRadius}px 0 0 ${singleCrossFocusWingRadius}px`,
                                                   padding: "0 3px",
                                                   letterSpacing: "0.02em",
                                                   pointerEvents: "none",
@@ -2373,6 +2708,7 @@ const SectionBlock = memo(function SectionBlock({
                                             {singleIsMentored && (
                                               <MentoredShiftBadge
                                                 rightInset={cornerLockClearance || undefined}
+                                                topInset={singlePillBadge ? 19 : undefined}
                                               />
                                             )}
                                             <div
@@ -2507,52 +2843,22 @@ const SectionBlock = memo(function SectionBlock({
                                                 )}
                                               </span>
                                             )}
-                                            {noteTypes.length > 0 && (
-                                              <div
-                                                style={{
-                                                  position: "absolute",
-                                                  bottom: shouldShowAuthorName ? 18 : 3,
-                                                  right: 4,
-                                                  display: "flex",
-                                                  gap: 2,
-                                                }}
-                                              >
-                                                {indicatorTypes
-                                                  .filter((ind) => noteTypes.includes(ind.id))
-                                                  .map((ind) => (
-                                                    <MaybeHint
-                                                      key={ind.name}
-                                                      content={ind.name}
-                                                      side="top"
-                                                    >
-                                                      <div
-                                                        style={{
-                                                          width: 10,
-                                                          height: 10,
-                                                          borderRadius: "50%",
-                                                          background: ind.color,
-                                                          border:
-                                                            "1.5px solid rgba(255,255,255,0.9)",
-                                                          flexShrink: 0,
-                                                        }}
-                                                      />
-                                                    </MaybeHint>
-                                                  ))}
-                                              </div>
-                                            )}
+                                            <NoteDots
+                                              marks={noteMarks}
+                                              indicatorTypes={indicatorTypes}
+                                              style={{
+                                                bottom: shouldShowAuthorName ? 18 : 3,
+                                                right: 4,
+                                              }}
+                                            />
                                             {(draftBadge || publishBadge) && (
                                               <GridDiffBadge
                                                 badge={{
                                                   ...(draftBadge ?? publishBadge!),
-                                                  topOffset: -8,
-                                                  // Past the lock avatar first,
-                                                  // then past the "M" that has
-                                                  // itself been pushed past it.
-                                                  rightOffset:
-                                                    cornerLockClearance +
-                                                    (singleIsMentored
-                                                      ? MENTORED_CORNER_CLEARANCE
-                                                      : 4),
+                                                  topOffset: 0,
+                                                  leftOffset: 4,
+                                                  overlapPillEdge: true,
+                                                  showChangeTooltip: !showShiftDetailHoverCards,
                                                 }}
                                               />
                                             )}
@@ -2562,7 +2868,7 @@ const SectionBlock = memo(function SectionBlock({
                                           <AuthorBadge
                                             name={auditName}
                                             leftInset={singleAuthorLeftInset}
-                                            rightInset={noteTypes.length > 0 ? 21 : 5}
+                                            rightInset={noteMarks.length > 0 ? 21 : 5}
                                             bottomInset={singleAuthorBottomInset}
                                           />
                                         )}
@@ -2576,13 +2882,14 @@ const SectionBlock = memo(function SectionBlock({
                                   // the cell, where neighbouring rows could cover it.
                                   const multiPillBadges = labels.map(
                                     (_, labelIndex) =>
-                                      (showsDraftBadge && draftBadge == null
+                                      (showsDraftBadge &&
+                                      (draftBadge == null || draftBadge.text === "Changed")
                                         ? buildPillBadge({
                                             source: "draft",
                                             descriptor: draftDiff?.pillDiffs[labelIndex]?.badge,
                                           })
                                         : null) ??
-                                      (publishBadge == null
+                                      (publishBadge == null || publishBadge.text === "Changed"
                                         ? buildPillBadge({
                                             source: "publish",
                                             descriptor:
@@ -2590,37 +2897,22 @@ const SectionBlock = memo(function SectionBlock({
                                           })
                                         : null),
                                   );
-                                  const multiHasRaisedDiffBadge =
-                                    multiPillBadges.some((badge) => badge != null) ||
-                                    draftBadge != null ||
-                                    publishBadge != null;
-                                  const multiTopInset = multiHasRaisedDiffBadge
-                                    ? RAISED_DIFF_BADGE_TOP_INSET
-                                    : 3;
+                                  const multiTopInset = 3;
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
-                                  // Four things anchor to this cell's top-right
-                                  // corner and each has to start past the one
-                                  // before it: the lock avatar, the last pill's
-                                  // mentored "M", the note dots, then the cell's
-                                  // diff badge. The offsets used to be constants
-                                  // written for one dot, no "M" and no lock, so
-                                  // a second indicator or a mentored last pill
-                                  // piled them into the same 16px square.
-                                  const lastPillIsMentored =
-                                    cellSegments[labels.length - 1]?.isMentored ?? false;
-                                  const multiMentoredRightOffset = lastPillIsMentored
-                                    ? cornerLockClearance + MENTORED_CORNER_CLEARANCE
-                                    : cornerLockClearance;
-                                  const multiNotesRightOffset = Math.max(
-                                    multiMentoredRightOffset,
-                                    2,
+                                  // Status chips own the top-right corner. Keep
+                                  // note dots on the bottom edge instead.
+                                  const multiNotesRightOffset = 2;
+                                  const multiHoverChangeDetails = Array.from(
+                                    new Set(
+                                      [
+                                        draftBadge?.tooltip,
+                                        publishBadge?.tooltip,
+                                        ...multiPillBadges.map((badge) => badge?.tooltip),
+                                      ].filter((detail): detail is string => !!detail),
+                                    ),
                                   );
-                                  const multiBadgeRightOffset =
-                                    noteTypes.length > 0
-                                      ? multiNotesRightOffset + noteDotsWidth(noteTypes.length) + 4
-                                      : Math.max(3, multiMentoredRightOffset);
                                   return (
                                     <>
                                       {isBulkSelected && (
@@ -2647,6 +2939,8 @@ const SectionBlock = memo(function SectionBlock({
                                         indicators={hoverIndicatorNames}
                                         requestLabel={activeRequestLabel}
                                         status={hoverStatus}
+                                        changeDetails={multiHoverChangeDetails}
+                                        publicationLabel={publicationLabel}
                                       >
                                         <div
                                           style={{
@@ -2763,6 +3057,9 @@ const SectionBlock = memo(function SectionBlock({
                                               );
                                               const multiCrossFocusPill =
                                                 isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                                              const multiCrossFocusWingRadius =
+                                                MULTI_SHIFT_PILL_RADIUS -
+                                                (draftPillBorderKind ? 2 : 1);
                                               const multiCrossFocusPalette =
                                                 getCrossFocusBadgePalette({
                                                   color: effectiveColorLi,
@@ -2795,7 +3092,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     boxShadow:
                                                       publishRingStatus === "new" ||
                                                       publishRingStatus === "modified"
-                                                        ? getPublishDiffInsetRing(
+                                                        ? getPublishDiffRing(
                                                             publishRingStatus,
                                                             borderColor(multiForegroundColor),
                                                           )
@@ -2810,6 +3107,9 @@ const SectionBlock = memo(function SectionBlock({
                                                       : "var(--dg-fs-caption)",
                                                     fontWeight: 600,
                                                     position: "relative",
+                                                    // A sibling pill otherwise paints over the
+                                                    // raised chip at their shared edge.
+                                                    zIndex: pillBadge ? 2 : 1,
                                                     cursor: "pointer",
                                                     textDecoration:
                                                       draftKind === "deleted"
@@ -2832,8 +3132,11 @@ const SectionBlock = memo(function SectionBlock({
                                                     <GridDiffBadge
                                                       badge={{
                                                         ...pillBadge,
-                                                        topOffset: -8,
+                                                        topOffset: 0,
                                                         leftOffset: 4,
+                                                        overlapPillEdge: true,
+                                                        showChangeTooltip:
+                                                          !showShiftDetailHoverCards,
                                                       }}
                                                     />
                                                   )}
@@ -2841,7 +3144,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     <span
                                                       style={{
                                                         position: "absolute",
-                                                        top: pillBadge ? 8 : 0,
+                                                        top: 0,
                                                         bottom: 0,
                                                         left: 0,
                                                         display: "flex",
@@ -2852,9 +3155,7 @@ const SectionBlock = memo(function SectionBlock({
                                                         background:
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
-                                                        borderRadius: pillBadge
-                                                          ? "0 0 0 2px"
-                                                          : "2px 0 0 2px",
+                                                        borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
                                                         padding: "0 2px",
                                                         letterSpacing: "0.02em",
                                                         pointerEvents: "none",
@@ -2876,6 +3177,7 @@ const SectionBlock = memo(function SectionBlock({
                                                           ? cornerLockClearance || undefined
                                                           : undefined
                                                       }
+                                                      topInset={pillBadge ? 19 : undefined}
                                                     />
                                                   )}
                                                   <div
@@ -3007,45 +3309,23 @@ const SectionBlock = memo(function SectionBlock({
                                               );
                                             })}
                                           </div>
-                                          {noteTypes.length > 0 && (
-                                            <div
-                                              style={{
-                                                position: "absolute",
-                                                top: 2,
-                                                right: multiNotesRightOffset,
-                                                display: "flex",
-                                                gap: NOTE_DOT_GAP,
-                                                zIndex: 1,
-                                              }}
-                                            >
-                                              {indicatorTypes
-                                                .filter((ind) => noteTypes.includes(ind.id))
-                                                .map((ind) => (
-                                                  <MaybeHint
-                                                    key={ind.name}
-                                                    content={ind.name}
-                                                    side="top"
-                                                  >
-                                                    <div
-                                                      style={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        borderRadius: "50%",
-                                                        background: ind.color,
-                                                        border: "1.5px solid rgba(255,255,255,0.9)",
-                                                        flexShrink: 0,
-                                                      }}
-                                                    />
-                                                  </MaybeHint>
-                                                ))}
-                                            </div>
-                                          )}
+                                          <NoteDots
+                                            marks={noteMarks}
+                                            indicatorTypes={indicatorTypes}
+                                            style={{
+                                              bottom: 2,
+                                              right: multiNotesRightOffset,
+                                              zIndex: 1,
+                                            }}
+                                          />
                                           {(draftBadge || publishBadge) && (
                                             <GridDiffBadge
                                               badge={{
                                                 ...(draftBadge ?? publishBadge!),
-                                                topOffset: -8,
-                                                rightOffset: multiBadgeRightOffset,
+                                                topOffset: 0,
+                                                leftOffset: 4,
+                                                overlapPillEdge: true,
+                                                showChangeTooltip: !showShiftDetailHoverCards,
                                               }}
                                             />
                                           )}
@@ -3076,7 +3356,7 @@ const SectionBlock = memo(function SectionBlock({
                                   publishDiff?.from ??
                                   assignmentIdsFromPublishState(
                                     publishDiff?.fromState,
-                                    assignmentIdByPair,
+                                    publishedAssignmentIdByPair,
                                   );
                                 const publishDeletedAbsenceTypeId =
                                   publishDiff?.fromAbsenceTypeId ??
@@ -3106,6 +3386,7 @@ const SectionBlock = memo(function SectionBlock({
                                         publishDiff,
                                         resolvePublisherName,
                                         detail: `Deleted ${deletedLabel}.`,
+                                        timeZone: publicationTimeZone,
                                       })
                                     : undefined;
                                 // A reviewer checking a delete before publishing
@@ -3141,13 +3422,15 @@ const SectionBlock = memo(function SectionBlock({
                                   color: "var(--dg-color-danger-bg)",
                                   text: "var(--dg-color-danger-dark)",
                                 });
+                                const deletedCrossFocusWingRadius =
+                                  SINGLE_SHIFT_PILL_RADIUS - (isDraftDelete ? 2 : 1);
                                 const deletedPill = (
                                   <div
                                     data-shift-pill="deleted"
                                     aria-label={deletedTooltip ?? "Deleted shift"}
                                     style={{
                                       position: "absolute",
-                                      top: insetFromVisibleCellTop(RAISED_DIFF_BADGE_TOP_INSET),
+                                      top: insetFromVisibleCellTop(4),
                                       right: "4px",
                                       bottom: "4px",
                                       left: insetFromVisibleCellLeft(4),
@@ -3159,8 +3442,10 @@ const SectionBlock = memo(function SectionBlock({
                                       ...(isDraftDelete
                                         ? {}
                                         : {
-                                            boxShadow:
-                                              "0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px var(--dg-color-danger-dark)",
+                                            boxShadow: getPublishDiffRing(
+                                              "deleted",
+                                              "var(--dg-color-danger-dark)",
+                                            ),
                                           }),
                                       display: "flex",
                                       flexDirection: "column",
@@ -3176,15 +3461,17 @@ const SectionBlock = memo(function SectionBlock({
                                         kind: "deleted",
                                         text: "Deleted",
                                         tooltip: deletedTooltip,
-                                        topOffset: -8,
+                                        topOffset: 0,
                                         leftOffset: 4,
+                                        overlapPillEdge: true,
+                                        showChangeTooltip: !showShiftDetailHoverCards,
                                       }}
                                     />
                                     {deletedCrossFocusArea && (
                                       <span
                                         style={{
                                           position: "absolute",
-                                          top: 8,
+                                          top: 0,
                                           bottom: 0,
                                           left: 0,
                                           display: "flex",
@@ -3194,7 +3481,7 @@ const SectionBlock = memo(function SectionBlock({
                                           lineHeight: 1,
                                           background: deletedCrossFocusPalette.background,
                                           color: deletedCrossFocusPalette.color,
-                                          borderRadius: "0 0 0 2px",
+                                          borderRadius: `${deletedCrossFocusWingRadius}px 0 0 ${deletedCrossFocusWingRadius}px`,
                                           padding: "0 3px",
                                           letterSpacing: "0.02em",
                                           pointerEvents: "none",
@@ -3206,6 +3493,7 @@ const SectionBlock = memo(function SectionBlock({
                                     {deletedWasMentored && (
                                       <MentoredShiftBadge
                                         rightInset={cornerLockClearance || undefined}
+                                        topInset={19}
                                       />
                                     )}
                                     <span
@@ -3219,44 +3507,45 @@ const SectionBlock = memo(function SectionBlock({
                                     </span>
                                   </div>
                                 );
+                                const deletedHoverEntries: ShiftDetailEntry[] = [
+                                  {
+                                    label: deletedLabel,
+                                    jobName: null,
+                                    focusAreaName: deletedCrossFocusArea?.name ?? null,
+                                    timeLabel: null,
+                                    isCustomTime: false,
+                                    isMentored: deletedWasMentored,
+                                  },
+                                ];
+                                const deletedShiftContent = (
+                                  <ShiftDetailHoverCard
+                                    enabled={showShiftDetailHoverCards}
+                                    employeeName={getEmployeeDisplayName(emp)}
+                                    date={date}
+                                    entries={deletedHoverEntries}
+                                    indicators={hoverIndicatorNames}
+                                    requestLabel={null}
+                                    status="Deleted"
+                                    changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                    publicationLabel={publicationLabel}
+                                  >
+                                    {deletedPill}
+                                  </ShiftDetailHoverCard>
+                                );
                                 return (
                                   <>
-                                    {deletedPill}
+                                    {deletedShiftContent}
                                     {/* Deleting the shift does not delete the
                                         cell's notes — they outlive the draft and
                                         come back the moment it publishes. This
                                         branch used to drop them, so a note went
                                         invisible for exactly as long as the
                                         delete sat unpublished. */}
-                                    {noteTypes.length > 0 && (
-                                      <div
-                                        style={{
-                                          position: "absolute",
-                                          top: 5,
-                                          right: 5,
-                                          display: "flex",
-                                          gap: NOTE_DOT_GAP,
-                                          zIndex: 7,
-                                        }}
-                                      >
-                                        {indicatorTypes
-                                          .filter((ind) => noteTypes.includes(ind.id))
-                                          .map((ind) => (
-                                            <MaybeHint key={ind.name} content={ind.name} side="top">
-                                              <div
-                                                style={{
-                                                  width: NOTE_DOT_SIZE,
-                                                  height: NOTE_DOT_SIZE,
-                                                  borderRadius: "50%",
-                                                  background: ind.color,
-                                                  border: "1.5px solid rgba(255,255,255,0.9)",
-                                                  flexShrink: 0,
-                                                }}
-                                              />
-                                            </MaybeHint>
-                                          ))}
-                                      </div>
-                                    )}
+                                    <NoteDots
+                                      marks={noteMarks}
+                                      indicatorTypes={indicatorTypes}
+                                      style={{ top: 5, right: 5, zIndex: 7 }}
+                                    />
                                     {shouldShowAuthorName && auditName && (
                                       <AuthorBadge
                                         name={auditName}
@@ -3283,34 +3572,11 @@ const SectionBlock = memo(function SectionBlock({
                                     OFF
                                   </span>
                                 )}
-                                {noteTypes.length > 0 && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: 5,
-                                      right: 5,
-                                      display: "flex",
-                                      gap: 2,
-                                    }}
-                                  >
-                                    {indicatorTypes
-                                      .filter((ind) => noteTypes.includes(ind.id))
-                                      .map((ind) => (
-                                        <MaybeHint key={ind.name} content={ind.name} side="top">
-                                          <div
-                                            style={{
-                                              width: 10,
-                                              height: 10,
-                                              borderRadius: "50%",
-                                              background: ind.color,
-                                              border: "1.5px solid rgba(255,255,255,0.85)",
-                                              flexShrink: 0,
-                                            }}
-                                          />
-                                        </MaybeHint>
-                                      ))}
-                                  </div>
-                                )}
+                                <NoteDots
+                                  marks={noteMarks}
+                                  indicatorTypes={indicatorTypes}
+                                  style={{ top: 5, right: 5 }}
+                                />
                               </>
                             )}
                             {cellEditor && (
@@ -3320,6 +3586,7 @@ const SectionBlock = memo(function SectionBlock({
                               >
                                 <span
                                   style={{
+                                    ...getAvatarTypography(20),
                                     position: "absolute",
                                     top: 2,
                                     right: 2,
@@ -3336,12 +3603,9 @@ const SectionBlock = memo(function SectionBlock({
                                     // Two initials at the badge size run wider
                                     // than this 20px circle, so the marker
                                     // sizes its own text off the ring instead.
-                                    fontSize: 9,
-                                    fontWeight: 700,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    lineHeight: 1,
                                     zIndex: 2,
                                     pointerEvents: "none",
                                   }}
@@ -3532,7 +3796,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   indicatorTypes = [],
   isCellInteractive = true,
   canDragShifts,
-  activeIndicatorIdsForKey,
+  noteMarksForKey,
   activeFocusArea = null,
   certifications = [],
   orgRoles = [],
@@ -3545,6 +3809,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
+  publishedMetadataForKey,
   cellEditors,
   showAudit,
   createdByNameForKey,
@@ -3858,7 +4123,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     indicatorTypes={indicatorTypes}
                     isCellInteractive={isCellInteractive}
                     canDragShifts={canDragShifts ?? isCellInteractive}
-                    activeIndicatorIdsForKey={activeIndicatorIdsForKey}
+                    noteMarksForKey={noteMarksForKey}
                     getCustomShiftTimes={getCustomShiftTimes}
                     getPublishedCustomShiftTimes={getPublishedCustomShiftTimes}
                     draftKindForKey={draftKindForKey}
@@ -3868,6 +4133,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
                     publishDiffForKey={publishDiffForKey}
+                    publishedMetadataForKey={publishedMetadataForKey}
                     certifications={certifications}
                     orgRoles={orgRoles}
                     cellEditors={cellEditors}
@@ -4079,7 +4345,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         indicatorTypes={model.indicatorTypes}
         isCellInteractive={model.options.isCellInteractive}
         canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
-        activeIndicatorIdsForKey={model.accessors.activeIndicatorIdsForKey}
+        noteMarksForKey={model.accessors.noteMarksForKey}
         activeFocusArea={model.activeFocusArea}
         certifications={model.certifications}
         orgRoles={model.orgRoles}
@@ -4093,6 +4359,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
         publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
         publishDiffForKey={model.accessors.publishDiffForKey}
+        publishedMetadataForKey={model.accessors.publishedMetadataForKey}
         cellEditors={model.cellEditors}
         showAudit={model.options.showAudit}
         createdByNameForKey={model.accessors.createdByNameForKey}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -7,6 +8,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 interface ConfirmDialogProps {
   title: string;
+  returnFocus?: React.RefObject<HTMLElement | null>;
   message: string | React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
@@ -23,7 +25,7 @@ interface ConfirmDialogProps {
    */
   variant?: "danger" | "warning" | "info";
   /**
-   * Overrides the busy state the dialog works out for itself. Only needed when
+   * Adds the caller's pending state to the dialog's own async latch. Only needed when
    * the pending flag lives outside this confirm (a shared `actionLoading` keyed
    * by row, say); an async `onConfirm` already spins on its own.
    */
@@ -41,6 +43,7 @@ interface ConfirmDialogProps {
 
 export default function ConfirmDialog({
   title,
+  returnFocus,
   message,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
@@ -60,13 +63,13 @@ export default function ConfirmDialog({
   // told the user something irreversible is about to happen, and a slow
   // request leaves the button sitting there looking unpressed. The latch is
   // synchronous, so the second click is dropped before React can re-render;
-  // `isRunning` only drives the spinner. A caller passing its own `isLoading`
-  // still wins, and a synchronous `onConfirm` never spins at all.
+  // `isRunning` also blocks dismissal. A caller's `isLoading` can keep the
+  // dialog busy longer; a synchronous `onConfirm` never spins on its own.
   const confirm = useAsyncAction(onConfirm);
   const secondaryConfirm = useAsyncAction(onSecondaryConfirm ?? (() => {}));
 
-  const confirmBusy = isLoading ?? confirm.isRunning;
-  const secondaryBusy = isSecondaryLoading ?? secondaryConfirm.isRunning;
+  const confirmBusy = Boolean(isLoading || confirm.isRunning);
+  const secondaryBusy = Boolean(isSecondaryLoading || secondaryConfirm.isRunning);
 
   const confirmClass =
     variant === "danger" ? "dg-btn dg-btn-danger-filled" : "dg-btn dg-btn-primary";
@@ -74,7 +77,7 @@ export default function ConfirmDialog({
   const confirmStyle: React.CSSProperties | undefined =
     variant === "warning" ? { background: "var(--dg-color-warning)", border: "none" } : undefined;
 
-  const descId = "confirm-dialog-desc";
+  const descId = useId();
   const actionDisabled = confirmBusy || secondaryBusy;
   const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
@@ -85,7 +88,15 @@ export default function ConfirmDialog({
     : confirmStyle;
 
   return (
-    <Modal title={title} onClose={onCancel} style={{ maxWidth }} aria-describedby={descId}>
+    <Modal
+      title={title}
+      returnFocus={returnFocus}
+      onClose={onCancel}
+      onRequestClose={() => !actionDisabled}
+      showCloseButton={false}
+      style={{ maxWidth }}
+      aria-describedby={descId}
+    >
       <div
         id={descId}
         style={{
@@ -114,16 +125,6 @@ export default function ConfirmDialog({
         >
           {cancelLabel}
         </Button>
-        <Button
-          className={confirmClass}
-          style={confirmButtonStyle}
-          onClick={confirm.run}
-          disabled={actionDisabled || confirmDisabled}
-        >
-          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
-            {confirmLabel}
-          </ButtonLoading>
-        </Button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <Button
             className={confirmClass}
@@ -136,6 +137,16 @@ export default function ConfirmDialog({
             </ButtonLoading>
           </Button>
         )}
+        <Button
+          className={confirmClass}
+          style={confirmButtonStyle}
+          onClick={confirm.run}
+          disabled={actionDisabled || confirmDisabled}
+        >
+          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
+            {confirmLabel}
+          </ButtonLoading>
+        </Button>
       </div>
     </Modal>
   );

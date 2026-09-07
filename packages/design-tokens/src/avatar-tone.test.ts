@@ -48,7 +48,7 @@ function deltaE(hexA: string, hexB: string): number {
 const MIN_AA_CONTRAST = 4.5;
 /** Below this, two chips read as the same color at avatar size. */
 const MIN_DELTA_E = 0.05;
-const PALETTE_SIZE = 11;
+const PALETTE_SIZE = 16;
 
 /** Enough seeds to land on every slot, since the palette itself is private. */
 const SAMPLE_SEEDS = Array.from({ length: 400 }, (_, i) => `staff-${i}`);

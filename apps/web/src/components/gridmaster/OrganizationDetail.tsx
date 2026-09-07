@@ -523,7 +523,11 @@ export default function OrganizationDetail({
         />
       )}
       {!tabLoading && tab === "activity" && (
-        <AuditLogView orgId={organization.id} title="Organization Activity" />
+        <AuditLogView
+          orgId={organization.id}
+          title="Organization Activity"
+          timeZone={organization.timezone ?? null}
+        />
       )}
       {!tabLoading && tab === "invitations" && invitationsQuery.data && (
         <InvitationsTab

@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, type ComponentProps } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -29,7 +30,7 @@ const CHANNELS: Array<{
   {
     id: "in_app",
     label: "In-app",
-    description: "Shows up in your DubGrid notification list.",
+    description: "Shows up in your in-app notification list.",
     icon: "phone-portrait-outline",
   },
   {
@@ -83,11 +84,8 @@ export function NotificationCategorySheet({
                 <Text style={styles.label}>{channel.label}</Text>
                 <Text style={styles.description}>{channel.description}</Text>
               </View>
-              <Switch
+              <AppSwitch
                 accessibilityLabel={`${channel.label} notifications`}
-                ios_backgroundColor={mobileColors.border}
-                thumbColor={mobileColors.surface}
-                trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                 value={category.channels[channel.id]}
                 onValueChange={() => onToggle(category.key, channel.id)}
               />
@@ -115,7 +113,12 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     list: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
+      // A hairline, not `cardBorder`. Cards on the page are drawn by their
+      // shadow, which is why `cardBorder` is transparent in light mode - but a
+      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
+      // no shadow to draw it there was no edge at all in light mode. Dark is
+      // unchanged: `cardBorder` already resolves to this token there.
+      borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",

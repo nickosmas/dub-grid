@@ -352,6 +352,7 @@ export default function ShiftRequestBoard({
 
   function renderActions(req: ShiftRequest, isOwnRequest: boolean, isTarget: boolean) {
     const actions: React.ReactNode[] = [];
+    const primaryActions: React.ReactNode[] = [];
     const requesterFullLabel =
       joinShiftJobSegmentNames(req.requesterSegments ?? []) ||
       joinAssignmentNames(req.requesterAssignmentDefinitionIds, assignmentNameMap) ||
@@ -366,7 +367,7 @@ export default function ShiftRequestBoard({
       !isOwnRequest &&
       currentEmpId
     ) {
-      actions.push(
+      primaryActions.push(
         <Button
           key="claim"
           className="dg-btn dg-btn-primary"
@@ -396,7 +397,7 @@ export default function ShiftRequestBoard({
 
     // Target of a swap or targeted pickup with open status: Accept / Decline
     if (isTarget && (req.type === "swap" || req.type === "pickup") && req.status === "open") {
-      actions.push(
+      primaryActions.push(
         <Button
           key="accept"
           className="dg-btn dg-btn-primary"
@@ -419,6 +420,8 @@ export default function ShiftRequestBoard({
         >
           Accept
         </Button>,
+      );
+      actions.push(
         <Button
           key="decline"
           className="dg-btn dg-btn-ghost"
@@ -477,6 +480,17 @@ export default function ShiftRequestBoard({
             />
             <div style={{ display: "flex", gap: 6 }}>
               <Button
+                className="dg-btn dg-btn-ghost"
+                onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))}
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  padding: "7px 14px",
+                  border: "1px solid var(--dg-color-border)",
+                }}
+              >
+                Back
+              </Button>
+              <Button
                 className="dg-btn dg-btn-danger-filled"
                 disabled={hasRunningAction}
                 onClick={() => {
@@ -512,22 +526,11 @@ export default function ShiftRequestBoard({
               >
                 Confirm Reject
               </Button>
-              <Button
-                className="dg-btn dg-btn-ghost"
-                onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))}
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  padding: "7px 14px",
-                  border: "1px solid var(--dg-color-border)",
-                }}
-              >
-                Back
-              </Button>
             </div>
           </div>,
         );
       } else {
-        actions.push(
+        primaryActions.push(
           <Button
             key="approve"
             className="dg-btn dg-btn-primary"
@@ -551,6 +554,8 @@ export default function ShiftRequestBoard({
           >
             Approve
           </Button>,
+        );
+        actions.push(
           <Button
             key="reject"
             className="dg-btn dg-btn-ghost"
@@ -602,9 +607,14 @@ export default function ShiftRequestBoard({
       );
     }
 
-    if (actions.length === 0) return null;
+    const orderedActions = [...actions, ...primaryActions];
+    if (orderedActions.length === 0) return null;
 
-    return <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>{actions}</div>;
+    return (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+        {orderedActions}
+      </div>
+    );
   }
 
   // ── Render ───────────────────────────────────────────────────────────────

@@ -286,7 +286,8 @@ export default function ProfileSessionsScreen() {
       />
       <ConfirmationModal
         body={confirmationBody}
-        confirmLabel="Sign Out"
+        iconName="log-out-outline"
+        confirmLabel="Sign out"
         confirmTone="danger"
         loading={revokeMutation.isPending || sessionScopeLoading != null}
         onCancel={() => setPendingConfirmation(null)}

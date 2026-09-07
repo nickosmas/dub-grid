@@ -3,7 +3,13 @@
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SELF_ACTION_FORBIDDEN_CODE, SelfActionForbiddenError } from "@dubgrid/domain";
-import type { AuditLogEntry, Employee, EmployeeStatus, Invitation, ShiftMap } from "@/types";
+import type {
+  Employee,
+  EmployeeActivityEntry,
+  EmployeeStatus,
+  Invitation,
+  ShiftMap,
+} from "@/types";
 
 export interface UpdateEmployeeIdentityInput {
   employeeId: string;
@@ -291,11 +297,14 @@ export function fetchEmployeeInvitations(orgId: string, employeeId: string): Pro
   }).then((data) => data.invitations);
 }
 
-export function fetchEmployeeRoleHistory(userId: string, orgId: string): Promise<AuditLogEntry[]> {
-  return requestEmployeeAction<{ entries: AuditLogEntry[] }>({
-    action: "fetchEmployeeRoleHistory",
+export function fetchEmployeeActivity(
+  orgId: string,
+  employeeId: string,
+): Promise<EmployeeActivityEntry[]> {
+  return requestEmployeeAction<{ entries: EmployeeActivityEntry[] }>({
+    action: "fetchEmployeeActivity",
     orgId,
-    userId,
+    employeeId,
   }).then((data) => data.entries);
 }
 

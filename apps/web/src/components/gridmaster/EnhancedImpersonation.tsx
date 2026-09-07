@@ -540,16 +540,6 @@ export default function EnhancedImpersonation({
                 </div>
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                   <Button
-                    className="dg-btn dg-btn-primary"
-                    onClick={requestStart}
-                    disabled={loading || justification.trim().length < 10}
-                  >
-                    <ButtonLoading
-                      loading={loading}
-                      spinnerSize={16}
-                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
-                  </Button>
-                  <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {
                       setSelectedUser(null);
@@ -558,6 +548,16 @@ export default function EnhancedImpersonation({
                     }}
                   >
                     Cancel
+                  </Button>
+                  <Button
+                    className="dg-btn dg-btn-primary"
+                    onClick={requestStart}
+                    disabled={loading || justification.trim().length < 10}
+                  >
+                    <ButtonLoading
+                      loading={loading}
+                      spinnerSize={16}
+                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </Button>
                 </div>
               </>
@@ -766,16 +766,6 @@ export default function EnhancedImpersonation({
                 </div>
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                   <Button
-                    className="dg-btn dg-btn-primary"
-                    onClick={requestStart}
-                    disabled={loading || justification.trim().length < 10}
-                  >
-                    <ButtonLoading
-                      loading={loading}
-                      spinnerSize={16}
-                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
-                  </Button>
-                  <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {
                       setSelectedUser(null);
@@ -784,6 +774,16 @@ export default function EnhancedImpersonation({
                     }}
                   >
                     Clear
+                  </Button>
+                  <Button
+                    className="dg-btn dg-btn-primary"
+                    onClick={requestStart}
+                    disabled={loading || justification.trim().length < 10}
+                  >
+                    <ButtonLoading
+                      loading={loading}
+                      spinnerSize={16}
+                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </Button>
                 </div>
               </>

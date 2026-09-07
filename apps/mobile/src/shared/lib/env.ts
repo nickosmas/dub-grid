@@ -185,7 +185,7 @@ export function validateMobileEnv(
       issues.push({
         key: "EXPO_PUBLIC_API_BASE_URL",
         message:
-          "Your mobile API URL points at the hosted DubGrid backend while Supabase points at a local machine. Use `npm run use:mobile:local` for local testing or `npm run use:mobile:remote` for the hosted backend.",
+          "Your mobile API URL points at the hosted backend while Supabase points at a local machine. Use `npm run use:mobile:local` for local testing or `npm run use:mobile:remote` for the hosted backend.",
       });
     }
 

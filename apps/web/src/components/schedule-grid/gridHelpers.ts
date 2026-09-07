@@ -52,21 +52,10 @@ export function getDraftBorder(draftKind: DraftKind, fallback: string): string {
   return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
 }
 
-export function getPublishDiffBoxShadow(kind: string, fallback: string): string {
+/** Published-change ring painted two pixels outside the pill's border. */
+export function getPublishDiffRing(kind: string, fallback: string): string {
   const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
-  return `0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px ${color}`;
-}
-
-/**
- * Publish-diff ring for pills that share a cell. An outward ring spreads
- * outside the border box without reserving layout space, so two side-by-side
- * pills separated by a hairline gap end up drawing their rings on top of each
- * other and over the neighbour's body. Drawing it inward keeps each ring
- * inside its own pill.
- */
-export function getPublishDiffInsetRing(kind: string, fallback: string): string {
-  const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
-  return `inset 0 0 0 2px ${color}`;
+  return `0 0 0 2px ${color}`;
 }
 
 export function joinBoxShadows(...values: Array<string | undefined>): string | undefined {
@@ -76,7 +65,6 @@ export function joinBoxShadows(...values: Array<string | undefined>): string | u
 
 export const SINGLE_SHIFT_PILL_RADIUS = 8;
 export const MULTI_SHIFT_PILL_RADIUS = 6;
-export const RAISED_DIFF_BADGE_TOP_INSET = 10;
 export const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 24;
 export const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 20;
 export const BULK_SELECTION_RING_PADDING = 2;
@@ -152,6 +140,8 @@ export function cellLevelDiffBadge(
   if (!summary?.cellBadge) return null;
   const badge = summary.cellBadge;
   if (badge.kind === "new" && badge.text === "New") return null;
+  // A removed split-shift segment has no surviving pill to carry its marker.
+  // Keep that cell-level summary even when its unchanged sibling remains.
   return badge.text === "Changed" || summary.pillDiffs.length === 0 ? badge : null;
 }
 
@@ -186,14 +176,45 @@ export function buildPublishTooltip(args: {
   publishDiff: PublishChange & { publishedAt: string; publishedBy: string };
   resolvePublisherName?: (userId: string) => string | null;
   detail?: string;
+  timeZone?: string | null;
 }): string {
   const { publishDiff, resolvePublisherName, detail } = args;
-  const publisherName = publishDiff.publishedBy
-    ? resolvePublisherName?.(publishDiff.publishedBy)
-    : null;
-  const summary = `Published ${formatRelativePublishTime(publishDiff.publishedAt)}${publisherName ? ` by ${publisherName}` : ""}.`;
+  const summary = formatPublishedMetadata({
+    publishedAt: publishDiff.publishedAt,
+    publishedBy: publishDiff.publishedBy,
+    resolvePublisherName,
+    timeZone: args.timeZone,
+  });
 
-  return detail ? `${summary} ${detail}` : summary;
+  // The change is the primary fact. Keep the publication metadata separate so
+  // the compact fallback hover card has exactly two readable lines.
+  return detail ? `${detail}\n${summary}` : summary;
+}
+
+export function formatPublishedMetadata(args: {
+  publishedAt: string;
+  publishedBy: string | null | undefined;
+  resolvePublisherName?: (userId: string) => string | null;
+  timeZone?: string | null;
+}): string {
+  const { publishedAt: publishedAtIso, publishedBy, resolvePublisherName, timeZone } = args;
+  const publisherName = publishedBy
+    ? (resolvePublisherName?.(publishedBy) ?? "Unknown author")
+    : null;
+  const publishedAt = new Date(publishedAtIso);
+  const publishedDateTime = Number.isNaN(publishedAt.getTime())
+    ? "Published at an unknown time"
+    : `Published ${publishedAt.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+        ...(timeZone ? { timeZone } : {}),
+      })}`;
+  const summary = `${publishedDateTime}${publisherName ? ` by ${publisherName}` : ""}.`;
+  return summary;
 }
 
 export function timeRangesFromCustomTimes(args: {

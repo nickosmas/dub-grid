@@ -172,6 +172,13 @@ export default function DomainSelector() {
             />
 
             <div className="dg-auth-selector-actions">
+              <Button
+                type="button"
+                onClick={() => setShowHelp(true)}
+                className="dg-auth-link dg-auth-link--subtle dg-auth-help-link"
+              >
+                Need help finding your subdomain?
+              </Button>
               <button type="submit" disabled={loading} className="dg-btn dg-btn-primary dg-btn-lg">
                 <ButtonLoading
                   loading={loading}
@@ -181,13 +188,6 @@ export default function DomainSelector() {
                   Continue
                 </ButtonLoading>
               </button>
-              <Button
-                type="button"
-                onClick={() => setShowHelp(true)}
-                className="dg-auth-link dg-auth-link--subtle dg-auth-help-link"
-              >
-                Need help finding your subdomain?
-              </Button>
             </div>
           </Form>
         </Card>

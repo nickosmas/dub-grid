@@ -135,6 +135,7 @@ function BillingMetric({
 
   return (
     <div
+      data-stat-card
       style={{
         border: "1px solid var(--dg-color-border-light)",
         borderRadius: "var(--dg-radius-lg)",

@@ -2,56 +2,37 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   getVisibleSheetCount,
   resetSheetPresentationTracking,
-  trackSheetPresentation,
+  registerModalPresentation,
 } from "./modal-presentation";
 
-describe("sheet presentation tracking", () => {
-  beforeEach(() => {
-    resetSheetPresentationTracking();
+describe("modal presentation policy", () => {
+  beforeEach(resetSheetPresentationTracking);
+
+  it("allows one task with one confirmation", () => {
+    registerModalPresentation("sheet", "Edit access");
+    expect(() => registerModalPresentation("confirmation", "Discard edits?")).not.toThrow();
+    expect(getVisibleSheetCount()).toBe(1);
   });
 
-  it("allows a confirmation layered over the sheet it guards", () => {
-    expect(() => {
-      trackSheetPresentation("show", "Edit management access");
-      trackSheetPresentation("show", "Discard unsaved changes?");
-    }).not.toThrow();
-    expect(getVisibleSheetCount()).toBe(2);
+  it.each(["sheet", "confirmation"] as const)("rejects a second %s", (kind) => {
+    registerModalPresentation(kind, "First");
+    expect(() => registerModalPresentation(kind, "Second")).toThrow(`Only one ${kind}`);
   });
 
-  it("rejects a third sheet and names the stack that produced it", () => {
-    trackSheetPresentation("show", "Edit management access");
-    trackSheetPresentation("show", "Discard unsaved changes?");
-
-    expect(() => trackSheetPresentation("show", "App access")).toThrow(
-      /Edit management access > Discard unsaved changes\? > App access/,
-    );
+  it("allows a required gate to interrupt a task and its confirmation", () => {
+    registerModalPresentation("sheet", "Edit access");
+    registerModalPresentation("confirmation", "Discard edits?");
+    expect(() => registerModalPresentation("gate", "Unlock")).not.toThrow();
   });
 
-  it("frees the slot again once a sheet closes", () => {
-    trackSheetPresentation("show", "Edit management access");
-    trackSheetPresentation("show", "Discard unsaved changes?");
-    trackSheetPresentation("hide", "Discard unsaved changes?");
-
-    expect(() => trackSheetPresentation("show", "App access")).not.toThrow();
-    expect(getVisibleSheetCount()).toBe(2);
-  });
-
-  // Sheets do not always close in the order they opened: a screen can dismiss
-  // the one underneath while a confirmation is still up.
-  it("removes the sheet that actually closed, not the most recent one", () => {
-    trackSheetPresentation("show", "Edit management access");
-    trackSheetPresentation("show", "Discard unsaved changes?");
-    trackSheetPresentation("hide", "Edit management access");
-
-    expect(() => trackSheetPresentation("show", "App access")).not.toThrow();
-  });
-
-  // An unbalanced hide would otherwise drive the count negative and hand a
-  // screen extra headroom before the limit bites.
-  it("never counts below zero", () => {
-    trackSheetPresentation("hide", "Never shown");
-    trackSheetPresentation("hide", "Never shown either");
-
+  it("releases the exact surface, even when labels match or cleanup repeats", () => {
+    const closeSheet = registerModalPresentation("sheet", "Access");
+    const closeConfirmation = registerModalPresentation("confirmation", "Access");
+    closeSheet();
+    closeSheet();
     expect(getVisibleSheetCount()).toBe(0);
+    expect(() => registerModalPresentation("confirmation", "Other")).toThrow();
+    closeConfirmation();
+    expect(() => registerModalPresentation("sheet", "Next task")).not.toThrow();
   });
 });

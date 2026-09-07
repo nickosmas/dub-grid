@@ -292,7 +292,22 @@ export default function ProfilePasswordScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed" scrollEnabled={contentState.kind !== "loading"}>
+    <Screen
+      bottomPaddingMode="tabbed"
+      footer={
+        contentState.kind === "loading" || contentState.kind === "error" ? null : (
+          <View style={styles.submitRow}>
+            <Button
+              disabled={!passwordLooksReady || passwordSaving}
+              label="Update password"
+              loading={passwordSaving}
+              onPress={requestPasswordChange}
+            />
+          </View>
+        )
+      }
+      scrollEnabled={contentState.kind !== "loading"}
+    >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={3} sections={1} showHero={false} />
@@ -383,20 +398,13 @@ export default function ProfilePasswordScreen() {
               Changing your password signs you out everywhere else.
             </Text>
           </ProfilePanel>
-          <View style={styles.submitRow}>
-            <Button
-              disabled={!passwordLooksReady || passwordSaving}
-              label="Update password"
-              loading={passwordSaving}
-              onPress={requestPasswordChange}
-            />
-          </View>
         </ProfileSection>
       )}
       <ConfirmationModal
         body="You'll be signed out of every device after the password is updated."
         confirmLabel="Update and sign out"
-        confirmTone="danger"
+        confirmTone="warning"
+        iconName="key-outline"
         loading={passwordSaving}
         onCancel={() => {
           setIsConfirming(false);

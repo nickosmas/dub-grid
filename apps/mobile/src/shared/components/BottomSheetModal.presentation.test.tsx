@@ -9,9 +9,11 @@ vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
 );
 
+let ConfirmationModal: (typeof import("./ConfirmationModal"))["ConfirmationModal"];
 let BottomSheetModal: (typeof import("./BottomSheetModal"))["BottomSheetModal"];
 
 beforeAll(async () => {
+  ConfirmationModal = (await import("./ConfirmationModal")).ConfirmationModal;
   BottomSheetModal = (await import("./BottomSheetModal")).BottomSheetModal;
 });
 
@@ -42,22 +44,52 @@ describe("BottomSheetModal stacking guard", () => {
     resetSheetPresentationTracking();
   });
 
-  it("allows a confirmation over the sheet it guards", () => {
-    expect(() => render(<Sheets visible={[true, true]} />)).not.toThrow();
+  it("allows a real confirmation over its task sheet", () => {
+    expect(() =>
+      render(
+        <>
+          <Sheets visible={[true]} />
+          <ConfirmationModal
+            visible
+            title="Discard edits?"
+            confirmLabel="Discard"
+            onCancel={() => {}}
+            onConfirm={() => {}}
+          />
+        </>,
+      ),
+    ).not.toThrow();
   });
 
-  it("fails the render when a third sheet joins them", () => {
-    expect(() => render(<Sheets visible={[true, true, true]} />)).toThrow(/past the limit of 2/);
+  it("rejects two task sheets", () => {
+    expect(() => render(<Sheets visible={[true, true]} />)).toThrow(/Only one sheet/);
   });
 
-  it("ignores sheets that are mounted but not visible", () => {
-    expect(() => render(<Sheets visible={[true, false, false, false]} />)).not.toThrow();
+  it("rejects two real confirmations", () => {
+    expect(() =>
+      render(
+        <>
+          <ConfirmationModal
+            visible
+            title="First?"
+            confirmLabel="Confirm"
+            onCancel={() => {}}
+            onConfirm={() => {}}
+          />
+          <ConfirmationModal
+            visible
+            title="Second?"
+            confirmLabel="Confirm"
+            onCancel={() => {}}
+            onConfirm={() => {}}
+          />
+        </>,
+      ),
+    ).toThrow(/Only one confirmation/);
   });
 
-  it("frees the slot when a sheet closes", () => {
-    const view = render(<Sheets visible={[true, true]} />);
-
-    expect(() => view.rerender(<Sheets visible={[true, false]} />)).not.toThrow();
-    expect(() => view.rerender(<Sheets visible={[true, false, true]} />)).not.toThrow();
+  it("ignores mounted but hidden sheets and frees the slot on handoff", () => {
+    const view = render(<Sheets visible={[true, false, false]} />);
+    expect(() => view.rerender(<Sheets visible={[false, true, false]} />)).not.toThrow();
   });
 });

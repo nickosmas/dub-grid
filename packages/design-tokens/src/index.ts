@@ -10,6 +10,12 @@ export {
 } from "./animated-logo";
 
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
+export { getAvatarTypography } from "./avatar-typography";
+export {
+  EDITOR_ACTION_LABELS,
+  getEditorDismissLabel,
+  getMobileEditorDismissLabel,
+} from "./editor-action-labels";
 
 export {
   mobileIconToneTokens,

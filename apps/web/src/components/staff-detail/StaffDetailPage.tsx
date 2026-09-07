@@ -25,8 +25,8 @@ import {
   activateEmployee,
   deactivateEmployee,
   fetchEmployeeById,
+  fetchEmployeeActivity,
   fetchEmployeeInvitations,
-  fetchEmployeeRoleHistory,
   fetchEmployeeShifts,
   updateEmployee,
   removeEmployee,
@@ -51,7 +51,7 @@ import type {
   Invitation,
   OrganizationRole,
   OrganizationUser,
-  AuditLogEntry,
+  EmployeeActivityEntry,
 } from "@/types";
 import { fetchRecurringShifts } from "@/features/schedule/client";
 import {
@@ -75,6 +75,20 @@ interface StaffDetailPageProps {
 }
 
 type StaffProfileSection = "profile" | "overview" | "activity";
+
+const HISTORY_NAV_GROUP: ShellNavGroup<StaffProfileSection> = {
+  id: "history",
+  label: "History",
+  items: [
+    {
+      id: "activity",
+      label: "Activity",
+      Icon: ActivityIcon,
+      description:
+        "Profile edits, status changes, access changes, and invitations for this person.",
+    },
+  ],
+};
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
@@ -133,19 +147,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     );
   }, [invitations]);
 
-  // Key is a sub-prefix of `queryKeys.org.roleHistory(orgId)`, so realtime
-  // invalidation of the org-level prefix (role_change_log changes)
-  // automatically refreshes this query too.
-  const employeeUserId = employee?.userId ?? null;
-  const roleHistoryQuery = useQuery<AuditLogEntry[]>({
-    queryKey:
-      orgId && employeeUserId
-        ? [...queryKeys.org.roleHistory(orgId), employeeUserId]
-        : ["org", "anon", "roleHistory", employeeId],
-    queryFn: () => fetchEmployeeRoleHistory(employeeUserId!, orgId!),
-    enabled: Boolean(orgId) && Boolean(employeeUserId) && perms.isGridmaster,
+  // Same gate as the route: the ledger's read policy plus this page's own
+  // details permission. Keyed under `queryKeys.org.auditLog(orgId)` so the
+  // audit_log and role_change_log realtime invalidations refresh it.
+  const canViewActivity =
+    perms.isGridmaster ||
+    perms.isSuperAdmin ||
+    (perms.role === "admin" && perms.canViewEmployeeDetails);
+  const activityQuery = useQuery<EmployeeActivityEntry[]>({
+    queryKey: orgId
+      ? [...queryKeys.org.auditLog(orgId), "employee", employeeId]
+      : ["org", "anon", "auditLog", "employee", employeeId],
+    queryFn: () => fetchEmployeeActivity(orgId!, employeeId),
+    enabled: Boolean(orgId) && !perms.isLoading && canViewActivity,
   });
-  const roleHistory = roleHistoryQuery.data ?? [];
 
   useEffect(() => {
     if (perms.isLoading) return;
@@ -566,9 +581,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [directory, employee?.id],
   );
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
+  const showScheduleDetails = !directoryPerson?.isManagementUser || isOnSchedule;
   const profileSection = searchParams.get("section");
   const activeSection: StaffProfileSection =
-    profileSection === "activity"
+    profileSection === "activity" && canViewActivity
       ? "activity"
       : profileSection === "overview" || (profileSection === "schedule" && isOnSchedule)
         ? "overview"
@@ -592,20 +608,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           },
         ],
       },
-      {
-        id: "history",
-        label: "History",
-        items: [
-          {
-            id: "activity",
-            label: "Activity",
-            Icon: ActivityIcon,
-            description: "Role and invitation history for this staff member.",
-          },
-        ],
-      },
+      ...(canViewActivity ? [HISTORY_NAV_GROUP] : []),
     ],
-    [],
+    [canViewActivity],
   );
   // Matches the directory table's Access column: the membership's role, or the
   // role a pending invitation will grant once it is accepted.
@@ -747,8 +752,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <div>
                       <div className="dg-card-title">Work details</div>
                       <div className="dg-card-subtitle">
-                        Employment, {(org?.focusAreaLabel ?? "focus areas").toLowerCase()},
-                        certification, roles, and notes.
+                        {showScheduleDetails
+                          ? `Employment, ${(org?.focusAreaLabel ?? "focus areas").toLowerCase()}, certification, roles, and notes.`
+                          : "Internal notes."}
                       </div>
                     </div>
                   </div>
@@ -775,35 +781,41 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     </div>
                   ) : (
                     <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                      <ProfileField
-                        label="Employment"
-                        value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
-                      />
-                      <ProfileField
-                        label={org?.focusAreaLabel ?? "Focus areas"}
-                        value={
-                          employee.focusAreaIds
-                            .map((id) => focusAreas.find((item) => item.id === id)?.name)
-                            .filter(Boolean)
-                            .join(", ") || "—"
-                        }
-                      />
-                      <ProfileField
-                        label={org?.certificationLabel ?? "Certification"}
-                        value={
-                          certifications.find((item) => item.id === employee.certificationId)
-                            ?.name ?? "—"
-                        }
-                      />
-                      <ProfileField
-                        label={org?.roleLabel ?? "Roles"}
-                        value={
-                          employee.roleIds
-                            .map((id) => orgRoles.find((item) => item.id === id)?.name)
-                            .filter(Boolean)
-                            .join(", ") || "—"
-                        }
-                      />
+                      {showScheduleDetails && (
+                        <>
+                          <ProfileField
+                            label="Employment"
+                            value={
+                              employee.employmentType === "part_time" ? "Part-time" : "Full-time"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.focusAreaLabel ?? "Focus areas"}
+                            value={
+                              employee.focusAreaIds
+                                .map((id) => focusAreas.find((item) => item.id === id)?.name)
+                                .filter(Boolean)
+                                .join(", ") || "—"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.certificationLabel ?? "Certification"}
+                            value={
+                              certifications.find((item) => item.id === employee.certificationId)
+                                ?.name ?? "—"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.roleLabel ?? "Roles"}
+                            value={
+                              employee.roleIds
+                                .map((id) => orgRoles.find((item) => item.id === id)?.name)
+                                .filter(Boolean)
+                                .join(", ") || "—"
+                            }
+                          />
+                        </>
+                      )}
                       {employee.contactNotes ? (
                         <ProfileField label="Internal notes" value={employee.contactNotes} />
                       ) : null}
@@ -833,6 +845,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             directoryPerson?.userId ? handlePermissionsChange : undefined
                           }
                           isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                          labels={{
+                            focusAreaLabel: org?.focusAreaLabel,
+                            certificationLabel: org?.certificationLabel,
+                            roleLabel: org?.roleLabel,
+                          }}
                           pendingInvitationEmail={pendingInvite?.email}
                         />
                       </div>
@@ -977,8 +994,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               {activeSection === "activity" ? (
                 <ActivityTab
                   employee={employee}
-                  roleHistory={roleHistory}
-                  invitations={invitations}
+                  entries={activityQuery.data ?? []}
+                  timeZone={org?.timezone ?? null}
+                  loading={activityQuery.isPending}
+                  error={
+                    activityQuery.error
+                      ? formatClientErrorMessage(
+                          activityQuery.error,
+                          "We couldn't load activity right now.",
+                        )
+                      : null
+                  }
                 />
               ) : null}
             </section>
@@ -995,6 +1021,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           }
           onClose={closeManagementAccessEditor}
           onRequestClose={requestManagementAccessClose}
+          className="dg-modal--tight-header"
           style={{ maxWidth: 560, width: "100%" }}
         >
           <EmployeeManagementAccessEditor

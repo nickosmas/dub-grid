@@ -61,6 +61,25 @@ export function formatAdminPermissionsSummary(
   return `${granted.length} permissions enabled`;
 }
 
+/** The permission half of a membership review, for editors that only touch permissions. */
+export function buildAdminPermissionChanges(
+  previous: AdminPermissions | null | undefined,
+  next: AdminPermissions | null | undefined,
+): AccessReviewChange[] {
+  if (permissionsEqual(previous, next)) return [];
+  return [
+    {
+      key: "adminPermissions",
+      label: "Admin Permissions",
+      previousValue: previous ?? null,
+      nextValue: next ?? null,
+      previousDisplay: formatAdminPermissionsSummary(previous),
+      nextDisplay: formatAdminPermissionsSummary(next),
+      sensitive: true,
+    },
+  ];
+}
+
 export function buildMembershipAccessChanges(
   previous: OrganizationUser,
   next: Pick<OrganizationUser, "orgRole" | "adminPermissions">,
@@ -79,17 +98,7 @@ export function buildMembershipAccessChanges(
     });
   }
 
-  if (!permissionsEqual(previous.adminPermissions, next.adminPermissions)) {
-    changes.push({
-      key: "adminPermissions",
-      label: "Admin Permissions",
-      previousValue: previous.adminPermissions ?? null,
-      nextValue: next.adminPermissions ?? null,
-      previousDisplay: formatAdminPermissionsSummary(previous.adminPermissions),
-      nextDisplay: formatAdminPermissionsSummary(next.adminPermissions),
-      sensitive: true,
-    });
-  }
+  changes.push(...buildAdminPermissionChanges(previous.adminPermissions, next.adminPermissions));
 
   return changes;
 }

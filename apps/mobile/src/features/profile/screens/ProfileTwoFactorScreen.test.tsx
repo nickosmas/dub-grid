@@ -107,7 +107,7 @@ describe("ProfileTwoFactorScreen", () => {
     await waitFor(() => {
       expect(enroll).toHaveBeenCalledWith({
         factorType: "totp",
-        friendlyName: "DubGrid Mobile Authenticator",
+        friendlyName: "Mobile App Authenticator",
       });
     });
 

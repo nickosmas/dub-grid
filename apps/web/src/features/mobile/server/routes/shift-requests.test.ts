@@ -845,4 +845,69 @@ describe("mobile shift-requests route", () => {
       }),
     ]);
   });
+
+  it("returns no swap options for a deleted requester history entry", async () => {
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "org-1", timezone: "America/Los_Angeles" },
+      permissions: {
+        canEditShifts: false,
+        canManageEmployees: false,
+        canApproveShiftRequests: false,
+      },
+      serviceClient: {},
+      user: { id: "user-1" },
+    });
+    fetchLinkedEmployeeForUser.mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111" });
+    fetchMobileScheduleEntries.mockResolvedValue([
+      {
+        employeeId: "11111111-1111-4111-8111-111111111111",
+        employeeName: "Alex Kim",
+        employeeFocusAreaIds: [2],
+        date: "2026-04-19",
+        state: {
+          kind: "empty",
+          segments: [],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        presentation: {
+          label: "",
+          focusAreaId: null,
+          focusAreaName: null,
+          displayFocusAreaName: null,
+          startTime: null,
+          endTime: null,
+          segments: [],
+        },
+        change: {
+          kind: "deleted",
+          previousPresentation: {
+            label: "Day",
+            shiftName: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+        publishedAt: "2026-04-18T00:00:00.000Z",
+        publishedByName: "Mina Diaz",
+      },
+    ]);
+
+    const { GET } = await import("./shift-swap-options");
+    const response = await GET({
+      nextUrl: new URL(
+        "http://localhost/api/mobile/v1/shift-requests/swap-options?requesterEmpId=11111111-1111-4111-8111-111111111111&requesterShiftDate=2026-04-19&startDate=2026-04-19&endDate=2026-04-25",
+      ),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).entries).toEqual([]);
+  });
 });

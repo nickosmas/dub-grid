@@ -47,6 +47,7 @@ export type AuditAction =
   | "invitation.access_replaced"
   | "invitation.revoked"
   | "invitation.resent"
+  | "invitation.expired"
   // Config items
   | "focus_area.upserted"
   | "focus_area.archived"

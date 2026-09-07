@@ -176,7 +176,6 @@ function collectThinInteractiveOverrides(): string[] {
 
 const documentedMicroTextCounts = {
   "app/globals.css": 2,
-  "components/ScheduleGrid.tsx": 1,
   "components/dashboard/DonutChart.tsx": 1,
   "components/schedule-grid/badges.tsx": 1,
 };
@@ -470,9 +469,8 @@ describe("productive typography contract", () => {
       "components/ShiftEditPanel.tsx",
       "components/dashboard/ActionQueueCard.tsx",
       "components/dashboard/CoverageBySectionCard.tsx",
-      "components/gridmaster/AuditLogView.tsx",
+      "components/activity/ActivityLogParts.tsx",
       "components/profile/SessionList.tsx",
-      "components/settings/ActivityLog.tsx",
       "components/settings/BillingSettings.tsx",
       "components/settings/Coverage.tsx",
       "components/settings/Jobs.tsx",

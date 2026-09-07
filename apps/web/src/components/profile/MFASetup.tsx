@@ -275,13 +275,13 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           less secure.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
+          <Button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
+            Cancel
+          </Button>
           <Button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
             <ButtonLoading loading={loading} spinnerSize={14}>
               Confirm Disable
             </ButtonLoading>
-          </Button>
-          <Button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
-            Cancel
           </Button>
         </div>
       </div>
@@ -413,19 +413,6 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
 
       <div style={{ display: "flex", gap: 10 }}>
         <Button
-          onClick={verifyEnrollment}
-          disabled={loading || verifyCode.length !== 6}
-          className="dg-btn dg-btn-primary"
-        >
-          <ButtonLoading
-            loading={loading}
-            spinnerColor="var(--dg-color-text-inverse)"
-            spinnerSize={14}
-          >
-            Verify &amp; Enable
-          </ButtonLoading>
-        </Button>
-        <Button
           onClick={() => {
             // Cancel enrollment — unenroll the pending factor
             if (factorId) {
@@ -437,6 +424,19 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           className="dg-btn dg-btn-secondary"
         >
           Cancel
+        </Button>
+        <Button
+          onClick={verifyEnrollment}
+          disabled={loading || verifyCode.length !== 6}
+          className="dg-btn dg-btn-primary"
+        >
+          <ButtonLoading
+            loading={loading}
+            spinnerColor="var(--dg-color-text-inverse)"
+            spinnerSize={14}
+          >
+            Verify &amp; Enable
+          </ButtonLoading>
         </Button>
       </div>
     </div>

@@ -31,7 +31,7 @@ import { fetchOrganizationBilling } from "@/features/billing/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
@@ -247,6 +247,7 @@ export default function Header({ orgName }: HeaderProps) {
     role,
     canViewStaff,
     canAccessSettings,
+    canViewReports,
     isSuperAdmin,
     isImpersonating,
     isUserViewActive,
@@ -282,9 +283,7 @@ export default function Header({ orgName }: HeaderProps) {
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {
-      return (
-        featureFlags.reports && !isUserViewActive && (role === "admin" || isSuperAdmin === true)
-      );
+      return featureFlags.reports && !isUserViewActive && (isSuperAdmin || canViewReports);
     }
     if (item.id === "settings") {
       return isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);
@@ -301,6 +300,7 @@ export default function Header({ orgName }: HeaderProps) {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [exitingForLogout, setExitingForLogout] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
 
   const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
@@ -393,6 +393,7 @@ export default function Header({ orgName }: HeaderProps) {
   const logoutConfirmDialog = logoutConfirmOpen ? (
     isInSandbox ? (
       <ConfirmDialog
+        returnFocus={accountTriggerRef}
         title="Exit sandbox to sign out"
         message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
         confirmLabel="Exit & sign out"
@@ -404,6 +405,7 @@ export default function Header({ orgName }: HeaderProps) {
       />
     ) : (
       <ConfirmDialog
+        returnFocus={accountTriggerRef}
         title="Sign out"
         message="Are you sure you want to sign out?"
         confirmLabel="Sign out"
@@ -474,6 +476,7 @@ export default function Header({ orgName }: HeaderProps) {
           {/* Hamburger */}
           <Button
             onClick={() => setDrawerOpen((o) => !o)}
+            ref={accountTriggerRef}
             aria-label={drawerOpen ? "Close menu" : "Open menu"}
             aria-expanded={drawerOpen}
             style={{
@@ -668,6 +671,7 @@ export default function Header({ orgName }: HeaderProps) {
         <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
           <Button
             onClick={() => setMenuOpen((o) => !o)}
+            ref={accountTriggerRef}
             aria-label="Account menu"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -699,6 +703,7 @@ export default function Header({ orgName }: HeaderProps) {
           >
             <div
               style={{
+                ...getAvatarTypography(28),
                 width: 28,
                 height: 28,
                 boxSizing: "border-box",
@@ -708,8 +713,6 @@ export default function Header({ orgName }: HeaderProps) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
                 color: avatarTone.textColor,
                 flexShrink: 0,
               }}

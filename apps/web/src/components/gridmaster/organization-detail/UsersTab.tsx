@@ -429,7 +429,7 @@ export function UsersTab({
       {/* Permissions editor modal */}
       {editingPerms && (
         <PermissionsEditor
-          title={`Admin Permissions \u2014 ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
+          title={`Admin permissions: ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
           subtitle={
             <>
               Configure which actions this admin can perform. <em>View Schedule</em> and{" "}
@@ -437,11 +437,15 @@ export function UsersTab({
             </>
           }
           initialPermissions={editingPerms.adminPermissions}
-          buildReview={(perms) => {
-            const changes = buildMembershipAccessChanges(editingPerms, {
-              orgRole: editingPerms.orgRole,
-              adminPermissions: perms,
-            });
+          showPermissionCounter
+          buildReview={(perms, initial) => {
+            const changes = buildMembershipAccessChanges(
+              { ...editingPerms, adminPermissions: initial },
+              {
+                orgRole: editingPerms.orgRole,
+                adminPermissions: perms,
+              },
+            );
             return changes.length > 0
               ? {
                   title: "Review Permission Changes",

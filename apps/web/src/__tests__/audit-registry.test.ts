@@ -6,7 +6,10 @@ import {
   AUDIT_CATEGORY_LABELS,
   AUDIT_CATEGORY_OPTIONS,
   getAuditCategoryLabel,
+  getAuditCategoryOptions,
   getResourceTypeLabel,
+  ORG_ACTIVITY_CATEGORIES,
+  PERSON_ACTIVITY_CATEGORIES,
 } from "@/lib/audit/registry";
 import { AuditDetails } from "@/lib/audit/details";
 import { describeAction, formatDetails, summarizeDetails } from "@/lib/activity-log-utils";
@@ -249,5 +252,104 @@ describe("AuditDetails accessors", () => {
     const d = new AuditDetails({ count: Number.NaN });
     expect(d.number("count")).toBeNull();
     expect(d.count("count")).toBe(0);
+  });
+});
+
+describe("access change rows", () => {
+  it("renders a permission-map change as the flags that flipped, not as Updated", () => {
+    const rows = formatDetails({
+      action: "organization_access.updated",
+      details: {
+        changes: [
+          {
+            field: "adminPermissions",
+            label: "Admin Permissions",
+            from: { canEditShifts: false, canViewReports: true, canViewStaff: true },
+            to: { canEditShifts: true, canViewReports: false, canViewStaff: true },
+          },
+        ],
+      },
+    });
+
+    expect(rows).toEqual([
+      { label: "Allowed", value: "Edit shifts" },
+      { label: "Not allowed", value: "View reports" },
+    ]);
+  });
+
+  it("lists only what a first grant allowed", () => {
+    const rows = formatDetails({
+      action: "membership.updated",
+      details: {
+        changes: [
+          {
+            field: "adminPermissions",
+            label: "Admin Permissions",
+            from: null,
+            to: { canEditShifts: true, canViewReports: false },
+          },
+        ],
+      },
+    });
+
+    expect(rows).toEqual([{ label: "Allowed", value: "Edit shifts" }]);
+  });
+
+  it("says so when a permission edit changed nothing effective", () => {
+    const rows = formatDetails({
+      action: "organization_access.updated",
+      details: {
+        changes: [
+          {
+            field: "adminPermissions",
+            label: "Admin Permissions",
+            from: null,
+            to: { canEditShifts: false },
+          },
+        ],
+      },
+    });
+
+    expect(rows).toEqual([{ label: "Admin Permissions", value: "No effective change" }]);
+  });
+});
+
+describe("scoped category filters", () => {
+  it("offers a person only the categories their activity can contain", () => {
+    const options = getAuditCategoryOptions(PERSON_ACTIVITY_CATEGORIES);
+
+    expect(options.map((option) => option.value)).toEqual([
+      "all",
+      "people",
+      "access",
+      "invitations",
+    ]);
+  });
+
+  it("keeps every person category backed by actions the registry knows", () => {
+    for (const category of PERSON_ACTIVITY_CATEGORIES) {
+      const actions = Object.values(AUDIT_ACTIONS).filter((spec) => spec.category === category);
+      expect(actions.length, category).toBeGreaterThan(0);
+    }
+  });
+
+  it("drops only platform rows from an organization's filter", () => {
+    const values = getAuditCategoryOptions(ORG_ACTIVITY_CATEGORIES).map((o) => o.value);
+
+    // Platform rows are written without an org id, so an org query cannot
+    // return them; impersonation carries the org it entered, so it stays.
+    expect(values).not.toContain("platform");
+    expect(values).toContain("impersonation");
+    expect(values).toContain("billing");
+    expect(values).toHaveLength(Object.keys(AUDIT_CATEGORY_LABELS).length);
+  });
+
+  it("never offers a category with no prefix to filter on", () => {
+    for (const scope of [PERSON_ACTIVITY_CATEGORIES, ORG_ACTIVITY_CATEGORIES]) {
+      for (const option of getAuditCategoryOptions(scope)) {
+        if (option.value === "all") continue;
+        expect(option.prefixes.length, option.value).toBeGreaterThan(0);
+      }
+    }
   });
 });

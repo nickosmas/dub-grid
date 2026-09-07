@@ -28,22 +28,40 @@ export function getPersonOrgRole(person: MobilePerson): OrgRole {
   return person.orgRole ?? person.pendingInvitation?.roleToAssign ?? "user";
 }
 
+/** Whose role this sheet is changing, and what holds it. */
+export type OrgRoleSubject = {
+  currentRole: OrgRole;
+  /** Set when the role lives on an invitation, which a change revokes and resends. */
+  invitationEmail: string | null;
+  displayName: string;
+};
+
+export function getPersonOrgRoleSubject(person: MobilePerson): OrgRoleSubject {
+  return {
+    currentRole: getPersonOrgRole(person),
+    invitationEmail: person.userId ? null : (person.pendingInvitation?.email ?? null),
+    displayName: `${person.firstName} ${person.lastName}`.trim() || person.email,
+  };
+}
+
 /**
- * The access level on its own, opened from the badge on a person's profile.
+ * The access level on its own, opened from the badge on a person's profile
+ * and from the roster's actions sheet for someone with no profile to badge.
  * Management departments are not here on purpose: someone can be an Admin
  * without managing a department, and bundling the two is what made this
- * unreachable from the app before.
+ * unreachable from the app before - and what put a role control inside the
+ * management-access sheet, where it had no business being.
  */
 export function OrgRoleSheet({
   visible,
-  person,
+  subject,
   isPending,
   error,
   onDismiss,
   onSubmit,
 }: {
   visible: boolean;
-  person: MobilePerson;
+  subject: OrgRoleSubject;
   isPending: boolean;
   /**
    * Why the last change failed. Rendered in the sheet rather than a toast: this
@@ -54,9 +72,8 @@ export function OrgRoleSheet({
   onDismiss: () => void;
   onSubmit: (orgRole: OrgRole) => Promise<unknown>;
 }) {
-  const currentRole = getPersonOrgRole(person);
+  const { currentRole, invitationEmail, displayName } = subject;
   const [pendingRole, setPendingRole] = useState<OrgRole | null>(null);
-  const invitationEmail = person.userId ? null : (person.pendingInvitation?.email ?? null);
 
   const confirmation = useMemo(() => {
     const next = pendingRole ?? currentRole;
@@ -79,12 +96,15 @@ export function OrgRoleSheet({
   return (
     <>
       <BottomSheetModal
-        header={
-          <SheetHeader
-            subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
-            title="App access"
-          />
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions>
+              <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            </SheetActions>
+          </>
         }
+        header={<SheetHeader subtitle={displayName} title="App access" />}
         scrollable
         visible={visible}
         onDismiss={onDismiss}
@@ -103,12 +123,6 @@ export function OrgRoleSheet({
             />
           ))}
         </SelectionSection>
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal

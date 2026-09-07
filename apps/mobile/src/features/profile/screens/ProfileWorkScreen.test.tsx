@@ -14,8 +14,15 @@ const useBootstrap = vi.fn();
 const updateMobilePerson = vi.fn();
 const updateProfileAccount = vi.fn();
 const pushToast = vi.fn();
+const routerBack = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("expo-router", () => ({
+  router: {
+    back: routerBack,
+  },
+}));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -130,6 +137,7 @@ describe("ProfileWorkScreen", () => {
     updateMobilePerson.mockReset();
     updateProfileAccount.mockReset();
     pushToast.mockReset();
+    routerBack.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useQuery.mockReturnValue({
@@ -192,8 +200,11 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "RN" })).toBeInTheDocument();
     expect(screen.getByLabelText("Contact notes")).toBeInTheDocument();
+    // No Edit/view toggle: the screen opens straight into the editor, with no
+    // separate "start editing" step. Its "Cancel" (asserted elsewhere) leaves
+    // the screen entirely, unlike PersonDetailScreen's, which exits back to a
+    // view mode this screen doesn't have.
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
   it("preserves a dirty draft when the same profile refetches in the background", async () => {
@@ -240,22 +251,26 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
   });
 
-  it("keeps Save disabled and hides Discard until a field changes, then saves", async () => {
+  it("keeps Save disabled (but visible) until a field changes, then saves", async () => {
     render(<ProfileWorkScreen />);
 
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    // Save is grayed rather than removed, so the footer doesn't reflow the
+    // moment the first field changes. Cancel is the only other button: it is
+    // always live, because backing out is valid whether or not there is work.
     expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+    // Nothing typed yet, so the dismiss button reads Cancel; it becomes Discard
+    // once there is something to throw away.
+    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "Discard" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(screen.getByText("Save these changes?")).toBeInTheDocument();
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
+    expect(screen.queryByRole("alert")).toBeNull();
 
     await waitFor(() => {
       expect(updateMobilePerson).toHaveBeenCalledWith(
@@ -270,6 +285,43 @@ describe("ProfileWorkScreen", () => {
         }),
       );
     });
+  });
+
+  it("explains an email-change request before submitting it", () => {
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const confirmation = screen.getByRole("alert");
+    expect(confirmation).toHaveTextContent("Change your sign-in email?");
+    expect(confirmation).toHaveTextContent("new@example.com");
+    expect(updateMobilePerson).not.toHaveBeenCalled();
+    expect(updateProfileAccount).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
+  });
+
+  it("leaves the screen when Cancel is pressed on a clean draft", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    // Reset in place. Leaving with edits in hand is the back gesture's job, so
+    // Discard must not navigate.
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("hides an incompatible new role while keeping the selected role removable", () => {

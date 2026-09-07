@@ -79,6 +79,14 @@
 - Never hardcode a default English term for an org-customizable label
   (Wings/Focus Areas, Skill Levels/Certifications, etc.) - read it
   through the org's terminology config
+- Peer action buttons use a two-column grid with equal width and height. Two
+  actions sit side by side; four use two equal rows. For an odd action count,
+  the final action spans both columns (three is two above, one full-width below;
+  five continues with two equal rows, then one full-width below). Do not let
+  labels or variants make a peer larger within a row.
+- Button labels never wrap on either platform. Keep them to one line, scale
+  mobile labels down to a legible floor when space is tight, then truncate
+  rather than creating a second line.
 
 ## Database and data access
 
@@ -138,7 +146,10 @@ reviewable diff.
   jsdom throws `payload must be a Uint8Array`
 - This is a concurrent, multi-session dev environment: check `ps` before
   installs/builds, and re-run a suspect test file in isolation rather
-  than judging a regression off a full-suite run under parallel load
+  than judging a regression off a full-suite run under parallel load.
+  In a terminal session, run the suite from a throwaway worktree (see
+  `AGENTS.md`) so it tests your own commit rather than the shared tree's mix
+  of everyone's changes
 
 ## Browser Verification
 

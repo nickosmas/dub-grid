@@ -71,7 +71,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Unlock DubGrid",
+        promptMessage: "Unlock the app",
       });
       if (result.success) {
         setLocked(false);
@@ -137,15 +137,16 @@ export function AppLockProvider({ children }: PropsWithChildren) {
           would defeat it. `dismissDisabled` is what makes the sheet blocking —
           the only way past it is the device check. */}
       <BottomSheetModal
+        presentationKind="gate"
         accessibilityRole="alert"
         backdrop="cover"
         dismissDisabled
         footer={
           <SheetActions>
-            <Button label="Unlock" loading={authenticating} onPress={() => void attemptUnlock()} />
+            <Button label="Unlock" loading={authenticating} onPress={() => attemptUnlock()} />
           </SheetActions>
         }
-        header={<SheetHeader icon="lock-closed-outline" title="DubGrid is locked" />}
+        header={<SheetHeader icon="lock-closed-outline" title="App locked" />}
         visible={showLock}
         onDismiss={() => {}}
       >

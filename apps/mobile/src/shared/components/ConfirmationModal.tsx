@@ -1,16 +1,22 @@
-import { useEffect, useMemo, type ReactNode } from "react";
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import { ActionButtons } from "./ActionButtons";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AppText } from "./AppText";
-import { InsideSheetContext, SheetActions } from "./BottomSheetModal";
+import { InsideSheetContext } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
 import { InlineError } from "./InlineError";
 import { Pressable } from "./Pressable";
+import { registerModalPresentation } from "../lib/modal-presentation";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMotionPreference } from "../motion/useMotionPreference";
@@ -23,21 +29,61 @@ type ConfirmationTone = Extract<
 >;
 
 /** How far the card sits below full size while hidden, and settles from. */
-const CARD_ENTRANCE_SCALE = 0.92;
+const CARD_ENTRANCE_SCALE = 0.98;
 
 /**
- * The app's one confirmation surface: a centered popup over a scrim, not a
- * bottom sheet.
- *
- * It used to be built on `BottomSheetModal`, which meant every yes/no prompt
- * in the app - sign out, discard changes, remove a person - slid up as a full
- * sheet. That's the same surface a form or a picker opens, so a screen that
- * already had a sheet open answered its own "are you sure?" with a second
- * one, and the sheet stopped reading as a distinct, bigger interaction. A
- * popup is a smaller, unambiguous interruption, and it can sit on top of an
- * open sheet without tripping the sheet stacking guard, because it no longer
- * is one - it does not report itself to `trackSheetPresentation`.
+ * The glyph for each tone's icon badge. Outline, not solid: this app's own
+ * convention (`StatusBanner`'s `centeredIconName`) reaches for the outline
+ * variant whenever an icon is the prominent, standalone focus rather than a
+ * small accent beside text - the same role this badge plays here.
  */
+const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.glyphMap> = {
+  primary: "checkmark-circle-outline",
+  secondary: "checkmark-circle-outline",
+  neutral: "information-circle-outline",
+  danger: "warning-outline",
+  warning: "warning-outline",
+};
+
+/**
+ * Background/border/icon colour for the tone badge, mirroring
+ * `StatusBanner`'s tone-to-colour mapping (`dangerSoft`/`dangerBorder`/
+ * `dangerText`, etc.) rather than inventing a second one. `neutral` has no
+ * matching semantic-soft token in the palette, so it composes the same
+ * control-surface tokens `Button`'s own neutral tone already uses.
+ */
+function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileColors) {
+  switch (tone) {
+    case "danger":
+      return {
+        background: mobileColors.dangerSoft,
+        border: mobileColors.dangerBorder,
+        icon: mobileColors.dangerText,
+      };
+    case "warning":
+      return {
+        background: mobileColors.warningSoft,
+        border: mobileColors.warningBorder,
+        icon: mobileColors.warningText,
+      };
+    case "neutral":
+      return {
+        background: mobileColors.controlNeutralBg,
+        border: mobileColors.borderSubtle,
+        icon: mobileColors.textSecondary,
+      };
+    case "primary":
+    case "secondary":
+    default:
+      return {
+        background: mobileColors.brandSoft,
+        border: mobileColors.brandBorder,
+        icon: mobileColors.brand,
+      };
+  }
+}
+
+/** A brief consequence decision. Editable tasks belong in a sheet or page. */
 export function ConfirmationModal({
   visible,
   title,
@@ -46,6 +92,7 @@ export function ConfirmationModal({
   confirmLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
+  iconName,
   error,
   loading,
   onCancel,
@@ -58,6 +105,7 @@ export function ConfirmationModal({
   confirmLabel: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
+  iconName?: keyof typeof Ionicons.glyphMap;
   /**
    * Why the last confirm failed, shown above the actions.
    *
@@ -68,7 +116,7 @@ export function ConfirmationModal({
    */
   error?: string | null;
   /**
-   * Overrides the busy state `Button` works out for itself. Only needed when
+   * Adds the caller's pending state to the popup's async latch. Only needed when
    * the pending flag lives outside this popup; an async `onConfirm` already
    * spins on its own.
    */
@@ -79,8 +127,27 @@ export function ConfirmationModal({
   const isDestructive = confirmTone === "danger";
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { spring, timing } = useMotionPreference();
+  // A real pixel value, not `maxHeight: "80%"`: that string only resolves
+  // against a parent with a settled height, and `card`'s own parent
+  // (`avoider`) has none of its own - it shrinks to fit `card`, which is
+  // exactly what `card` is trying to bound. Yoga's percentage math against an
+  // indeterminate ancestor can't be relied on, and empirically collapsed the
+  // ScrollView below to a sliver, clipping the body text against the footer.
+  // `BottomSheetModal` sidesteps the same trap by measuring the window itself.
+  const { height: windowHeight } = useWindowDimensions();
+  const presentationName = useRef(title);
+  useEffect(() => {
+    if (visible) return registerModalPresentation("confirmation", presentationName.current);
+  }, [visible]);
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDark, windowHeight),
+    [mobileColors, isDark, windowHeight],
+  );
+  const iconColors = useMemo(
+    () => getConfirmationIconColors(confirmTone, mobileColors),
+    [confirmTone, mobileColors],
+  );
+  const { timing } = useMotionPreference();
 
   // The popup latches the confirm itself rather than leaving it to `Button`,
   // because the busy state has a second job here: a pending confirmation must
@@ -92,25 +159,22 @@ export function ConfirmationModal({
     }
     return onConfirm();
   });
-  const isBusy = loading ?? confirm.isRunning;
+  const isBusy = Boolean(loading || confirm.isRunning);
 
   const cardScale = useSharedValue(CARD_ENTRANCE_SCALE);
   const cardOpacity = useSharedValue(0);
-  // Resolved once per config change on the JS thread, not inside the worklet
-  // below - a worklet that calls `spring`/`timing` itself throws, since both
-  // are plain functions Reanimated can't run on the UI thread.
-  const enterSpring = useMemo(() => spring("bouncy"), [spring]);
+  // Resolve the motion configuration outside the UI-thread worklet.
   const fade = useMemo(() => timing("standard", 180), [timing]);
 
   useEffect(() => {
     if (visible) {
-      cardScale.value = withSpring(1, enterSpring);
+      cardScale.value = withTiming(1, fade);
       cardOpacity.value = withTiming(1, fade);
     } else {
       cardScale.value = withTiming(CARD_ENTRANCE_SCALE, fade);
       cardOpacity.value = withTiming(0, fade);
     }
-  }, [visible, enterSpring, fade, cardScale, cardOpacity]);
+  }, [visible, fade, cardScale, cardOpacity]);
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
@@ -152,7 +216,19 @@ export function ConfirmationModal({
           >
             <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
               <View style={styles.header}>
-                <AppText align="center" variant="cardTitle">
+                <View
+                  style={[
+                    styles.iconBadge,
+                    { backgroundColor: iconColors.background, borderColor: iconColors.border },
+                  ]}
+                >
+                  <Ionicons
+                    color={iconColors.icon}
+                    name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
+                    size={24}
+                  />
+                </View>
+                <AppText align="center" variant="sectionTitle">
                   {title}
                 </AppText>
               </View>
@@ -171,18 +247,25 @@ export function ConfirmationModal({
                 {children}
                 {error ? <InlineError message={error} /> : null}
               </ScrollView>
-              {/* Outside the ScrollView so the confirm/cancel actions stay put
-                  regardless of how much the popup's body has to scroll. */}
+              {/* Keep actions visible while the body scrolls. */}
               <View style={styles.footer}>
-                <SheetActions>
+                <ActionButtons
+                  primaryAction={
+                    <Button
+                      label={confirmLabel}
+                      loading={isBusy}
+                      onPress={confirm.run}
+                      tone={confirmTone}
+                    />
+                  }
+                >
                   <Button
-                    label={confirmLabel}
-                    loading={isBusy}
-                    onPress={confirm.run}
-                    tone={confirmTone}
+                    disabled={isBusy}
+                    label={cancelLabel}
+                    onPress={handleDismiss}
+                    tone="plain"
                   />
-                  <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="neutral" />
-                </SheetActions>
+                </ActionButtons>
               </View>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -192,7 +275,7 @@ export function ConfirmationModal({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight: number) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -212,31 +295,50 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: "100%",
       // A cap, not a fixed height: most confirmations are two lines and a
       // button stack, and a popup that always ran to 80% of the screen would
-      // read as an oversized sheet wearing a different corner radius.
-      maxHeight: "80%",
+      // read as an oversized sheet wearing a different corner radius. A real
+      // pixel value, not the string "80%" - see the comment where
+      // `windowHeight` is read, above.
+      maxHeight: windowHeight * 0.8,
+      // Load-bearing, not decorative: without it Yoga has no bounded height
+      // to hand the ScrollView below, and the ScrollView can collapse
+      // instead of sizing to its content, clipping the body text against the
+      // footer's divider. `BottomSheetModal`'s own `sheet` carries the same
+      // `flexShrink: 1` for the same reason.
+      flexShrink: 1,
       borderRadius: mobileRadii.card,
       backgroundColor: mobileColors.surface,
       overflow: "hidden",
       ...mobileElevation("overlay", isDark),
     },
     header: {
+      alignItems: "center",
       paddingHorizontal: mobileSpace.xl,
-      paddingTop: mobileSpace.xl,
+      paddingTop: mobileSpace["2xl"],
       paddingBottom: mobileSpace.sm,
     },
+    iconBadge: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: mobileSpace.md,
+    },
     scrollArea: {
-      flexGrow: 0,
+      flexShrink: 1,
     },
     body: {
       paddingHorizontal: mobileSpace.xl,
       paddingBottom: mobileSpace.lg,
       gap: mobileSpace.sm,
     },
+    // No top divider: unlike a sheet, this card has no scrollable body long
+    // enough to need a permanent "more below" cue, and the mockup this
+    // redesign matches separates the actions with space alone.
     footer: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
       paddingHorizontal: mobileSpace.xl,
-      paddingTop: 14,
+      paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.xl,
     },
   });

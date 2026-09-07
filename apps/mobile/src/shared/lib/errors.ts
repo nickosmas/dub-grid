@@ -27,9 +27,9 @@ export {
 };
 
 const GENERIC_INLINE_NETWORK_ERROR_MESSAGE =
-  "We couldn't connect to DubGrid from this device. Check your internet connection and try again.";
+  "We couldn't connect right now. Check your internet connection and try again.";
 const DEV_INLINE_NETWORK_ERROR_MESSAGE =
-  "We couldn't reach DubGrid from this device. Make sure your phone is on the same Wi-Fi network as the laptop running the dev server, then try again.";
+  "We couldn't reach the local service from this device. Make sure your phone is on the same Wi-Fi network as the laptop running the dev server, then try again.";
 const NETWORK_ERROR_TOAST_KEY = "network-connection-error";
 
 export function buildInlineNetworkErrorMessage(): string {

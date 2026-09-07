@@ -2,7 +2,8 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
@@ -193,12 +194,9 @@ export default function ProfileSecurityScreen() {
                       DubGrid.
                     </Text>
                   </View>
-                  <Switch
+                  <AppSwitch
                     accessibilityLabel="App lock"
                     disabled={appLockToggling}
-                    ios_backgroundColor={mobileColors.border}
-                    thumbColor={mobileColors.surface}
-                    trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                     value={appLockEnabled}
                     onValueChange={(next) => void toggleAppLock(next)}
                   />

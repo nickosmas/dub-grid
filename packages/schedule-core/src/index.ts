@@ -85,6 +85,10 @@ export * from "./team-schedule";
 export * from "./open-shifts";
 import { getRequestSortTime } from "./open-shifts";
 
+export function isDeletedScheduleHistory(entry: Pick<ScheduleEntryLike, "change">): boolean {
+  return entry.change?.kind === "deleted";
+}
+
 export function buildMeScheduleSegmentItems(
   entries: ReadonlyArray<ScheduleEntryLike>,
 ): MeScheduleSegmentItem[] {
@@ -112,7 +116,13 @@ export function buildMeScheduleSegmentItems(
   });
 
   for (const entry of orderedEntries) {
-    const segments = getScheduleEntrySegments(entry);
+    const previousPresentation =
+      entry.change?.kind === "deleted" ? entry.change.previousPresentation : null;
+    // A deleted cell can have no effective segments at all. Its published
+    // presentation is still the row the employee needs to see in Your Week.
+    const segments = getScheduleEntrySegments(
+      previousPresentation ? { ...entry, presentation: previousPresentation, segments: [] } : entry,
+    );
 
     segments.forEach((segment, index) => {
       items.push({
@@ -154,7 +164,9 @@ export function getFeaturedMeScheduleSegment(input: {
   selectedDate: string;
   todayDate: string;
 }): FeaturedMeScheduleSegment {
-  const items = buildMeScheduleSegmentItems(input.entries);
+  const items = buildMeScheduleSegmentItems(input.entries).filter(
+    (item) => !isDeletedScheduleHistory(item.entry),
+  );
   const selectedDayItems = items.filter((item) => item.date === input.selectedDate);
 
   if (input.rangeStartDate && input.rangeStartDate.localeCompare(input.todayDate) > 0) {
@@ -327,7 +339,7 @@ export function buildWeeklyHoursSummary(
   targetHours = 40,
 ): WeeklyHoursSummary {
   const scheduledMinutes = entries.reduce((total, entry) => {
-    if (getScheduleEntryAbsenceTypeId(entry) != null) {
+    if (isDeletedScheduleHistory(entry) || getScheduleEntryAbsenceTypeId(entry) != null) {
       return total;
     }
 

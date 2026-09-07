@@ -98,6 +98,11 @@ describe("shared chrome theming", () => {
     expect(globalsCss).toContain(".dg-btn-warning-filled");
   });
 
+  it("keeps every native button label to one line", () => {
+    expect(globalsCss).toMatch(/button\s*\{\s*white-space: nowrap;\s*\}/);
+    expect(buttonVariants({ variant: "default" })).toContain("whitespace-nowrap");
+  });
+
   it("maps compact and filled button variants to the shared button tokens", () => {
     expect(buttonVariants({ size: "sm" })).toContain("sm:h-[var(--dg-btn-h-sm)]");
     expect(buttonVariants({ size: "sm" })).toContain("px-[var(--dg-btn-px-sm)]");

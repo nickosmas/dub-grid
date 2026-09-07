@@ -27,10 +27,15 @@ lint errors in CI instead.
 
 - **pre-commit** — Prettier and ESLint over the _staged files only_, so it stays
   fast. Lint errors block; the repo's known warnings do not.
+- **commit-msg** - strips AI attribution trailers. The no-attribution rule in
+  `blueprint/context/ai-interaction.md` is markdown an agent's own session
+  instructions can override without anyone noticing, so it is enforced here
+  instead. A human co-author trailer is left alone.
 - **pre-push** — `type-check` and the full `test` suite, both through Turborepo,
   so unchanged workspaces replay from cache.
 
-Bypass with `--no-verify` on either command when you genuinely need to.
+Bypass with `--no-verify` on `git commit` or `git push` when you genuinely
+need to.
 
 We deliberately do not use husky: it installs itself through a `prepare` script,
 and install scripts are disabled repo-wide (see
@@ -88,6 +93,15 @@ chore/short-description      # Tooling, deps, config
 ```
 
 Always branch from `dev`. Target PRs to `dev` unless hotfixing `main`.
+
+These names are for work that gets a branch of its own: a contributor in their
+own clone, a Claude Code cloud session (which pushes `claude/*` branches), or
+Dependabot. All of them merge into `dev` through a pull request.
+
+Agent sessions working in a shared local checkout do not branch. Several run
+against one working tree at once, so branches there would collide; they commit
+straight to `dev` from a throwaway worktree instead. See "DubGrid Git policy"
+and "Work in a throwaway worktree" in `AGENTS.md`.
 
 ---
 

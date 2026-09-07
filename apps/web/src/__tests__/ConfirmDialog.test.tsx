@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -20,8 +20,12 @@ describe("ConfirmDialog", () => {
     );
 
     expect(screen.getByRole("dialog")).toHaveStyle({ maxWidth: "620px" });
-    expect(screen.getByRole("button", { name: "Discard my edits" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Discard all org edits" })).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter(Boolean),
+    ).toEqual(["Cancel", "Discard all org edits", "Discard my edits"]);
   });
 
   it("can disable destructive actions while keeping cancel available", async () => {
@@ -96,4 +100,45 @@ describe("ConfirmDialog", () => {
 
     expect(screen.getByRole("button", { name: /Remove/ })).toBeDisabled();
   });
+});
+
+describe("ConfirmDialog dismissal", () => {
+  it.each(["primary", "secondary"])(
+    "keeps every exit blocked during a %s request",
+    async (action) => {
+      let settle!: () => void;
+      const pending = () =>
+        new Promise<void>((resolve) => {
+          settle = resolve;
+        });
+      const onCancel = vi.fn();
+      render(
+        <ConfirmDialog
+          title="Discard edits?"
+          message="Choose which edits to discard."
+          confirmLabel="Discard mine"
+          secondaryConfirmLabel="Discard all"
+          isLoading={false}
+          isSecondaryLoading={false}
+          onConfirm={pending}
+          onSecondaryConfirm={pending}
+          onCancel={onCancel}
+        />,
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: action === "primary" ? "Discard mine" : "Discard all" }),
+      );
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Close modal" })).toBeNull();
+      fireEvent.click(screen.getByRole("presentation"));
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      expect(onCancel).not.toHaveBeenCalled();
+      await act(async () => {
+        settle();
+      });
+      await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(onCancel).toHaveBeenCalledOnce());
+    },
+  );
 });

@@ -96,17 +96,17 @@ function isAbortError(error: unknown): boolean {
 function createMobileTransportErrorMessage(baseUrl: string, error: unknown): string {
   void baseUrl;
   if (isAbortError(error)) {
-    return "DubGrid took too long to respond. Check your internet connection and try again.";
+    return "This is taking longer than expected. Check your internet connection and try again.";
   }
 
-  return "We couldn't connect to DubGrid from this device. Check your internet connection and try again.";
+  return "We couldn't connect right now. Check your internet connection and try again.";
 }
 
 function createNonJsonApiErrorMessage(baseUrl: string, path: string, response: Response): string {
   void baseUrl;
   void path;
   void response;
-  return "DubGrid isn't responding correctly right now. Try again in a moment.";
+  return "Please try again in a moment.";
 }
 
 export async function mobileApiRequest<T>(

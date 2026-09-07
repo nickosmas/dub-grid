@@ -47,6 +47,15 @@ function renderPanel(
     },
   ],
   contactEmail: string | null = null,
+  panelOverrides: Partial<
+    Pick<
+      React.ComponentProps<typeof ManagementStaffPanel>,
+      | "canManageScheduleEmployees"
+      | "canManageManagementAccess"
+      | "onAddToSchedule"
+      | "onRoleChange"
+    >
+  > = {},
 ) {
   const onSave = vi.fn().mockResolvedValue(undefined);
   const onClose = vi.fn();
@@ -65,6 +74,7 @@ function renderPanel(
       canManageManagementAccess
       onClose={onClose}
       onSave={onSave}
+      {...panelOverrides}
     />,
   );
 
@@ -203,5 +213,35 @@ describe("ManagementStaffPanel", () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledOnce();
     });
+  });
+
+  it("keeps management actions outside the scroll region and above editor actions", () => {
+    renderPanel({}, undefined, null, { onAddToSchedule: vi.fn() });
+
+    const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
+    const editorFooter = document.querySelector<HTMLElement>(
+      '[data-slot="staff-panel-editor-actions"]',
+    );
+    const scrollRegion = Array.from(document.querySelectorAll<HTMLElement>("div")).find(
+      (element) => element.style.overflowY === "auto",
+    );
+
+    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeInTheDocument();
+    expect(actionFooter).not.toBeNull();
+    expect(editorFooter).not.toBeNull();
+    expect(scrollRegion).not.toContainElement(actionFooter);
+    expect(actionFooter?.nextElementSibling).toBe(editorFooter);
+  });
+
+  it("places the authorized access dropdown in the management-only header", () => {
+    renderPanel({}, undefined, null, { onRoleChange: vi.fn().mockResolvedValue(undefined) });
+
+    const headerAccess = document.querySelector<HTMLElement>(
+      '[data-slot="management-header-access"]',
+    );
+
+    expect(headerAccess).toContainElement(screen.getByText("Admin"));
+    expect(headerAccess).not.toHaveTextContent("Role");
+    expect(document.querySelector('[data-slot="management-body-access"]')).toBeNull();
   });
 });

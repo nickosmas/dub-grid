@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import dynamic from "next/dynamic";
+import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 
@@ -17,6 +18,7 @@ import type {
   Employee,
   AbsenceType,
   ShiftMap,
+  PublishChange,
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
@@ -26,6 +28,7 @@ import {
   fetchShifts,
   fetchPublishHistory,
   fetchPublishedDateRanges,
+  fetchRecentPublishHistory,
   fetchShiftRequests,
 } from "@/features/schedule/client";
 import {
@@ -67,15 +70,27 @@ import DashboardLoading from "./DashboardLoading";
 import { useDashboardInvitations } from "./useDashboardInvitations";
 const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
-const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), { ssr: false });
-const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), { ssr: false });
-const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), { ssr: false });
+const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
+const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
+const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), {
+  ssr: false,
+  loading: LazyProgressFallback,
+});
 const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), {
   ssr: false,
+  loading: LazyProgressFallback,
 });
 
 type ExpandedPanel =
@@ -421,11 +436,42 @@ export default function DashboardView({
   const [publishedDateRanges, setPublishedDateRanges] = useState<
     { startDate: string; endDate: string }[]
   >([]);
+  const [recentPublishedChanges, setRecentPublishedChanges] = useState<Map<string, PublishChange>>(
+    () => new Map(),
+  );
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
 
   const invitations = useDashboardInvitations(orgId, !isUserDashboardMode);
+
+  useEffect(() => {
+    let cancelled = false;
+    const today = new Date(`${todayKey}T00:00:00`);
+    const heroEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const historyStart = isUserDashboardMode && today < periodStart ? today : periodStart;
+    const historyEnd = isUserDashboardMode && heroEnd > periodEnd ? heroEnd : periodEnd;
+    fetchRecentPublishHistory(orgId, null, true, {
+      startDate: formatDateKey(historyStart),
+      endDate: formatDateKey(historyEnd),
+    })
+      .then((entries) => {
+        if (cancelled) return;
+        const changes = new Map<string, PublishChange>();
+        for (let entryIndex = entries.length - 1; entryIndex >= 0; entryIndex -= 1) {
+          for (const change of entries[entryIndex].changes) {
+            changes.set(`${change.empId}_${change.date}`, change);
+          }
+        }
+        setRecentPublishedChanges(changes);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentPublishedChanges(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isUserDashboardMode, orgId, periodEnd, periodStart, todayKey]);
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -1123,6 +1169,7 @@ export default function DashboardView({
     prevPeriodLabel,
     currentPeriodShifts,
     allShifts,
+    recentPublishedChanges,
     periodStats,
     sectionCoverage,
     openShifts,

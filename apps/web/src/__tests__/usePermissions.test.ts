@@ -48,7 +48,6 @@ import {
   getPermissionsFromSession,
   buildPerms,
   ROLE_LEVEL,
-  unionPermissions,
   applyViewImplications,
   READ_ONLY_PERMS,
 } from "@/features/permissions";
@@ -180,7 +179,7 @@ describe("getPermissionsFromSession", () => {
     expect(perms.canManageUsers).toBe(true);
   });
 
-  it("returns read-only perms for admin JWT (no admin_permissions from JWT alone)", () => {
+  it("returns the admin baseline for an admin JWT (no admin_permissions from JWT alone)", () => {
     const session = createSession({
       platform_role: "none",
       org_role: "admin",
@@ -189,7 +188,9 @@ describe("getPermissionsFromSession", () => {
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("admin");
     expect(perms.level).toBe(2);
-    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canEditShifts).toBe(true);
+    expect(perms.canPublishSchedule).toBe(true);
+    expect(perms.canManageEmployees).toBe(false);
     expect(perms.canViewSchedule).toBe(true);
     expect(perms.canViewStaff).toBe(true);
   });
@@ -347,6 +348,7 @@ describe("usePermissions hook", () => {
         canManageCoverageRequirements: false,
         canApproveShiftRequests: false,
         canViewDashboardAnalytics: false,
+        canViewReports: false,
       }),
     });
 
@@ -444,60 +446,6 @@ describe("usePermissions hook", () => {
     expect(result.current.role).toBe("user");
     expect(result.current.canEditShifts).toBe(false);
     expect(result.current.canViewSchedule).toBe(true);
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Part E: unionPermissions
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("unionPermissions", () => {
-  it("returns READ_ONLY_PERMS baseline for empty input", () => {
-    const result = unionPermissions([]);
-    expect(result).toEqual({ ...READ_ONLY_PERMS, canManageOrgSettings: false });
-  });
-
-  it("returns the single permission set when given one input", () => {
-    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canManageEmployees: true };
-    const result = unionPermissions([perms]);
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canManageEmployees).toBe(true);
-    expect(result.canPublishSchedule).toBe(false);
-  });
-
-  it("unions multiple permission sets (most permissive wins)", () => {
-    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
-    const deptB = { ...ALL_FALSE_PERMS, canManageEmployees: true, canEditNotes: true };
-    const result = unionPermissions([deptA, deptB]);
-
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canManageEmployees).toBe(true);
-    expect(result.canEditNotes).toBe(true);
-    expect(result.canPublishSchedule).toBe(false);
-  });
-
-  it("always blocks canManageOrgSettings regardless of input", () => {
-    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
-    const result = unionPermissions([perms]);
-    expect(result.canManageOrgSettings).toBe(false);
-  });
-
-  it("preserves canViewSchedule and canViewStaff from READ_ONLY baseline", () => {
-    const result = unionPermissions([ALL_FALSE_PERMS]);
-    expect(result.canViewSchedule).toBe(true);
-    expect(result.canViewStaff).toBe(true);
-  });
-
-  it("handles three departments with disjoint permissions", () => {
-    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true };
-    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
-    const deptC = { ...ALL_FALSE_PERMS, canApproveShiftRequests: true };
-    const result = unionPermissions([deptA, deptB, deptC]);
-
-    expect(result.canEditShifts).toBe(true);
-    expect(result.canManageFocusAreas).toBe(true);
-    expect(result.canApproveShiftRequests).toBe(true);
-    expect(result.canManageOrgSettings).toBe(false);
   });
 });
 
@@ -707,29 +655,5 @@ describe("buildPerms — user role per-user permissions", () => {
     const result = buildPerms("user", "org-1", false, perms);
     expect(result.canAccessSettings).toBe(true);
     expect(result.canManageOrg).toBe(false);
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Part I: unionPermissions with view permissions
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("unionPermissions with view permissions", () => {
-  it("unions canView permissions from multiple departments", () => {
-    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const deptB = { ...ALL_FALSE_PERMS, canViewScheduleDefinitions: true };
-    const result = unionPermissions([deptA, deptB]);
-    expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canViewScheduleDefinitions).toBe(true);
-    expect(result.canManageFocusAreas).toBe(false);
-    expect(result.canManageScheduleDefinitions).toBe(false);
-  });
-
-  it("preserves view permissions alongside manage permissions", () => {
-    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
-    const result = unionPermissions([deptA, deptB]);
-    expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canManageFocusAreas).toBe(true);
   });
 });

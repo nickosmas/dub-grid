@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { MapPin } from "lucide-react";
+import { toast } from "sonner";
 import { labelStyle } from "@/lib/styles";
 import { Button } from "@/components/Button";
 import type { StructuredOrganizationAddress } from "@/lib/organization-profile";
@@ -294,6 +295,9 @@ function AddressLine1Input({
       if (patch.addressLine1) onChange(patch.addressLine1);
       onAutofill(timezone ? { ...patch, timezone } : patch);
     } catch {
+      // Without this the panel just closes and the fields stay empty, which is
+      // indistinguishable from the lookup still being in flight.
+      toast.error("We couldn't load that address. Enter it manually.");
       closePanel();
     }
   }
@@ -409,16 +413,21 @@ function AddressLine1Input({
                         id={`${id}-option-${index}`}
                         type="button"
                         role="option"
-                        spinner={false}
                         aria-selected={isActive}
                         className="dg-address-item"
+                        // Picking a suggestion costs a Places Details round trip
+                        // before anything fills in, so the pin doubles as the
+                        // pending slot rather than the row sitting inert.
+                        icon={
+                          <span className="dg-address-item-icon" aria-hidden="true">
+                            <MapPin size={14} strokeWidth={2.2} />
+                          </span>
+                        }
+                        spinnerSize={14}
                         onMouseDown={(event) => event.preventDefault()}
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => handleSelectPrediction(prediction)}
                       >
-                        <span className="dg-address-item-icon" aria-hidden="true">
-                          <MapPin size={14} strokeWidth={2.2} />
-                        </span>
                         <span className="dg-address-item-copy">
                           <span className="dg-address-item-title">
                             <HighlightedGoogleText value={title} />

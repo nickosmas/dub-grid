@@ -165,6 +165,85 @@ export function addDaysToIsoDate(value: string, days: number): string {
 }
 
 /**
+ * Minutes to add to UTC to reach the zone's wall clock at this instant, so
+ * New York in summer is -240 and Tokyo is 540. `hourCycle: "h23"` rather than
+ * `hour12: false`: the latter renders midnight as "24" in some engines.
+ */
+export function getTimeZoneOffsetMinutes(value: Date, timeZone?: string | null): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timeZone ?? "UTC",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(value);
+
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value ?? "0");
+  const wallClock = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+
+  // The formatted parts carry no milliseconds, so compare against a truncated
+  // instant or every offset comes back a fraction of a minute off.
+  return (wallClock - Math.floor(value.getTime() / 1000) * 1000) / 60000;
+}
+
+/**
+ * The UTC instant at which a calendar day begins in the given zone.
+ *
+ * Three passes rather than one because the offset that applies to a wall-clock
+ * time is the offset at the instant it maps to, which is circular across a DST
+ * boundary. When midnight does not exist at all (zones such as Santiago spring
+ * forward at 00:00), the day starts at the first instant it actually reaches.
+ */
+export function getZonedMidnightUtc(isoDate: string, timeZone?: string | null): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const wallClock = Date.UTC(year, month - 1, day);
+
+  const firstOffset = getTimeZoneOffsetMinutes(new Date(wallClock), timeZone);
+  let candidate = wallClock - firstOffset * 60000;
+
+  const secondOffset = getTimeZoneOffsetMinutes(new Date(candidate), timeZone);
+  if (secondOffset === firstOffset) {
+    return new Date(candidate);
+  }
+
+  candidate -= (secondOffset - firstOffset) * 60000;
+  const thirdOffset = getTimeZoneOffsetMinutes(new Date(candidate), timeZone);
+  if (thirdOffset === secondOffset) {
+    return new Date(candidate);
+  }
+
+  return new Date(wallClock - Math.min(secondOffset, thirdOffset) * 60000);
+}
+
+/**
+ * UTC bounds covering whole calendar days in the org's zone, for a query whose
+ * upper bound is inclusive. Consecutive ranges are contiguous to the
+ * millisecond, so no event can fall between two of them.
+ */
+export function getZonedDayRangeUtc(
+  startDate: string,
+  endDate: string,
+  timeZone?: string | null,
+): { startAt: string; endAt: string } {
+  const startAt = getZonedMidnightUtc(startDate, timeZone);
+  const dayAfterEnd = getZonedMidnightUtc(addDaysToIsoDate(endDate, 1), timeZone);
+  return {
+    startAt: startAt.toISOString(),
+    endAt: new Date(dayAfterEnd.getTime() - 1).toISOString(),
+  };
+}
+
+/**
  * Formats a publish_history `publishedAt` timestamptz as "Aug 23, 2026, 2:30
  * PM" in the org's timezone — date AND time, not just date. Canonical so web
  * and mobile render publish info identically instead of each formatting it

@@ -9,6 +9,7 @@ import type {
   CoverageRequirement,
   Employee,
   ShiftMap,
+  PublishChange,
   PublishHistoryEntryWithName,
   AbsenceType,
 } from "@/types";
@@ -53,6 +54,8 @@ export interface DashboardContentProps {
   // Shift data
   currentPeriodShifts: ShiftMap;
   allShifts: ShiftMap;
+  /** Latest published change for each affected employee/date cell. */
+  recentPublishedChanges?: Map<string, PublishChange>;
 
   // Computed stats
   periodStats: WeeklyStats;

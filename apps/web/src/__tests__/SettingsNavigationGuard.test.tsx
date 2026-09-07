@@ -149,7 +149,6 @@ function renderDepartmentsWithSidebar() {
         focusAreaLabel="Focus Areas"
         departmentLabel="Departments"
         canManageFocusAreas
-        canManageOrgLabels
         onDepartmentsChange={vi.fn()}
         onFocusAreasChange={vi.fn()}
       />
@@ -166,13 +165,16 @@ describe("settings panels guard navigation", () => {
     const user = userEvent.setup();
     renderCoverageWithSidebar();
     await dirtyTheCoveragePanel(user);
+    const staffInput = screen.getByRole("spinbutton");
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Unsaved changes" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(navigate).not.toHaveBeenCalled();
-    // Still on the panel, with the edit intact behind the dialog.
-    expect(screen.getByRole("spinbutton")).toHaveValue(3);
+    // Opening the confirmation preserves the draft in the underlying panel.
+    expect(staffInput).toHaveValue(3);
+    expect(within(dialog).getByRole("button", { name: "Keep editing" })).toHaveFocus();
   });
 
   it("keeps the edit when the user chooses to stay", async () => {

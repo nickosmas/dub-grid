@@ -82,7 +82,7 @@ const SAMPLE_NOTIFICATION = {
   category: "shift_requests",
   title: "Pickup available",
   message: "A shift is waiting for response.",
-  metadata: { requestId: "req-1" },
+  metadata: { requestId: "req-1" } as Record<string, unknown>,
   priority: "high",
   groupKey: null,
   groupCount: 1,
@@ -144,12 +144,68 @@ describe("NotificationsScreen", () => {
     });
   });
 
+  function mockBootstrapPermissions(permissions: { canApproveShiftRequests: boolean }) {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => ({
+      data: queryKey[1] === "bootstrap" ? { permissions } : undefined,
+      error: null,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    }));
+  }
+
   it("shows the empty state when no alerts exist", () => {
     useInfiniteQuery.mockReturnValue(buildInfiniteQueryResult());
 
     render(<NotificationsScreen />);
 
     expect(screen.getByText("No alerts yet")).toBeInTheDocument();
+  });
+
+  // Alerts are addressed by role when they are sent, but roles change after
+  // the fact: an approval request left behind by a demotion names someone
+  // else's request and can no longer be acted on.
+  it("hides approval alerts from someone who can no longer approve", () => {
+    mockBootstrapPermissions({ canApproveShiftRequests: false });
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({
+        notifications: [
+          {
+            ...SAMPLE_NOTIFICATION,
+            id: "00000000-0000-4000-8000-000000000002",
+            title: "New swap request",
+            metadata: { requestId: "req-2", action: "approve_request", tab: "approval" },
+          },
+          SAMPLE_NOTIFICATION,
+        ],
+        unreadCount: 2,
+      }),
+    );
+
+    render(<NotificationsScreen />);
+
+    expect(screen.queryByText("New swap request")).not.toBeInTheDocument();
+    expect(screen.getByText("Pickup available")).toBeInTheDocument();
+  });
+
+  it("keeps approval alerts for someone who can approve", () => {
+    mockBootstrapPermissions({ canApproveShiftRequests: true });
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({
+        notifications: [
+          {
+            ...SAMPLE_NOTIFICATION,
+            id: "00000000-0000-4000-8000-000000000002",
+            title: "New swap request",
+            metadata: { requestId: "req-2", action: "approve_request", tab: "approval" },
+          },
+        ],
+        unreadCount: 1,
+      }),
+    );
+
+    render(<NotificationsScreen />);
+
+    expect(screen.getByText("New swap request")).toBeInTheDocument();
   });
 
   // The filter row was a third hand-rolled chip strip, so selecting a filter

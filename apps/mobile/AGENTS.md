@@ -192,9 +192,9 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
 | List entrance               | `<AnimatedListItem index>`                                                                  |
 | Show/hide a block           | `<Collapsible open>`                                                                        |
-| Any modal at all            | `<BottomSheetModal>` (`dismissDisabled` for blocking gates)                                 |
+| A short task or selection   | `<BottomSheetModal>`; use a page for substantial or multi-step editing                      |
 | A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body             |
-| A confirmation              | `<ConfirmationModal>` — primary action first, cancel below                                  |
+| A consequential decision    | `<ConfirmationModal>`; cancel left, confirm right; always side by side                      |
 | Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
 | An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel               |
 | Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
@@ -239,11 +239,28 @@ verb — see `request-action-feedback.ts`, where every variant carries its own
 
 ### Modals and sheets
 
-There is **one** modal design: the bottom sheet. Grabber, 40pt top corners,
-full-bleed to the bottom edge, drag/tap-outside/back to dismiss. There is no
-full-screen modal, no centred alert card and no close (✕) button anywhere —
-`ModalHeader` was deleted once every caller moved onto the sheet, and a long
-multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
+Choose the surface by the user's task:
+
+- **ConfirmationModal:** a short consequence and an explicit action. Use for
+  discarded edits, access changes, and significant side effects. Do not put
+  editable forms or competing configuration choices inside a confirmation.
+- **BottomSheetModal:** contextual choices, filters, short forms, and compact
+  review tasks. Use a page for long or multi-step workflows.
+- **Ordinary saves:** save directly and show progress and success. Ask again
+  only when the save has a significant additional consequence.
+- **Layering:** one task sheet and at most one confirmation. Both primitives
+  register their actual kind. Replace one task with the next using
+  `useModalHandoff`; do not stack task sheets. Only required consent and app
+  lock use `presentationKind="gate"` to interrupt an existing task.
+- **Confirmation behavior:** backdrop and Android back mean Cancel while idle.
+  Pending work blocks every dismissal path. Keep request failures in the
+  active surface via `error`, rather than a toast or an obscured parent.
+  Use specific sentence-case action labels and an action-specific `iconName`
+  when helpful; danger does not imply a trash icon. Horizontal actions put
+  Cancel left and Confirm right, always side by side. Long labels wrap inside
+  their equal-width buttons. Motion is restrained.
+
+Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
 
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
@@ -264,8 +281,21 @@ multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
   wait for a scroll event — a sheet whose content never fills it never fires one.
   The list's own overscroll stays off (`bounces` / `overScrollMode`) so only one
   of the two effects ever answers a drag.
-- **Stacked actions go in `<SheetActions>`, primary first.** The `footer` slot
-  is a bordered row, for a `Clear all` / `Done` pair — not for a submit stack.
+- **Action groups use `<ActionButtons>`; sheet footers use `<SheetActions>`.**
+  Two buttons always share one equal-width row. With three or more, the first
+  two share a row and each remaining button is full width below them. A single
+  button stays full width. Supporting actions come first and the primary
+  decision comes last, so pairs read secondary-left/primary-right and stacks
+  read secondary-top/primary-bottom. Pass the primary decision through the
+  group's `primaryAction` prop instead of relying on caller order. Keep errors
+  or supporting text outside the action group. Conditional actions and
+  fragments count by the buttons actually shown. Do not switch pairs to a
+  vertical layout on narrow screens or at larger text sizes; let labels wrap
+  within each button.
+- **Profile hero quick actions keep their established centered wrapping
+  layout.** They are navigation and communication shortcuts, not a bottom form
+  action group. Keep `ProfileQuickActions` out of `ActionButtons`; apply the
+  secondary-first/primary-last rule to bottom content, form, and sheet actions.
 - **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
   it. Only the app lock wants this, and for it the choice is a security one.
 - **A sheet holding unsaved input must guard its dismissal.** Route `onDismiss`

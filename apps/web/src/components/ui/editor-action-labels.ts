@@ -1,17 +1,6 @@
-export const EDITOR_ACTION_LABELS = {
-  save: "Save",
-  cancel: "Cancel",
-  discard: "Discard",
-  close: "Close",
-} as const;
-
-export function getEditorDismissLabel({
-  hasUnsavedChanges,
-  isCreating = false,
-}: {
-  hasUnsavedChanges: boolean;
-  isCreating?: boolean;
-}): string {
-  if (isCreating) return EDITOR_ACTION_LABELS.cancel;
-  return hasUnsavedChanges ? EDITOR_ACTION_LABELS.discard : EDITOR_ACTION_LABELS.close;
-}
+/**
+ * Both apps share this rule, so it lives in `@dubgrid/design-tokens`. This
+ * module stays as the web import path only so the call sites here don't all
+ * have to change; add nothing to it.
+ */
+export { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@dubgrid/design-tokens";

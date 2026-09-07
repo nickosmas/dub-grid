@@ -151,6 +151,7 @@ export const ALL_FALSE_PERMS: AdminPermissions = {
   canManageCoverageRequirements: false,
   canApproveShiftRequests: false,
   canViewDashboardAnalytics: false,
+  canViewReports: false,
 };
 
 export function makeJwtClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {

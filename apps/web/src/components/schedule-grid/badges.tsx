@@ -1,5 +1,7 @@
+import React, { useRef, useState } from "react";
 import { UserPen } from "lucide-react";
 import { MaybeHint } from "@/components/ui/hint";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import type { ActiveShiftRequestStatus } from "@/types";
 import { PublishDiffPill } from "./publishDiffPill";
 
@@ -8,10 +10,26 @@ export type GridDiffBadgeConfig = {
   kind: "new" | "modified" | "time" | "deleted";
   text: string;
   tooltip?: string;
+  /** Use the cell's full shift detail card instead when it is available. */
+  showChangeTooltip?: boolean;
+  /** Center the chip on the pill's top edge without reserving layout space. */
+  overlapPillEdge?: boolean;
   topOffset?: number;
   rightOffset?: number;
   leftOffset?: number;
 };
+
+/**
+ * Grid badges communicate the state of a published or draft change, not the
+ * previous value. The full diff stays in the tooltip; putting fragments such
+ * as "Was ?" or "Changed" on the tiny pill made the schedule both ambiguous
+ * and visually noisy.
+ */
+function getGridDiffBadgeLabel(kind: GridDiffBadgeConfig["kind"]): string {
+  if (kind === "new") return "New";
+  if (kind === "deleted") return "Deleted";
+  return "Edited";
+}
 
 export function shouldUseShiftColorForDiffState(args: { isCross: boolean }): boolean {
   return !args.isCross;
@@ -58,6 +76,8 @@ export function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
   const topOffset = badge.topOffset ?? 1;
   const rightOffset = badge.rightOffset ?? 1;
   const leftOffset = badge.leftOffset;
+  const label = getGridDiffBadgeLabel(badge.kind);
+  const showChangeTooltip = badge.showChangeTooltip !== false;
   const dataAttributes =
     badge.source === "publish"
       ? { "data-publish-badge": badge.kind }
@@ -66,10 +86,11 @@ export function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
     <PublishDiffPill
       kind={badge.kind}
       {...dataAttributes}
-      aria-label={badge.tooltip ?? badge.text}
+      aria-label={badge.tooltip ?? label}
       style={{
         position: "absolute",
         top: topOffset,
+        transform: badge.overlapPillEdge ? "translateY(-50%)" : undefined,
         ...(leftOffset != null
           ? {
               left: leftOffset,
@@ -83,32 +104,97 @@ export function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
               maxWidth: `calc(100% - ${rightOffset + 4}px)`,
             }),
         borderRadius: 3,
-        pointerEvents: badge.tooltip ? "auto" : "none",
-        zIndex: 6,
+        // Let the outer shift card own hover when it is enabled. Otherwise a
+        // tiny status chip creates a competing second popup for the same cell.
+        pointerEvents: badge.tooltip && showChangeTooltip ? "auto" : "none",
+        // The chip is deliberately outside the pill's content box. Keep it
+        // above neighbouring pill layers without consuming layout space.
+        zIndex: 10,
       }}
     >
-      {badge.text}
+      {label}
     </PublishDiffPill>
   );
 
-  if (!badge.tooltip) {
+  if (!badge.tooltip || !showChangeTooltip) {
     return badgeNode;
   }
 
+  return <ChangeHoverCard content={badge.tooltip}>{badgeNode}</ChangeHoverCard>;
+}
+
+/**
+ * The change card is intentionally independent of the shift-detail card.
+ * When the organization disables full shift hover cards, a change chip still
+ * has to reveal its exact history rather than becoming an inert decoration.
+ */
+function ChangeHoverCard({
+  content,
+  children,
+}: {
+  content: string;
+  children: React.ReactElement<
+    React.HTMLAttributes<HTMLSpanElement> & React.RefAttributes<HTMLSpanElement>
+  >;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const trigger = React.cloneElement(children, {
+    ref: (node: HTMLSpanElement | null) => {
+      triggerRef.current = node;
+    },
+    onMouseEnter: (event: React.MouseEvent<HTMLSpanElement>) => {
+      children.props.onMouseEnter?.(event);
+      setIsOpen(true);
+    },
+    onMouseLeave: (event: React.MouseEvent<HTMLSpanElement>) => {
+      children.props.onMouseLeave?.(event);
+      setIsOpen(false);
+    },
+  });
+
   return (
-    <MaybeHint content={badge.tooltip} side="top">
-      {badgeNode}
-    </MaybeHint>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      {trigger}
+      {isOpen && triggerRef.current ? (
+        <PopoverContent
+          anchor={triggerRef}
+          collisionPadding={12}
+          positionMethod="fixed"
+          side="top"
+          sideOffset={8}
+          role="tooltip"
+          style={{
+            width: "max-content",
+            maxWidth: 260,
+            padding: "8px 10px",
+            borderRadius: "var(--dg-radius-sm)",
+            border: "1px solid var(--dg-color-border)",
+            background: "var(--dg-color-surface)",
+            color: "var(--dg-color-text-primary)",
+            boxShadow: "var(--tooltip-shadow)",
+            fontSize: "var(--dg-fs-caption)",
+            lineHeight: 1.4,
+            whiteSpace: "pre-line",
+          }}
+        >
+          {content}
+        </PopoverContent>
+      ) : null}
+    </Popover>
   );
 }
 
 export function MentoredShiftBadge({
   compact = false,
   rightInset = 0.5,
+  topInset = 0.5,
 }: {
   compact?: boolean;
   /** Pushed inward when something outranks it in the corner — see LOCK_CORNER_CLEARANCE. */
   rightInset?: number;
+  /** Moved below a top-right change chip when both are present. */
+  topInset?: number;
 }) {
   const size = compact ? 15 : 16;
   const badge = (
@@ -117,7 +203,7 @@ export function MentoredShiftBadge({
       aria-label="Mentored assignment"
       style={{
         position: "absolute",
-        top: 0.5,
+        top: topInset,
         right: rightInset,
         width: size,
         height: size,

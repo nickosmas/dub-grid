@@ -8,6 +8,7 @@ import {
   type MobileDepartment,
   type MobileManagementUserInviteBody,
 } from "@dubgrid/contracts";
+import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { AppText } from "../../../shared/components/AppText";
 import {
   BottomSheetModal,
@@ -146,6 +147,33 @@ export function ManagementUserInviteSheet({
   return (
     <>
       <BottomSheetModal
+        footer={
+          <>
+            {error ? <InlineError message={error} /> : null}
+            <SheetActions
+              primaryAction={
+                <Button
+                  disabled={isPending || managementDepartments.length === 0}
+                  label="Send Invitation"
+                  loading={isPending}
+                  onPress={submit}
+                  tone="primary"
+                />
+              }
+            >
+              <Button
+                disabled={isPending}
+                // Same tri-state the edit surfaces use. Discard clears the
+                // draft directly rather than through the guard, whose
+                // `onDiscard` would also run on the way out and reintroduce the
+                // fields emptying as the sheet slides away.
+                label={getMobileEditorDismissLabel({ hasUnsavedChanges })}
+                onPress={hasUnsavedChanges ? () => setDraft(EMPTY_DRAFT) : guard.requestClose}
+                tone="neutral"
+              />
+            </SheetActions>
+          </>
+        }
         header={
           <SheetHeader
             subtitle="They'll get an invitation to join management, with no schedule profile."
@@ -245,19 +273,6 @@ export function ManagementUserInviteSheet({
             </View>
           </View>
         )}
-
-        {error ? <InlineError message={error} /> : null}
-
-        <SheetActions>
-          <Button
-            disabled={isPending || managementDepartments.length === 0}
-            label="Send Invitation"
-            loading={isPending}
-            onPress={submit}
-            tone="primary"
-          />
-          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
-        </SheetActions>
       </BottomSheetModal>
 
       <ConfirmationModal {...guard.confirmationProps} />

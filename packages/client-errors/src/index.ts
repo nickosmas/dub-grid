@@ -49,7 +49,7 @@ export const API_ERRORS = {
    * limiter, a dependency it can't reach. "Service temporarily unavailable"
    * named the mechanism and left the reader with nothing to do.
    */
-  SERVICE_UNAVAILABLE: "DubGrid is having trouble right now. Try again in a moment.",
+  SERVICE_UNAVAILABLE: "We're having trouble completing that right now. Try again in a moment.",
   // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
   // for any forbidden/unauthorized error that isn't one of the specific
   // causes below. Prefer a specific constant at new call sites.

@@ -41,10 +41,15 @@ export const queryKeys = {
     peopleChangeRequests: (orgId: string, status: string) =>
       ["org", orgId, "peopleChangeRequests", status] as const,
     publishHistory: (orgId: string) => ["org", orgId, "publishHistory"] as const,
+    // Bare prefix: also covers every per-person activity timeline in the org
+    // (["org", orgId, "auditLog", "employee", employeeId]).
     auditLog: (orgId: string) => ["org", orgId, "auditLog"] as const,
-    // Bare prefix — matches every employee's role-history query for the org
-    // (["org", orgId, "roleHistory", userId]) regardless of which user.
-    roleHistory: (orgId: string) => ["org", orgId, "roleHistory"] as const,
+    // Both sit under the `auditLog` prefix, so realtime invalidation of
+    // audit_log and role_change_log refreshes every period and probe at once.
+    auditLogRange: (orgId: string, startAt: string, endAt: string, page: number, filters: string) =>
+      ["org", orgId, "auditLog", "range", startAt, endAt, page, filters] as const,
+    auditLogLatestBefore: (orgId: string, before: string, filters: string) =>
+      ["org", orgId, "auditLog", "latestBefore", before, filters] as const,
   },
   employees: {
     all: (orgId: string) => ["employees", orgId] as const,

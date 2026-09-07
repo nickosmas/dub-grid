@@ -507,10 +507,7 @@ async function authorize(req: NextRequest, orgId: string, permission: SettingsPe
           );
         case "departmentsManage":
           return (
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canManageFocusAreas ||
-            permissions.canManageOrgLabels
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageFocusAreas
           );
         case "scheduleDefinitionsRead":
           return (

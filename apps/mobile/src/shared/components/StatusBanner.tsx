@@ -181,11 +181,9 @@ function CenteredStatus({
         ) : null}
       </View>
       {actionLabel && onAction ? (
-        // Wrapped, not placed directly: `fullWidth={false}` gives the button
-        // `alignSelf: "flex-start"`, and that beats the `alignItems: "center"`
-        // on the card around it — so the action sat hard left under centred
-        // copy. The wrapper is the flex child that stretches, and the button
-        // centres inside it. `EmptyStateCard` solves it the same way.
+        // `fullWidth={false}` gives the button `alignSelf: "flex-start"`.
+        // Centre it on the wrapper's main axis so that child-level cross-axis
+        // override cannot pull it back to the left.
         <View style={centeredStyles.actionRow}>
           <Button compact fullWidth={false} label={actionLabel} onPress={onAction} tone="primary" />
         </View>
@@ -241,7 +239,8 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
     },
     actionRow: {
       alignSelf: "stretch",
-      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "center",
     },
     title: {
       ...mobileText.sectionTitle,

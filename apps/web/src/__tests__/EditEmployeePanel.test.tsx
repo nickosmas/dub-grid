@@ -323,22 +323,17 @@ describe("EditEmployeePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Remove from Schedule (management users)
+  // Coming off the schedule (management users)
   // -------------------------------------------------------------------------
-  describe("Remove from Schedule (management users)", () => {
-    it("does not render a Remove from Schedule button for a non-management user", () => {
-      renderPanel();
-      expect(
-        screen.queryByRole("button", { name: "Remove from Schedule" }),
-      ).not.toBeInTheDocument();
-    });
-
+  describe("Coming off the schedule (management users)", () => {
+    // Deselecting the focus areas is the whole removal path now; there is no
+    // separate button, so the tags and the consequence note carry it.
     it("allows a management user to clear all focus areas and save with an empty list", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
       renderPanel({ onSave, isManagementUser: true });
 
-      await user.click(screen.getByRole("button", { name: "Remove from Schedule" }));
+      await user.click(screen.getByRole("button", { name: "North" }));
 
       expect(screen.getByText(/removes them from the schedule/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
@@ -346,6 +341,15 @@ describe("EditEmployeePanel", () => {
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ focusAreaIds: [] }));
+    });
+
+    it("withholds the removal note from a non-management user, who can't come off the schedule", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      await user.click(screen.getByRole("button", { name: "North" }));
+
+      expect(screen.queryByText(/removes them from the schedule/i)).not.toBeInTheDocument();
     });
 
     it("Save is not disabled when all focus areas are deselected for a management user", async () => {
@@ -358,6 +362,18 @@ describe("EditEmployeePanel", () => {
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+    });
+
+    it("hides saved schedule assignments for a management-only person", () => {
+      renderPanel({
+        isManagementUser: true,
+        employee: { ...employee, focusAreaIds: [], certificationId: null, roleIds: [] },
+      });
+
+      expect(screen.queryByText("Assignments")).not.toBeInTheDocument();
+      expect(screen.queryByText(/removes them from the schedule/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "North" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Full-time" })).not.toBeInTheDocument();
     });
   });
 

@@ -1,3 +1,4 @@
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -55,6 +56,7 @@ import {
 } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
   mobileMotion,
@@ -833,18 +835,22 @@ export default function PeopleScreen() {
                     {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
                   </Text>
                 </View>
-                <View style={styles.requestActions}>
-                  <Button
-                    compact
-                    disabled={resolveRequestMutation.isPending}
-                    label="Approve"
-                    onPress={() => {
-                      setProfileRequestConfirmation({
-                        request,
-                        action: "approve",
-                      });
-                    }}
-                  />
+                <ActionButtons
+                  primaryAction={
+                    <Button
+                      compact
+                      disabled={resolveRequestMutation.isPending}
+                      label="Approve"
+                      onPress={() => {
+                        setProfileRequestConfirmation({
+                          request,
+                          action: "approve",
+                        });
+                      }}
+                    />
+                  }
+                  style={styles.requestActions}
+                >
                   <Button
                     compact
                     disabled={resolveRequestMutation.isPending}
@@ -857,7 +863,7 @@ export default function PeopleScreen() {
                     }}
                     tone="neutral"
                   />
-                </View>
+                </ActionButtons>
               </View>
             ))}
           </View>
@@ -1176,6 +1182,8 @@ function PersonRow({
         ]}
       >
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.personAvatarText, { color: avatarTone.textColor }]}
         >
@@ -1285,7 +1293,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 44,
     },
     personAvatarText: {
-      ...mobileText.bodyStrong,
+      ...mobileAvatarText(44),
     },
     personCopy: {
       flex: 1,

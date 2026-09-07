@@ -107,21 +107,6 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
         </div>
         <div style={{ display: "flex", gap: 12 }}>
           <Button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: "10px 24px",
-              borderRadius: "var(--dg-radius-lg)",
-              border: "none",
-              background: "var(--dg-color-primary, #2563EB)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Refresh
-          </Button>
-          <Button
             onClick={() => signOut()}
             style={{
               padding: "10px 24px",
@@ -135,6 +120,21 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             }}
           >
             Sign Out
+          </Button>
+          <Button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "var(--dg-radius-lg)",
+              border: "none",
+              background: "var(--dg-color-primary, #2563EB)",
+              color: "white",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Refresh
           </Button>
         </div>
       </div>

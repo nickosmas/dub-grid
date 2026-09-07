@@ -120,9 +120,9 @@ describe("SelectionRow", () => {
 });
 
 describe("FilterButton", () => {
-  it("calls onPress and reflects the active filter count via accessibility state", () => {
+  it("shows the active count, announces it, and remains tappable as filters change", () => {
     const onPress = vi.fn();
-    render(
+    const { rerender } = render(
       <FilterButton
         accessibilityLabel="Open filters"
         activeCount={2}
@@ -131,8 +131,36 @@ describe("FilterButton", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("Open filters"));
+    fireEvent.click(screen.getByLabelText("Open filters, 2 active filters"));
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Filter")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+
+    rerender(
+      <FilterButton
+        accessibilityLabel="Open filters"
+        activeCount={1}
+        expanded={false}
+        onPress={onPress}
+      />,
+    );
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("2")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Open filters, 1 active filter"));
+    expect(onPress).toHaveBeenCalledTimes(2);
+
+    rerender(
+      <FilterButton
+        accessibilityLabel="Open filters"
+        activeCount={0}
+        expanded={false}
+        onPress={onPress}
+      />,
+    );
+    expect(screen.getByText("Filter")).toBeInTheDocument();
+    expect(screen.queryByText(/Filter \(/)).not.toBeInTheDocument();
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Open filters"));
+    expect(onPress).toHaveBeenCalledTimes(3);
   });
 });

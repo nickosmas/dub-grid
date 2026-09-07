@@ -37,6 +37,21 @@ export function SessionDetailSheet({
 }) {
   return (
     <BottomSheetModal
+      // Signing this device out from its own detail sheet would drop the
+      // user mid-flow with a sheet still open. The bulk sheet's "Sign out
+      // everywhere" is the deliberate way to do that.
+      footer={
+        session && !session.isCurrent ? (
+          <SheetActions>
+            <Button
+              label="Sign out this device"
+              loading={revoking}
+              onPress={() => onRevoke(session)}
+              tone="danger"
+            />
+          </SheetActions>
+        ) : null
+      }
       header={
         <SheetHeader
           subtitle={session?.isCurrent ? "This device" : undefined}
@@ -48,49 +63,34 @@ export function SessionDetailSheet({
       onDismiss={onDismiss}
     >
       {session ? (
-        <>
-          <ProfileList>
-            <ProfileInfoRow
-              iconName="phone-portrait-outline"
-              label="Platform"
-              value={formatSessionPlatform(session.platform)}
-            />
-            <ProfileInfoRow
-              iconName="cube-outline"
-              label={session.platform === "web" ? "Browser" : "App"}
-              value={formatSessionClient(session)}
-            />
-            <ProfileInfoRow
-              iconName="globe-outline"
-              label="IP address"
-              value={formatSessionLocation(session)}
-            />
-            <ProfileInfoRow
-              iconName="log-in-outline"
-              label="First signed in"
-              value={formatSessionTimestamp(session.createdAt)}
-            />
-            <ProfileInfoRow
-              iconName="time-outline"
-              isLast
-              label="Last active"
-              value={formatSessionTimestamp(session.lastActiveAt)}
-            />
-          </ProfileList>
-          {/* Signing this device out from its own detail sheet would drop the
-              user mid-flow with a sheet still open. The bulk sheet's "Sign out
-              everywhere" is the deliberate way to do that. */}
-          {session.isCurrent ? null : (
-            <SheetActions>
-              <Button
-                label="Sign out this device"
-                loading={revoking}
-                onPress={() => onRevoke(session)}
-                tone="danger"
-              />
-            </SheetActions>
-          )}
-        </>
+        <ProfileList>
+          <ProfileInfoRow
+            iconName="phone-portrait-outline"
+            label="Platform"
+            value={formatSessionPlatform(session.platform)}
+          />
+          <ProfileInfoRow
+            iconName="cube-outline"
+            label={session.platform === "web" ? "Browser" : "App"}
+            value={formatSessionClient(session)}
+          />
+          <ProfileInfoRow
+            iconName="globe-outline"
+            label="IP address"
+            value={formatSessionLocation(session)}
+          />
+          <ProfileInfoRow
+            iconName="log-in-outline"
+            label="First signed in"
+            value={formatSessionTimestamp(session.createdAt)}
+          />
+          <ProfileInfoRow
+            iconName="time-outline"
+            isLast
+            label="Last active"
+            value={formatSessionTimestamp(session.lastActiveAt)}
+          />
+        </ProfileList>
       ) : null}
     </BottomSheetModal>
   );
