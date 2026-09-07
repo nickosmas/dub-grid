@@ -247,6 +247,60 @@ describe("AdminHomeScreen", () => {
     expect(screen.queryByText("No recent activity")).not.toBeInTheDocument();
   });
 
+  it("shows unpublished draft changes only when the authorized summary is non-zero", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...EMPTY_DASHBOARD_DATA,
+        metrics: {
+          ...EMPTY_DASHBOARD_DATA.metrics,
+          draftSummary: { newCount: 1, modifiedCount: 0, deletedCount: 1, total: 2 },
+        },
+      },
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.getByText("Unpublished changes")).toBeInTheDocument();
+    expect(screen.getByText("1 new change")).toBeInTheDocument();
+    expect(screen.getByText("1 deleted change")).toBeInTheDocument();
+  });
+
+  it("hides authorized zero and permission-redacted draft summaries", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...EMPTY_DASHBOARD_DATA,
+        metrics: {
+          ...EMPTY_DASHBOARD_DATA.metrics,
+          draftSummary: { newCount: 0, modifiedCount: 0, deletedCount: 0, total: 0 },
+        },
+      },
+    });
+
+    const { rerender } = render(<AdminHomeScreen />);
+    expect(screen.queryByText("Unpublished changes")).not.toBeInTheDocument();
+
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    rerender(<AdminHomeScreen />);
+
+    expect(screen.queryByText("Unpublished changes")).not.toBeInTheDocument();
+  });
+
   it("omits the pending-approvals queue for a super_admin", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,

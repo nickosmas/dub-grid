@@ -19,6 +19,7 @@ import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
+import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyScheduleCard } from "../components/MyScheduleCard";
@@ -142,6 +143,7 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
+  const draftSummary = data.metrics.draftSummary;
   const hasPersonalSchedule =
     Boolean(myScheduleQuery.error) || (myScheduleQuery.data?.entries.length ?? 0) > 0;
   // Prefer the linked employee record's name — it's always populated from the
@@ -178,6 +180,7 @@ export function AdminHomeScreen() {
         loading={dashboardQuery.isFetching}
       />
       <DashboardHeroCard summary={data.heroSummary} metrics={data.metrics} />
+      {draftSummary && draftSummary.total > 0 ? <DraftSummaryCard summary={draftSummary} /> : null}
       {role === "admin" && data.actionQueue.length > 0 ? (
         <ActionQueueCard
           requests={data.actionQueue}

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 606a8d54bc39fcd47c956b6993735a69173937dd1b18fc4a99fba964671196dc -->
+<!-- blueprint:source-hash fe44af19f94bc307b208119e4dc3dc2d9c9c09a8d29144d175db6bcfd278e117 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
