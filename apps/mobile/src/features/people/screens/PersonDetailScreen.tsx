@@ -630,9 +630,11 @@ export default function PersonDetailScreen() {
       return;
     }
 
+    // Only the email is worth stopping for. Coming off the schedule is already
+    // stated inline, by the notice above the focus areas, so asking again here
+    // warned twice for one action.
     const changesAccessEmail = normalizeOptionalStaffEmail(draft.email) !== person.email;
-    const leavesSchedule = person.focusAreaIds.length > 0 && draft.focusAreaIds.length === 0;
-    if (changesAccessEmail || leavesSchedule) {
+    if (changesAccessEmail) {
       setShowSaveConfirmation(true);
       return;
     }
@@ -1291,16 +1293,11 @@ export default function PersonDetailScreen() {
         </ProfileSection>
       ) : null}
       <ConfirmationModal
-        body={[
-          draft && normalizeOptionalStaffEmail(draft.email) !== person.email
+        body={
+          draft
             ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
-            : null,
-          draft && person.focusAreaIds.length > 0 && draft.focusAreaIds.length === 0
-            ? "They will leave the schedule and keep their management access."
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" ")}
+            : ""
+        }
         confirmLabel="Save"
         error={confirmationError}
         loading={updateMutation.isPending}
@@ -1309,7 +1306,7 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title="Save this access change?"
+        title="Change the staff email?"
         visible={showSaveConfirmation}
       />
       <ConfirmationModal {...guard.confirmationProps} />

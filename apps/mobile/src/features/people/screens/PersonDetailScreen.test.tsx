@@ -1380,11 +1380,18 @@ describe("PersonDetailScreen", () => {
 
   describe("schedule membership", () => {
     function renderForSchedule(person: Record<string, unknown>) {
-      const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
+      // `mutateAsync` as well as `mutate`: the edit panel's save awaits the
+      // promise, so a mock carrying only `mutate` makes a save look like a
+      // no-op rather than a failure.
+      const mutationCalls: Array<{
+        mutate: ReturnType<typeof vi.fn>;
+        mutateAsync: ReturnType<typeof vi.fn>;
+      }> = [];
       useMutation.mockImplementation(() => {
         const mutate = vi.fn();
-        mutationCalls.push({ mutate });
-        return { error: null, isPending: false, mutate };
+        const mutateAsync = vi.fn().mockResolvedValue(undefined);
+        mutationCalls.push({ mutate, mutateAsync });
+        return { error: null, isPending: false, mutate, mutateAsync };
       });
       useQuery.mockReturnValue({
         data: { person: makePerson(person) },
@@ -1413,6 +1420,21 @@ describe("PersonDetailScreen", () => {
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    });
+
+    // The notice above the chips already says what saving does, so saving goes
+    // straight through. A confirmation here as well warned twice for one action.
+    it("saves an emptied schedule without a second confirmation", () => {
+      const mutationCalls = renderForSchedule({ managementDepartmentIds: [9] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(
+        mutationCalls.flatMap((call) => call.mutateAsync.mock.calls.map(([payload]) => payload)),
+      ).toContainEqual(expect.objectContaining({ focusAreaIds: [] }));
     });
 
     // Without management access the focus areas are the whole staff record, so
