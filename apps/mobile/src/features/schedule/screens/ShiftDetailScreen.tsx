@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,7 @@ import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRow
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import {
   createShiftRequest,
   getPeople,
@@ -81,6 +83,27 @@ import {
   sortScheduleEntries,
 } from "../lib/schedule";
 import { getScheduleEntrySegmentChange } from "../lib/scheduleScreenChips";
+import {
+  HERO_CARD_BACKGROUND_DARK,
+  HERO_CARD_BACKGROUND_LIGHT,
+  HERO_CARD_GRADIENT_DARK,
+  HERO_CARD_GRADIENT_END,
+  HERO_CARD_GRADIENT_LIGHT,
+  HERO_CARD_GRADIENT_LOCATIONS,
+  HERO_CARD_GRADIENT_START,
+  HERO_CARD_SHADOW_DARK,
+  HERO_CARD_SHADOW_LIGHT,
+  HERO_ICON_COLOR,
+  getShiftHeroStatus,
+  getShiftHeroStatusLabel,
+  toHeroTimingStatus,
+} from "../lib/heroCardTheme";
+import {
+  getCurrentTimeValue,
+  getHeroTiming,
+  getSegmentEndTime,
+  getSegmentStartTime,
+} from "../lib/scheduleScreenHelpers";
 import {
   addDaysIso,
   buildShiftmateSegmentGroups,
@@ -203,13 +226,18 @@ function buildSegmentJobChip(
   return buildJobChip(mobileColors, isDark, label, segment);
 }
 
-function MentoredPill() {
+function MentoredPill({ inverse = false }: { inverse?: boolean }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
+    <View
+      accessibilityLabel="Mentored assignment"
+      style={[styles.mentoredPill, inverse && styles.mentoredPillInverse]}
+    >
+      <Text style={[styles.mentoredPillText, inverse && styles.mentoredPillTextInverse]}>
+        Mentored
+      </Text>
     </View>
   );
 }
@@ -265,6 +293,8 @@ export default function ShiftDetailScreen() {
   const linkedEmployeeFocusAreaIds = bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? [];
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const todayDateKey = getCurrentDateTimeParts(timeZone).dateKey;
+  const now = useRealtimeNow();
+  const currentTimeValue = getCurrentTimeValue(now, timeZone);
   const canViewTeamSchedule = bootstrapQuery.data
     ? bootstrapQuery.data.permissions.canViewSchedule
     : false;
@@ -771,6 +801,42 @@ export default function ShiftDetailScreen() {
     !hasSplitShift && (detailTitleChip || primarySegment?.isMentored),
   );
 
+  // The same live status and countdown the Home hero prints, computed from this
+  // one shift rather than from a pass over the whole week. The primary segment
+  // is what the header describes, so it is what the countdown follows; a split
+  // shift's later segments carry their own times in the segment list.
+  const heroStartTime =
+    getSegmentStartTime(primarySegment) ??
+    (shiftEntry ? getScheduleEntryStartTime(shiftEntry) : null);
+  const heroEndTime =
+    getSegmentEndTime(primarySegment) ?? (shiftEntry ? getScheduleEntryEndTime(shiftEntry) : null);
+  const heroStatus = getShiftHeroStatus({
+    entry: shiftEntry,
+    startTime: heroStartTime,
+    endTime: heroEndTime,
+    currentDate: todayDateKey,
+    currentTime: currentTimeValue,
+  });
+  const heroStatusLabel = getShiftHeroStatusLabel(heroStatus);
+  const heroTiming = getHeroTiming(
+    shiftEntry,
+    heroStartTime,
+    heroEndTime,
+    toHeroTimingStatus(heroStatus),
+    todayDateKey,
+    currentTimeValue,
+  );
+  const heroBadgeDotStyle =
+    heroStatus === "active"
+      ? styles.detailHeroBadgeDotActive
+      : heroStatus === "away" || heroStatus === "completed"
+        ? styles.detailHeroBadgeDotMuted
+        : styles.detailHeroBadgeDotScheduled;
+  const heroCardThemeStyle = {
+    backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,
+  };
+
   const shouldShowShiftmates = Boolean(
     canViewTeamSchedule &&
     shiftEntry &&
@@ -1011,51 +1077,64 @@ export default function ShiftDetailScreen() {
         />
       ) : (
         <>
-          <View style={styles.shiftDetailCard} testID="shift-detail-card">
-            <View style={styles.detailSummaryRow}>
-              <View style={styles.detailSummaryContent}>
-                <View style={styles.detailHeroHeader}>
-                  <View style={styles.detailHeroCopy}>
-                    {shouldShowDetailTitle ? (
-                      <View style={styles.detailHeroTitleRow}>
-                        <Text
-                          maxFontSizeMultiplier={MAX_FONT_SCALE}
-                          numberOfLines={1}
-                          style={[styles.detailHeroTitle, styles.detailHeroTitleInline]}
-                        >
-                          {detailCardTitle}
-                        </Text>
-                        <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
-                      </View>
-                    ) : null}
-                    {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
-                      <View style={styles.detailHeroPillRow}>
-                        {detailTitleChip || primarySegment?.isMentored ? (
-                          <DetailHeaderJobPill
-                            chip={detailTitleChip}
-                            isMentored={primarySegment?.isMentored === true}
-                          />
-                        ) : null}
-                        {!shouldShowDetailTitle ? (
-                          <DetailShiftChangeBadge
-                            change={hasSplitShift ? null : shiftEntry.change}
-                          />
-                        ) : null}
-                      </View>
-                    ) : null}
-                    {isViewingOtherEmployee && shiftEntry.employeeName ? (
-                      <Text style={styles.detailEmployeeName}>{shiftEntry.employeeName}</Text>
-                    ) : null}
+          {/* The same hero surface the Home screen leads with: gradient card,
+              live status badge, inline area and time rows, and the countdown.
+              Opening a shift should feel like zooming into that card, not like
+              dropping onto a plainer restatement of it. */}
+          <View style={[styles.shiftDetailCard, heroCardThemeStyle]} testID="shift-detail-card">
+            <LinearGradient
+              colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
+              locations={HERO_CARD_GRADIENT_LOCATIONS}
+              start={HERO_CARD_GRADIENT_START}
+              end={HERO_CARD_GRADIENT_END}
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.detailHeroContent}>
+              <View style={styles.detailHeroHeader}>
+                <View style={styles.detailHeroCopy}>
+                  <View style={styles.detailHeroBadge}>
+                    <View style={[styles.detailHeroBadgeDot, heroBadgeDotStyle]} />
+                    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailHeroBadgeText}>
+                      {heroStatusLabel}
+                    </Text>
                   </View>
+                  {shouldShowDetailTitle ? (
+                    <View style={styles.detailHeroTitleRow}>
+                      <Text
+                        maxFontSizeMultiplier={MAX_FONT_SCALE}
+                        numberOfLines={1}
+                        style={[styles.detailHeroTitle, styles.detailHeroTitleInline]}
+                      >
+                        {detailCardTitle}
+                      </Text>
+                      <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
+                    </View>
+                  ) : null}
+                  {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
+                    <View style={styles.detailHeroPillRow}>
+                      {detailTitleChip || primarySegment?.isMentored ? (
+                        <DetailHeaderJobPill
+                          chip={detailTitleChip}
+                          isMentored={primarySegment?.isMentored === true}
+                        />
+                      ) : null}
+                      {!shouldShowDetailTitle ? (
+                        <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {isViewingOtherEmployee && shiftEntry.employeeName ? (
+                    <Text style={styles.detailEmployeeName}>{shiftEntry.employeeName}</Text>
+                  ) : null}
                 </View>
+                <DetailDateTile date={shiftEntry.date} />
               </View>
-              <DetailDateTile date={shiftEntry.date} />
-            </View>
 
-            <View style={styles.detailInfoStack}>
               {hasSplitShift ? (
                 <ShiftEntrySegmentList
                   entry={shiftEntry}
+                  inverse
                   showSegmentLabels={false}
                   suppressCountAccessibilityLabel
                   variant="detail"
@@ -1066,65 +1145,104 @@ export default function ShiftDetailScreen() {
                   Drop and swap actions apply to the shift you choose.
                 </Text>
               ) : null}
-              {!hasMultipleSegments && timeRange ? (
-                <DetailInfoRow
-                  iconName="time-outline"
-                  label="Shift time"
-                  value={timeRange}
-                  prominent
-                />
+              {!hasMultipleSegments && (focusAreaName || timeRange) ? (
+                <View style={styles.detailHeroContextGroup}>
+                  {focusAreaName ? (
+                    <View
+                      accessibilityLabel={`Focus area ${focusAreaName}`}
+                      style={styles.detailHeroAreaRow}
+                    >
+                      <Ionicons color={HERO_ICON_COLOR} name="location-outline" size={18} />
+                      <Text
+                        maxFontSizeMultiplier={MAX_FONT_SCALE}
+                        style={styles.detailHeroAreaLabel}
+                      >
+                        {focusAreaName}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {timeRange ? (
+                    <View
+                      accessibilityLabel={`Shift time ${timeRange}`}
+                      style={styles.detailHeroScheduleRow}
+                    >
+                      <View style={styles.detailHeroTimeRow}>
+                        <Ionicons color={HERO_ICON_COLOR} name="time-outline" size={24} />
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          style={styles.detailHeroTimeText}
+                        >
+                          {timeRange}
+                        </Text>
+                      </View>
+                      {heroTiming ? (
+                        <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
+                          style={styles.detailHeroProgressLabel}
+                        >
+                          {heroTiming.label}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {/* Tied to the time row: a lone bar with no range beside it
+                      says nothing. */}
+                  {timeRange && heroTiming?.progress != null ? (
+                    <View style={styles.detailHeroProgressTrack} testID="shift-detail-progress">
+                      <View
+                        style={[
+                          styles.detailHeroProgressFill,
+                          { width: `${Math.max(heroTiming.progress, 0.08) * 100}%` },
+                        ]}
+                      />
+                    </View>
+                  ) : null}
+                </View>
               ) : null}
-              {!hasMultipleSegments && focusAreaName ? (
-                <DetailInfoRow
-                  iconName="location-outline"
-                  label="Focus area"
-                  value={focusAreaName}
+
+              {canCreateRequestsForShift ? (
+                <View style={styles.detailActionsRow}>
+                  <View style={styles.detailActionButtonWrap}>
+                    <Button
+                      accessibilityLabel="Drop shift"
+                      disabled={createRequestMutation.isPending}
+                      fullWidth
+                      icon="exit-outline"
+                      label="Drop shift"
+                      onPress={() => resetRequestMode("coverage")}
+                      shape="pill"
+                      size="md"
+                      tone="plain"
+                    />
+                  </View>
+                  {canCreateSwapForShift ? (
+                    <View style={styles.detailActionButtonWrap}>
+                      <Button
+                        accessibilityLabel="Swap"
+                        disabled={createRequestMutation.isPending}
+                        fullWidth
+                        icon="swap-horizontal-outline"
+                        label="Swap"
+                        onPress={() => resetRequestMode("swap")}
+                        shape="pill"
+                        size="md"
+                        tone="plain"
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <PreviousShiftFooter change={shiftEntry.change} />
+
+              {publishedSummary ? (
+                <DetailPublishedFooter
+                  publishedAtLabel={publishedAtLabel}
+                  publishedByName={shiftEntry.publishedByName}
+                  summary={publishedSummary}
                 />
               ) : null}
             </View>
-
-            {canCreateRequestsForShift ? (
-              <View style={styles.detailActionsRow}>
-                <View style={styles.detailActionButtonWrap}>
-                  <Button
-                    accessibilityLabel="Drop shift"
-                    disabled={createRequestMutation.isPending}
-                    fullWidth
-                    icon="exit-outline"
-                    label="Drop shift"
-                    onPress={() => resetRequestMode("coverage")}
-                    shape="pill"
-                    size="md"
-                    tone="neutral"
-                  />
-                </View>
-                {canCreateSwapForShift ? (
-                  <View style={styles.detailActionButtonWrap}>
-                    <Button
-                      accessibilityLabel="Swap"
-                      disabled={createRequestMutation.isPending}
-                      fullWidth
-                      icon="swap-horizontal-outline"
-                      label="Swap"
-                      onPress={() => resetRequestMode("swap")}
-                      shape="pill"
-                      size="md"
-                      tone="primary"
-                    />
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-
-            <PreviousShiftFooter change={shiftEntry.change} />
-
-            {publishedSummary ? (
-              <DetailPublishedFooter
-                publishedAtLabel={publishedAtLabel}
-                publishedByName={shiftEntry.publishedByName}
-                summary={publishedSummary}
-              />
-            ) : null}
           </View>
 
           {shouldRenderShiftmatesSection ? (
@@ -1637,7 +1755,7 @@ function DetailHeaderJobPill({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
-    return isMentored ? <MentoredPill /> : null;
+    return isMentored ? <MentoredPill inverse /> : null;
   }
 
   // Absences use the category as the main heading and keep the specific
@@ -1721,13 +1839,9 @@ function DetailShiftChangeBadge({ change }: { change: MobileScheduleEntry["chang
   return (
     <View
       accessibilityLabel={`Shift ${DETAIL_SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
-      style={[
-        styles.detailShiftChangeBadge,
-        change.kind === "modified" && styles.detailShiftChangeBadgeModified,
-        change.kind === "deleted" && styles.detailShiftChangeBadgeDeleted,
-      ]}
+      style={[styles.detailShiftChangeBadge, styles.detailShiftChangeBadgeInverse]}
     >
-      <Text style={styles.detailShiftChangeBadgeText}>
+      <Text style={[styles.detailShiftChangeBadgeText, styles.detailShiftChangeBadgeTextInverse]}>
         {DETAIL_SHIFT_CHANGE_LABELS[change.kind]}
       </Text>
     </View>
@@ -1778,11 +1892,11 @@ function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"]
         onPress={() => setShowPreviousShift(true)}
         style={styles.detailPreviousShiftFooter}
       >
-        <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
+        <Ionicons color={HERO_ICON_COLOR} name="arrow-undo-outline" size={16} />
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailPreviousShiftText}>
           View previous shift
         </Text>
-        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
+        <Ionicons color={HERO_ICON_COLOR} name="chevron-forward" size={18} />
       </PressableRow>
       <BottomSheetModal
         accessibilityLabel="Dismiss previous shift details"
@@ -1872,7 +1986,7 @@ function DetailPublishedFooter({
         onPress={() => setShowPublication(true)}
         style={styles.detailPublishedFooter}
       >
-        <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={16} />
+        <Ionicons color={HERO_ICON_COLOR} name="information-circle-outline" size={16} />
         <Text
           numberOfLines={1}
           ellipsizeMode="tail"
@@ -1947,11 +2061,13 @@ function ActionSegmentSelector({
 function DetailJobPill({
   chip,
   eyebrowDisplay = "inside",
+  inverse = false,
   isMentored = false,
   prominent = false,
 }: {
   chip: JobChip | null;
   eyebrowDisplay?: EyebrowDisplay;
+  inverse?: boolean;
   isMentored?: boolean;
   prominent?: boolean;
 }) {
@@ -1959,7 +2075,7 @@ function DetailJobPill({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   if (!chip) {
-    return isMentored ? <MentoredPill /> : null;
+    return isMentored ? <MentoredPill inverse={inverse} /> : null;
   }
 
   const accessibilityLabel = chip.eyebrowLabel
@@ -2422,11 +2538,13 @@ function SwapOptionCard({
 
 function ShiftEntrySegmentList({
   entry,
+  inverse = false,
   showSegmentLabels = true,
   suppressCountAccessibilityLabel = false,
   variant,
 }: {
   entry: MobileScheduleEntry;
+  inverse?: boolean;
   showSegmentLabels?: boolean;
   suppressCountAccessibilityLabel?: boolean;
   variant: "detail" | "supporting";
@@ -2442,9 +2560,11 @@ function ShiftEntrySegmentList({
         return change ? DETAIL_SHIFT_CHANGE_LABELS[change.kind] : null;
       }}
       includeSegmentLabelInStatus={variant === "supporting"}
+      inverse={inverse}
       renderSegmentChip={(segment) => (
         <DetailJobPill
           chip={buildSegmentJobChip(mobileColors, isDark, segment)}
+          inverse={inverse}
           isMentored={segment.isMentored === true}
         />
       )}

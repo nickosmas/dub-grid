@@ -27,27 +27,41 @@ export const ACTION_SEGMENT_OPTION_RADIUS = Math.min(
  */
 export const createStyles = (mobileColors: MobileColors, isDark = false) =>
   StyleSheet.create({
+    // Geometry and shadow are the Home hero's (scheduleScreenStyles' meHeroCard):
+    // the gradient and background colour are applied by the screen so the two
+    // cards stay one surface.
     shiftDetailCard: {
+      position: "relative",
+      overflow: "hidden",
+      borderRadius: mobileRadii.card,
+      marginTop: 12,
+      marginBottom: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
+      shadowOffset: {
+        width: 0,
+        height: 14,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 28,
+      elevation: 5,
+    },
+    // The placeholder stands in for the hero before its data lands, so it keeps
+    // the hero's geometry but a plain surface: skeleton bars on the gradient
+    // read as a broken card rather than a loading one.
+    shiftDetailSkeletonCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.cardBorder,
       marginTop: 12,
       marginBottom: 8,
-      padding: mobileSpace.xl,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
       gap: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
-    detailSummaryRow: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: 14,
-    },
-    detailSummaryContent: {
-      flex: 1,
-      minWidth: 0,
-      justifyContent: "center",
+    detailHeroContent: {
       gap: mobileSpace.lg,
     },
     detailHeroHeader: {
@@ -60,6 +74,31 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flex: 1,
       minWidth: 0,
       gap: 7,
+    },
+    detailHeroBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    detailHeroBadgeDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+    },
+    detailHeroBadgeDotActive: {
+      backgroundColor: "#86EFAC",
+    },
+    detailHeroBadgeDotScheduled: {
+      backgroundColor: "#BFDBFE",
+    },
+    detailHeroBadgeDotMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.55)",
+    },
+    detailHeroBadgeText: {
+      ...mobileText.label,
+      color: mobileColors.textInverse,
+      textTransform: "uppercase",
     },
     detailHeroTitleRow: {
       width: "100%",
@@ -80,27 +119,24 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    detailShiftChangeBadgeNew: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    detailShiftChangeBadgeModified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    detailShiftChangeBadgeDeleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
     detailShiftChangeBadgeText: {
       ...mobileText.badge,
       color: mobileColors.brand,
       fontWeight: "700",
       textTransform: "none",
     },
+    // On the gradient the tinted soft fills vanish, so every kind shares one
+    // translucent white pill and lets the label carry the meaning.
+    detailShiftChangeBadgeInverse: {
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.28)",
+    },
+    detailShiftChangeBadgeTextInverse: {
+      color: mobileColors.textInverse,
+    },
     detailHeroTitle: {
       ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
+      color: mobileColors.textInverse,
     },
     detailHeroTitleInline: {
       flexShrink: 1,
@@ -108,7 +144,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailEmployeeName: {
       ...mobileText.rowTitle,
-      color: mobileColors.textSubtle,
+      color: "rgba(255, 255, 255, 0.82)",
     },
     // Mirrors the home card's meTypePillStack/meTypePillLabel: the chip kind
     // reads as an eyebrow above the pill, not as the pill's own text.
@@ -128,15 +164,61 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       ...mobileText.rowTitle,
       fontSize: 17,
       lineHeight: 22,
-      color: mobileColors.textMuted,
+      color: "rgba(255, 255, 255, 0.82)",
     },
-    detailInfoStack: {
-      width: "100%",
-      gap: mobileSpace.sm,
+    // The area, time and countdown rows mirror the Home hero's context group.
+    detailHeroContextGroup: {
+      gap: 8,
+    },
+    detailHeroAreaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    detailHeroAreaLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    detailHeroScheduleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    detailHeroTimeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+      gap: 9,
+      minWidth: 0,
+    },
+    detailHeroTimeText: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textInverse,
+      flexShrink: 1,
+    },
+    detailHeroProgressLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+      flexShrink: 0,
+    },
+    detailHeroProgressTrack: {
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: "rgba(15, 23, 42, 0.24)",
+      overflow: "hidden",
+    },
+    detailHeroProgressFill: {
+      height: "100%",
+      borderRadius: 999,
+      backgroundColor: "#42E878",
     },
     detailSplitNotice: {
       ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
+      color: "rgba(255, 255, 255, 0.82)",
     },
     detailActionsRow: {
       flexDirection: "row",
@@ -148,7 +230,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailPublishedFooter: {
       borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
+      borderTopColor: "rgba(255, 255, 255, 0.18)",
       paddingTop: mobileSpace.md,
       minHeight: 44,
       flexDirection: "row",
@@ -161,9 +243,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: mobileSpace.sm,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: "rgba(255, 255, 255, 0.22)",
       borderRadius: mobileRadii.control,
-      backgroundColor: "transparent",
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
     },
@@ -171,19 +253,19 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       flex: 1,
       minWidth: 0,
       ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
+      color: "rgba(255, 255, 255, 0.9)",
     },
     detailPublishedText: {
       flex: 1,
       minWidth: 0,
       ...mobileText.meta,
-      color: mobileColors.textSubtle,
+      color: "rgba(255, 255, 255, 0.7)",
     },
     // Nested inside detailPublishedText, so it inherits that token's size and
     // only needs to move the family up a weight.
     detailPublishedName: {
       fontFamily: mobileTypography.fontFamily.semibold,
-      color: mobileColors.textMuted,
+      color: "rgba(255, 255, 255, 0.9)",
     },
     detailPublicationSummary: {
       ...mobileText.body,
@@ -246,13 +328,12 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "flex-start",
     },
     detailDateTile: {
-      alignSelf: "center",
       flexShrink: 0,
       minWidth: 58,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
+      borderColor: "rgba(255, 255, 255, 0.22)",
+      backgroundColor: "rgba(255, 255, 255, 0.14)",
       alignItems: "center",
       justifyContent: "center",
       gap: 4,
@@ -261,11 +342,11 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailDateWeekday: {
       ...mobileText.label,
-      color: mobileColors.textPrimary,
+      color: "rgba(255, 255, 255, 0.72)",
     },
     detailDateDay: {
       ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
+      color: mobileColors.textInverse,
     },
     detailShiftTitle: {
       ...mobileText.rowTitle,
@@ -344,6 +425,13 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     mentoredPillText: {
       ...mobileText.badge,
       color: mobileColors.textSecondary,
+    },
+    mentoredPillInverse: {
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.24)",
+    },
+    mentoredPillTextInverse: {
+      color: mobileColors.textInverse,
     },
     detailSegmentList: {
       gap: 12,
