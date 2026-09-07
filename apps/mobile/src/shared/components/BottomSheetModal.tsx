@@ -89,6 +89,10 @@ const CLOSE_BUTTON_SIZE = 44;
 /** What `SheetHeader` renders its title at, which is what the close button lines up with. */
 const SHEET_TITLE_LINE_HEIGHT = mobileText.screenTitle.lineHeight ?? 28;
 
+/** Centres the close button on the title's first line. */
+const CLOSE_BUTTON_TOP =
+  SHEET_CONTENT_TOP_PADDING + (SHEET_TITLE_LINE_HEIGHT - CLOSE_BUTTON_SIZE) / 2;
+
 export function BottomSheetModal({
   visible,
   onDismiss,
@@ -259,7 +263,9 @@ export function BottomSheetModal({
                   a touch starting here can never be claimed by the scrolling
                   body, so the sheet always drags — without the user having to
                   hit the 40x4 handle itself. */}
-                <View style={styles.dragRegion}>
+                <View
+                  style={[styles.dragRegion, dismissDisabled ? null : styles.dragRegionWithClose]}
+                >
                   {/* Every sheet carries the handle, blocking ones included: it is
                     what marks the top of the sheet as the thing you grab, and a
                     blocking sheet answers that grab by following the finger a
@@ -350,6 +356,15 @@ const createStyles = (
       minHeight: 44,
       justifyContent: "center",
     },
+    // The close button is absolutely positioned, so it adds no height of its
+    // own: on a sheet whose header is a single-line title it ends 8pt below
+    // that line, leaving the header's own `paddingBottom` as the only gap
+    // before the body and the button crowding whatever came next. This floors
+    // the region at the button's full extent plus real breathing room. A taller
+    // header (a subtitle, a wrapped title) already clears it and is unaffected.
+    dragRegionWithClose: {
+      minHeight: CLOSE_BUTTON_TOP + CLOSE_BUTTON_SIZE + mobileSpace.lg,
+    },
     // Absolute so it can't push the title off-centre or add height to the drag
     // region, and so a header that wraps to two lines keeps it pinned to the
     // first line rather than drifting to the middle of the block.
@@ -359,7 +374,7 @@ const createStyles = (
       // `SHEET_CONTENT_TOP_PADDING` tall and the header adds no padding of its
       // own, so that is where the title starts; the rest centres this button's
       // box on that line box rather than on the header as a whole.
-      top: SHEET_CONTENT_TOP_PADDING + (SHEET_TITLE_LINE_HEIGHT - CLOSE_BUTTON_SIZE) / 2,
+      top: CLOSE_BUTTON_TOP,
       // Matches the header's own `paddingHorizontal`, so the gap to the right
       // edge is the gap the title keeps from the left.
       right: mobileSpace.xl,
