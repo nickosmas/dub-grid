@@ -77,6 +77,11 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Print / export (PDF, CSV, .ics)
 - Test sandbox: cookie-based cloned org for safe QA without touching real
   tenant data
+- Management-only assignment visibility: after a person is removed from the
+  schedule, hide schedule-specific assignments and any removal warning rather
+  than presenting stale controls. The inverse applies after management access is
+  removed. Capability transitions must refresh the saved person state before the
+  next editor render.
 - Explicit schedule-indicator removal: active shift note/indicator controls in
   the slideover must offer a clear, accessible removal affordance instead of
   requiring users to discover that clicking the active indicator removes it.
@@ -87,13 +92,14 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   schema, tenant isolation, and ledger state. Planning this gate does not
   authorize any production mutation.
 
-The roadmap order is the mobile release catch-up in item 17, authentication and
-onboarding release hardening in item 18, explicit schedule-indicator removal in
-item 19, then production migration safety in item 20. Item 17 is deliberately
-split into role eligibility, the shared dashboard model, and native dashboard
-presentation so each can be reviewed independently. Item 18 is split into state
-correctness, full journey coverage, performance and resilience, security, and
-release qualification. Item 20 must remain last.
+The roadmap starts with management-only assignment visibility in item 17, then
+the mobile release catch-up in item 18, authentication and onboarding release
+hardening in item 19, explicit schedule-indicator removal in item 20, and
+production migration safety in item 21. Item 18 is deliberately split into role
+eligibility, the shared dashboard model, and native dashboard presentation so
+each can be reviewed independently. Item 19 is split into state correctness,
+full journey coverage, performance and resilience, security, and release
+qualification. Item 21 must remain last.
 
 ## 4. Data - What are we storing?
 

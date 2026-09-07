@@ -41,51 +41,57 @@
 
 ## Roadmap
 
-- [ ] 17. **Mobile release catch-up** - close the remaining release-delta
+- [x] 17. **Management-only assignment visibility** - after a person is removed
+      from the schedule, hide all schedule-assignment fields and the stale
+      schedule-removal notice; after a person is removed from management, hide
+      management-only controls. Re-show only the controls authorized by their
+      current saved capability state, with transition-safe cache updates and
+      regression coverage for both directions.
+- [ ] 18. **Mobile release catch-up** - close the remaining release-delta
       gaps while preserving the intentional web-only schedule authoring and
       organization-settings boundaries.
-  - [x] 17a. **Mobile role certification eligibility** - expose role
+  - [x] 18a. **Mobile role certification eligibility** - expose role
         certification requirements to mobile and prevent incompatible new role
         selections before save.
-  - [ ] 17b. **Canonical mobile dashboard model** - make web and mobile consume
+  - [ ] 18b. **Canonical mobile dashboard model** - make web and mobile consume
         one dashboard calculation model and extend the authenticated mobile
         payload with canonical metrics, coverage, drafts, and trends.
-  - [ ] 17c. **Canonical mobile dashboard experience** - present the canonical
+  - [ ] 18c. **Canonical mobile dashboard experience** - present the canonical
         dashboard data in native mobile cards and read-only detail screens,
         without adding schedule editing or publishing.
-- [ ] 18. **Authentication and onboarding release hardening** - leave no known
+- [ ] 19. **Authentication and onboarding release hardening** - leave no known
       correctness, performance, resilience, or security defects across the
       complete web and mobile entry lifecycle before production readiness.
-  - [ ] 18a. **Admission and onboarding state correctness** - make durable
+  - [ ] 19a. **Admission and onboarding state correctness** - make durable
         per-member, per-organization completion authoritative; completed users
         must never see onboarding again after app admission, refresh, token
         rotation, realtime organization changes, role changes, or a new session,
         while incomplete users cannot bypass required setup, billing, or MFA
         gates.
-  - [ ] 18b. **Complete authentication journey coverage** - audit and repair
+  - [ ] 19b. **Complete authentication journey coverage** - audit and repair
         invitation acceptance, subdomain and organization entry, sign-in,
         session restoration, password reset and recovery, MFA enrollment and
         challenge, logout and revocation, expired sessions, onboarding variants,
         and trial/setup gates across every role on web and mobile.
-  - [ ] 18c. **Authentication speed and resilience** - measure cold and warm
+  - [ ] 19c. **Authentication speed and resilience** - measure cold and warm
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
         and verify slow, offline, retry, cross-tab, and token-refresh behavior.
-  - [ ] 18d. **Authentication security hardening** - verify tenant and session
+  - [ ] 19d. **Authentication security hardening** - verify tenant and session
         isolation, current membership enforcement, stale-claim handling, MFA
         assurance, invite/recovery expiry and replay protection, redirect safety,
         CSRF protection, enumeration resistance, rate limiting, token secrecy,
         auditability, and RLS-backed authorization.
-  - [ ] 18e. **Authentication release qualification** - add a durable automated
+  - [ ] 19e. **Authentication release qualification** - add a durable automated
         role/state/browser matrix and complete authenticated browser plus native
         device checks; close every confirmed in-scope defect and report any
         unavailable evidence explicitly before marking the epic complete.
-- [ ] 19. **Explicit schedule-indicator removal** - make removing an active
+- [ ] 20. **Explicit schedule-indicator removal** - make removing an active
       shift note/indicator discoverable in the shift slideover, without relying
       on clicking the active indicator itself. Preserve authorization,
       confirmation, audit, and save behavior; provide an accessible explicit
       removal affordance and regression coverage.
-- [ ] 20. **Production migration safety** - final release gate only after all
+- [ ] 21. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

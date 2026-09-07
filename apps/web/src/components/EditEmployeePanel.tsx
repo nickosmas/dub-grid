@@ -23,6 +23,7 @@ import { satisfiesCertificationRequirement } from "@/lib/credential-requirements
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
+import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   checkEmployeeEmailConflict,
@@ -418,6 +419,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       }
       return notices;
     }, [isManagementUser, form.focusAreaIds.length]);
+    // A management user can draft removal from the schedule and still reverse it
+    // before saving. Once the saved record no longer has a focus-area assignment,
+    // the entire schedule-only section must disappear on every editor surface.
+    const showScheduleAssignments = !isManagementUser || hasSavedScheduleAssignment(employee);
 
     const fieldLabel: React.CSSProperties = {
       fontSize: "var(--dg-type-field-title-size)",
@@ -534,24 +539,26 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   </div>
                 )}
 
-                <div>
-                  <label style={fieldLabel}>Employment</label>
-                  <CustomSelect
-                    value={form.employmentType}
-                    options={[
-                      { value: "full_time", label: "Full-time" },
-                      { value: "part_time", label: "Part-time" },
-                    ]}
-                    onChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        employmentType: v === "part_time" ? "part_time" : "full_time",
-                      }))
-                    }
-                    disabled={readOnly}
-                    style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
-                  />
-                </div>
+                {showScheduleAssignments && (
+                  <div>
+                    <label style={fieldLabel}>Employment</label>
+                    <CustomSelect
+                      value={form.employmentType}
+                      options={[
+                        { value: "full_time", label: "Full-time" },
+                        { value: "part_time", label: "Part-time" },
+                      ]}
+                      onChange={(v) =>
+                        setForm((p) => ({
+                          ...p,
+                          employmentType: v === "part_time" ? "part_time" : "full_time",
+                        }))
+                      }
+                      disabled={readOnly}
+                      style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
+                    />
+                  </div>
+                )}
 
                 {!hideIdentityFields && (
                   <div
@@ -670,104 +677,105 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               </div>
             </div>
 
-            {/* ── Assignments section ── */}
-            <div
-              style={{
-                borderTop: "1px solid var(--dg-color-border-light)",
-                paddingTop: 20,
-                paddingBottom: 20,
-              }}
-            >
-              <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                Assignments
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <SectionNotice messages={assignmentNotices} />
-                <div>
-                  <label style={fieldLabel}>{certificationLabel}</label>
-                  <CustomSelect
-                    value={form.certificationId != null ? String(form.certificationId) : ""}
-                    options={[
-                      { value: "", label: "— None —" },
-                      ...certifications.map((d) => ({
-                        value: String(d.id),
-                        label: d.name,
-                      })),
-                    ]}
-                    onChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        certificationId: v ? Number(v) : null,
-                      }))
-                    }
-                    disabled={readOnly}
-                    style={{ width: "100%" }}
-                  />
+            {showScheduleAssignments && (
+              <div
+                style={{
+                  borderTop: "1px solid var(--dg-color-border-light)",
+                  paddingTop: 20,
+                  paddingBottom: 20,
+                }}
+              >
+                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                  Assignments
                 </div>
-
-                <div>
-                  <label style={fieldLabel}>
-                    {focusAreaLabel}
-                    {!isManagementUser && (
-                      <span style={{ color: "var(--dg-color-danger)" }}> *</span>
-                    )}
-                  </label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {focusAreas.map((focusArea) => {
-                      const active = form.focusAreaIds.includes(focusArea.id);
-                      return (
-                        <SelectableTag
-                          key={focusArea.id}
-                          selected={active}
-                          onClick={() => {
-                            toggleFocusArea(focusArea.id);
-                            markTouched("focusAreaIds");
-                          }}
-                          disabled={readOnly}
-                          padding="5px 12px"
-                        >
-                          {focusArea.name}
-                        </SelectableTag>
-                      );
-                    })}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <SectionNotice messages={assignmentNotices} />
+                  <div>
+                    <label style={fieldLabel}>{certificationLabel}</label>
+                    <CustomSelect
+                      value={form.certificationId != null ? String(form.certificationId) : ""}
+                      options={[
+                        { value: "", label: "— None —" },
+                        ...certifications.map((d) => ({
+                          value: String(d.id),
+                          label: d.name,
+                        })),
+                      ]}
+                      onChange={(v) =>
+                        setForm((p) => ({
+                          ...p,
+                          certificationId: v ? Number(v) : null,
+                        }))
+                      }
+                      disabled={readOnly}
+                      style={{ width: "100%" }}
+                    />
                   </div>
-                  {fieldErrors.focusAreaIds && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.focusAreaIds}
-                    </div>
-                  )}
-                </div>
 
-                <div>
-                  <label style={fieldLabel}>{roleLabel}</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {roles
-                      .filter((role) => form.roleIds.includes(role.id) || !isRoleBlocked(role.id))
-                      .map((role) => {
-                        const active = form.roleIds.includes(role.id);
+                  <div>
+                    <label style={fieldLabel}>
+                      {focusAreaLabel}
+                      {!isManagementUser && (
+                        <span style={{ color: "var(--dg-color-danger)" }}> *</span>
+                      )}
+                    </label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {focusAreas.map((focusArea) => {
+                        const active = form.focusAreaIds.includes(focusArea.id);
                         return (
                           <SelectableTag
-                            key={role.id}
+                            key={focusArea.id}
                             selected={active}
-                            onClick={() => toggleRole(role.id)}
+                            onClick={() => {
+                              toggleFocusArea(focusArea.id);
+                              markTouched("focusAreaIds");
+                            }}
                             disabled={readOnly}
                             padding="5px 12px"
                           >
-                            {role.name}
+                            {focusArea.name}
                           </SelectableTag>
                         );
                       })}
+                    </div>
+                    {fieldErrors.focusAreaIds && (
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--dg-color-danger)",
+                          marginTop: 4,
+                        }}
+                        role="alert"
+                      >
+                        {fieldErrors.focusAreaIds}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={fieldLabel}>{roleLabel}</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {roles
+                        .filter((role) => form.roleIds.includes(role.id) || !isRoleBlocked(role.id))
+                        .map((role) => {
+                          const active = form.roleIds.includes(role.id);
+                          return (
+                            <SelectableTag
+                              key={role.id}
+                              selected={active}
+                              onClick={() => toggleRole(role.id)}
+                              disabled={readOnly}
+                              padding="5px 12px"
+                            >
+                              {role.name}
+                            </SelectableTag>
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ── Invite status ── */}

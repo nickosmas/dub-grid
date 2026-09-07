@@ -278,7 +278,7 @@ export default function AddEmployeeModal({
               </Button>
               <Button
                 onClick={handleRequestClose}
-                className="dg-btn dg-btn-ghost"
+                className="dg-btn dg-btn-secondary"
                 style={{ flex: isMobile ? 1 : undefined }}
               >
                 {EDITOR_ACTION_LABELS.close}

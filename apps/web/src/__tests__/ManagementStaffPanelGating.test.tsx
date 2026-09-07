@@ -75,7 +75,7 @@ describe("ManagementStaffPanel access gating", () => {
     expect(screen.getByRole("button", { name: /manage permissions/i })).toBeTruthy();
   });
 
-  it("shows the role control for a super_admin (no permission matrix)", () => {
+  it("shows the header access control for a super_admin without a role label or permission matrix", () => {
     render(
       <ManagementStaffPanel
         {...baseProps}
@@ -85,7 +85,10 @@ describe("ManagementStaffPanel access gating", () => {
         onPermissionsChange={vi.fn(async () => {})}
       />,
     );
-    expect(screen.getByText("Role")).toBeTruthy();
+    expect(document.querySelector('[data-slot="management-header-access"]')).toHaveTextContent(
+      "Super Admin",
+    );
+    expect(screen.queryByText("Role")).toBeNull();
     expect(screen.queryByRole("button", { name: /manage permissions/i })).toBeNull();
   });
 

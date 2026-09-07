@@ -363,6 +363,18 @@ describe("EditEmployeePanel", () => {
       await user.click(screen.getByRole("button", { name: "North" }));
       expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
     });
+
+    it("hides saved schedule assignments for a management-only person", () => {
+      renderPanel({
+        isManagementUser: true,
+        employee: { ...employee, focusAreaIds: [], certificationId: null, roleIds: [] },
+      });
+
+      expect(screen.queryByText("Assignments")).not.toBeInTheDocument();
+      expect(screen.queryByText(/removes them from the schedule/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "North" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Full-time" })).not.toBeInTheDocument();
+    });
   });
 
   // -------------------------------------------------------------------------

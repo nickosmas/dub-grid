@@ -21,7 +21,7 @@ export function StaffDetailHeader({ employee, orgRole, actions }: StaffDetailHea
       orgRole={orgRole}
       email={employee.email}
       phone={employee.phone}
-      employmentType={employee.employmentType}
+      employmentType={employee.focusAreaIds.length > 0 ? employee.employmentType : undefined}
       employeeNumber={employee.employeeNumber}
       actions={actions}
     />

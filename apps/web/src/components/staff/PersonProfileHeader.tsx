@@ -73,7 +73,7 @@ export function PersonProfileHeader({
         <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
           <BioField label="Email" value={email || "—"} />
           <BioField label="Phone" value={phone || "—"} />
-          <BioField label="Employment" value={employmentLabel} />
+          {employmentType !== undefined && <BioField label="Employment" value={employmentLabel} />}
           <BioField
             label="Employee ID"
             value={employeeNumber != null ? `#${employeeNumber}` : "—"}

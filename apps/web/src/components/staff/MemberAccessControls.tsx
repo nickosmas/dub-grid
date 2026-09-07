@@ -44,6 +44,8 @@ export function MemberAccessControls({
   isSelf = false,
   pendingInvitationEmail,
   labels,
+  showRole = true,
+  showPermissionControl = true,
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
@@ -54,6 +56,9 @@ export function MemberAccessControls({
   pendingInvitationEmail?: string;
   /** Org terminology for the editor's row descriptions; defaults apply when absent. */
   labels?: Partial<PermissionEditorLabels>;
+  /** Lets a panel place the role selector in its header and permissions in its body. */
+  showRole?: boolean;
+  showPermissionControl?: boolean;
 }) {
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
@@ -65,7 +70,7 @@ export function MemberAccessControls({
 
   return (
     <>
-      {onRoleChange && orgRole && isSelf && (
+      {showRole && onRoleChange && orgRole && isSelf && (
         <div>
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
@@ -87,7 +92,7 @@ export function MemberAccessControls({
           </p>
         </div>
       )}
-      {onRoleChange && orgRole && !isSelf && (
+      {showRole && onRoleChange && orgRole && !isSelf && (
         <div>
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
@@ -142,7 +147,7 @@ export function MemberAccessControls({
           )}
         </div>
       )}
-      {onPermissionsChange && orgRole === "admin" && (
+      {showPermissionControl && onPermissionsChange && orgRole === "admin" && (
         <div>
           <label style={fieldLabelStyle}>Permissions</label>
           <div>

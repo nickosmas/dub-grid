@@ -127,7 +127,7 @@ describe("AddManagementUserToScheduleModal", () => {
     expect(updateEmployeeMock).not.toHaveBeenCalled();
   });
 
-  it("patches the existing employee row with the new scheduling attributes", async () => {
+  it("patches only scheduling attributes and preserves existing profile details", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onAdded = vi.fn();
@@ -146,44 +146,32 @@ describe("AddManagementUserToScheduleModal", () => {
       />,
     );
 
-    const firstNameInput = screen.getByDisplayValue("Jordan");
-    const lastNameInput = screen.getByDisplayValue("Lee");
-    const phoneInput = screen.getByDisplayValue("(415) 425-3334");
-
-    await user.clear(firstNameInput);
-    await user.type(firstNameInput, "  Jordyn  ");
-    await user.clear(lastNameInput);
-    await user.type(lastNameInput, "  Lane  ");
-    await user.clear(phoneInput);
-    await user.type(phoneInput, "415-555-0199");
-
+    await user.click(screen.getByRole("button", { name: "Full-time" }));
+    await user.click(screen.getByRole("option", { name: "Part-time" }));
     await user.click(screen.getByRole("button", { name: "North" }));
     await user.click(screen.getByRole("button", { name: "Supervisor" }));
-    const textboxes = screen.getAllByRole("textbox");
-    const notesInput = textboxes[textboxes.length - 1];
-    await user.type(notesInput, "Internal note");
 
     const addButton = screen.getByRole("button", { name: /add to schedule/i });
     expect(addButton).toBeEnabled();
     await user.click(addButton);
 
     await waitFor(() => {
-      // updateEmployee receives the merged Employee — preserves id /
-      // employeeNumber / userId / status / departmentIds (management) and
-      // overlays the new scheduling fields.
+      // updateEmployee receives the merged Employee — only the schedule
+      // assignments change; profile and management details are preserved.
       expect(updateEmployeeMock).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "emp-99",
           employeeNumber: 1042,
           userId: "user-1",
-          firstName: "Jordyn",
-          lastName: "Lane",
+          firstName: "Jordan",
+          lastName: "Lee",
           email: "jordan@example.com",
-          phone: "(415) 555-0199",
+          phone: "(415) 425-3334",
+          employmentType: "part_time",
           certificationId: null,
           focusAreaIds: [1],
           roleIds: [7],
-          contactNotes: "Internal note",
+          contactNotes: "",
         }),
         "org-1",
         0,
@@ -195,7 +183,7 @@ describe("AddManagementUserToScheduleModal", () => {
     });
   });
 
-  it("keeps email editing in Profile details", () => {
+  it("keeps profile fields out of the schedule-only dialog", () => {
     render(
       <AddManagementUserToScheduleModal
         orgId="org-1"
@@ -211,32 +199,11 @@ describe("AddManagementUserToScheduleModal", () => {
 
     expect(screen.queryByDisplayValue("jordan@example.com")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
-  });
-
-  it("blocks the patch when the phone number is invalid", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <AddManagementUserToScheduleModal
-        orgId="org-1"
-        person={makePerson()}
-        employee={makeEmployee()}
-        focusAreas={focusAreas}
-        certifications={certifications}
-        roles={roles}
-        onClose={vi.fn()}
-        onAdded={vi.fn()}
-      />,
-    );
-
-    const phoneInput = screen.getByDisplayValue("(415) 425-3334");
-    await user.clear(phoneInput);
-    await user.type(phoneInput, "123");
-    await user.tab();
-    await user.click(screen.getByRole("button", { name: "North" }));
-
-    expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
+    expect(screen.queryByLabelText(/first name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/last name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/phone/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/internal notes/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Full-time" })).toBeInTheDocument();
   });
 
   it("replaces stale parent state with the authoritative employee on conflict", async () => {

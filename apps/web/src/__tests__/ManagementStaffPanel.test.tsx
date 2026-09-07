@@ -50,7 +50,10 @@ function renderPanel(
   panelOverrides: Partial<
     Pick<
       React.ComponentProps<typeof ManagementStaffPanel>,
-      "canManageScheduleEmployees" | "canManageManagementAccess" | "onAddToSchedule"
+      | "canManageScheduleEmployees"
+      | "canManageManagementAccess"
+      | "onAddToSchedule"
+      | "onRoleChange"
     >
   > = {},
 ) {
@@ -228,5 +231,17 @@ describe("ManagementStaffPanel", () => {
     expect(editorFooter).not.toBeNull();
     expect(scrollRegion).not.toContainElement(actionFooter);
     expect(actionFooter?.nextElementSibling).toBe(editorFooter);
+  });
+
+  it("places the authorized access dropdown in the management-only header", () => {
+    renderPanel({}, undefined, null, { onRoleChange: vi.fn().mockResolvedValue(undefined) });
+
+    const headerAccess = document.querySelector<HTMLElement>(
+      '[data-slot="management-header-access"]',
+    );
+
+    expect(headerAccess).toContainElement(screen.getByText("Admin"));
+    expect(headerAccess).not.toHaveTextContent("Role");
+    expect(document.querySelector('[data-slot="management-body-access"]')).toBeNull();
   });
 });

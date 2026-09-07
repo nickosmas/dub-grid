@@ -6,8 +6,6 @@ import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { validatePhone, validateRequired } from "@/components/FormField";
-import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -20,14 +18,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
  *  views), so callers with just an `Employee` in scope can pass it directly. */
 type SchedulePrefillPerson = Pick<
   DirectoryPerson,
-  | "firstName"
-  | "lastName"
-  | "email"
-  | "phone"
-  | "certificationId"
-  | "focusAreaIds"
-  | "roleIds"
-  | "userId"
+  "firstName" | "lastName" | "email" | "certificationId" | "focusAreaIds" | "roleIds" | "userId"
 >;
 
 interface AddManagementUserToScheduleModalProps {
@@ -61,37 +52,28 @@ export function AddManagementUserToScheduleModal({
   onClose,
   onAdded,
 }: AddManagementUserToScheduleModalProps) {
-  const [firstName, setFirstName] = useState(person.firstName);
-  const [lastName, setLastName] = useState(person.lastName);
-  const [phone, setPhone] = useState(person.phone);
+  const [employmentType, setEmploymentType] = useState(employee.employmentType);
   const [certificationId, setCertificationId] = useState<number | null>(person.certificationId);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>(person.focusAreaIds);
   const [roleIds, setRoleIds] = useState<number[]>(person.roleIds);
-  const [contactNotes, setContactNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const initialDraftSnapshot = useMemo(
     () =>
       JSON.stringify({
-        firstName: person.firstName,
-        lastName: person.lastName,
-        phone: person.phone,
+        employmentType: employee.employmentType,
         certificationId: person.certificationId,
         focusAreaIds: [...person.focusAreaIds].sort((left, right) => left - right),
         roleIds: [...person.roleIds].sort((left, right) => left - right),
-        contactNotes: "",
       }),
-    [person],
+    [employee.employmentType, person],
   );
   const hasUnsavedChanges =
     JSON.stringify({
-      firstName,
-      lastName,
-      phone,
+      employmentType,
       certificationId,
       focusAreaIds: [...focusAreaIds].sort((left, right) => left - right),
       roleIds: [...roleIds].sort((left, right) => left - right),
-      contactNotes,
     }) !== initialDraftSnapshot;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
@@ -105,24 +87,15 @@ export function AddManagementUserToScheduleModal({
 
   const fieldErrors = useMemo(
     () => ({
-      firstName: touched.firstName ? validateRequired(firstName, "First name") : null,
-      lastName: touched.lastName ? validateRequired(lastName, "Last name") : null,
-      phone: touched.phone ? validatePhone(phone) : null,
       focusAreaIds:
         touched.focusAreaIds && focusAreaIds.length === 0
           ? `At least one ${focusAreaLabel.toLowerCase()} is required`
           : null,
     }),
-    [firstName, focusAreaIds, focusAreaLabel, lastName, phone, touched],
+    [focusAreaIds, focusAreaLabel, touched],
   );
 
-  const canSubmit =
-    !!person.userId &&
-    !validateRequired(firstName, "First name") &&
-    !validateRequired(lastName, "Last name") &&
-    !validatePhone(phone) &&
-    focusAreaIds.length > 0 &&
-    !saving;
+  const canSubmit = !!person.userId && focusAreaIds.length > 0 && !saving;
 
   function markTouched(field: string) {
     setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
@@ -144,9 +117,6 @@ export function AddManagementUserToScheduleModal({
   async function handleSubmit() {
     if (!person.userId || !canSubmit) {
       setTouched({
-        firstName: true,
-        lastName: true,
-        phone: true,
         focusAreaIds: true,
       });
       return;
@@ -154,18 +124,14 @@ export function AddManagementUserToScheduleModal({
 
     setSaving(true);
     try {
-      // PATCH the existing employees row with scheduling attributes.
-      // employee_number / id / user_id / status / employmentType / etc.
-      // are preserved by spreading the existing row.
+      // PATCH only schedule assignments. Existing profile details and access
+      // fields remain untouched and continue to be edited in Profile details.
       const updated: Employee = {
         ...employee,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: normalizeOptionalUsPhone(phone),
+        employmentType,
         certificationId,
         focusAreaIds,
         roleIds,
-        contactNotes: contactNotes.trim(),
       };
       const savedEmployee = await updateEmployee(updated, orgId, employee.version);
       toast.success("Added to the schedule");
@@ -213,50 +179,18 @@ export function AddManagementUserToScheduleModal({
             access.
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={fieldLabelStyle}>First name</label>
-              <input
-                className="dg-input"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                onBlur={() => markTouched("firstName")}
-                style={
-                  fieldErrors.firstName ? { borderColor: "var(--dg-color-danger)" } : undefined
-                }
-              />
-              {fieldErrors.firstName && <FieldError message={fieldErrors.firstName} />}
-            </div>
-            <div>
-              <label style={fieldLabelStyle}>Last name</label>
-              <input
-                className="dg-input"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                onBlur={() => markTouched("lastName")}
-                style={fieldErrors.lastName ? { borderColor: "var(--dg-color-danger)" } : undefined}
-              />
-              {fieldErrors.lastName && <FieldError message={fieldErrors.lastName} />}
-            </div>
-          </div>
-
           <div>
-            <div>
-              <label style={fieldLabelStyle}>Phone</label>
-              <input
-                className="dg-input"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onBlur={() => {
-                  markTouched("phone");
-                  if (!validatePhone(phone)) {
-                    setPhone(normalizeOptionalUsPhone(phone));
-                  }
-                }}
-                style={fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined}
-              />
-              {fieldErrors.phone && <FieldError message={fieldErrors.phone} />}
-            </div>
+            <label style={fieldLabelStyle}>Employment</label>
+            <CustomSelect
+              value={employmentType}
+              options={[
+                { value: "full_time", label: "Full-time" },
+                { value: "part_time", label: "Part-time" },
+              ]}
+              onChange={(value) =>
+                setEmploymentType(value === "part_time" ? "part_time" : "full_time")
+              }
+            />
           </div>
 
           <div>
@@ -281,21 +215,19 @@ export function AddManagementUserToScheduleModal({
             {fieldErrors.focusAreaIds && <FieldError message={fieldErrors.focusAreaIds} />}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={fieldLabelStyle}>{certificationLabel}</label>
-              <CustomSelect
-                value={certificationId != null ? String(certificationId) : ""}
-                options={[
-                  { value: "", label: "— None —" },
-                  ...certifications.map((item) => ({
-                    value: String(item.id),
-                    label: item.name !== item.abbr ? `${item.name} (${item.abbr})` : item.name,
-                  })),
-                ]}
-                onChange={(value) => setCertificationId(value ? Number(value) : null)}
-              />
-            </div>
+          <div>
+            <label style={fieldLabelStyle}>{certificationLabel}</label>
+            <CustomSelect
+              value={certificationId != null ? String(certificationId) : ""}
+              options={[
+                { value: "", label: "— None —" },
+                ...certifications.map((item) => ({
+                  value: String(item.id),
+                  label: item.name !== item.abbr ? `${item.name} (${item.abbr})` : item.name,
+                })),
+              ]}
+              onChange={(value) => setCertificationId(value ? Number(value) : null)}
+            />
           </div>
 
           <div>
@@ -314,19 +246,8 @@ export function AddManagementUserToScheduleModal({
             </div>
           </div>
 
-          <div>
-            <label style={fieldLabelStyle}>Internal notes</label>
-            <textarea
-              className="dg-input"
-              value={contactNotes}
-              onChange={(e) => setContactNotes(e.target.value)}
-              rows={3}
-              style={{ resize: "vertical", minHeight: 72 }}
-            />
-          </div>
-
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
             </Button>
             <Button

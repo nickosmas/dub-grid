@@ -25,9 +25,11 @@ import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
+import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
 import { StaffPanelFooter } from "./StaffPanelFooter";
 import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
+import { hasSavedScheduleAssignment } from "./capability-state";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -251,7 +253,7 @@ export function ManagementStaffPanel({
   // first/last/dept editing if we keyed off `source === "employee"`. The
   // schedule grid + the People page roster both gate on focusAreaIds, so
   // use that as the source of truth here too.
-  const isEmployee = person.focusAreaIds.length > 0;
+  const isEmployee = hasSavedScheduleAssignment(person);
   const isOnSchedule = isEmployee;
   const isExpired = person.invitationStatus === "expired";
   // Every org member gets an `employees` row now (Flow B + seed backfill), so
@@ -451,15 +453,15 @@ export function ManagementStaffPanel({
   // Role + permission controls, the same ones StaffDetailPanel renders for
   // on-schedule staff. Self-gates on the callbacks, which the parent passes
   // only to managers.
+  const showBodyAccessControl = Boolean(onPermissionsChange && person.orgRole === "admin");
   const accessControls = (
     <MemberAccessControls
       orgRole={person.orgRole}
       adminPermissions={person.adminPermissions}
-      onRoleChange={onRoleChange}
       onPermissionsChange={onPermissionsChange}
       labelStyle={labelStyle}
       isSelf={isSelf}
-      pendingInvitationEmail={isPending ? effectiveEmail : undefined}
+      showRole={false}
     />
   );
 
@@ -612,6 +614,16 @@ export function ManagementStaffPanel({
                 </Link>
               )}
             </div>
+            {onRoleChange && person.orgRole ? (
+              <div data-slot="management-header-access" style={{ flexShrink: 0 }}>
+                <InlineRoleSelect
+                  orgRole={person.orgRole}
+                  onChange={onRoleChange}
+                  isSelf={isSelf}
+                  pendingInvitationEmail={isPending ? effectiveEmail : undefined}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -804,7 +816,9 @@ export function ManagementStaffPanel({
                 </div>
               )}
 
-              {accessControls}
+              {showBodyAccessControl && (
+                <div data-slot="management-body-access">{accessControls}</div>
+              )}
             </>
           )}
 

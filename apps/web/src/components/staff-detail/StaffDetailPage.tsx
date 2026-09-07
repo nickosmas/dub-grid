@@ -581,6 +581,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [directory, employee?.id],
   );
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
+  const showScheduleDetails = !directoryPerson?.isManagementUser || isOnSchedule;
   const profileSection = searchParams.get("section");
   const activeSection: StaffProfileSection =
     profileSection === "activity" && canViewActivity
@@ -751,8 +752,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <div>
                       <div className="dg-card-title">Work details</div>
                       <div className="dg-card-subtitle">
-                        Employment, {(org?.focusAreaLabel ?? "focus areas").toLowerCase()},
-                        certification, roles, and notes.
+                        {showScheduleDetails
+                          ? `Employment, ${(org?.focusAreaLabel ?? "focus areas").toLowerCase()}, certification, roles, and notes.`
+                          : "Internal notes."}
                       </div>
                     </div>
                   </div>
@@ -779,35 +781,41 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     </div>
                   ) : (
                     <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                      <ProfileField
-                        label="Employment"
-                        value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
-                      />
-                      <ProfileField
-                        label={org?.focusAreaLabel ?? "Focus areas"}
-                        value={
-                          employee.focusAreaIds
-                            .map((id) => focusAreas.find((item) => item.id === id)?.name)
-                            .filter(Boolean)
-                            .join(", ") || "—"
-                        }
-                      />
-                      <ProfileField
-                        label={org?.certificationLabel ?? "Certification"}
-                        value={
-                          certifications.find((item) => item.id === employee.certificationId)
-                            ?.name ?? "—"
-                        }
-                      />
-                      <ProfileField
-                        label={org?.roleLabel ?? "Roles"}
-                        value={
-                          employee.roleIds
-                            .map((id) => orgRoles.find((item) => item.id === id)?.name)
-                            .filter(Boolean)
-                            .join(", ") || "—"
-                        }
-                      />
+                      {showScheduleDetails && (
+                        <>
+                          <ProfileField
+                            label="Employment"
+                            value={
+                              employee.employmentType === "part_time" ? "Part-time" : "Full-time"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.focusAreaLabel ?? "Focus areas"}
+                            value={
+                              employee.focusAreaIds
+                                .map((id) => focusAreas.find((item) => item.id === id)?.name)
+                                .filter(Boolean)
+                                .join(", ") || "—"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.certificationLabel ?? "Certification"}
+                            value={
+                              certifications.find((item) => item.id === employee.certificationId)
+                                ?.name ?? "—"
+                            }
+                          />
+                          <ProfileField
+                            label={org?.roleLabel ?? "Roles"}
+                            value={
+                              employee.roleIds
+                                .map((id) => orgRoles.find((item) => item.id === id)?.name)
+                                .filter(Boolean)
+                                .join(", ") || "—"
+                            }
+                          />
+                        </>
+                      )}
                       {employee.contactNotes ? (
                         <ProfileField label="Internal notes" value={employee.contactNotes} />
                       ) : null}

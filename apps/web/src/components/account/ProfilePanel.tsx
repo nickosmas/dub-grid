@@ -621,7 +621,7 @@ export function ProfilePanel({
         orgRole={selfOrgRole}
         email={user?.email ?? employee?.email}
         phone={employee?.phone}
-        employmentType={employee?.employmentType}
+        employmentType={employee?.focusAreaIds.length ? employee.employmentType : undefined}
         employeeNumber={employee?.employeeNumber}
       />
 

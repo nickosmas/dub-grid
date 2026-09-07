@@ -74,6 +74,7 @@ import { DirectoryCertificationCards } from "./DirectoryCertificationCards";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessEditor } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
+import { hasSavedScheduleAssignment } from "./capability-state";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
@@ -2009,7 +2010,7 @@ export function MembersSection({
                       // people and pending invites still use the lighter
                       // ManagementStaffPanel via expandedPersonId.
                       const isOnScheduleMember =
-                        person.focusAreaIds.length > 0 && person.employeeId;
+                        hasSavedScheduleAssignment(person) && person.employeeId;
                       const isExpanded = isOnScheduleMember
                         ? person.employeeId === expandedEmpId
                         : person.personId === expandedPersonId;
@@ -2143,7 +2144,7 @@ export function MembersSection({
                                       `employees` filter). `source === "employee"`
                                       is no longer a valid signal — every member
                                       has an employees row post-Flow-B. */}
-                                  {person.focusAreaIds.length > 0 && (
+                                  {hasSavedScheduleAssignment(person) && (
                                     <span
                                       className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
                                       style={{

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 12c15fd46eb823362ff3d14c555672bd6f7a20e32874269b5e0096c567ae79d1 -->
+<!-- blueprint:source-hash 606a8d54bc39fcd47c956b6993735a69173937dd1b18fc4a99fba964671196dc -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 17-19.
+Everything below is already shipped except the unchecked work in items 18-21.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -62,41 +62,46 @@ Everything below is already shipped except the unchecked work in items 17-19.
 15. **Print / export** - PDF, CSV, and .ics output.
 16. **Test sandbox** - cookie-based cloned org for safe QA against
     non-production data.
-17. **Mobile release catch-up** - close release-delta gaps while preserving
+17. **Management-only assignment visibility** - hide schedule-assignment
+    controls and their stale schedule-removal notice as soon as a person is no
+    longer on the schedule; conversely, hide management-only controls when
+    management access is removed. Saved capability state, not a stale form,
+    determines the visible editor sections.
+18. **Mobile release catch-up** - close release-delta gaps while preserving
     deliberate web-only authoring and organization-settings boundaries.
-    - **17a. Mobile role certification eligibility** - expose role credential
+    - **18a. Mobile role certification eligibility** - expose role credential
       requirements and prevent incompatible new mobile selections before save.
-    - **17b. Canonical mobile dashboard model** - share dashboard calculations
+    - **18b. Canonical mobile dashboard model** - share dashboard calculations
       and deliver canonical dashboard data through the authenticated mobile API.
-    - **17c. Canonical mobile dashboard experience** - show those facts in
+    - **18c. Canonical mobile dashboard experience** - show those facts in
       native, read-only dashboard cards and detail screens.
-18. **Authentication and onboarding release hardening** - leave no known
+19. **Authentication and onboarding release hardening** - leave no known
     correctness, performance, resilience, or security defects across the full
     web and mobile entry lifecycle.
-    - **18a. Admission and onboarding state correctness** - treat durable
+    - **19a. Admission and onboarding state correctness** - treat durable
       per-member, per-organization completion as authoritative. A completed
       member must never be returned to onboarding after admission, refresh,
       token rotation, realtime organization changes, role changes, or a new
       session; an incomplete member cannot bypass required gates.
-    - **18b. Complete authentication journey coverage** - verify invitation,
+    - **19b. Complete authentication journey coverage** - verify invitation,
       organization entry, sign-in, session restoration, recovery, MFA,
       revocation, onboarding variants, and trial/setup gates for every role on
       web and mobile.
-    - **18c. Authentication speed and resilience** - measure cold and warm
+    - **19c. Authentication speed and resilience** - measure cold and warm
       entry, remove avoidable serial work and duplicate requests, prevent blank
       states, and verify slow, offline, retry, cross-tab, and token-refresh
       behavior.
-    - **18d. Authentication security hardening** - verify tenant/session
+    - **19d. Authentication security hardening** - verify tenant/session
       isolation, live membership, stale claims, MFA assurance, replay/expiry,
       redirect and CSRF safety, enumeration resistance, rate limiting, token
       secrecy, auditability, and RLS authorization.
-    - **18e. Authentication release qualification** - maintain an automated
+    - **19e. Authentication release qualification** - maintain an automated
       role/state/browser matrix, run authenticated browser and native device
       checks, close confirmed defects, and disclose unavailable evidence.
-19. **Explicit schedule-indicator removal** - provide a discoverable,
+20. **Explicit schedule-indicator removal** - provide a discoverable,
     accessible removal control for active shift notes/indicators in the shift
     slideover rather than relying only on clicking the selected indicator.
-20. **Production migration safety** - the final release gate after all product
+21. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
