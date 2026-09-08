@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash e322c22d1da7fb1de9e1122857ac9bd0166e369a676914968a02fff5627b54b0 -->
+<!-- blueprint:source-hash 16dbfc041e22b8683003a0a41d8ce1fd449c503476766526bcfcac967efd3aee -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 18-22.
+Everything below is already shipped except the unchecked work in items 19-22.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -105,6 +105,18 @@ Everything below is already shipped except the unchecked work in items 18-22.
       entry, remove avoidable serial work and duplicate requests, prevent blank
       states, and verify slow, offline, retry, cross-tab, and token-refresh
       behavior.
+      - **19c1. Web authentication entry performance** - measure and improve
+        cold and warm login, proxy, session-verification, and organization-
+        bootstrap paths without weakening authentication or tenant checks.
+      - **19c2. Mobile authentication entry performance** - measure and improve
+        cold and warm session restoration and organization bootstrap without
+        treating slow restoration as logout.
+      - **19c3. Degraded-network authentication recovery** - keep useful
+        content or an explicit bounded recovery path visible during slow,
+        offline, timeout, and retry states on web and mobile.
+      - **19c4. Authentication session continuity under change** - preserve
+        current identity, permissions, and tenant data through cross-tab auth,
+        token rotation, foreground/resume, and organization switching.
     - **19d. Authentication security hardening** - verify tenant/session
       isolation, live membership, stale claims, MFA assurance, replay/expiry,
       redirect and CSRF safety, enumeration resistance, rate limiting, token

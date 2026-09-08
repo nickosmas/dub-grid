@@ -11,6 +11,7 @@ const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignOut = vi.fn();
+const mockFetch = vi.fn();
 
 vi.mock("@/features/account/client", () => ({
   clearBrowserAuthState: vi.fn(),
@@ -45,10 +46,16 @@ function TestConsumer() {
 const fakeUser = { id: "user-123", email: "test@example.com" };
 const fakeSession = { user: fakeUser, access_token: "token-abc" };
 
+function accessToken(sessionId: string): string {
+  return `header.${btoa(JSON.stringify({ session_id: sessionId }))}.signature`;
+}
+
 // ─── Setup / teardown ────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("fetch", mockFetch);
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
   // Default: no session
   mockGetSession.mockResolvedValue(null);
   mockGetUser.mockResolvedValue(null);
@@ -61,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -184,6 +192,44 @@ describe("AuthProvider — auth state changes", () => {
     });
 
     expect(screen.getByTestId("user")).toHaveTextContent("null");
+  });
+
+  it("registers one restored session when overlapping auth events carry the same session id", async () => {
+    const trackedSession = {
+      ...fakeSession,
+      access_token: accessToken("restored-session"),
+      refresh_token: "refresh-token",
+    };
+    let authCallback: (event: string, session: unknown) => void = () => {};
+    mockGetSession.mockResolvedValue(trackedSession);
+    mockGetUser.mockResolvedValue(fakeUser);
+    mockOnAuthStateChange.mockImplementation(
+      (callback: (event: string, session: unknown) => void) => {
+        authCallback = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      },
+    );
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user")).toHaveTextContent("user-123");
+    });
+
+    await act(async () => {
+      authCallback("SIGNED_IN", trackedSession);
+      authCallback("TOKEN_REFRESHED", trackedSession);
+    });
+
+    await waitFor(() => {
+      expect(
+        mockFetch.mock.calls.filter(([url]) => url === "/api/auth/track-session"),
+      ).toHaveLength(1);
+    });
   });
 });
 

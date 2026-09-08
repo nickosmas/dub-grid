@@ -351,6 +351,32 @@ describe("POST /api/auth/login", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it.each(["user", "admin", "super_admin"] as const)(
+    "returns a usable organization destination for the %s role",
+    async (orgRole) => {
+      signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: orgRole }),
+          user: {
+            id: USER_ID,
+            email: "user@example.com",
+            email_confirmed_at: "2026-01-01T00:00:00Z",
+            factors: [],
+          },
+        },
+        error: null,
+      });
+
+      const response = await POST(makeRequest("acme.localhost"));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        destination: "/dashboard",
+      });
+    },
+  );
+
   it("switches a new session to the organization selected by the subdomain", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: {

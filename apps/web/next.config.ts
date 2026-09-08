@@ -55,6 +55,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Performance measurements may run beside the developer's normal server.
+  // Give that opt-in process its own build directory so Next's dev lock and
+  // generated output never collide with `.next`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Be explicit so the browser bundle always receives the public env contract
   // even when the app is started from a workspace subdirectory.
   env: publicEnv,

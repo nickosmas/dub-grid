@@ -57,8 +57,11 @@ export async function waitForClientHydration(page: Page): Promise<void> {
 /** A timeout of 0 means the run has no limit, so it is never lowered. */
 const LOGIN_TIMEOUT_FLOOR_MS = 60_000;
 
-/** Logs in as the seeded QA super admin on its organization subdomain. */
-export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
+/** Logs in as the seeded QA super admin on an organization subdomain. */
+export async function loginAsQaSuperAdmin(
+  page: Page,
+  origin = QA_SUPER_ADMIN_ORIGIN,
+): Promise<void> {
   // A first-ever login for a fresh seed runs through up to four sequential
   // gates (terms, onboarding, trial modal, cookie consent), each with its
   // own multi-second wait budget - comfortably past Playwright's default
@@ -73,7 +76,7 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
     test.setTimeout(LOGIN_TIMEOUT_FLOOR_MS);
   }
 
-  await page.goto(`${QA_SUPER_ADMIN_ORIGIN}/login`);
+  await page.goto(`${origin}/login`);
   await waitForClientHydration(page);
 
   await page.getByLabel("Email").fill(QA_SUPER_ADMIN_EMAIL);

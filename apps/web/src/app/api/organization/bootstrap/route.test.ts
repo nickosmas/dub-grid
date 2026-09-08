@@ -114,6 +114,27 @@ describe("GET /api/organization/bootstrap", () => {
     });
   });
 
+  it("reuses the verified bootstrap actor during organization authorization", async () => {
+    const request = new NextRequest("http://acme.localhost/api/organization/bootstrap", {
+      headers: { host: "acme.localhost" },
+    });
+
+    await GET(request);
+
+    expect(requireAuthenticatedUserWithClaims).toHaveBeenCalledTimes(1);
+    expect(requireOrgPermissions).toHaveBeenCalledTimes(1);
+    expect(requireOrgPermissions).toHaveBeenCalledWith(
+      request,
+      ORG_ID,
+      expect.any(Function),
+      expect.objectContaining({
+        allowLockedOrganization: true,
+        allowDuringSetup: true,
+        actor: { id: USER_ID },
+      }),
+    );
+  });
+
   it("returns a controlled error when the database fan-out exceeds its deadline", async () => {
     const response = await GET(
       new NextRequest("http://acme.localhost/api/organization/bootstrap", {

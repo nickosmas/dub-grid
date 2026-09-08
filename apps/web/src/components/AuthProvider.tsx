@@ -14,13 +14,14 @@ import {
   subscribeToBrowserAuthChanges,
 } from "@/features/account/client";
 import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
+import { createSessionRegistration } from "@/features/account/client/session-registration";
 
 /**
  * Track session via API route so the server can capture the client IP address.
  * The server keys the row by the Supabase auth session_id claim so web and
  * mobile sessions share the same registry.
  */
-async function trackSession() {
+async function sendSessionRegistration() {
   const { deviceLabel, browserName, browserVersion } = getWebSessionMetadata(navigator.userAgent);
 
   await fetch("/api/auth/track-session", {
@@ -29,6 +30,8 @@ async function trackSession() {
     body: JSON.stringify({ platform: "web", deviceLabel, browserName, browserVersion }),
   });
 }
+
+const trackSession = createSessionRegistration(sendSessionRegistration);
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -70,7 +73,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
         // Track existing session on page load (session restored from cookies)
         if (initialSession?.refresh_token && verifiedUser) {
-          trackSession().catch(() => {});
+          trackSession(initialSession).catch(() => {});
         }
       } catch (error) {
         // Only WIPE persisted auth for a known-recoverable failure (stale/invalid
@@ -131,7 +134,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           nextSession.refresh_token &&
           verifiedUser
         ) {
-          trackSession().catch(() => {});
+          trackSession(nextSession).catch(() => {});
         }
       })();
     });

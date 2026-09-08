@@ -100,6 +100,22 @@
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
         and verify slow, offline, retry, cross-tab, and token-refresh behavior.
+    - [x] 19c1. **Web authentication entry performance** - measure cold and
+          warm web login, proxy, session-verification, and organization-bootstrap
+          paths; remove confirmed avoidable serial work and duplicate requests
+          without weakening authentication or tenant checks.
+    - [ ] 19c2. **Mobile authentication entry performance** - measure cold and
+          warm mobile session restoration and organization bootstrap; remove
+          confirmed unnecessary waits and duplicate requests without turning
+          slow restoration into premature logout.
+    - [ ] 19c3. **Degraded-network authentication recovery** - keep useful
+          content or an explicit recovery path visible across web and mobile
+          during slow, offline, timeout, and retry states, with bounded retries
+          and no blank or permanently latched loading screens.
+    - [ ] 19c4. **Authentication session continuity under change** - verify and
+          repair cross-tab sign-in/sign-out, token rotation and refresh,
+          foreground/resume, and organization-switch races without stale
+          identity, permissions, or tenant data.
   - [ ] 19d. **Authentication security hardening** - verify tenant and session
         isolation, current membership enforcement, stale-claim handling, MFA
         assurance, invite/recovery expiry and replay protection, redirect safety,
