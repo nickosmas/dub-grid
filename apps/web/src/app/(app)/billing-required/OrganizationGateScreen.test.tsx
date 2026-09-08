@@ -75,6 +75,20 @@ describe("OrganizationGateScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: /check again/i }));
 
     await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(2));
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads exactly once when a manual check finds the organization open", async () => {
+    fetchOrganizationAccessStatus
+      .mockResolvedValueOnce({ available: false, state: "locked" })
+      .mockResolvedValueOnce({ available: true, state: "active" });
+
+    renderScreen();
+    await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: /check again/i }));
+
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   });
 
   it("signs out without leaving the user to find their own way", async () => {

@@ -18,6 +18,8 @@ export interface OnboardingDecisionInput {
   orgLoading: boolean;
   entryGate: OnboardingEntryGate | null;
   onBillingRecoveryRoute: boolean;
+  /** Only the Super Admin can enter the organization's billing recovery page. */
+  canRecoverBilling: boolean;
   /** Org-wide configuration completeness: live, and shared by every member. */
   setupComplete: boolean;
   canCompleteSetup: boolean;
@@ -28,7 +30,7 @@ export interface OnboardingDecisionInput {
 
 export type OnboardingDecision =
   | { kind: "bootstrap-recovery" }
-  | { kind: "billing-redirect" }
+  | { kind: "billing-redirect"; destination: "recovery" | "organization-gate" }
   | { kind: "app"; settled: boolean }
   | { kind: "setup-pending" }
   | { kind: "wizard"; isOrgSetup: boolean; freezePhase: OnboardingPhase | null };
@@ -48,9 +50,13 @@ export function resolveOnboardingDecision(input: OnboardingDecisionInput): Onboa
   if (!input.orgDataReliable) return { kind: "app", settled: false };
 
   if (input.entryGate?.billingLocked) {
-    return input.onBillingRecoveryRoute
-      ? { kind: "app", settled: true }
-      : { kind: "billing-redirect" };
+    if (input.canRecoverBilling && input.onBillingRecoveryRoute) {
+      return { kind: "app", settled: true };
+    }
+    return {
+      kind: "billing-redirect",
+      destination: input.canRecoverBilling ? "recovery" : "organization-gate",
+    };
   }
 
   // Once the app itself has been shown off settled data, this mount keeps

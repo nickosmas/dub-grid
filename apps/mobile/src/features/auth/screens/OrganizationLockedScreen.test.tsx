@@ -95,6 +95,26 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(screen.getByText(/Grace period ends/)).toBeInTheDocument();
+    expect(screen.getByText(/still in its grace period/i)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["trial_pending", /Super Admin starts the trial on the web/i],
+    ["trial_ending_soon", /trial is ending soon/i],
+    ["payment_attention_required", /organization may still be available/i],
+  ])("shows truthful recovery detail for %s", (state, expectedCopy) => {
+    mockStatus({ state, isLocked: false, trialGraceEndsAt: null, orgRole: "user" });
+
+    render(
+      <OrganizationLockedScreen
+        accessToken="token-123"
+        message="Organization unavailable. Contact your organization administrator."
+        onRetry={onRetry}
+        onSignOut={onSignOut}
+      />,
+    );
+
+    expect(screen.getByText(expectedCopy)).toBeInTheDocument();
   });
 
   it("shows a Manage billing on web button only for super_admins, and opens the billing URL", async () => {

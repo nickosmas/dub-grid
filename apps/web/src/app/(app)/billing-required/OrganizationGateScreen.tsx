@@ -90,8 +90,13 @@ export function OrganizationGateScreen() {
   async function checkAgain() {
     const result = await status.refetch();
     // A check the user asked for skips the cooldown: they are watching, and a
-    // reload that lands back here is a clearer answer than a silent no-op.
-    if (result.data?.available) window.location.reload();
+    // reload that lands back here is a clearer answer than a silent no-op. Mark
+    // the reload first so the query update cannot make the availability effect
+    // issue a second reload before navigation completes.
+    if (result.data?.available) {
+      claimAutomaticReload();
+      window.location.reload();
+    }
   }
 
   return (

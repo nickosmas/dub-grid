@@ -397,6 +397,7 @@ describe("OnboardingGate setup lock", () => {
   });
 
   it("redirects super admins to billing recovery when billing is locked", async () => {
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.setupStatus = {
       isComplete: true,
@@ -418,9 +419,31 @@ describe("OnboardingGate setup lock", () => {
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });
 
+  it("sends an admin with a stale billing-lock flag to the organization gate, never billing settings", async () => {
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    mockEmployeesData.employees = [{ id: "employee-1" }];
+    mockOrganizationData.entryGate.billingLocked = true;
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith("/billing-required");
+    });
+    expect(mockRouter.replace).not.toHaveBeenCalledWith("/settings?section=org-billing");
+  });
+
   it("allows super admins to stay on billing recovery when billing is locked", async () => {
     mockPathname = "/settings";
     mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.setupStatus = {
       isComplete: true,
@@ -443,6 +466,7 @@ describe("OnboardingGate setup lock", () => {
   it("renders billing recovery without waiting for setup data", async () => {
     mockPathname = "/settings";
     mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.loading = true;
     mockEmployeesData.loading = true;
@@ -451,6 +475,26 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps a completed super admin in the app after billing recovery", async () => {
+    mockPathname = "/settings";
+    mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
+    mockPermissions.isSuperAdmin = true;
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+    mockOrganizationData.entryGate.billingLocked = true;
+
+    const { rerenderGate } = renderGate();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+
+    mockOrganizationData.entryGate.billingLocked = false;
+    rerenderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 

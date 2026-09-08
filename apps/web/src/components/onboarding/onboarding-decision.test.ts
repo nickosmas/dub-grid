@@ -9,6 +9,7 @@ function input(overrides: Partial<OnboardingDecisionInput> = {}): OnboardingDeci
     orgLoading: false,
     entryGate: { onboardingCompleted: false, adminOnboardingCompleted: true, billingLocked: null },
     onBillingRecoveryRoute: false,
+    canRecoverBilling: false,
     setupComplete: true,
     canCompleteSetup: false,
     orgDataReliable: true,
@@ -72,11 +73,12 @@ describe("resolveOnboardingDecision", () => {
     });
   });
 
-  it("still enforces the billing lock after the app has been shown", () => {
+  it("still sends a billing-locked super admin to recovery after the app has been shown", () => {
     expect(
       resolveOnboardingDecision(
         input({
           appAlreadyShown: true,
+          canRecoverBilling: true,
           entryGate: {
             onboardingCompleted: true,
             adminOnboardingCompleted: true,
@@ -84,7 +86,7 @@ describe("resolveOnboardingDecision", () => {
           },
         }),
       ),
-    ).toEqual({ kind: "billing-redirect" });
+    ).toEqual({ kind: "billing-redirect", destination: "recovery" });
   });
 
   it("lets a billing-locked super admin stay on the recovery route", () => {
@@ -92,6 +94,7 @@ describe("resolveOnboardingDecision", () => {
       resolveOnboardingDecision(
         input({
           onBillingRecoveryRoute: true,
+          canRecoverBilling: true,
           entryGate: {
             onboardingCompleted: false,
             adminOnboardingCompleted: true,
@@ -100,6 +103,20 @@ describe("resolveOnboardingDecision", () => {
         }),
       ),
     ).toEqual({ kind: "app", settled: true });
+  });
+
+  it("sends a non-recovery role to the terminal organization gate", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: true,
+            billingLocked: true,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "billing-redirect", destination: "organization-gate" });
   });
 
   it("prefers the frozen phase over live setup completeness", () => {

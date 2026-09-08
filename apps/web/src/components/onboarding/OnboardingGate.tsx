@@ -122,12 +122,14 @@ import OnboardingWizard from "./OnboardingWizard";
 import SetupPendingScreen from "./SetupPendingScreen";
 import OrganizationBootstrapRecovery from "./OrganizationBootstrapRecovery";
 
-function BillingRedirect() {
+function BillingRedirect({ destination }: { destination: "recovery" | "organization-gate" }) {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/settings?section=org-billing");
-  }, [router]);
+    router.replace(
+      destination === "recovery" ? "/settings?section=org-billing" : "/billing-required",
+    );
+  }, [destination, router]);
 
   return null;
 }
@@ -187,6 +189,7 @@ function OnboardingCheck({
     orgLoading,
     entryGate,
     onBillingRecoveryRoute: isBillingRecoveryRoute(pathname, section),
+    canRecoverBilling: role === "super_admin",
     // Adding employees is a post-wizard task on the People page, so it doesn't
     // gate org setup completion. setupStatus.isComplete is the configuration
     // contract (focus areas + schedule definitions + certifications + roles).
@@ -236,7 +239,7 @@ function OnboardingCheck({
         />
       );
     case "billing-redirect":
-      return <BillingRedirect />;
+      return <BillingRedirect destination={decision.destination} />;
     case "app":
       // A post-login handoff needs a branded transition while the onboarding
       // decision resolves. Ordinary signed-in refreshes keep the app visible so

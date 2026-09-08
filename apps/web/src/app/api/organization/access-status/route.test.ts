@@ -106,6 +106,16 @@ describe("GET /api/organization/access-status", () => {
     });
   });
 
+  it("also holds an admin while the trial clock has not started", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("admin"));
+    respondWith(orgRow());
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "trial_pending",
+    });
+  });
+
   it("lets a super admin through the same unstarted trial", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
     respondWith(orgRow());
@@ -122,10 +132,39 @@ describe("GET /api/organization/access-status", () => {
     expect(await (await GET(request())).json()).toEqual({ available: true, state: "active" });
   });
 
+  it("keeps payment-attention and trial-grace organizations open", async () => {
+    respondWith(orgRow({ subscription_status: "past_due" }));
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: true,
+      state: "payment_attention_required",
+    });
+
+    respondWith(
+      orgRow({
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() - 86_400_000).toISOString(),
+      }),
+    );
+
+    expect(await (await GET(request())).json()).toEqual({ available: true, state: "trial_grace" });
+  });
+
   it("reports a lapsed subscription as locked", async () => {
     respondWith(orgRow({ subscription_status: "canceled" }));
 
     expect(await (await GET(request())).json()).toEqual({ available: false, state: "locked" });
+  });
+
+  it("holds suspended organizations even when their subscription is active", async () => {
+    respondWith(
+      orgRow({
+        suspended_at: "2026-01-01T00:00:00.000Z",
+        subscription_status: "active",
+      }),
+    );
+
+    expect(await (await GET(request())).json()).toEqual({ available: false, state: "suspended" });
   });
 
   it("reports an archived organization without evaluating billing", async () => {

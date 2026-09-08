@@ -150,6 +150,45 @@ describe("GET mobile org-status route", () => {
     expect(body.isLocked).toBe(true);
   });
 
+  it("returns grace timing for a trial in its open grace period", async () => {
+    fetchMobileOrganizationRowById.mockResolvedValue({
+      ...ORG_ROW,
+      subscription_status: "trialing",
+      trial_ends_at: new Date(Date.now() - 86_400_000).toISOString(),
+    });
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+    const body = await response.json();
+
+    expect(body.state).toBe("trial_grace");
+    expect(body.isLocked).toBe(false);
+    expect(body.trialGraceEndsAt).toEqual(expect.any(String));
+  });
+
+  it("returns payment attention without locking an admin", async () => {
+    fetchMobileOrganizationMembershipRows.mockResolvedValue([
+      {
+        organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+        org_role: "admin",
+      },
+    ]);
+    fetchMobileOrganizationRowById.mockResolvedValue({
+      ...ORG_ROW,
+      subscription_status: "past_due",
+    });
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      state: "payment_attention_required",
+      isLocked: false,
+      orgRole: "admin",
+    });
+  });
+
   it("reports the super_admin's own org role for role-appropriate copy", async () => {
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
       {

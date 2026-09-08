@@ -42,12 +42,24 @@ function getDetailLine(
     return "Billing needs attention before this organization can be used again.";
   }
 
-  if (!["trial_grace", "trial_ending_soon", "payment_attention_required"].includes(status.state)) {
-    // The org looks fine now — a billing fix may have just landed.
-    return "This organization may be available again. Try reloading.";
+  if (status.state === "trial_pending") {
+    return "Your organization opens once a Super Admin starts the trial on the web.";
   }
 
-  return null;
+  if (status.state === "trial_grace") {
+    return "The trial has ended, but the organization is still in its grace period. Try again to refresh access.";
+  }
+
+  if (status.state === "trial_ending_soon") {
+    return "The trial is ending soon. Try again to refresh access.";
+  }
+
+  if (status.state === "payment_attention_required") {
+    return "Billing needs attention, but the organization may still be available. Try again to refresh access.";
+  }
+
+  // The org looks fine now, so a billing fix may have just landed.
+  return "This organization may be available again. Try again to refresh access.";
 }
 
 export function OrganizationLockedScreen({
