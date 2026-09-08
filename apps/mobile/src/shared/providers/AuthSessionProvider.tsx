@@ -7,6 +7,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { registerMobileSessionPresence } from "../lib/api";
 import { getSupabaseClient } from "../lib/supabase";
 
@@ -59,8 +60,18 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
     activeSessionWriter = writeSession;
 
+    let stopSessionRestore = authEntryRecorder.startPhase("session_restore");
+    const finishSessionRestore = () => {
+      stopSessionRestore();
+      stopSessionRestore = () => {};
+    };
+
     const releaseStartup = (session: Session | null) => {
       startupReleased = true;
+      finishSessionRestore();
+      if (!session) {
+        authEntryRecorder.cancel("warm_restore");
+      }
       writeSession(session);
     };
 
@@ -80,7 +91,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         // authority on session state. It may resolve after the user has signed
         // in again, so writing its old result would resurrect stale auth.
         if (!isMounted || startupReleased) return;
-        writeSession(data.session ?? null);
+        releaseStartup(data.session ?? null);
       })
       .catch(async (error) => {
         clearTimeout(sessionRestoreTimeout);
@@ -94,7 +105,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         }
 
         if (!isMounted) return;
-        writeSession(null);
+        releaseStartup(null);
       });
 
     const {

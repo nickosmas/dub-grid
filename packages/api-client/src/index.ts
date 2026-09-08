@@ -61,6 +61,7 @@ export async function createJsonApiRequest<T>(input: {
   onAuthFailure?: () => Promise<void> | void;
   onTransportErrorMessage?: (baseUrl: string, error: unknown) => string;
   onNonJsonErrorMessage?: (baseUrl: string, path: string, response: Response) => string;
+  onResponse?: (response: Response) => void;
 }): Promise<T> {
   const {
     baseUrl,
@@ -71,6 +72,7 @@ export async function createJsonApiRequest<T>(input: {
     onAuthFailure,
     onTransportErrorMessage,
     onNonJsonErrorMessage,
+    onResponse,
   } = input;
 
   let response: Response;
@@ -85,6 +87,8 @@ export async function createJsonApiRequest<T>(input: {
         `Request failed for ${getRequestOrigin(baseUrl)}`,
     );
   }
+
+  onResponse?.(response);
 
   const contentType = response.headers?.get?.("content-type") ?? "";
   const payload = await response.json().catch(() => null);

@@ -74,6 +74,10 @@ import {
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
+import {
+  authEntryRecorder,
+  type AuthEntryRequestKind,
+} from "../../features/auth/lib/auth-entry-measurement";
 import { getMobileEnvConfig } from "./env";
 
 type SupabaseSessionLike = {
@@ -84,6 +88,13 @@ type SupabaseSessionLike = {
 };
 
 const MOBILE_REQUEST_TIMEOUT_MS = 15_000;
+
+function getAuthEntryRequestKind(path: string): AuthEntryRequestKind | null {
+  if (path === "/api/mobile/v1/auth/login") return "login";
+  if (path === "/api/mobile/v1/bootstrap") return "bootstrap";
+  if (path === "/api/mobile/v1/session-presence") return "session_presence";
+  return null;
+}
 
 function assertApiBaseUrl(): string {
   return getMobileEnvConfig().apiBaseUrl;
@@ -157,6 +168,9 @@ async function mobileRequest<T>(
   parse: (value: unknown) => T,
   handleAuthFailure: boolean,
 ): Promise<T> {
+  const measurementRequestKind = getAuthEntryRequestKind(path);
+  const measurementStartedAt = globalThis.performance?.now() ?? Date.now();
+  let serverTiming: string | null = null;
   const baseUrl = assertApiBaseUrl();
   const timeoutController = new AbortController();
   const callerSignal = init.signal;
@@ -186,8 +200,19 @@ async function mobileRequest<T>(
       },
       onTransportErrorMessage: createMobileTransportErrorMessage,
       onNonJsonErrorMessage: createNonJsonApiErrorMessage,
+      onResponse: (response: Response) => {
+        serverTiming = response.headers?.get?.("server-timing") ?? null;
+      },
     });
   } finally {
+    if (measurementRequestKind) {
+      const measurementEndedAt = globalThis.performance?.now() ?? Date.now();
+      authEntryRecorder.recordRequest(
+        measurementRequestKind,
+        measurementEndedAt - measurementStartedAt,
+        serverTiming,
+      );
+    }
     callerSignal?.removeEventListener("abort", abortFromCaller);
     if (timeoutId) {
       clearTimeout(timeoutId);

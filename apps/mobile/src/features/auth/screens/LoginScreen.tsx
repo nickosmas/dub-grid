@@ -20,10 +20,10 @@ import {
   getBootstrap,
   loginToOrganization,
   lookupOrganization,
-  registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
+import { authEntryRecorder } from "../lib/auth-entry-measurement";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
@@ -202,14 +202,16 @@ export default function LoginScreen() {
   async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
     await saveLastOrg(response.organization);
 
+    const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
     const { error: sessionError } = await withSessionHandoffTimeout(
       getSupabaseClient().auth.setSession({
         access_token: session.accessToken,
         refresh_token: session.refreshToken,
       }),
-    );
+    ).finally(stopSessionHandoff);
 
     if (sessionError) {
+      authEntryRecorder.cancel("cold_sign_in");
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: sessionError,
         fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
@@ -217,8 +219,6 @@ export default function LoginScreen() {
       setError(nextError);
       return;
     }
-
-    registerMobileSessionPresence(session.accessToken).catch(() => {});
 
     // Warm bootstrap before handing off. The tab tree can't draw its tab bar or
     // pick the Home screen without it, and the launch splash is long spent by
@@ -232,6 +232,9 @@ export default function LoginScreen() {
     });
 
     router.replace("/(tabs)/home");
+    requestAnimationFrame(() => {
+      authEntryRecorder.markAuthenticatedNavigationReady("cold_sign_in");
+    });
   }
 
   async function handleOrganizationContinue() {
@@ -270,6 +273,7 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     setError(null);
+    authEntryRecorder.start("cold_sign_in");
     try {
       const response = await loginToOrganization({
         orgSlug: orgSlug.trim().toLowerCase(),
@@ -278,6 +282,7 @@ export default function LoginScreen() {
       });
 
       if (response.mfaRequired && response.mfa) {
+        authEntryRecorder.cancel("cold_sign_in");
         setPendingMfaLogin(response as PendingMfaLogin);
         setMfaCode("");
         setPassword("");
@@ -288,6 +293,7 @@ export default function LoginScreen() {
 
       await finishLogin(response);
     } catch (loginError) {
+      authEntryRecorder.cancel("cold_sign_in");
       // The JWT hook refuses terminated employees with a sentinel message
       // (ACCOUNT_DISABLED_CODE) — surface a friendly disabled-account message
       // instead of the generic invalid-credentials fallback.

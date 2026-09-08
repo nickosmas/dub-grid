@@ -77,6 +77,35 @@ describe("createJsonApiRequest", () => {
     expect(result).toBe(42);
   });
 
+  it("exposes the response to an optional observer without changing parsing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ value: 42 }), {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              "server-timing": "total;dur=12.3",
+            },
+          }),
+      ),
+    );
+    const onResponse = vi.fn();
+
+    const result = await createJsonApiRequest({
+      baseUrl: "https://api.example.com",
+      path: "/thing",
+      init: {},
+      parse: (value) => (value as { value: number }).value,
+      onResponse,
+    });
+
+    expect(result).toBe(42);
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    expect(onResponse.mock.calls[0]?.[0].headers.get("server-timing")).toBe("total;dur=12.3");
+  });
+
   it("throws ApiResponseError with the parsed message on a non-ok JSON response", async () => {
     vi.stubGlobal(
       "fetch",

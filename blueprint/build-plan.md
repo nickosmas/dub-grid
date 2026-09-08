@@ -104,7 +104,7 @@
           warm web login, proxy, session-verification, and organization-bootstrap
           paths; remove confirmed avoidable serial work and duplicate requests
           without weakening authentication or tenant checks.
-    - [ ] 19c2. **Mobile authentication entry performance** - measure cold and
+    - [x] 19c2. **Mobile authentication entry performance** - measure cold and
           warm mobile session restoration and organization bootstrap; remove
           confirmed unnecessary waits and duplicate requests without turning
           slow restoration into premature logout.

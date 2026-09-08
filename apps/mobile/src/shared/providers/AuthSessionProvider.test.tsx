@@ -9,13 +9,15 @@ import {
 const getSession = vi.fn();
 const signOut = vi.fn();
 const unsubscribe = vi.fn();
-const onAuthStateChange = vi.fn(() => ({
-  data: {
-    subscription: {
-      unsubscribe,
+const onAuthStateChange = vi.fn(
+  (_callback: (event: string, session: { access_token: string } | null) => void) => ({
+    data: {
+      subscription: {
+        unsubscribe,
+      },
     },
-  },
-}));
+  }),
+);
 const { registerMobileSessionPresence } = vi.hoisted(() => ({
   registerMobileSessionPresence: vi.fn(),
 }));
@@ -51,7 +53,7 @@ describe("AuthSessionProvider", () => {
     registerMobileSessionPresence.mockResolvedValue({ success: true });
   });
 
-  it("registers restored mobile sessions", async () => {
+  it("registers each restored token once even when auth state replays it", async () => {
     getSession.mockResolvedValueOnce({
       data: {
         session: {
@@ -71,6 +73,38 @@ describe("AuthSessionProvider", () => {
     });
 
     expect(registerMobileSessionPresence).toHaveBeenCalledWith("access-token-1");
+    expect(registerMobileSessionPresence).toHaveBeenCalledTimes(1);
+
+    const authStateCallback = onAuthStateChange.mock.calls[0]?.[0];
+    act(() => {
+      authStateCallback?.("SIGNED_IN", { access_token: "access-token-1" });
+    });
+
+    expect(registerMobileSessionPresence).toHaveBeenCalledTimes(1);
+  });
+
+  it("registers a newly observed token after the session changes", async () => {
+    getSession.mockResolvedValueOnce({
+      data: { session: { access_token: "access-token-1" } },
+    });
+
+    render(
+      <AuthSessionProvider>
+        <SessionProbe />
+      </AuthSessionProvider>,
+    );
+
+    await waitFor(() => {
+      expect(registerMobileSessionPresence).toHaveBeenCalledWith("access-token-1");
+    });
+
+    const authStateCallback = onAuthStateChange.mock.calls[0]?.[0];
+    act(() => {
+      authStateCallback?.("TOKEN_REFRESHED", { access_token: "access-token-2" });
+    });
+
+    expect(registerMobileSessionPresence).toHaveBeenCalledTimes(2);
+    expect(registerMobileSessionPresence).toHaveBeenLastCalledWith("access-token-2");
   });
 
   it("releases startup when the stored session restore hangs", async () => {

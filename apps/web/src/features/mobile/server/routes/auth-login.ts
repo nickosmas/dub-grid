@@ -14,6 +14,7 @@ import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { withTiming, type Timer } from "@/lib/server-timing";
 
 async function hashEmail(email: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -29,7 +30,7 @@ const CORS_METHODS = ["POST", "OPTIONS"] as const;
 
 export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest, timer: Timer) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
 
@@ -50,11 +51,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const emailHash = await hashEmail(parsed.data.email);
-  const { limited, misconfigured, reset } = await checkRateLimit(
-    loginLimiter,
-    `login:${emailHash}`,
-  );
+  const { limited, misconfigured, reset } = await timer.time("rate_limit", async () => {
+    const emailHash = await hashEmail(parsed.data.email);
+    return checkRateLimit(loginLimiter, `login:${emailHash}`);
+  });
 
   if (misconfigured) {
     return json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
@@ -81,10 +81,12 @@ export async function POST(req: NextRequest) {
   const sessionClient = createMobileEphemeralAuthClient(supabaseUrl, anonKey);
 
   try {
-    const payload = await loginMobileUser(serviceClient, sessionClient, {
-      ...parsed.data,
-      orgSlug: normalizedOrgSlug,
-    });
+    const payload = await timer.time("login_flow", () =>
+      loginMobileUser(serviceClient, sessionClient, {
+        ...parsed.data,
+        orgSlug: normalizedOrgSlug,
+      }),
+    );
 
     return json(mobileAuthLoginResponseSchema.parse(payload));
   } catch (error) {
@@ -101,3 +103,5 @@ export async function POST(req: NextRequest) {
     return json({ error: "We could not finish signing you in right now." }, { status: 503 });
   }
 }
+
+export const POST = withTiming(handlePOST);

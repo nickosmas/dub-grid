@@ -16,6 +16,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getMobileNavigationTheme } from "@dubgrid/design-tokens";
 import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRealtimeProvider";
+import { markMobileAuthRuntimeStarted } from "../src/features/auth/lib/auth-entry-measurement";
 import { ConsentGate } from "../src/features/consent/components/ConsentGate";
 import { TermsGate } from "../src/features/consent/components/TermsGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
@@ -40,6 +41,7 @@ import {
 import { mobileTypography } from "../src/shared/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+markMobileAuthRuntimeStarted();
 
 /**
  * Expo Router renders this instead of crashing the app when a render throws.

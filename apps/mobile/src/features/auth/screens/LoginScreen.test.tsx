@@ -408,7 +408,9 @@ describe("LoginScreen", () => {
       access_token: "token-123",
       refresh_token: "refresh-123",
     });
-    expect(registerMobileSessionPresence).toHaveBeenCalledWith("token-123");
+    // AuthSessionProvider owns registration for every newly observed token.
+    // LoginScreen must not send a second request during the same handoff.
+    expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
     // Warmed before the handoff, not after it. The tab tree can't draw its tab
     // bar or pick the Home screen without bootstrap, and the launch splash is
@@ -542,7 +544,7 @@ describe("LoginScreen", () => {
       access_token: "verified-token",
       refresh_token: "verified-refresh",
     });
-    expect(registerMobileSessionPresence).toHaveBeenCalledWith("verified-token");
+    expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
   });
 

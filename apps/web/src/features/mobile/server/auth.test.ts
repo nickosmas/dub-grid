@@ -231,20 +231,64 @@ describe("requireMobileAuth", () => {
     expect(result.response.status).toBe(401);
   });
 
-  it("allows mobile auth context once organization setup is complete", async () => {
-    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+  it.each(["user", "admin", "super_admin"])(
+    "allows %s mobile auth context once organization setup is complete",
+    async (orgRole) => {
+      fetchMobileOrganizationMembershipRows.mockResolvedValue([
+        {
+          user_id: USER_ID,
+          org_role: orgRole,
+          admin_permissions: null,
+          joined_at: "2026-01-01T00:00:00.000Z",
+          updated_at: null,
+          department_ids: [],
+          dept_admin_ids: [],
+          organization: {
+            id: ORG_ID,
+            name: "DubGrid Health",
+            slug: "dubgrid-health",
+          },
+        },
+      ]);
+      getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+
+      const { requireMobileAuth } = await import("./auth");
+      const result = await requireMobileAuth(
+        new Request("http://localhost/api/mobile/v1/bootstrap", {
+          headers: { authorization: "Bearer access-token" },
+        }) as never,
+      );
+
+      expect("response" in result).toBe(false);
+      if ("response" in result) return;
+      expect(result.currentOrg.id).toBe(ORG_ID);
+      expect(result.permissions.orgId).toBe(ORG_ID);
+      expect(result.membership?.orgRole).toBe(orgRole);
+    },
+  );
+
+  it("rejects Gridmaster accounts before resolving organization membership", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClient({
+        setupComplete: true,
+        claims: { platform_role: "gridmaster" },
+      }),
+    );
 
     const { requireMobileAuth } = await import("./auth");
     const result = await requireMobileAuth(
       new Request("http://localhost/api/mobile/v1/bootstrap", {
-        headers: { authorization: "Bearer access-token" },
+        headers: { authorization: "Bearer gridmaster-token" },
       }) as never,
     );
 
-    expect("response" in result).toBe(false);
-    if ("response" in result) return;
-    expect(result.currentOrg.id).toBe(ORG_ID);
-    expect(result.permissions.orgId).toBe(ORG_ID);
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(403);
+    expect(await result.response.json()).toEqual({
+      error: "Gridmaster mobile access is not supported",
+    });
+    expect(fetchMobileOrganizationMembershipRows).not.toHaveBeenCalled();
   });
 
   it("allows an aal1 mobile session when no verified TOTP factor exists", async () => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
+import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
 import { AppSplashScreen } from "./AppSplashScreen";
@@ -78,6 +79,12 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   if (isStartupResolved) {
     hasCompletedRef.current = true;
   }
+
+  useEffect(() => {
+    if (isStartupResolved) {
+      authEntryRecorder.markStartupGateReady();
+    }
+  }, [isStartupResolved]);
 
   return (
     <View style={styles.root}>

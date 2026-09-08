@@ -14,29 +14,34 @@ import {
   requireMobileAuth,
 } from "@/features/mobile/server";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
+import { withTiming, type Timer } from "@/lib/server-timing";
 
 export const dynamic = "force-dynamic";
 const CORS_METHODS = ["GET", "OPTIONS"] as const;
 
 export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
-  const auth = await requireMobileAuth(req);
+  const auth = await timer.time("auth", () => requireMobileAuth(req));
   if ("response" in auth) return withMobileCors(req, auth.response, CORS_METHODS);
 
-  const payload = await loadMobileBootstrapPayload(auth, {
-    fetchLinkedEmployeeForUser,
-    fetchMobileUnreadNotificationCount,
-    fetchMobileAbsenceTypes,
-    fetchMobileFocusAreas,
-    fetchMobileRoles,
-    fetchMobileCertifications,
-    fetchMobileDepartments,
-    fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
-    mapOrganizationToMobileConfig,
-  });
+  const payload = await timer.time("fanout", () =>
+    loadMobileBootstrapPayload(auth, {
+      fetchLinkedEmployeeForUser,
+      fetchMobileUnreadNotificationCount,
+      fetchMobileAbsenceTypes,
+      fetchMobileFocusAreas,
+      fetchMobileRoles,
+      fetchMobileCertifications,
+      fetchMobileDepartments,
+      fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
+      mapOrganizationToMobileConfig,
+    }),
+  );
 
   return json(mobileBootstrapResponseSchema.parse(payload));
 }
+
+export const GET = withTiming(handleGET);
