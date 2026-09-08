@@ -129,7 +129,7 @@ export function getOrganizationBootstrapRetryDelay(error: unknown, failureCount:
   return Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
 }
 
-export type OrganizationAccessState = BillingAccessState | "archived" | "unknown";
+export type OrganizationAccessState = BillingAccessState | "archived" | "unavailable" | "unknown";
 
 export interface OrganizationAccessStatus {
   /** True once the proxy's organization gate would no longer hold the caller. */

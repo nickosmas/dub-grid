@@ -2,15 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { CacheKey, cacheThrough, TTL } from "@/lib/cache";
+import { CacheKey, cacheSet, TTL } from "@/lib/cache";
 import * as Sentry from "@/lib/sentry";
 
 export const dynamic = "force-dynamic";
 
-// Same columns, same cache key and TTL as the org-access read in proxy.ts. The
-// gate that holds a user on /billing-required lives there, so answering from
-// anywhere else would let this route say "open" while the very next navigation
-// bounced off a gate still reading the older row.
+// Same columns and cache key as the org-access read in proxy.ts. Unlike normal
+// navigation, this recovery check deliberately reads the source of truth and
+// replaces the cached answer before telling the browser to try the gate again.
 type OrgAccessRow = {
   suspended_at: string | null;
   archived_at: string | null;
@@ -34,25 +33,34 @@ export async function GET(req: NextRequest) {
   // No org claim means the proxy skips the gate entirely for this caller.
   if (!orgId) return NextResponse.json({ available: true, state: "active" });
 
+  const canViewAccessDetails =
+    auth.claims.org_role === "super_admin" || auth.claims.platform_role === "gridmaster";
+
   let org: OrgAccessRow;
   try {
-    org = await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, async () => {
-      const { data } = await getServiceClient()
-        .from("organizations")
-        .select("suspended_at, archived_at, subscription_status, trial_ends_at")
-        .eq("id", orgId)
-        .maybeSingle();
-      return (data as OrgAccessRow) ?? null;
-    });
+    const { data, error } = await getServiceClient()
+      .from("organizations")
+      .select("suspended_at, archived_at, subscription_status, trial_ends_at")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (error) throw error;
+    org = (data as OrgAccessRow) ?? null;
+    await cacheSet(CacheKey.mwOrgAccess(orgId), org, TTL.MIDDLEWARE);
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "organization-access-status" } });
     // A cache or database blip must never read as "your organization is open" —
     // that would send the caller into a reload the gate immediately undoes.
-    return NextResponse.json({ available: false, state: "unknown" });
+    return NextResponse.json({
+      available: false,
+      state: canViewAccessDetails ? "unknown" : "unavailable",
+    });
   }
 
   if (org?.archived_at) {
-    return NextResponse.json({ available: false, state: "archived" });
+    return NextResponse.json({
+      available: false,
+      state: canViewAccessDetails ? "archived" : "unavailable",
+    });
   }
 
   const billingAccess = evaluateOrganizationBillingAccess({
@@ -63,10 +71,12 @@ export async function GET(req: NextRequest) {
 
   // Mirrors the proxy: a super admin can recover billing themselves, so it
   // never parks them on the gate page while the trial clock is unstarted.
-  const canRecoverBilling =
-    auth.claims.org_role === "super_admin" || auth.claims.platform_role === "gridmaster";
+  const canRecoverBilling = canViewAccessDetails;
   const available =
     !billingAccess.isLocked && (billingAccess.state !== "trial_pending" || canRecoverBilling);
 
-  return NextResponse.json({ available, state: billingAccess.state });
+  return NextResponse.json({
+    available,
+    state: canViewAccessDetails ? billingAccess.state : available ? "active" : "unavailable",
+  });
 }

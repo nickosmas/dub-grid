@@ -894,8 +894,13 @@ export const mobileBillingAccessStateSchema = z.enum([
   "suspended",
 ]);
 
+export const mobileOrgStatusStateSchema = z.union([
+  mobileBillingAccessStateSchema,
+  z.literal("unavailable"),
+]);
+
 export const mobileOrgStatusResponseSchema = z.object({
-  state: mobileBillingAccessStateSchema,
+  state: mobileOrgStatusStateSchema,
   isLocked: z.boolean(),
   trialGraceEndsAt: z.string().nullable(),
   orgRole: mobileRoleSchema,

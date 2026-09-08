@@ -53,12 +53,12 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(screen.getByText("Organization unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Contact your organization administrator.")).toBeInTheDocument();
+    expect(screen.getByText(/currently unavailable/i)).toBeInTheDocument();
     expect(screen.queryByText(/Grace period ends/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Manage billing on web")).not.toBeInTheDocument();
   });
 
-  it("shows a suspended detail line when org-status reports suspended", () => {
+  it("does not show suspension detail to a regular user", () => {
     mockStatus({ state: "suspended", isLocked: true, trialGraceEndsAt: null, orgRole: "user" });
 
     render(
@@ -70,14 +70,11 @@ describe("OrganizationLockedScreen", () => {
       />,
     );
 
-    expect(
-      screen.getByText(
-        "This organization is currently unavailable. Contact support if you need help.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/support|suspend/i)).not.toBeInTheDocument();
   });
 
-  it("shows the grace-period end date for a trial_grace org", () => {
+  it("does not show grace-period detail to an Admin", () => {
     mockStatus({
       state: "trial_grace",
       isLocked: false,
@@ -94,16 +91,16 @@ describe("OrganizationLockedScreen", () => {
       />,
     );
 
-    expect(screen.getByText(/Grace period ends/)).toBeInTheDocument();
-    expect(screen.getByText(/still in its grace period/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Grace period ends/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/grace period/i)).not.toBeInTheDocument();
   });
 
   it.each([
     ["trial_pending", /Super Admin starts the trial on the web/i],
     ["trial_ending_soon", /trial is ending soon/i],
     ["payment_attention_required", /organization may still be available/i],
-  ])("shows truthful recovery detail for %s", (state, expectedCopy) => {
-    mockStatus({ state, isLocked: false, trialGraceEndsAt: null, orgRole: "user" });
+  ])("shows truthful recovery detail to a Super Admin for %s", (state, expectedCopy) => {
+    mockStatus({ state, isLocked: false, trialGraceEndsAt: null, orgRole: "super_admin" });
 
     render(
       <OrganizationLockedScreen

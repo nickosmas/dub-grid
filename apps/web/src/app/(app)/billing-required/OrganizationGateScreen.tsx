@@ -15,18 +15,18 @@ import { useLogout } from "@/hooks";
 import { consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
 
-const RECHECK_INTERVAL_MS = 20_000;
+export const ORGANIZATION_GATE_RECHECK_INTERVAL_MS = 5_000;
 
-// The proxy accepts an org-access answer up to TTL.MIDDLEWARE (30s) old plus a
-// 10s per-instance memo, so it can still be holding the gate for a moment after
-// this page has been told the organization is open. Waiting longer than that
-// window between automatic reloads keeps a stale gate to one extra reload
-// instead of a loop.
+// The status endpoint refreshes the shared access answer and the proxy bypasses
+// its short memo when this route reloads. Retain a modest cooldown as a final
+// guard against a malformed or temporarily inconsistent upstream response.
 const RELOAD_COOLDOWN_MS = 45_000;
 const RELOAD_MARKER_KEY = "dg-org-gate-reloaded-at";
 
 export function getGateMessage(state: OrganizationAccessState | undefined): string {
   switch (state) {
+    case "unavailable":
+      return "This organization is currently unavailable. Please try again later.";
     case "locked":
       return "This organization is on hold until an administrator sorts out its billing.";
     case "suspended":
@@ -74,7 +74,7 @@ export function OrganizationGateScreen() {
   const status = useQuery({
     queryKey: queryKeys.org.accessStatus(),
     queryFn: ({ signal }) => fetchOrganizationAccessStatus(signal),
-    refetchInterval: RECHECK_INTERVAL_MS,
+    refetchInterval: ORGANIZATION_GATE_RECHECK_INTERVAL_MS,
     retry: false,
     gcTime: 0,
   });

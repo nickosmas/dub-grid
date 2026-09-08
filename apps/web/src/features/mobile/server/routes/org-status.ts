@@ -14,11 +14,9 @@ import { isSessionRevoked } from "@/lib/auth/revocation";
 export const dynamic = "force-dynamic";
 
 // Deliberately bypasses requireMobileAuth/resolveMobileAuthContext — that
-// path throws a 403 with only a canned message the moment an org is locked,
-// before any billing detail reaches the client. This route does the same
-// minimal identity + membership lookup but always returns the billing state
-// instead of short-circuiting, so OrganizationLockedScreen can show real
-// detail (trial grace end date, role-appropriate next step).
+// path throws a 403 with only a canned message the moment an org is locked.
+// This route does the same minimal identity + membership lookup but returns
+// recovery detail only to roles that own billing or platform operations.
 export async function GET(req: NextRequest) {
   const accessToken = extractMobileBearerToken(req.headers.get("authorization"));
   if (!accessToken) {
@@ -71,12 +69,16 @@ export async function GET(req: NextRequest) {
   });
 
   const orgRole = currentMembership.org_role ?? "user";
+  const canViewAccessDetails =
+    orgRole === "super_admin" || verified.claims.platform_role === "gridmaster";
+  const available =
+    !billingAccess.isLocked && (billingAccess.state !== "trial_pending" || canViewAccessDetails);
 
   return NextResponse.json(
     mobileOrgStatusResponseSchema.parse({
-      state: billingAccess.state,
+      state: canViewAccessDetails ? billingAccess.state : available ? "active" : "unavailable",
       isLocked: billingAccess.isLocked,
-      trialGraceEndsAt: billingAccess.trialGraceEndsAt,
+      trialGraceEndsAt: canViewAccessDetails ? billingAccess.trialGraceEndsAt : null,
       orgRole: orgRole === "super_admin" || orgRole === "admin" ? orgRole : "user",
     }),
   );

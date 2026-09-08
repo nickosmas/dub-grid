@@ -78,7 +78,6 @@ export function OrganizationLockedScreen({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
-  const body = formatLockedMessage(message);
 
   const statusQuery = useQuery({
     queryKey: ["mobile", "org-status", accessToken],
@@ -87,10 +86,15 @@ export function OrganizationLockedScreen({
     retry: false,
   });
   const status = statusQuery.data ?? null;
-  const detailLine = getDetailLine(status);
-  const graceDate =
-    status?.state === "trial_grace" ? formatGraceDate(status.trialGraceEndsAt) : null;
   const isSuperAdmin = status?.orgRole === "super_admin";
+  const body = isSuperAdmin
+    ? formatLockedMessage(message)
+    : "This organization is currently unavailable. Please try again later.";
+  const detailLine = isSuperAdmin ? getDetailLine(status) : null;
+  const graceDate =
+    isSuperAdmin && status?.state === "trial_grace"
+      ? formatGraceDate(status.trialGraceEndsAt)
+      : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>

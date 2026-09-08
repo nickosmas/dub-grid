@@ -2,14 +2,33 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { usePermissions } from "@/hooks";
 import { Button } from "@/components/Button";
+import { fetchOrganizationBilling } from "@/features/billing/client";
+import { queryKeys } from "@/lib/query-keys";
 
 const DISMISS_KEY = "dg_mfa_nag_dismissed";
 
 export default function MfaNagBanner() {
-  const { mfaNagRequired } = usePermissions();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { mfaNagRequired, isSuperAdmin, isGridmaster, isImpersonating, orgId } = usePermissions();
   const [dismissed, setDismissed] = useState(true);
+  const isBillingSection =
+    pathname === "/settings" && searchParams.get("section") === "org-billing";
+  const shouldCheckBillingLock =
+    isBillingSection && isSuperAdmin && !isGridmaster && !isImpersonating && Boolean(orgId);
+  const billingQuery = useQuery({
+    queryKey: queryKeys.org.billing(orgId!),
+    queryFn: () => fetchOrganizationBilling(orgId!),
+    enabled: shouldCheckBillingLock,
+    staleTime: 30_000,
+  });
+  const isBillingRecoveryMode =
+    shouldCheckBillingLock &&
+    (billingQuery.isLoading || billingQuery.data?.billingAccess.isLocked === true);
 
   // Read from sessionStorage after mount only — dismissal is meant to last
   // for this browser session, not forever, so a fresh login re-shows it.
@@ -17,7 +36,7 @@ export default function MfaNagBanner() {
     setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
   }, []);
 
-  if (!mfaNagRequired || dismissed) return null;
+  if (!mfaNagRequired || dismissed || isBillingRecoveryMode) return null;
 
   function dismiss() {
     sessionStorage.setItem(DISMISS_KEY, "1");

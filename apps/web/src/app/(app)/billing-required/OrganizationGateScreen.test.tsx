@@ -24,6 +24,7 @@ import { isAuthTransitionPending, markAuthTransition } from "@/lib/auth-transiti
 import {
   claimAutomaticReload,
   getGateMessage,
+  ORGANIZATION_GATE_RECHECK_INTERVAL_MS,
   OrganizationGateScreen,
 } from "./OrganizationGateScreen";
 
@@ -51,6 +52,10 @@ describe("OrganizationGateScreen", () => {
     expect(screen.getByRole("button", { name: /check again/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
     await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalled());
+  });
+
+  it("checks for restored access within five seconds while the gate is visible", () => {
+    expect(ORGANIZATION_GATE_RECHECK_INTERVAL_MS).toBe(5_000);
   });
 
   it("reloads on its own once the organization opens", async () => {
@@ -109,12 +114,13 @@ describe("OrganizationGateScreen", () => {
     await waitFor(() => expect(isAuthTransitionPending()).toBe(false));
   });
 
-  it("says what is actually wrong when billing has lapsed", async () => {
-    fetchOrganizationAccessStatus.mockResolvedValue({ available: false, state: "locked" });
+  it("does not identify the cause to a held-out User or Admin", async () => {
+    fetchOrganizationAccessStatus.mockResolvedValue({ available: false, state: "unavailable" });
 
     renderScreen();
 
-    expect(await screen.findByText(/billing/i)).toBeInTheDocument();
+    expect(await screen.findByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/billing|trial|suspend|archive/i)).not.toBeInTheDocument();
   });
 });
 
@@ -126,7 +132,13 @@ describe("getGateMessage", () => {
     expect(getGateMessage(undefined)).toBe(setupCopy);
   });
 
-  it("names the real cause for a locked, suspended, or deleted organization", () => {
+  it("uses neutral wording for a redacted unavailable state", () => {
+    const message = getGateMessage("unavailable");
+    expect(message).toMatch(/currently unavailable/i);
+    expect(message).not.toMatch(/billing|trial|suspend|archive/i);
+  });
+
+  it("keeps cause-specific recovery wording for authorized states", () => {
     expect(getGateMessage("locked")).toMatch(/billing/i);
     expect(getGateMessage("suspended")).toMatch(/suspended/i);
     expect(getGateMessage("archived")).toMatch(/no longer available/i);
@@ -141,8 +153,7 @@ describe("claimAutomaticReload", () => {
   it("spends one automatic reload, then holds off until the proxy's gate can catch up", () => {
     const start = 1_000_000;
     expect(claimAutomaticReload(start)).toBe(true);
-    // A gate still serving its cached answer bounces the user straight back
-    // here; without the cooldown that is an endless reload loop.
+    // Retain a final loop guard even though the recovery path refreshes access.
     expect(claimAutomaticReload(start + 20_000)).toBe(false);
     expect(claimAutomaticReload(start + 46_000)).toBe(true);
   });

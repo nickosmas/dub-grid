@@ -101,23 +101,22 @@ function getMobileUserName(user: User): {
 }
 
 function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
-  if (billingAccess.reason === "suspended") {
-    return "Organization unavailable. Contact your organization administrator.";
-  }
-
   if (orgRole === "super_admin") {
+    if (billingAccess.reason === "suspended") {
+      return "Organization unavailable. Contact DubGrid support for help.";
+    }
     return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
+  return "Organization unavailable. Please try again later.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
-  if (orgRole === "super_admin" || orgRole === "admin") {
+  if (orgRole === "super_admin") {
     return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
+  return "Organization unavailable. Please try again later.";
 }
 
 async function requireMobileOrganization(

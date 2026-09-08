@@ -16,6 +16,7 @@ const auditInsert = vi.fn();
 const scheduleSubscriptionCancellation = vi.fn();
 const syncSubscriptionSeats = vi.fn();
 const extendTrial = vi.fn();
+const cacheDel = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -49,6 +50,14 @@ vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
+vi.mock("@/lib/cache", () => ({
+  cacheDel: (...args: unknown[]) => cacheDel(...args),
+  CacheKey: {
+    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+    organization: (orgId: string) => `dg:org:${orgId}:organization`,
+  },
+}));
+
 import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -63,6 +72,7 @@ function makeRequest(body: unknown) {
 describe("POST /api/gridmaster/subscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    cacheDel.mockResolvedValue(undefined);
     validateCsrfOrigin.mockReturnValue(null);
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
@@ -239,6 +249,22 @@ describe("POST /api/gridmaster/subscription", () => {
       subscription_status: "trialing",
       trial_ends_at: expect.any(String),
     });
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:mw:orgAccess:${ORG_ID}`,
+      `dg:org:${ORG_ID}:organization`,
+    );
+  });
+
+  it("invalidates organization access after overriding billing to active", async () => {
+    const response = await POST(
+      makeRequest({ orgId: ORG_ID, action: "override_status", status: "active" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:mw:orgAccess:${ORG_ID}`,
+      `dg:org:${ORG_ID}:organization`,
+    );
   });
 
   it("syncs Stripe seats to app users and audits the action", async () => {

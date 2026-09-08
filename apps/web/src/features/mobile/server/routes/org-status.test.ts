@@ -104,16 +104,14 @@ describe("GET mobile org-status route", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns real billing state for a healthy org, unlike the old canned-message-only path", async () => {
+  it("redacts a pending trial from a regular user", async () => {
     const { GET } = await import("./org-status");
     const response = await GET(makeRequest("Bearer token-123"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    // No trial_ends_at yet means the trial clock hasn't started (see
-    // project_trial_activation_rule) — not locked, just pending.
     expect(body).toEqual({
-      state: "trial_pending",
+      state: "unavailable",
       isLocked: false,
       trialGraceEndsAt: null,
       orgRole: "user",
@@ -135,7 +133,7 @@ describe("GET mobile org-status route", () => {
     expect(body.isLocked).toBe(false);
   });
 
-  it("still returns billing detail (not just a 403) when the org is locked", async () => {
+  it("does not return billing detail when a regular user's org is locked", async () => {
     fetchMobileOrganizationRowById.mockResolvedValue({
       ...ORG_ROW,
       subscription_status: "canceled",
@@ -146,11 +144,11 @@ describe("GET mobile org-status route", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.state).toBe("locked");
+    expect(body.state).toBe("unavailable");
     expect(body.isLocked).toBe(true);
   });
 
-  it("returns grace timing for a trial in its open grace period", async () => {
+  it("does not return grace timing to a regular user", async () => {
     fetchMobileOrganizationRowById.mockResolvedValue({
       ...ORG_ROW,
       subscription_status: "trialing",
@@ -161,9 +159,9 @@ describe("GET mobile org-status route", () => {
     const response = await GET(makeRequest("Bearer token-123"));
     const body = await response.json();
 
-    expect(body.state).toBe("trial_grace");
+    expect(body.state).toBe("active");
     expect(body.isLocked).toBe(false);
-    expect(body.trialGraceEndsAt).toEqual(expect.any(String));
+    expect(body.trialGraceEndsAt).toBeNull();
   });
 
   it("returns payment attention without locking an admin", async () => {
@@ -183,8 +181,9 @@ describe("GET mobile org-status route", () => {
     const body = await response.json();
 
     expect(body).toMatchObject({
-      state: "payment_attention_required",
+      state: "active",
       isLocked: false,
+      trialGraceEndsAt: null,
       orgRole: "admin",
     });
   });
@@ -207,5 +206,24 @@ describe("GET mobile org-status route", () => {
 
     expect(body.state).toBe("suspended");
     expect(body.orgRole).toBe("super_admin");
+  });
+
+  it("preserves access detail for a Gridmaster", async () => {
+    verifyAccessToken.mockResolvedValue({
+      userId: "gridmaster-1",
+      sessionId: "session-1",
+      email: "gridmaster@example.com",
+      issuedAtMs: Date.now(),
+      claims: { sub: "gridmaster-1", org_id: "org-1", platform_role: "gridmaster" },
+    });
+    fetchMobileOrganizationRowById.mockResolvedValue({
+      ...ORG_ROW,
+      subscription_status: "canceled",
+    });
+
+    const { GET } = await import("./org-status");
+    const body = await (await GET(makeRequest("Bearer token-123"))).json();
+
+    expect(body.state).toBe("locked");
   });
 });

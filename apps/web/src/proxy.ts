@@ -7,7 +7,7 @@ import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
-import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
@@ -74,13 +74,19 @@ function redirectWithCookies(url: URL, source: NextResponse): NextResponse {
 async function readOrgAccess(
   orgId: string,
   load: () => Promise<MwOrgAccess>,
+  refresh = false,
 ): Promise<MwOrgAccess> {
   const now = Date.now();
-  const memoized = mwOrgAccessMemo.get(orgId);
-  if (memoized && memoized.expiresAt > now) return memoized.value;
+  if (!refresh) {
+    const memoized = mwOrgAccessMemo.get(orgId);
+    if (memoized && memoized.expiresAt > now) return memoized.value;
+  }
 
-  const value = await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
+  const value = refresh
+    ? await load()
+    : await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
   mwOrgAccessMemo.set(orgId, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
+  if (refresh) void cacheSet(CacheKey.mwOrgAccess(orgId), value, TTL.MIDDLEWARE);
   return value;
 }
 
@@ -562,14 +568,18 @@ export async function proxy(req: NextRequest) {
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
       const orgAccess = await timer.time("mw_org_access", () =>
-        readOrgAccess(claims.org_id!, async () => {
-          const { data } = await supabase
-            .from("organizations")
-            .select("suspended_at, archived_at, subscription_status, trial_ends_at")
-            .eq("id", claims.org_id!)
-            .maybeSingle();
-          return (data as MwOrgAccess) ?? null;
-        }),
+        readOrgAccess(
+          claims.org_id!,
+          async () => {
+            const { data } = await supabase
+              .from("organizations")
+              .select("suspended_at, archived_at, subscription_status, trial_ends_at")
+              .eq("id", claims.org_id!)
+              .maybeSingle();
+            return (data as MwOrgAccess) ?? null;
+          },
+          pathname === "/billing-required",
+        ),
       );
 
       // A deleted (archived) org revokes access just like a suspended one. A

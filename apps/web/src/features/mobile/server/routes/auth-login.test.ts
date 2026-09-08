@@ -332,8 +332,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error:
-        "Organization unavailable. Your organization opens up once your administrator finishes setup.",
+      error: "Organization unavailable. Please try again later.",
     });
   });
 

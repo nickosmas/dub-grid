@@ -195,7 +195,7 @@ describe("requireMobileAuth", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "Organization unavailable. Sign in on the web to finish organization setup.",
+      error: "Organization unavailable. Please try again later.",
     });
   });
 

@@ -6,6 +6,7 @@ import {
   mobileDashboardMetricsSchema,
   mobileNotificationPreferencesResponseSchema,
   mobileNotificationSchema,
+  mobileOrgStatusResponseSchema,
   mobilePersonSchema,
   mobilePersonResponseSchema,
   mobilePersonUpdateBodySchema,
@@ -31,6 +32,22 @@ import { scheduleCellStateSchema } from "./schedule";
 import { getOptionalUsPhoneError, normalizeOptionalUsPhone, staffNameSchema } from "./staff";
 
 describe("mobile contracts", () => {
+  it("accepts a privacy-redacted organization status", () => {
+    expect(
+      mobileOrgStatusResponseSchema.parse({
+        state: "unavailable",
+        isLocked: true,
+        trialGraceEndsAt: null,
+        orgRole: "admin",
+      }),
+    ).toEqual({
+      state: "unavailable",
+      isLocked: true,
+      trialGraceEndsAt: null,
+      orgRole: "admin",
+    });
+  });
+
   it("distinguishes redacted dashboard drafts from an authorized zero", () => {
     const baseMetrics = {
       coveragePct: 100,
