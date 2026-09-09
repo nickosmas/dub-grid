@@ -7,10 +7,11 @@ import { decodeJwt } from "jose";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
+import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
-import { markAuthTransition } from "@/lib/auth-transition";
+import { consumeAuthTransition, markAuthTransition } from "@/lib/auth-transition";
 import { setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -18,6 +19,7 @@ import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
   exitSandbox,
+  clearBrowserAuthState,
   fetchAccessibleOrganizations,
   getBrowserAuthSession,
   refreshBrowserSession,
@@ -54,10 +56,47 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   const queryClient = useQueryClient();
   const [isHydrated, setIsHydrated] = useState(false);
   const submittingRef = useRef(false);
+  const flowGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const organizationHandoffActiveRef = useRef(false);
+  const switchAttemptRef = useRef<{ targetOrgId: string; promise: Promise<boolean> } | null>(null);
+  const mfaProceedRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
+    mountedRef.current = true;
     setIsHydrated(true);
+    return () => {
+      mountedRef.current = false;
+      flowGenerationRef.current += 1;
+    };
   }, []);
+
+  function isCurrentFlow(generation: number): boolean {
+    return mountedRef.current && flowGenerationRef.current === generation;
+  }
+
+  function beginOrganizationHandoff() {
+    organizationHandoffActiveRef.current = true;
+    setHandoffActive(true);
+    setHandoffFailed(false);
+    markAuthTransition();
+    setUserViewActive(false);
+    void queryClient.cancelQueries();
+    queryClient.clear();
+  }
+
+  function failClosedOrganizationHandoff() {
+    clearBrowserAuthState();
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    consumeAuthTransition();
+    organizationHandoffActiveRef.current = false;
+    if (!mountedRef.current) return;
+    setHandoffActive(false);
+    setHandoffFailed(true);
+    setMfaRequired(false);
+    setLoading(false);
+  }
 
   // Same-org login → soft nav (smooth, no reload). After an ORG SWITCH → hard
   // nav: a soft nav leaves useOrganizationData's one-time org context pinned to
@@ -73,61 +112,97 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   }
   // Switches to targetOrgId (already confirmed as one of the user's
   // memberships), refreshes the session, starts the org's trial if
-  // applicable, and clears sandbox/query-cache state. A recoverable failure
-  // stays on the MFA screen so the verified session is not mistaken for a
-  // logout. Shared by the fast-path (server said
+  // applicable, and clears sandbox/query-cache state. Once switch_org commits,
+  // any incomplete handoff fails closed to a fresh sign-in surface. Shared by
+  // the fast-path (server said
   // needsClientOrgSwitch) and the MFA-verified path (which can't go through
   // the server route a second time — see handleMFAVerified).
-  async function switchToOrgAndPrepare(targetOrgId: string): Promise<boolean> {
-    await settleWithRequestTimeout(switchBrowserOrganization(targetOrgId));
-    await settleWithRequestTimeout(refreshBrowserSession());
-    // Don't carry a prior session's "view as user" toggle into the org we
-    // just switched into (it would silently force read-only).
-    setUserViewActive(false);
-    // Drop the prior org's React Query cache so the new org's dashboard
-    // never paints with stale cross-org data. The hard nav below would
-    // eventually reset this, but clearing here guarantees nothing in
-    // between hits the old cache.
-    queryClient.clear();
-    // First super_admin login starts this org's trial (idempotent,
-    // self-gated server-side) and wiping any sandbox left over from the
-    // previous session (involuntary logout / browser close that never ran
-    // the explicit exit) are independent of each other, so run them
-    // concurrently rather than one after the other.
-    //
-    // Both stay awaited, not fire-and-forget: the caller hard-navigates
-    // immediately after this returns, which aborted the in-flight sandbox
-    // request often enough that the sandbox routinely survived the switch —
-    // and a surviving sandbox cookie pins every later request to a clone of
-    // the org the user just left, at an elevated role. Both are still
-    // non-fatal on failure: trial activation never blocks sign-in, and the
-    // switch route now clears the sandbox cookie server-side regardless, so
-    // this call is only what deletes the org row.
-    await Promise.all([
-      settleWithRequestTimeout(startBrowserTrial(targetOrgId)).catch(() => {
-        // Non-fatal: never block sign-in on trial activation.
-      }),
-      settleWithRequestTimeout(exitSandbox()).catch(() => {
-        // Non-fatal: never block sign-in on sandbox teardown.
-      }),
-    ]);
-    // The prior org's permissions are cached in a module-level singleton keyed
-    // by user id, which a same-user org switch does not invalidate on its own.
-    return true;
+  async function switchToOrgAndPrepare(targetOrgId: string, generation: number): Promise<boolean> {
+    const existing = switchAttemptRef.current;
+    if (existing?.targetOrgId === targetOrgId) return existing.promise;
+
+    const promise = (async () => {
+      await settleWithRequestTimeout(switchBrowserOrganization(targetOrgId));
+      if (!isCurrentFlow(generation)) {
+        failClosedOrganizationHandoff();
+        return false;
+      }
+
+      // switch_org has committed. From this point onward no failure may put
+      // the old organization's interactive session back on screen.
+      beginOrganizationHandoff();
+
+      let refreshedSession;
+      try {
+        refreshedSession = await settleWithRequestTimeout(refreshBrowserSession());
+      } catch (error) {
+        failClosedOrganizationHandoff();
+        throw error;
+      }
+
+      if (!isCurrentFlow(generation)) {
+        failClosedOrganizationHandoff();
+        return false;
+      }
+
+      let refreshedOrganizationMatches = false;
+      try {
+        refreshedOrganizationMatches =
+          !!refreshedSession && decodeJwt(refreshedSession.access_token).org_id === targetOrgId;
+      } catch {
+        refreshedOrganizationMatches = false;
+      }
+      if (!refreshedOrganizationMatches) {
+        failClosedOrganizationHandoff();
+        throw new Error("organization_session_mismatch");
+      }
+
+      // First super_admin login starts this org's trial (idempotent,
+      // self-gated server-side) and wiping any sandbox left over from the
+      // previous session (involuntary logout / browser close that never ran
+      // the explicit exit) are independent of each other, so run them
+      // concurrently rather than one after the other.
+      //
+      // Both stay awaited, not fire-and-forget: the caller hard-navigates
+      // immediately after this returns, which aborted the in-flight sandbox
+      // request often enough that the sandbox routinely survived the switch —
+      // and a surviving sandbox cookie pins every later request to a clone of
+      // the org the user just left, at an elevated role. Both are still
+      // non-fatal on failure: trial activation never blocks sign-in, and the
+      // switch route now clears the sandbox cookie server-side regardless, so
+      // this call is only what deletes the org row.
+      await Promise.all([
+        settleWithRequestTimeout(startBrowserTrial(targetOrgId)).catch(() => {
+          // Non-fatal: never block sign-in on trial activation.
+        }),
+        settleWithRequestTimeout(exitSandbox()).catch(() => {
+          // Non-fatal: never block sign-in on sandbox teardown.
+        }),
+      ]);
+      return isCurrentFlow(generation);
+    })();
+
+    switchAttemptRef.current = { targetOrgId, promise };
+    const clearAttempt = () => {
+      if (switchAttemptRef.current?.promise === promise) switchAttemptRef.current = null;
+    };
+    void promise.then(clearAttempt, clearAttempt);
+    return promise;
   }
 
   // Looks up the user's membership in `orgSlug` and switches to it via
   // switchToOrgAndPrepare. Returns false (having already shown a toast and
   // signed the user out) when the lookup fails or no membership exists.
-  async function findAndSwitchToOrg(): Promise<boolean> {
+  async function findAndSwitchToOrg(generation: number): Promise<boolean> {
     const { organizations: orgs } = await settleWithRequestTimeout(fetchAccessibleOrganizations());
+    if (!isCurrentFlow(generation)) return false;
     const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
     if (!targetOrg) {
       await signOutFromBrowser("local");
       toast.error("Your account is not associated with this organization.");
       return false;
     }
-    return switchToOrgAndPrepare(targetOrg.org_id);
+    return switchToOrgAndPrepare(targetOrg.org_id, generation);
   }
 
   const [email, setEmail] = useState("");
@@ -136,6 +211,8 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
   const [gridmasterPortalRequired, setGridmasterPortalRequired] = useState(false);
+  const [handoffActive, setHandoffActive] = useState(false);
+  const [handoffFailed, setHandoffFailed] = useState(false);
   // Seeded from the server, which already resolved this subdomain (see
   // app/login/page.tsx). That is what keeps the heading from painting the raw
   // slug first: a client-only source — an effect, `typeof window`, localStorage
@@ -189,7 +266,9 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
     e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
+    const generation = ++flowGenerationRef.current;
     setLoading(true);
+    setHandoffFailed(false);
     setGridmasterPortalRequired(false);
 
     try {
@@ -207,6 +286,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         body: JSON.stringify({ email, password }),
       });
       const result = await res.json().catch(() => null);
+      if (!isCurrentFlow(generation)) return;
 
       if (!res.ok) {
         if (res.status === 429) {
@@ -227,8 +307,8 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
           return;
         }
         if (result?.code === "SESSION_REFRESH_FAILED") {
+          failClosedOrganizationHandoff();
           toast.error("We couldn't verify your session. Sign in again.");
-          setLoading(false);
           return;
         }
         if (res.status === 401) {
@@ -250,13 +330,32 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         return;
       }
 
-      // Set the session in the client using the tokens from the server.
-      await settleWithRequestTimeout(
-        setBrowserSession({
-          access_token: result.session.access_token,
-          refresh_token: result.session.refresh_token,
-        }),
-      );
+      if (result.didSwitchOrg) {
+        let switchedOrganizationMatches = false;
+        try {
+          switchedOrganizationMatches = decodeJwt(result.session.access_token).org_slug === orgSlug;
+        } catch {
+          switchedOrganizationMatches = false;
+        }
+        if (!switchedOrganizationMatches) {
+          failClosedOrganizationHandoff();
+          throw new Error("organization_session_mismatch");
+        }
+        beginOrganizationHandoff();
+      }
+
+      try {
+        await settleWithRequestTimeout(
+          setBrowserSession({
+            access_token: result.session.access_token,
+            refresh_token: result.session.refresh_token,
+          }),
+        );
+      } catch (error) {
+        if (result.didSwitchOrg) failClosedOrganizationHandoff();
+        throw error;
+      }
+      if (!isCurrentFlow(generation)) return;
 
       // Check if MFA is required before proceeding
       if (result.mfa_required) {
@@ -272,13 +371,6 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       // the tokens set above are the post-switch ones. What is left is
       // browser-local state the server cannot touch.
       if (result.didSwitchOrg) {
-        // Don't carry a prior session's "view as user" toggle into the org we
-        // just switched into (it would silently force read-only).
-        setUserViewActive(false);
-        // Drop the prior org's React Query cache so the new org's dashboard
-        // never paints with stale cross-org data.
-        queryClient.clear();
-        markAuthTransition();
         navigateToDashboard(result.destination, true);
         return;
       }
@@ -292,14 +384,17 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       markAuthTransition();
       navigateToDashboard(result.destination, false);
     } catch (err: unknown) {
+      if (organizationHandoffActiveRef.current) failClosedOrganizationHandoff();
       toast.error(getWebAuthRecoveryMessage(err, "We couldn't sign you in. Try again."));
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     } finally {
       submittingRef.current = false;
     }
   }
 
   async function handleMFAVerified() {
+    if (mfaProceedRef.current) return mfaProceedRef.current;
+    const generation = ++flowGenerationRef.current;
     // After MFA verification, proceed with the org slug verification and
     // dashboard redirect. Unlike handleSubmit above, this can't go through
     // POST /api/auth/login (that already happened before MFA) — the second
@@ -307,6 +402,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
     // this orchestrates org-switch/trial/terms client-side same as before.
     async function proceed() {
       const session = await settleWithRequestTimeout(getBrowserAuthSession());
+      if (!isCurrentFlow(generation)) return;
       if (!session) {
         toast.error("Your session expired. Sign in again.");
         setMfaRequired(false);
@@ -322,7 +418,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         const signedInOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
 
         if (userSlug !== orgSlug) {
-          const switched = await findAndSwitchToOrg();
+          const switched = await findAndSwitchToOrg(generation);
           if (!switched) {
             setMfaRequired(false);
             return;
@@ -344,17 +440,32 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         }
       }
 
+      if (!isCurrentFlow(generation)) return;
+
+      const destination = await settleWithRequestTimeout(resolvePostLoginDestination());
+      if (!isCurrentFlow(generation)) return;
+
       markAuthTransition();
-      navigateToDashboard(
-        await settleWithRequestTimeout(resolvePostLoginDestination()),
-        didSwitchOrg,
-      );
+      navigateToDashboard(destination, didSwitchOrg);
     }
-    return proceed();
+    const promise = proceed();
+    mfaProceedRef.current = promise;
+    const clearProceed = () => {
+      if (mfaProceedRef.current === promise) mfaProceedRef.current = null;
+    };
+    void promise.then(clearProceed, clearProceed);
+    return promise;
   }
 
   function handleMFACancel() {
+    flowGenerationRef.current += 1;
+    organizationHandoffActiveRef.current = false;
+    clearBrowserAuthState();
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    consumeAuthTransition();
     void signOutFromBrowser("local");
+    setHandoffActive(false);
     setMfaRequired(false);
     setLoading(false);
   }
@@ -370,6 +481,10 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   const apexOrigin = `${protocol}//${baseDomain}${parsed?.port ?? ""}`;
   const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
   const gridmasterPortalHref = `${protocol}//gridmaster.${baseDomain}${parsed?.port ?? ""}/login`;
+
+  if (handoffActive) {
+    return <AuthTransitionScreen phase="workspace" />;
+  }
 
   if (mfaRequired) {
     return (
@@ -399,6 +514,12 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
 
             <p className="dg-auth-org-prefix">Sign in to</p>
             <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
+
+            {handoffFailed ? (
+              <p className="dg-form-error" role="alert">
+                We couldn't finish switching organizations. Sign in again.
+              </p>
+            ) : null}
 
             <EmailPasswordForm
               email={email}

@@ -9,7 +9,9 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
+import { getMobileAuthIdentity, isSameMobileAuthIdentity } from "../lib/access-token";
 import { registerMobileSessionPresence } from "../lib/api";
+import { queryClient } from "../lib/query-client";
 import { getSupabaseClient } from "../lib/supabase";
 
 type AuthSessionContextValue = {
@@ -26,8 +28,13 @@ const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 export const SESSION_RESTORE_TIMEOUT_MS = 12_000;
 let activeSessionWriter: ((session: Session | null) => void) | null = null;
 
-export function replaceAuthSession(session: Session | null) {
-  activeSessionWriter?.(session);
+export function replaceAuthSession(session: Session | null): boolean {
+  if (!activeSessionWriter) {
+    return false;
+  }
+
+  activeSessionWriter(session);
+  return true;
 }
 
 function shouldClearLocalAuthForRestoreError(error: unknown): boolean {
@@ -49,7 +56,34 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true;
+    let restoreGeneration = 0;
+    let restoreInFlight: Promise<void> | null = null;
+    let cancelRestore: (() => void) | null = null;
+    let committedIdentity = getMobileAuthIdentity(null);
+
     const writeSession = (session: Session | null) => {
+      const nextIdentity = getMobileAuthIdentity(session?.access_token ?? null);
+      const identityChanged = !isSameMobileAuthIdentity(committedIdentity, nextIdentity);
+      const crossesIdentityBoundary =
+        identityChanged &&
+        committedIdentity.kind === "authenticated" &&
+        nextIdentity.kind !== "unreadable";
+
+      if (nextIdentity.kind === "unreadable") {
+        void queryClient.cancelQueries();
+        queryClient.clear();
+        committedIdentity = nextIdentity;
+        lastTrackedAccessTokenRef.current = null;
+        setValue({ session: null, isLoading: false, restoreError: true });
+        return;
+      }
+
+      if (crossesIdentityBoundary) {
+        void queryClient.cancelQueries();
+        queryClient.clear();
+      }
+      committedIdentity = nextIdentity;
+
       if (!session?.access_token) {
         lastTrackedAccessTokenRef.current = null;
       } else if (lastTrackedAccessTokenRef.current !== session.access_token) {
@@ -64,7 +98,13 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       });
     };
 
-    activeSessionWriter = writeSession;
+    const commitAuthoritativeSession = (session: Session | null) => {
+      restoreGeneration += 1;
+      cancelRestore?.();
+      writeSession(session);
+    };
+
+    activeSessionWriter = commitAuthoritativeSession;
 
     let stopSessionRestore = authEntryRecorder.startPhase("session_restore");
     const finishSessionRestore = () => {
@@ -79,10 +119,6 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       }
       writeSession(session);
     };
-    let restoreGeneration = 0;
-    let restoreInFlight: Promise<void> | null = null;
-    let cancelRestore: (() => void) | null = null;
-
     const restoreSession = () => {
       if (restoreInFlight) return restoreInFlight;
       const generation = ++restoreGeneration;
@@ -148,14 +184,12 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      restoreGeneration += 1;
-      cancelRestore?.();
-      writeSession(session ?? null);
+      commitAuthoritativeSession(session ?? null);
     });
 
     return () => {
       isMounted = false;
-      if (activeSessionWriter === writeSession) {
+      if (activeSessionWriter === commitAuthoritativeSession) {
         activeSessionWriter = null;
       }
       retryRestoreRef.current = async () => undefined;

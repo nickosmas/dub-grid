@@ -10,6 +10,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getProfile, updateProfileMfaStatus } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -67,8 +68,8 @@ export default function ProfileTwoFactorScreen() {
   const [isConfirmingDisable, setIsConfirmingDisable] = useState(false);
 
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const contentState = useMobileContentState({

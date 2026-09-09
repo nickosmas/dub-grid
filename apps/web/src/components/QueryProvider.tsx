@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { listenForInvalidations } from "@/lib/cache-broadcast";
 import { clientEnv } from "@/lib/env";
+import AuthenticatedCacheBoundary from "@/components/AuthenticatedCacheBoundary";
 
 function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -81,5 +82,9 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => attachPerfLogger(queryClient), [queryClient]);
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthenticatedCacheBoundary>{children}</AuthenticatedCacheBoundary>
+    </QueryClientProvider>
+  );
 }

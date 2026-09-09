@@ -147,10 +147,14 @@ describe("NotificationDetailScreen", () => {
 
   it("renders a cached notification and auto-marks it read once", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    useQueryClient.mockReturnValue(mockQueryClient([SAMPLE_NOTIFICATION]));
+    const queryClient = mockQueryClient([SAMPLE_NOTIFICATION]);
+    useQueryClient.mockReturnValue(queryClient);
 
     render(<NotificationDetailScreen />);
 
+    expect(queryClient.getQueriesData).toHaveBeenCalledWith({
+      queryKey: ["mobile", "notifications-infinite", ["unreadable", null, null]],
+    });
     expect(screen.getByText("Pickup available")).toBeInTheDocument();
     expect(screen.getByText("A shift is waiting for response.")).toBeInTheDocument();
     expect(screen.getByText("HIGH")).toBeInTheDocument();

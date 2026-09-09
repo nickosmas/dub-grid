@@ -12,6 +12,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { getProfileSessions, revokeProfileSession } from "../../../shared/lib/api";
 import {
   disablePushForCurrentDevice,
@@ -70,8 +71,8 @@ export default function ProfileSessionsScreen() {
   const [isStaleOpen, setStaleOpen] = useState(false);
 
   const sessionsQuery = useQuery({
-    queryKey: ["mobile", "profile", "sessions", accessToken],
-    queryFn: () => getProfileSessions(accessToken!),
+    queryKey: mobileQueryKeys.profileSessions(accessToken),
+    queryFn: ({ signal }) => getProfileSessions(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const revokeMutation = useMutation({

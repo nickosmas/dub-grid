@@ -75,6 +75,29 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  it("cancels a core read when its caller aborts", async () => {
+    let transportSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      transportSignal = init.signal ?? undefined;
+      return new Promise((_resolve, reject) => {
+        transportSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getDashboard } = await import("./api");
+    const controller = new AbortController();
+
+    const request = getDashboard("token-123", undefined, controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toBeDefined();
+    expect(transportSignal?.aborted).toBe(true);
+  });
+
   it("adds shift request query params when a mobile date range is supplied", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

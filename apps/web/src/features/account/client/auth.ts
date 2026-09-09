@@ -1,6 +1,6 @@
 "use client";
 
-import type { EmailOtpType, RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { EmailOtpType, RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   clearSupabaseBrowserAuthState,
   getBrowserSession,
@@ -92,11 +92,12 @@ export async function setBrowserSession(input: {
   }
 }
 
-export async function refreshBrowserSession(): Promise<void> {
-  const { error } = await supabase.auth.refreshSession();
+export async function refreshBrowserSession(): Promise<Session | null> {
+  const { data, error } = await supabase.auth.refreshSession();
   if (error) {
     throw error;
   }
+  return data.session;
 }
 
 export async function resetBrowserPasswordForEmail(email: string, redirectTo: string) {

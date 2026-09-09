@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getMySchedule } from "../../../shared/lib/api";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 
 /**
  * The signed-in user's own upcoming shifts, as shown by `MyScheduleCard`.
@@ -18,8 +19,8 @@ import { getMySchedule } from "../../../shared/lib/api";
  */
 export function useMyScheduleQuery(accessToken: string | null, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ["mobile", "dashboard", "my-schedule", accessToken],
-    queryFn: () => getMySchedule(accessToken!),
+    queryKey: mobileQueryKeys.dashboardSchedule(accessToken),
+    queryFn: ({ signal }) => getMySchedule(accessToken!, undefined, signal),
     enabled: Boolean(accessToken) && (options?.enabled ?? true),
   });
 }

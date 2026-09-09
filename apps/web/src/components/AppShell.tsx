@@ -17,6 +17,7 @@ import {
 } from "@/features/organization/client/api";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
+import { useAuth } from "@/components/AuthProvider";
 
 const APP_ROUTES = [
   "/dashboard",
@@ -84,6 +85,7 @@ function AppHeader() {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useAuth();
   const { isGridmaster, isLoading, orgId } = usePermissions();
   const shellRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -130,7 +132,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
     ...getOrganizationBootstrapQueryPolicy(),
-    enabled: !isGridmaster && Boolean(orgId),
+    enabled: Boolean(user) && !isGridmaster && Boolean(orgId),
   });
   // Keyed remount of the page subtree resets form state on sandbox org switches.
   // Only apply it on app routes: on public routes (e.g. /login) the org id

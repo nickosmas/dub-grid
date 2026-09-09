@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { setSentryUser } from "@/lib/sentry";
 import { AuthContext } from "@/lib/auth-context";
@@ -37,15 +37,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const authGenerationRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    let isMounted = true;
+    const isCurrentGeneration = (generation: number) =>
+      isMounted && authGenerationRef.current === generation;
+
+    const commitAuthState = (
+      generation: number,
+      nextSession: Session | null,
+      nextUser: User | null,
+    ): boolean => {
+      if (!isCurrentGeneration(generation)) return false;
+
+      setSession(nextUser ? nextSession : null);
+      setUser(nextUser);
+      setIsLoading(false);
+      setSentryUser(nextUser ? { id: nextUser.id, email: nextUser.email } : null);
+      return true;
+    };
 
     // Initial session check with timeout — stale cookies from a different
     // Supabase instance (e.g. remote→local switch) can cause getSession()
     // to hang indefinitely on token refresh. The timeout clears the dead
     // session so the app doesn't spin forever.
     const checkSession = async () => {
+      const generation = authGenerationRef.current;
       try {
         const params = new URLSearchParams(window.location.search);
         const isVerifiedLoginHandoff =
@@ -67,15 +87,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         const verifiedUser = initialSession?.access_token
           ? await getVerifiedBrowserAuthUser()
           : null;
-        setSession(verifiedUser ? initialSession : null);
-        setUser(verifiedUser);
-        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
+        if (!commitAuthState(generation, initialSession, verifiedUser)) return;
 
         // Track existing session on page load (session restored from cookies)
         if (initialSession?.refresh_token && verifiedUser) {
           trackSession(initialSession).catch(() => {});
         }
       } catch (error) {
+        if (!isCurrentGeneration(generation)) return;
+
         // Only WIPE persisted auth for a known-recoverable failure (stale/invalid
         // refresh token), where clearing is the recovery. On a bare timeout the
         // tokens may still be valid (just slow) — don't wipe them, or we'd convert
@@ -84,11 +104,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (isRecoverableBrowserAuthFailure(error)) {
           clearBrowserAuthState();
         }
-        setSession(null);
-        setUser(null);
-        setSentryUser(null);
-      } finally {
-        setIsLoading(false);
+        commitAuthState(generation, null, null);
       }
     };
 
@@ -98,11 +114,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const {
       data: { subscription },
     } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, nextSession: Session | null) => {
+      const generation = ++authGenerationRef.current;
+
       if (event === "SIGNED_OUT" || !nextSession?.access_token) {
-        setSession(null);
-        setUser(null);
-        setIsLoading(false);
-        setSentryUser(null);
+        commitAuthState(generation, null, null);
         return;
       }
 
@@ -122,10 +137,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           trustsSessionUser && nextSession.user
             ? nextSession.user
             : await getVerifiedBrowserAuthUser().catch(() => null);
-        setSession(verifiedUser ? nextSession : null);
-        setUser(verifiedUser);
-        setIsLoading(false);
-        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
+        if (!commitAuthState(generation, nextSession, verifiedUser)) return;
 
         // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
         // and ProtectedRoute handles session-expiry redirects to /login.
@@ -140,6 +152,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => {
+      isMounted = false;
+      authGenerationRef.current += 1;
       subscription.unsubscribe();
     };
   }, []);

@@ -12,6 +12,7 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -103,9 +104,9 @@ export default function ProfileNotificationsScreen() {
   });
 
   const prefsQuery = useQuery({
-    queryKey: ["mobile", "notification-preferences", accessToken],
+    queryKey: mobileQueryKeys.notificationPreferences(accessToken),
     enabled: Boolean(accessToken),
-    queryFn: () => getProfileNotificationPreferences(accessToken!),
+    queryFn: ({ signal }) => getProfileNotificationPreferences(accessToken!, signal),
   });
 
   // Derived from the query cache — never local state. The toggle handler
@@ -127,7 +128,7 @@ export default function ProfileNotificationsScreen() {
       return saveProfileNotificationPreferences(accessToken, next);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(["mobile", "notification-preferences", accessToken], data);
+      queryClient.setQueryData(mobileQueryKeys.notificationPreferences(accessToken), data);
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
@@ -148,7 +149,7 @@ export default function ProfileNotificationsScreen() {
         [channel]: !localPrefs[category][channel],
       },
     };
-    queryClient.setQueryData(["mobile", "notification-preferences", accessToken], { prefs: next });
+    queryClient.setQueryData(mobileQueryKeys.notificationPreferences(accessToken), { prefs: next });
     saveMutation.mutate(next);
   };
 

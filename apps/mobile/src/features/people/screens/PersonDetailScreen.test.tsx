@@ -566,7 +566,7 @@ describe("PersonDetailScreen", () => {
     expect(useQuery.mock.calls[0]?.[0]?.queryKey).toEqual([
       "mobile",
       "person",
-      "token-123",
+      ["unreadable", null, null],
       "emp-1",
     ]);
     expect(screen.getByText("Super Admin")).toBeInTheDocument();

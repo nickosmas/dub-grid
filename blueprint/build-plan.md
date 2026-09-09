@@ -112,7 +112,7 @@
           content or an explicit recovery path visible across web and mobile
           during slow, offline, timeout, and retry states, with bounded retries
           and no blank or permanently latched loading screens.
-    - [ ] 19c4. **Authentication session continuity under change** - verify and
+    - [x] 19c4. **Authentication session continuity under change** - verify and
           repair cross-tab sign-in/sign-out, token rotation and refresh,
           foreground/resume, and organization-switch races without stale
           identity, permissions, or tenant data.

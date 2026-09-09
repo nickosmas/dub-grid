@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
 import { extractNotificationAction } from "@dubgrid/domain";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
@@ -35,6 +35,10 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
+import {
+  keepPreviousDataForMobileIdentity,
+  mobileQueryKeys,
+} from "../../../shared/lib/mobile-query-keys";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -81,7 +85,7 @@ function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams>
 }
 
 function getNotificationsQueryKey(accessToken: string | null, filter: FilterKey, search: string) {
-  return ["mobile", "notifications-infinite", accessToken, filter, search] as const;
+  return mobileQueryKeys.notifications(accessToken, { filter, search, pageSize: PAGE_SIZE });
 }
 
 function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
@@ -156,7 +160,7 @@ export default function NotificationsScreen() {
     queryKey,
     enabled: Boolean(accessToken),
     initialPageParam: null as { createdAt: string; id: string } | null,
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const params: MobileNotificationsListParams = {
         limit: PAGE_SIZE,
         ...chipToParams(filter),
@@ -164,7 +168,7 @@ export default function NotificationsScreen() {
         cursorId: pageParam?.id,
         search: debouncedSearch || undefined,
       };
-      return getNotifications(accessToken!, params);
+      return getNotifications(accessToken!, params, signal);
     },
     getNextPageParam: (lastPage) =>
       lastPage.notifications.length >= PAGE_SIZE ? lastPage.nextCursor : null,
@@ -172,7 +176,8 @@ export default function NotificationsScreen() {
     // keystroke is a new query. Without this the list blanks to nothing while
     // the new key resolves; with it the previous results stay on screen and
     // simply swap when the new ones land.
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
 
   // Alerts are addressed by role at send time, but a role can change after one

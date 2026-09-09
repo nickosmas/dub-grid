@@ -432,15 +432,27 @@ export function acceptCurrentTerms(accessToken: string): Promise<MobileTermsAcce
   );
 }
 
-export function getOrgStatus(accessToken: string): Promise<MobileOrgStatusResponse> {
-  return mobileApiRequest("/api/mobile/v1/org-status", accessToken, { method: "GET" }, (value) =>
-    mobileOrgStatusResponseSchema.parse(value),
+export function getOrgStatus(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<MobileOrgStatusResponse> {
+  return mobileApiRequest(
+    "/api/mobile/v1/org-status",
+    accessToken,
+    { method: "GET", signal },
+    (value) => mobileOrgStatusResponseSchema.parse(value),
   );
 }
 
-export function getProfile(accessToken: string): Promise<MobileProfileResponse> {
-  return mobileApiRequest("/api/mobile/v1/profile", accessToken, { method: "GET" }, (value) =>
-    mobileProfileResponseSchema.parse(value),
+export function getProfile(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<MobileProfileResponse> {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile",
+    accessToken,
+    { method: "GET", signal },
+    (value) => mobileProfileResponseSchema.parse(value),
   );
 }
 
@@ -483,20 +495,20 @@ export function updateProfileMfaStatus(
   );
 }
 
-export function getProfileChangeRequests(accessToken: string) {
+export function getProfileChangeRequests(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/change-requests",
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileProfileChangeRequestsResponseSchema.parse(value),
   );
 }
 
-export function getAdminProfileChangeRequests(accessToken: string) {
+export function getAdminProfileChangeRequests(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/change-requests?scope=admin",
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileProfileChangeRequestsResponseSchema.parse(value),
   );
 }
@@ -532,11 +544,11 @@ export function updateProfileChangeRequest(
   );
 }
 
-export function getProfileNotificationPreferences(accessToken: string) {
+export function getProfileNotificationPreferences(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/notification-preferences",
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileNotificationPreferencesResponseSchema.parse(value),
   );
 }
@@ -556,11 +568,11 @@ export function saveProfileNotificationPreferences(
   );
 }
 
-export function getProfileSessions(accessToken: string) {
+export function getProfileSessions(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/sessions",
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileProfileSessionsResponseSchema.parse(value),
   );
 }
@@ -703,11 +715,15 @@ export function getNativeSessionMetadata(
   };
 }
 
-export function getMySchedule(accessToken: string, query?: MobileScheduleRange) {
+export function getMySchedule(
+  accessToken: string,
+  query?: MobileScheduleRange,
+  signal?: AbortSignal,
+) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/me/schedule", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileMeScheduleResponseSchema.parse(value),
   );
 }
@@ -720,29 +736,41 @@ function getNativeSessionPlatform(): "ios" | "android" | null {
   return null;
 }
 
-export function getOrgSchedule(accessToken: string, query?: MobileScheduleRange) {
+export function getOrgSchedule(
+  accessToken: string,
+  query?: MobileScheduleRange,
+  signal?: AbortSignal,
+) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/org/schedule", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileOrgScheduleResponseSchema.parse(value),
   );
 }
 
-export function getDashboard(accessToken: string, query?: MobileScheduleRange) {
+export function getDashboard(
+  accessToken: string,
+  query?: MobileScheduleRange,
+  signal?: AbortSignal,
+) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/dashboard", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileDashboardResponseSchema.parse(value),
   );
 }
 
-export function getShiftRequests(accessToken: string, query?: MobileScheduleRange) {
+export function getShiftRequests(
+  accessToken: string,
+  query?: MobileScheduleRange,
+  signal?: AbortSignal,
+) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/shift-requests", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileShiftRequestsResponseSchema.parse(value),
   );
 }
@@ -754,6 +782,7 @@ export function getShiftRequestHistory(
     cursorCreatedAt?: string;
     cursorId?: string;
   },
+  signal?: AbortSignal,
 ) {
   return mobileApiRequest(
     appendQueryParams("/api/mobile/v1/shift-requests/history", {
@@ -762,7 +791,7 @@ export function getShiftRequestHistory(
       cursorId: query?.cursorId,
     }),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileShiftRequestHistoryResponseSchema.parse(value),
   );
 }
@@ -773,11 +802,12 @@ export function getShiftSwapOptions(
     requesterEmpId: string;
     requesterShiftDate: string;
   },
+  signal?: AbortSignal,
 ) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/shift-requests/swap-options", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileShiftSwapOptionsResponseSchema.parse(value),
   );
 }
@@ -823,7 +853,11 @@ export type MobileNotificationsListParams = {
   sort?: "asc" | "desc";
 };
 
-export function getNotifications(accessToken: string, params: MobileNotificationsListParams = {}) {
+export function getNotifications(
+  accessToken: string,
+  params: MobileNotificationsListParams = {},
+  signal?: AbortSignal,
+) {
   const query: Record<string, string | undefined> = {
     limit: params.limit ? String(params.limit) : undefined,
     cursorCreatedAt: params.cursorCreatedAt,
@@ -839,7 +873,7 @@ export function getNotifications(accessToken: string, params: MobileNotification
   return mobileApiRequest(
     appendQueryParams("/api/mobile/v1/notifications", query),
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileNotificationsResponseSchema.parse(value),
   );
 }
@@ -862,11 +896,11 @@ export function markAllNotificationsRead(accessToken: string) {
   );
 }
 
-export function getNotificationFacets(accessToken: string) {
+export function getNotificationFacets(accessToken: string, signal?: AbortSignal) {
   return mobileApiRequest(
     "/api/mobile/v1/notifications/facets",
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobileNotificationFacetsSchema.parse(value),
   );
 }
@@ -889,9 +923,12 @@ export function bulkUpdateNotifications(
   );
 }
 
-export function getPeople(accessToken: string) {
-  return mobileApiRequest("/api/mobile/v1/people", accessToken, { method: "GET" }, (value) =>
-    mobilePeopleResponseSchema.parse(value),
+export function getPeople(accessToken: string, signal?: AbortSignal) {
+  return mobileApiRequest(
+    "/api/mobile/v1/people",
+    accessToken,
+    { method: "GET", signal },
+    (value) => mobilePeopleResponseSchema.parse(value),
   );
 }
 
@@ -937,11 +974,11 @@ export function checkMobilePersonContact(
   );
 }
 
-export function getMobilePerson(accessToken: string, personId: string) {
+export function getMobilePerson(accessToken: string, personId: string, signal?: AbortSignal) {
   return mobileApiRequest(
     `/api/mobile/v1/people/${personId}`,
     accessToken,
-    { method: "GET" },
+    { method: "GET", signal },
     (value) => mobilePersonResponseSchema.parse(value),
   );
 }
@@ -1079,8 +1116,8 @@ export function removeMobilePersonManagementAccess(
   );
 }
 
-export function getManagementUsers(accessToken: string) {
-  return mobileApiRequest("/api/mobile/v1/management-users", accessToken, {}, (value) =>
+export function getManagementUsers(accessToken: string, signal?: AbortSignal) {
+  return mobileApiRequest("/api/mobile/v1/management-users", accessToken, { signal }, (value) =>
     mobileManagementUsersResponseSchema.parse(value),
   );
 }

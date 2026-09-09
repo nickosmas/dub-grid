@@ -8,6 +8,7 @@ import { getScreenBottomPadding } from "../../../shared/components/screen-layout
 import { getOrgStatus } from "../../../shared/lib/api";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -80,8 +81,8 @@ export function OrganizationLockedScreen({
   const insets = useSafeAreaInsets();
 
   const statusQuery = useQuery({
-    queryKey: ["mobile", "org-status", accessToken],
-    queryFn: () => getOrgStatus(accessToken!),
+    queryKey: mobileQueryKeys.orgStatus(accessToken),
+    queryFn: ({ signal }) => getOrgStatus(accessToken!, signal),
     enabled: Boolean(accessToken),
     retry: false,
   });

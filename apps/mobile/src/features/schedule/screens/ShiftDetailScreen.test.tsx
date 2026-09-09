@@ -1433,7 +1433,7 @@ describe("ShiftDetailScreen", () => {
     expect(swapOptionsQueryKeys.at(-1)).toEqual([
       "mobile",
       "shift-swap-options",
-      "token-123",
+      ["unreadable", null, null],
       "emp-1",
       "2026-04-16",
       "2026-04-16",

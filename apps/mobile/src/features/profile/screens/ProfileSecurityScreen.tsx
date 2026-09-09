@@ -17,6 +17,7 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useAppLockEnabled } from "../../../shared/providers/AppLockProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -55,13 +56,13 @@ export default function ProfileSecurityScreen() {
   const appLockEnabled = useAppLockEnabled();
 
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const sessionsQuery = useQuery({
-    queryKey: ["mobile", "profile", "sessions", accessToken],
-    queryFn: () => getProfileSessions(accessToken!),
+    queryKey: mobileQueryKeys.profileSessions(accessToken),
+    queryFn: ({ signal }) => getProfileSessions(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const bootstrapQuery = useBootstrap(accessToken);

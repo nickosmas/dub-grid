@@ -26,6 +26,8 @@ vi.mock("react-native", async () => ({
 
 const setOnline = vi.fn();
 const setFocused = vi.fn();
+const startAutoRefresh = vi.fn();
+const stopAutoRefresh = vi.fn();
 const getNetworkStateAsync = vi.fn();
 const addNetworkStateListener = vi.fn();
 const removeNetworkListener = vi.fn();
@@ -44,6 +46,15 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("expo-network", () => ({
   getNetworkStateAsync,
   addNetworkStateListener,
+}));
+
+vi.mock("../lib/supabase", () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      startAutoRefresh,
+      stopAutoRefresh,
+    },
+  }),
 }));
 
 let NetworkStateProvider: (typeof import("./NetworkStateProvider"))["NetworkStateProvider"];
@@ -72,6 +83,8 @@ describe("NetworkStateProvider", () => {
     vi.clearAllMocks();
     networkListener = null;
     appStateHarness.listener = null;
+    startAutoRefresh.mockResolvedValue(undefined);
+    stopAutoRefresh.mockResolvedValue(undefined);
     addNetworkStateListener.mockImplementation((listener) => {
       networkListener = listener;
       return {
@@ -209,11 +222,45 @@ describe("NetworkStateProvider", () => {
 
     act(() => {
       appStateHarness.listener?.("active");
+      appStateHarness.listener?.("inactive");
       appStateHarness.listener?.("background");
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+      appStateHarness.listener?.("active");
+    });
+
+    expect(setFocused.mock.calls).toEqual([[false], [true]]);
+    await act(async () => {
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    });
+    expect(startAutoRefresh).toHaveBeenCalledTimes(2);
+    expect(stopAutoRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps foreground focus usable when Supabase auto-refresh startup fails", async () => {
+    startAutoRefresh.mockRejectedValue(new Error("refresh unavailable"));
+    getNetworkStateAsync.mockResolvedValue({
+      isConnected: true,
+      isInternetReachable: true,
+    });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
       appStateHarness.listener?.("background");
       appStateHarness.listener?.("active");
     });
 
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
     expect(setFocused.mock.calls).toEqual([[false], [true]]);
   });
 

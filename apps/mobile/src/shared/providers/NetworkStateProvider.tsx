@@ -10,6 +10,7 @@ import {
 import { AppState, Platform, type AppStateStatus } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import * as Network from "expo-network";
+import { getSupabaseClient } from "../lib/supabase";
 
 const NETWORK_RECONNECT_STABILITY_MS = 1_500;
 // This provider renders nothing until the first probe resolves, and it sits
@@ -128,17 +129,42 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    function onAppStateChange(status: AppStateStatus) {
-      if (Platform.OS === "web" || appStateRef.current === status) return;
+    const auth = getSupabaseClient().auth;
+    let authRefreshOperation = Promise.resolve();
 
+    function setAuthRefreshActive(active: boolean) {
+      authRefreshOperation = authRefreshOperation
+        .catch(() => undefined)
+        .then(() => (active ? auth.startAutoRefresh() : auth.stopAutoRefresh()))
+        .then(
+          () => undefined,
+          () => undefined,
+        );
+    }
+
+    if (Platform.OS !== "web") {
+      setAuthRefreshActive(appStateRef.current === "active");
+    }
+
+    function onAppStateChange(status: AppStateStatus) {
+      if (Platform.OS === "web") return;
+
+      const wasActive = appStateRef.current === "active";
+      const isActive = status === "active";
       appStateRef.current = status;
-      focusManager.setFocused(status === "active");
+      if (wasActive === isActive) return;
+
+      focusManager.setFocused(isActive);
+      setAuthRefreshActive(isActive);
     }
 
     const subscription = AppState.addEventListener("change", onAppStateChange);
 
     return () => {
       subscription.remove();
+      if (Platform.OS !== "web") {
+        setAuthRefreshActive(false);
+      }
     };
   }, []);
 

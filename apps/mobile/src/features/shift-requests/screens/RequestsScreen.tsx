@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileOpenShift,
   MobileScheduleEntrySegment,
@@ -29,6 +29,10 @@ import {
   updateShiftRequest,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  keepPreviousDataForMobileIdentity,
+  mobileQueryKeys,
+} from "../../../shared/lib/mobile-query-keys";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import {
@@ -447,32 +451,36 @@ export default function RequestsScreen() {
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const canViewAllRequests = canApprove || canEditShifts || canManageEmployees;
   const requestsQueryKey = useMemo(
-    () =>
-      ["mobile", "requests", accessToken, requestRange.startDate, requestRange.endDate] as const,
+    () => mobileQueryKeys.shiftRequests(accessToken, requestRange),
     [accessToken, requestRange.startDate, requestRange.endDate],
   );
   const requestsQuery = useQuery({
     queryKey: requestsQueryKey,
-    queryFn: () => getShiftRequests(accessToken!, requestRange),
+    queryFn: ({ signal }) => getShiftRequests(accessToken!, requestRange, signal),
     enabled: Boolean(accessToken),
     // Keyed by the visible range: hold the previous page rather than flashing a
     // skeleton when the user changes it.
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   const historyQueryKey = useMemo(
-    () => ["mobile", "requests", "history", accessToken] as const,
+    () => mobileQueryKeys.shiftRequestHistory(accessToken, HISTORY_PAGE_SIZE),
     [accessToken],
   );
   const historyQuery = useInfiniteQuery({
     queryKey: historyQueryKey,
     enabled: Boolean(accessToken),
     initialPageParam: null as MobileShiftRequestHistoryCursor | null,
-    queryFn: ({ pageParam }) =>
-      getShiftRequestHistory(accessToken!, {
-        limit: HISTORY_PAGE_SIZE,
-        cursorCreatedAt: pageParam?.createdAt,
-        cursorId: pageParam?.id,
-      }),
+    queryFn: ({ pageParam, signal }) =>
+      getShiftRequestHistory(
+        accessToken!,
+        {
+          limit: HISTORY_PAGE_SIZE,
+          cursorCreatedAt: pageParam?.createdAt,
+          cursorId: pageParam?.id,
+        },
+        signal,
+      ),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
   // Named rather than inline so the content-state gate below can ask the same
@@ -480,15 +488,8 @@ export default function RequestsScreen() {
   const canLoadAvailabilitySchedule =
     Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests;
   const availabilityScheduleQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "requests",
-      "availability",
-      accessToken,
-      requestRange.startDate,
-      requestRange.endDate,
-    ],
-    queryFn: () => getMySchedule(accessToken!, requestRange),
+    queryKey: mobileQueryKeys.shiftRequestAvailability(accessToken, requestRange),
+    queryFn: ({ signal }) => getMySchedule(accessToken!, requestRange, signal),
     enabled: canLoadAvailabilitySchedule,
   });
   const refreshRequests = useCallback(() => {

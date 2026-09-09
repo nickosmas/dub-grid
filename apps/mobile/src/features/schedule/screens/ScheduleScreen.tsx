@@ -22,7 +22,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import { Pressable } from "../../../shared/components/Pressable";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -57,6 +57,10 @@ import {
 import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
+import {
+  keepPreviousDataForMobileIdentity,
+  mobileQueryKeys,
+} from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -696,23 +700,28 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // paging to the next week drops each of them to `isLoading` and flashes a
   // skeleton over a schedule the user was already reading.
   const scheduleQuery = useQuery({
-    queryKey: ["mobile", "schedule", scope, accessToken, range.startDate, range.endDate],
-    queryFn: () =>
-      isTeamScope ? getOrgSchedule(accessToken!, range) : getMySchedule(accessToken!, range),
+    queryKey: mobileQueryKeys.schedule(accessToken, scope, range),
+    queryFn: ({ signal }) =>
+      isTeamScope
+        ? getOrgSchedule(accessToken!, range, signal)
+        : getMySchedule(accessToken!, range, signal),
     enabled: canLoadSchedule,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   const meTeamScheduleQuery = useQuery({
-    queryKey: ["mobile", "schedule", "team", accessToken, range.startDate, range.endDate],
-    queryFn: () => getOrgSchedule(accessToken!, range),
+    queryKey: mobileQueryKeys.schedule(accessToken, "team", range),
+    queryFn: ({ signal }) => getOrgSchedule(accessToken!, range, signal),
     enabled: canLoadMeTeamSchedule,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   const requestsQuery = useQuery({
-    queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
-    queryFn: () => getShiftRequests(accessToken!, range),
+    queryKey: mobileQueryKeys.shiftRequests(accessToken, range),
+    queryFn: ({ signal }) => getShiftRequests(accessToken!, range, signal),
     enabled: canLoadRequests,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) =>
+      keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
   const refetchBootstrap = bootstrapQuery.refetch;
   const refetchSchedule = scheduleQuery.refetch;
@@ -768,7 +777,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       await Promise.all([
         refetchScreenContent(),
         queryClient.invalidateQueries({
-          queryKey: ["mobile", "requests", accessToken],
+          queryKey: ["mobile", "requests"],
         }),
       ]);
       pushToast({

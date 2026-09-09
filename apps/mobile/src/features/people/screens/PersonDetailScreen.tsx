@@ -29,6 +29,7 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import {
   BottomSheetModal,
   SheetHeader,
@@ -272,8 +273,8 @@ export default function PersonDetailScreen() {
   const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
 
   const personQuery = useQuery({
-    queryKey: ["mobile", "person", accessToken, personId],
-    queryFn: () => getMobilePerson(accessToken!, personId!),
+    queryKey: mobileQueryKeys.person(accessToken, personId),
+    queryFn: ({ signal }) => getMobilePerson(accessToken!, personId!, signal),
     enabled: Boolean(accessToken && personId && bootstrapQuery.data && !isSelfRoute),
   });
   const manualRefresh = useManualRefresh(() =>
@@ -388,11 +389,11 @@ export default function PersonDetailScreen() {
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
 
   function updateCachedPerson(nextPerson: MobilePerson) {
-    queryClient.setQueryData(["mobile", "person", accessToken, nextPerson.id], {
+    queryClient.setQueryData(mobileQueryKeys.person(accessToken, nextPerson.id), {
       person: nextPerson,
     });
     queryClient.setQueryData(
-      ["mobile", "people", accessToken],
+      mobileQueryKeys.people(accessToken),
       (current: { people: MobilePerson[] } | undefined) =>
         current
           ? {

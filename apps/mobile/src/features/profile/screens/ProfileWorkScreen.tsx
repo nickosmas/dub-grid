@@ -45,6 +45,7 @@ import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -177,8 +178,8 @@ export default function ProfileWorkScreen() {
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const bootstrapQuery = useBootstrap(accessToken);
