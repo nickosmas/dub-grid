@@ -142,6 +142,37 @@ describe("ForgotPasswordScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("releases a stalled request at its deadline and preserves the email", async () => {
+    vi.useFakeTimers();
+    resetPasswordForEmail.mockReturnValue(new Promise(() => undefined));
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.click(screen.getByText("Send reset code"));
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+
+    expect(screen.getByRole("button", { name: "Send reset code" })).toBeEnabled();
+    expect(screen.getByPlaceholderText("Email")).toHaveValue("nurse@dubgrid.test");
+    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("coalesces repeated reset requests while one is active", async () => {
+    let resolveRequest: ((value: { error: null }) => void) | undefined;
+    resetPasswordForEmail.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.click(screen.getByText("Send reset code"));
+    fireEvent.click(screen.getByText("Send reset code"));
+
+    expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
+    await act(async () => resolveRequest?.({ error: null }));
+  });
+
   it("rejects a malformed address without calling the API", async () => {
     render(<ForgotPasswordScreen />);
     fireEvent.change(screen.getByPlaceholderText("Email"), { target: { value: "not-an-email" } });

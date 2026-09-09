@@ -33,11 +33,13 @@ export default function AuthTransitionScreen({
   onRetry,
   retrying = false,
   offline = false,
+  showActionsImmediately = false,
 }: {
   phase: TransitionPhase;
   onRetry?: () => Promise<void>;
   retrying?: boolean;
   offline?: boolean;
+  showActionsImmediately?: boolean;
 }) {
   const { signOut } = useLogout();
   const [startedAt] = useState(() => getAuthTransitionStartedAt() ?? Date.now());
@@ -46,7 +48,7 @@ export default function AuthTransitionScreen({
   );
   const copy = PHASE_COPY[phase];
   const isSlow = elapsedSeconds >= 15;
-  const showEscape = elapsedSeconds >= 30;
+  const showEscape = showActionsImmediately || elapsedSeconds >= 30;
 
   useEffect(() => {
     const interval = window.setInterval(() => {

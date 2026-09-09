@@ -8,6 +8,7 @@ import {
   isRecoverableBrowserAuthError,
 } from "@/lib/browser-auth";
 import { supabase } from "@/lib/supabase";
+import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
@@ -18,7 +19,7 @@ export async function signOutFromBrowser(scope: "local" | "others" | "global"): 
   // record the revocation. Non-fatal: a failure here must never trap the user
   // in a signed-in state.
   try {
-    await fetch("/api/auth/sign-out", {
+    await fetchWithTimeout("/api/auth/sign-out", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scope: scope === "local" ? "local" : "global" }),
@@ -28,7 +29,9 @@ export async function signOutFromBrowser(scope: "local" | "others" | "global"): 
     // Ignore — proceed with the local sign-out regardless.
   }
 
-  const { error } = await supabase.auth.signOut({ scope });
+  const { error } = await settleWithRequestTimeout<
+    Awaited<ReturnType<typeof supabase.auth.signOut>>
+  >(supabase.auth.signOut({ scope }));
   if (error) {
     throw error;
   }

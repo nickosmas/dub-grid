@@ -12,6 +12,7 @@ import { AppSplashScreen } from "./AppSplashScreen";
  * flicker, short enough that it is usually over before startup resolves.
  */
 const MIN_SPLASH_MS = 900;
+const MAX_BOOTSTRAP_SPLASH_MS = 15_000;
 
 /**
  * The app's one and only splash.
@@ -33,6 +34,7 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   const bootstrapQuery = useBootstrap(accessToken);
   const onboardingQuery = useHasSeenOnboarding();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
+  const [bootstrapBudgetElapsed, setBootstrapBudgetElapsed] = useState(false);
 
   // Owned here, not by a route: the native splash has to come down on every
   // launch, including deep links that mount a screen without passing through
@@ -46,6 +48,16 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
 
     hasHiddenNativeSplashRef.current = true;
     SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setBootstrapBudgetElapsed(true);
+    }, MAX_BOOTSTRAP_SPLASH_MS);
+
+    return () => {
+      clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -70,7 +82,12 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
     minimumElapsed &&
     !isSessionLoading &&
     !onboardingQuery.isLoading &&
-    !(Boolean(accessToken) && bootstrapQuery.isLoading);
+    !(
+      Boolean(accessToken) &&
+      bootstrapQuery.isLoading &&
+      bootstrapQuery.fetchStatus !== "paused" &&
+      !bootstrapBudgetElapsed
+    );
 
   // Latched during render rather than synced in an effect: an effect would
   // leave the splash up for one extra frame after the app is ready, and this

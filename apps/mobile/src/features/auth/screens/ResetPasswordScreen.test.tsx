@@ -94,6 +94,37 @@ describe("ResetPasswordScreen", () => {
     expect(await screen.findByText("Set a new password")).toBeInTheDocument();
   });
 
+  it("keeps the code and releases verify after a provider deadline", async () => {
+    vi.useFakeTimers();
+    verifyOtp.mockReturnValue(new Promise(() => undefined));
+    render(<ResetPasswordScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByText("Verify code"));
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+
+    expect(screen.getByPlaceholderText("000000")).toHaveValue("123456");
+    expect(screen.getByRole("button", { name: "Verify code" })).toBeEnabled();
+    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
+  });
+
+  it("does not duplicate code verification while it is active", async () => {
+    let resolveVerification: ((value: { error: null }) => void) | undefined;
+    verifyOtp.mockReturnValue(
+      new Promise((resolve) => {
+        resolveVerification = resolve;
+      }),
+    );
+    render(<ResetPasswordScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByText("Verify code"));
+    fireEvent.click(screen.getByText("Verify code"));
+
+    expect(verifyOtp).toHaveBeenCalledTimes(1);
+    await act(async () => resolveVerification?.({ error: null }));
+  });
+
   it("explains an expired code instead of surfacing Supabase's wording", async () => {
     verifyOtp.mockResolvedValue({
       error: { code: "otp_expired", message: "Token has expired or is invalid" },
@@ -166,6 +197,27 @@ describe("ResetPasswordScreen", () => {
     expect(screen.getAllByText("Choose a password you haven't used before.")).toHaveLength(2);
     expect(signOut).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("preserves both password fields when the update reaches its deadline", async () => {
+    vi.useFakeTimers();
+    updateUser.mockReturnValue(new Promise(() => undefined));
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    fireEvent.change(screen.getByPlaceholderText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.click(screen.getByText("Update password"));
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+
+    expect(screen.getByPlaceholderText("New password")).toHaveValue("Str0ng!Passphrase");
+    expect(screen.getByPlaceholderText("Confirm password")).toHaveValue("Str0ng!Passphrase");
+    expect(screen.getByRole("button", { name: "Update password" })).toBeEnabled();
+    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
   });
 
   // The warning has to land while typing. Previously it only appeared after

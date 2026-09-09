@@ -12,7 +12,7 @@ import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import {
-  fetchOrganizationBootstrap,
+  getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
@@ -129,8 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // inputs after exit (and vice versa on enter) until manual refresh.
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
-    queryFn: () => fetchOrganizationBootstrap(),
-    staleTime: 60_000,
+    ...getOrganizationBootstrapQueryPolicy(),
     enabled: !isGridmaster && Boolean(orgId),
   });
   // Keyed remount of the page subtree resets form state on sandbox org switches.

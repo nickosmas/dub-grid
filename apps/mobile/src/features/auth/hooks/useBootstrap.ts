@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { getAuthRecoveryRetryDelay, shouldRetryAuthRecovery } from "@dubgrid/client-errors";
 import {
   getOrgIdFromAccessToken,
   getUserIdFromAccessToken,
 } from "../../../shared/lib/access-token";
 import { getBootstrap } from "../../../shared/lib/api";
-import { isNetworkConnectionError } from "../../../shared/lib/errors";
 
 /**
  * Every bootstrap cache entry lives under this prefix, so invalidators can
@@ -41,27 +41,22 @@ export function buildBootstrapQueryKey(accessToken: string | null) {
   ] as const;
 }
 
-export function useBootstrap(accessToken: string | null) {
-  return useQuery({
+export function createBootstrapQueryOptions(accessToken: string | null) {
+  return {
     queryKey: buildBootstrapQueryKey(accessToken),
     // Consume React Query's cancellation signal so a switch/logout cannot let
     // an in-flight bootstrap request complete into a stale cache entry.
-    queryFn: (context) =>
+    queryFn: (context: { signal?: AbortSignal } | undefined) =>
       context?.signal ? getBootstrap(accessToken!, context.signal) : getBootstrap(accessToken!),
     enabled: Boolean(accessToken),
-    retry: (failureCount, error) =>
-      failureCount < 3 && (isNetworkConnectionError(error) || isRetryableBootstrapStatus(error)),
-    retryDelay: (failureCount) => {
-      const capped = Math.min(1_000 * 2 ** failureCount, 30_000);
-      return Math.round(capped * (0.5 + Math.random() * 0.5));
-    },
-  });
+    retry: shouldRetryAuthRecovery,
+    retryDelay: (failureCount: number, error: unknown) =>
+      getAuthRecoveryRetryDelay(error, failureCount),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+  };
 }
 
-function isRetryableBootstrapStatus(error: unknown): boolean {
-  const status =
-    typeof error === "object" && error !== null && "status" in error
-      ? (error as { status?: unknown }).status
-      : null;
-  return status === 408 || status === 429 || (typeof status === "number" && status >= 500);
+export function useBootstrap(accessToken: string | null) {
+  return useQuery(createBootstrapQueryOptions(accessToken));
 }

@@ -5,7 +5,24 @@ import { createReactNativeModule } from "../../test/native";
 
 vi.useFakeTimers();
 
-vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+const appStateHarness = vi.hoisted(() => ({
+  listener: null as ((status: "active" | "background" | "inactive") => void) | null,
+  remove: vi.fn(),
+}));
+
+vi.mock("react-native", async () => ({
+  ...createReactNativeModule(await import("react")),
+  AppState: {
+    currentState: "active",
+    addEventListener: (
+      _event: string,
+      listener: (status: "active" | "background" | "inactive") => void,
+    ) => {
+      appStateHarness.listener = listener;
+      return { remove: appStateHarness.remove };
+    },
+  },
+}));
 
 const setOnline = vi.fn();
 const setFocused = vi.fn();
@@ -54,6 +71,7 @@ describe("NetworkStateProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     networkListener = null;
+    appStateHarness.listener = null;
     addNetworkStateListener.mockImplementation((listener) => {
       networkListener = listener;
       return {
@@ -83,6 +101,29 @@ describe("NetworkStateProvider", () => {
     expect(screen.getByTestId("resolved")).toHaveTextContent("true");
     expect(screen.getByTestId("offline")).toHaveTextContent("true");
     expect(setOnline).toHaveBeenCalledWith(false);
+  });
+
+  it("releases startup when the initial network probe does not settle", async () => {
+    getNetworkStateAsync.mockReturnValue(new Promise(() => {}));
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(1_999);
+    });
+    expect(screen.queryByTestId("resolved")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(screen.getByTestId("resolved")).toHaveTextContent("true");
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+    expect(setOnline).toHaveBeenCalledWith(true);
   });
 
   it("keeps the app offline until reconnect is stable", async () => {
@@ -123,6 +164,57 @@ describe("NetworkStateProvider", () => {
 
     expect(screen.getByTestId("online")).toHaveTextContent("true");
     expect(setOnline).toHaveBeenLastCalledWith(true);
+  });
+
+  it("coalesces repeated online events into one stable reconnect", async () => {
+    getNetworkStateAsync.mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      networkListener?.({ isConnected: true, isInternetReachable: true });
+      networkListener?.({ isConnected: true, isInternetReachable: true });
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(setOnline.mock.calls.filter(([value]) => value === true)).toHaveLength(1);
+  });
+
+  it("notifies React Query once per real foreground transition", async () => {
+    getNetworkStateAsync.mockResolvedValue({
+      isConnected: true,
+      isInternetReachable: true,
+    });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      appStateHarness.listener?.("active");
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+    });
+
+    expect(setFocused.mock.calls).toEqual([[false], [true]]);
   });
 
   it("cancels a reconnect transition when connectivity drops again", async () => {

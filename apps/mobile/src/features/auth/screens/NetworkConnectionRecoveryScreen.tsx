@@ -1,11 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { useNetworkRecovery } from "../../../shared/providers/NetworkRecoveryProvider";
-import { useOptionalNetworkStatus } from "../../../shared/providers/NetworkStateProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -16,52 +15,19 @@ import { mobileRadii, mobileText, type MobileColors } from "../../../shared/them
  */
 export function NetworkConnectionRecoveryScreen({
   isRetrying = false,
-  automaticallyRetry = true,
   onRetry,
 }: {
   isRetrying?: boolean;
-  automaticallyRetry?: boolean;
   onRetry: () => void | Promise<void>;
 }) {
   const colors = useMobileColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { setNetworkRecoveryActive } = useNetworkRecovery();
-  const { isOffline } = useOptionalNetworkStatus();
-  const [automaticRetryCount, setAutomaticRetryCount] = useState(0);
-  const automaticRetryInFlight = useRef(false);
-  const mounted = useRef(true);
 
   useEffect(() => {
     setNetworkRecoveryActive(true);
     return () => setNetworkRecoveryActive(false);
   }, [setNetworkRecoveryActive]);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!automaticallyRetry || isOffline || isRetrying) return;
-    const cappedDelay = Math.min(5_000 * 2 ** automaticRetryCount, 30_000);
-    const delay = Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
-    const timer = setTimeout(() => {
-      if (automaticRetryInFlight.current) return;
-      automaticRetryInFlight.current = true;
-      Promise.resolve()
-        .then(onRetry)
-        .catch(() => undefined)
-        .finally(() => {
-          automaticRetryInFlight.current = false;
-          if (mounted.current) {
-            setAutomaticRetryCount((count) => count + 1);
-          }
-        });
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [automaticallyRetry, automaticRetryCount, isOffline, isRetrying, onRetry]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

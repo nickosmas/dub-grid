@@ -234,6 +234,19 @@ describe("LoginScreen", () => {
     expect(screen.getByPlaceholderText("Email")).toBeInTheDocument();
   });
 
+  it("does not duplicate an active organization lookup", () => {
+    lookupOrganization.mockReturnValue(new Promise(() => undefined));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    fireEvent.click(screen.getByText("Continue"));
+
+    expect(lookupOrganization).toHaveBeenCalledTimes(1);
+  });
+
   // Auto-advancing focuses the email field, which raises the keyboard. Doing
   // that while the consent sheet is about to take over puts the keyboard on top
   // of a sheet the user must answer first.
@@ -638,6 +651,66 @@ describe("LoginScreen", () => {
     expect(
       await screen.findByText("Check your email and password and try again."),
     ).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("does not duplicate an active credential submission", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockReturnValue(new Promise(() => undefined));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(loginToOrganization).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the MFA code after a recoverable connection failure", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockResolvedValue({
+      session: { accessToken: "pending-token", refreshToken: "pending-refresh" },
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+      mfaRequired: true,
+      mfa: { factorId: "factor-123", friendlyName: "Authenticator" },
+    });
+    verifyMobileTotpFactor.mockRejectedValue(new TypeError("Network request failed"));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    await screen.findByText("Two-factor authentication");
+    fireEvent.change(screen.getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+
+    await waitFor(() => expect(verifyMobileTotpFactor).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Verification code")).toHaveValue("123456");
     expect(routerReplace).not.toHaveBeenCalled();
   });
 

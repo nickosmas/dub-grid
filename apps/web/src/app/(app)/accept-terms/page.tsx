@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -11,6 +11,9 @@ import { useTermsAcceptanceStatus } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { CURRENT_TERMS_VERSION } from "@/features/account/shared/terms";
 import { recordCurrentTermsAcceptance, signOutFromBrowser } from "@/features/account/client";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 
 // Default next destination if none provided. Matches the login form's default.
 const DEFAULT_NEXT = "/dashboard";
@@ -28,6 +31,7 @@ export default function AcceptTermsPage() {
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
   const { data: terms, isLoading: termsLoading } = useTermsAcceptanceStatus();
+  const acceptingRef = useRef(false);
 
   const next = safeNext(searchParams.get("next"));
 
@@ -63,7 +67,10 @@ export default function AcceptTermsPage() {
           : typeof err === "object" && err !== null && "message" in err
             ? String((err as { message: unknown }).message)
             : JSON.stringify(err);
-      console.error("Terms acceptance failed:", msg, err);
+      if (isRetryableAuthRecoveryError(err)) {
+        toast.error(getWebAuthRecoveryMessage(err, "We couldn't record that. Try again."));
+        return;
+      }
       const isStaleSession =
         msg.includes("JWT") ||
         msg.includes("expired") ||
@@ -71,19 +78,24 @@ export default function AcceptTermsPage() {
         msg.includes("not found");
       if (isStaleSession) {
         toast.error("Your session expired. Sign in again.");
-        await signOutFromBrowser("local");
+        await settleWithRequestTimeout(signOutFromBrowser("local")).catch(() => {});
         window.location.href = "/login";
         return;
       }
       toast.error("We couldn't record that. Try again.");
     },
+    onSettled: () => {
+      acceptingRef.current = false;
+    },
   });
 
   function handleAccept() {
+    if (acceptingRef.current) return;
     if (!user) {
       toast.error("Your session expired. Sign in again.");
       return;
     }
+    acceptingRef.current = true;
     accept.mutate();
   }
 

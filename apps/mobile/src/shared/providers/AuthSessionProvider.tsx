@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -14,6 +15,8 @@ import { getSupabaseClient } from "../lib/supabase";
 type AuthSessionContextValue = {
   session: Session | null;
   isLoading: boolean;
+  restoreError: boolean;
+  retryRestore: () => Promise<void>;
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
@@ -34,16 +37,18 @@ function shouldClearLocalAuthForRestoreError(error: unknown): boolean {
 }
 
 export function AuthSessionProvider({ children }: PropsWithChildren) {
-  const [value, setValue] = useState<AuthSessionContextValue>({
+  const [value, setValue] = useState<Omit<AuthSessionContextValue, "retryRestore">>({
     session: null,
     isLoading: true,
+    restoreError: false,
   });
   const lastTrackedAccessTokenRef = useRef<string | null>(null);
+  const retryRestoreRef = useRef<() => Promise<void>>(async () => undefined);
   const supabase = getSupabaseClient();
+  const retryRestore = useCallback(() => retryRestoreRef.current(), []);
 
   useEffect(() => {
     let isMounted = true;
-    let startupReleased = false;
     const writeSession = (session: Session | null) => {
       if (!session?.access_token) {
         lastTrackedAccessTokenRef.current = null;
@@ -55,6 +60,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       setValue({
         session,
         isLoading: false,
+        restoreError: false,
       });
     };
 
@@ -67,50 +73,83 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     };
 
     const releaseStartup = (session: Session | null) => {
-      startupReleased = true;
       finishSessionRestore();
       if (!session) {
         authEntryRecorder.cancel("warm_restore");
       }
       writeSession(session);
     };
+    let restoreGeneration = 0;
+    let restoreInFlight: Promise<void> | null = null;
+    let cancelRestore: (() => void) | null = null;
 
-    const sessionRestoreTimeout = setTimeout(() => {
-      if (!isMounted || startupReleased) {
-        return;
-      }
+    const restoreSession = () => {
+      if (restoreInFlight) return restoreInFlight;
+      const generation = ++restoreGeneration;
 
-      releaseStartup(null);
-    }, SESSION_RESTORE_TIMEOUT_MS);
+      const current = new Promise<void>((resolve) => {
+        let settled = false;
+        const settle = (apply: () => void) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(sessionRestoreTimeout);
+          cancelRestore = null;
+          if (isMounted && generation === restoreGeneration) apply();
+          resolve();
+        };
+        const sessionRestoreTimeout = setTimeout(() => {
+          settle(() => {
+            finishSessionRestore();
+            authEntryRecorder.cancel("warm_restore");
+            setValue((currentValue) => ({
+              ...currentValue,
+              isLoading: false,
+              restoreError: true,
+            }));
+          });
+        }, SESSION_RESTORE_TIMEOUT_MS);
+        cancelRestore = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(sessionRestoreTimeout);
+          cancelRestore = null;
+          resolve();
+        };
 
-    void supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        clearTimeout(sessionRestoreTimeout);
-        // Once the timeout releases startup, this request is no longer an
-        // authority on session state. It may resolve after the user has signed
-        // in again, so writing its old result would resurrect stale auth.
-        if (!isMounted || startupReleased) return;
-        releaseStartup(data.session ?? null);
-      })
-      .catch(async (error) => {
-        clearTimeout(sessionRestoreTimeout);
-
-        if (shouldClearLocalAuthForRestoreError(error)) {
-          try {
-            await supabase.auth.signOut({ scope: "local" });
-          } catch {
-            // Ignore cleanup failures; the provider still needs to recover locally.
-          }
-        }
-
-        if (!isMounted) return;
-        releaseStartup(null);
+        void supabase.auth.getSession().then(
+          ({ data }) => settle(() => releaseStartup(data.session ?? null)),
+          (error) =>
+            settle(() => {
+              finishSessionRestore();
+              authEntryRecorder.cancel("warm_restore");
+              if (shouldClearLocalAuthForRestoreError(error)) {
+                void supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+                writeSession(null);
+                return;
+              }
+              setValue((currentValue) => ({
+                ...currentValue,
+                isLoading: false,
+                restoreError: true,
+              }));
+            }),
+        );
+      }).finally(() => {
+        if (restoreInFlight === current) restoreInFlight = null;
       });
+
+      restoreInFlight = current;
+      return current;
+    };
+
+    retryRestoreRef.current = restoreSession;
+    void restoreSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      restoreGeneration += 1;
+      cancelRestore?.();
       writeSession(session ?? null);
     });
 
@@ -119,12 +158,17 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       if (activeSessionWriter === writeSession) {
         activeSessionWriter = null;
       }
-      clearTimeout(sessionRestoreTimeout);
+      retryRestoreRef.current = async () => undefined;
+      cancelRestore?.();
       subscription.unsubscribe();
     };
   }, []);
 
-  return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
+  return (
+    <AuthSessionContext.Provider value={{ ...value, retryRestore }}>
+      {children}
+    </AuthSessionContext.Provider>
+  );
 }
 
 export function useSessionState() {

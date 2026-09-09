@@ -98,7 +98,7 @@ describe("StartupSplashGate", () => {
   });
 
   it("holds past the minimum wait while bootstrap is still in flight", async () => {
-    useBootstrap.mockReturnValue({ isLoading: true });
+    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true });
 
     renderGate();
     await elapseMinimumSplash();
@@ -106,6 +106,31 @@ describe("StartupSplashGate", () => {
     // Releasing here would hand the tab tree an unknown role: the tab bar's
     // shape and the Home tab's choice of screen both come from bootstrap.
     expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+  });
+
+  it("lifts when an offline bootstrap is paused so recovery can render", async () => {
+    useBootstrap.mockReturnValue({ fetchStatus: "paused", isLoading: true });
+
+    renderGate();
+    await elapseMinimumSplash();
+
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
+  });
+
+  it("never lets an unsettled bootstrap latch the splash past its request budget", async () => {
+    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true });
+
+    renderGate();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(14_999);
+    });
+    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
   });
 
   it("does not wait on bootstrap when there is no session to bootstrap", async () => {

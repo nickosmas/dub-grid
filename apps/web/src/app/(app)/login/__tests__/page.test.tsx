@@ -11,6 +11,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OrgLogin, { type OrgLoginSeed } from "@/app/(app)/login/OrgLogin";
+import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -79,6 +80,7 @@ describe("OrgLogin submit states", () => {
       configurable: true,
     });
     mockSetSession.mockReset();
+    mockSetSession.mockResolvedValue(undefined);
     mockToastError.mockReset();
     vi.restoreAllMocks();
   });
@@ -130,6 +132,39 @@ describe("OrgLogin submit states", () => {
     // Button must be re-enabled — loading=false on error
     const button = screen.getByRole("button", { name: /sign in/i });
     expect(button).not.toBeDisabled();
+  });
+
+  it("finishes a delayed valid sign-in before the request deadline", async () => {
+    let resolveLogin: ((response: Response) => void) | undefined;
+    vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise((resolve) => {
+        resolveLogin = resolve;
+      }),
+    );
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    submitForm(container);
+
+    resolveLogin?.(
+      new Response(
+        JSON.stringify({
+          user: { email_confirmed_at: "2026-09-08T00:00:00Z" },
+          session: { access_token: "access", refresh_token: "refresh" },
+          mfa_required: false,
+          didSwitchOrg: false,
+          destination: "/dashboard",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(mockSetSession).toHaveBeenCalledWith({
+        access_token: "access",
+        refresh_token: "refresh",
+      });
+    });
   });
 
   it("does not set a browser session when the server rejects a stale post-switch session", async () => {
@@ -242,5 +277,55 @@ describe("OrgLogin submit states", () => {
     });
     expect(window.location.replace).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("uses safe retry copy for timeout and temporary server failure", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new RequestTimeoutError(15_000))
+      .mockResolvedValueOnce(new Response("Unavailable", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "private rate-limit detail" }), {
+          status: 429,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+
+    submitForm(container);
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "That took too long. Check your connection and try again.",
+      );
+    });
+    submitForm(container);
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "DubGrid is temporarily unavailable. Please try again.",
+      );
+    });
+    submitForm(container);
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Too many sign-in attempts. Wait a few minutes and try again.",
+      );
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(screen.getByDisplayValue("user@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("private rate-limit detail")).not.toBeInTheDocument();
+  });
+
+  it("prevents two credential requests from the same active submission", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+
+    submitForm(container);
+    fireEvent.submit(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

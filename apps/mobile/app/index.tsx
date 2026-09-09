@@ -11,13 +11,13 @@ import { useSessionState } from "../src/shared/providers/AuthSessionProvider";
  * made launch look like the splash played twice.
  */
 export default function IndexScreen() {
-  const { accessToken, isLoading } = useSessionState();
+  const { accessToken, isLoading, restoreError } = useSessionState();
   const onboardingQuery = useHasSeenOnboarding();
   const needsOnboarding = onboardingQuery.data === false;
   const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
-    if (isLoading || onboardingQuery.isLoading || hasNavigatedRef.current) {
+    if (isLoading || restoreError || onboardingQuery.isLoading || hasNavigatedRef.current) {
       return;
     }
 
@@ -31,12 +31,12 @@ export default function IndexScreen() {
       hasNavigatedRef.current = true;
       router.replace("/(auth)/onboarding");
     }
-  }, [accessToken, isLoading, needsOnboarding, onboardingQuery.isLoading]);
+  }, [accessToken, isLoading, needsOnboarding, onboardingQuery.isLoading, restoreError]);
 
   // Nothing to paint until the destination is known: the splash is on top, and
   // rendering the login screen early would flash it at a signed-in or first-run
   // user the moment the splash lifts.
-  if (isLoading || onboardingQuery.isLoading || accessToken || needsOnboarding) {
+  if (isLoading || onboardingQuery.isLoading || accessToken || (needsOnboarding && !restoreError)) {
     return null;
   }
 

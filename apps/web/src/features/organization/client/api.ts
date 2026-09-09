@@ -18,6 +18,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { fetchWithTimeout, RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 const ORGANIZATION_BOOTSTRAP_TIMEOUT_MS = 5_000;
+const ORGANIZATION_BOOTSTRAP_STALE_TIME_MS = 5 * 60_000;
 const ORGANIZATION_ACCESS_STATUS_TIMEOUT_MS = 8_000;
 
 export interface OrganizationBootstrap {
@@ -127,6 +128,19 @@ export function getOrganizationBootstrapRetryDelay(error: unknown, failureCount:
   }
   const cappedDelay = Math.min(1_000 * 2 ** failureCount, 30_000);
   return Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
+}
+
+export function getOrganizationBootstrapQueryPolicy() {
+  return {
+    queryFn: (context: { signal?: AbortSignal } | undefined) =>
+      fetchOrganizationBootstrap(context?.signal),
+    staleTime: ORGANIZATION_BOOTSTRAP_STALE_TIME_MS,
+    retry: (failureCount: number, error: unknown) =>
+      failureCount < 3 && isRetryableOrganizationBootstrapError(error),
+    retryDelay: (failureCount: number, error: unknown) =>
+      getOrganizationBootstrapRetryDelay(error, failureCount),
+    retryOnMount: false,
+  };
 }
 
 export type OrganizationAccessState = BillingAccessState | "archived" | "unavailable" | "unknown";

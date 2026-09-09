@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -13,15 +14,12 @@ import {
 } from "@/features/organization/client/api";
 import { useLogout } from "@/hooks";
 import { consumeAuthTransition } from "@/lib/auth-transition";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { queryKeys } from "@/lib/query-keys";
 
 export const ORGANIZATION_GATE_RECHECK_INTERVAL_MS = 5_000;
 
-// The status endpoint refreshes the shared access answer and the proxy bypasses
-// its short memo when this route reloads. Retain a modest cooldown as a final
-// guard against a malformed or temporarily inconsistent upstream response.
-const RELOAD_COOLDOWN_MS = 45_000;
-const RELOAD_MARKER_KEY = "dg-org-gate-reloaded-at";
+const ORGANIZATION_GATE_MANUAL_DEADLINE_MS = 15_000;
 
 export function getGateMessage(state: OrganizationAccessState | undefined): string {
   switch (state) {
@@ -38,30 +36,24 @@ export function getGateMessage(state: OrganizationAccessState | undefined): stri
   }
 }
 
-/** True when an automatic reload has not been spent inside the cooldown. */
-export function claimAutomaticReload(now: number = Date.now()): boolean {
-  try {
-    const last = Number(window.sessionStorage.getItem(RELOAD_MARKER_KEY));
-    if (Number.isFinite(last) && last > 0 && now - last < RELOAD_COOLDOWN_MS) return false;
-    window.sessionStorage.setItem(RELOAD_MARKER_KEY, String(now));
-  } catch {
-    // Private mode or blocked storage. Losing the cooldown is better than
-    // losing the reload the user is waiting on.
-  }
-  return true;
-}
-
 /**
  * The screen a user lands on when the organization gate in the proxy holds
  * them out: the trial clock has not started, or billing has lapsed.
  *
- * Reloading is what clears it. The gate lives in the proxy, so once the
- * organization opens the next request through it redirects to the app on its
- * own; this page only has to notice and reload. It polls for that, and keeps a
- * manual check and a way out for anyone who would rather not wait.
+ * The gate lives in the proxy, so once the organization opens, a client
+ * navigation through it immediately admits the same session. This page polls
+ * for that change and keeps a manual check and a way out for anyone who would
+ * rather not wait.
  */
 export function OrganizationGateScreen() {
+  const router = useRouter();
   const { signOut } = useLogout();
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const [checking, setChecking] = useState(false);
+  const recheckInFlight = useRef<Promise<void> | null>(null);
+  const admitted = useRef(false);
 
   // This page is where a held-out member's sign-in actually ends, and nothing
   // else on the route clears the handoff flag: the onboarding gate passes
@@ -74,29 +66,62 @@ export function OrganizationGateScreen() {
   const status = useQuery({
     queryKey: queryKeys.org.accessStatus(),
     queryFn: ({ signal }) => fetchOrganizationAccessStatus(signal),
-    refetchInterval: ORGANIZATION_GATE_RECHECK_INTERVAL_MS,
+    refetchInterval: online ? ORGANIZATION_GATE_RECHECK_INTERVAL_MS : false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     retry: false,
     gcTime: 0,
   });
+  const refetchStatus = status.refetch;
 
   const available = status.data?.available === true;
 
+  const admit = useCallback(() => {
+    if (admitted.current) return;
+    admitted.current = true;
+    router.replace("/schedule");
+  }, [router]);
+
   useEffect(() => {
     if (!available) return;
-    if (!claimAutomaticReload()) return;
-    window.location.reload();
-  }, [available]);
+    admit();
+  }, [admit, available]);
+
+  const recheck = useCallback(() => {
+    if (recheckInFlight.current) return recheckInFlight.current;
+    setChecking(true);
+    const current = settleWithRequestTimeout(
+      refetchStatus({ cancelRefetch: false }),
+      ORGANIZATION_GATE_MANUAL_DEADLINE_MS,
+    )
+      .then((result) => {
+        if (result.data?.available) admit();
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (recheckInFlight.current === current) recheckInFlight.current = null;
+        setChecking(false);
+      });
+    recheckInFlight.current = current;
+    return current;
+  }, [admit, refetchStatus]);
+
+  useEffect(() => {
+    const markOffline = () => setOnline(false);
+    const markOnline = () => {
+      setOnline(true);
+      void recheck();
+    };
+    window.addEventListener("offline", markOffline);
+    window.addEventListener("online", markOnline);
+    return () => {
+      window.removeEventListener("offline", markOffline);
+      window.removeEventListener("online", markOnline);
+    };
+  }, [recheck]);
 
   async function checkAgain() {
-    const result = await status.refetch();
-    // A check the user asked for skips the cooldown: they are watching, and a
-    // reload that lands back here is a clearer answer than a silent no-op. Mark
-    // the reload first so the query update cannot make the availability effect
-    // issue a second reload before navigation completes.
-    if (result.data?.available) {
-      claimAutomaticReload();
-      window.location.reload();
-    }
+    await recheck();
   }
 
   return (
@@ -128,7 +153,7 @@ export function OrganizationGateScreen() {
               onClick={checkAgain}
               type="button"
             >
-              <ButtonLoading loading={status.isFetching}>Check again</ButtonLoading>
+              <ButtonLoading loading={checking || status.isFetching}>Check again</ButtonLoading>
             </Button>
           </div>
         </AuthStateCard>

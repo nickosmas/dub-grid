@@ -87,7 +87,13 @@ export function useTabsGate(): TabsGateResult {
   // flaky connection hit that every time. With cached data the screens keep
   // rendering it and each surfaces its own error, the same reasoning the
   // comment below applies to the first load.
-  if (bootstrapQuery.isError && !bootstrapQuery.data) {
+  const isColdBootstrapRecovering =
+    !bootstrapQuery.data &&
+    (bootstrapQuery.isError ||
+      bootstrapQuery.fetchStatus === "paused" ||
+      bootstrapQuery.failureCount > 0);
+
+  if (isColdBootstrapRecovering) {
     return {
       kind: "blocked",
       element: (

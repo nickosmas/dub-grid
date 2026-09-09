@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchOrganizationBootstrap,
+  getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -14,8 +14,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
-    queryFn: () => fetchOrganizationBootstrap(),
-    staleTime: 60_000,
+    ...getOrganizationBootstrapQueryPolicy(),
   });
   const [pendingAction, setPendingAction] = useState<"exit" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);

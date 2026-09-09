@@ -29,20 +29,17 @@ describe("NetworkConnectionRecoveryScreen", () => {
     expect(screen.queryByText("Sign out")).not.toBeInTheDocument();
   });
 
-  it("keeps retrying automatically while the connection can recover", async () => {
+  it("leaves automatic retry ownership to the bounded bootstrap query", async () => {
     vi.useFakeTimers();
     try {
-      vi.spyOn(Math, "random").mockReturnValue(1);
-      onRetry.mockResolvedValue(undefined);
       render(<NetworkConnectionRecoveryScreen onRetry={onRetry} />);
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000);
+        await vi.advanceTimersByTimeAsync(60_000);
       });
 
-      expect(onRetry).toHaveBeenCalledOnce();
+      expect(onRetry).not.toHaveBeenCalled();
     } finally {
-      vi.restoreAllMocks();
       vi.useRealTimers();
     }
   });

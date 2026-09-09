@@ -10,7 +10,6 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
-import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -35,7 +34,8 @@ import {
   useClientHost,
   useSessionInvalidToast,
 } from "./shared";
-import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
+import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 
 const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
 
@@ -53,6 +53,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isHydrated, setIsHydrated] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -72,27 +73,22 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   }
   // Switches to targetOrgId (already confirmed as one of the user's
   // memberships), refreshes the session, starts the org's trial if
-  // applicable, and clears sandbox/query-cache state. On failure, signs the
-  // user out and shows an error toast. Shared by the fast-path (server said
+  // applicable, and clears sandbox/query-cache state. A recoverable failure
+  // stays on the MFA screen so the verified session is not mistaken for a
+  // logout. Shared by the fast-path (server said
   // needsClientOrgSwitch) and the MFA-verified path (which can't go through
   // the server route a second time — see handleMFAVerified).
   async function switchToOrgAndPrepare(targetOrgId: string): Promise<boolean> {
-    try {
-      await switchBrowserOrganization(targetOrgId);
-      await refreshBrowserSession();
-      // Don't carry a prior session's "view as user" toggle into the org we
-      // just switched into (it would silently force read-only).
-      setUserViewActive(false);
-      // Drop the prior org's React Query cache so the new org's dashboard
-      // never paints with stale cross-org data. The hard nav below would
-      // eventually reset this, but clearing here guarantees nothing in
-      // between hits the old cache.
-      queryClient.clear();
-    } catch {
-      await signOutFromBrowser("local");
-      toast.error("We couldn't switch organizations. Try again.");
-      return false;
-    }
+    await settleWithRequestTimeout(switchBrowserOrganization(targetOrgId));
+    await settleWithRequestTimeout(refreshBrowserSession());
+    // Don't carry a prior session's "view as user" toggle into the org we
+    // just switched into (it would silently force read-only).
+    setUserViewActive(false);
+    // Drop the prior org's React Query cache so the new org's dashboard
+    // never paints with stale cross-org data. The hard nav below would
+    // eventually reset this, but clearing here guarantees nothing in
+    // between hits the old cache.
+    queryClient.clear();
     // First super_admin login starts this org's trial (idempotent,
     // self-gated server-side) and wiping any sandbox left over from the
     // previous session (involuntary logout / browser close that never ran
@@ -108,10 +104,10 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
     // switch route now clears the sandbox cookie server-side regardless, so
     // this call is only what deletes the org row.
     await Promise.all([
-      startBrowserTrial(targetOrgId).catch(() => {
+      settleWithRequestTimeout(startBrowserTrial(targetOrgId)).catch(() => {
         // Non-fatal: never block sign-in on trial activation.
       }),
-      exitSandbox().catch(() => {
+      settleWithRequestTimeout(exitSandbox()).catch(() => {
         // Non-fatal: never block sign-in on sandbox teardown.
       }),
     ]);
@@ -124,12 +120,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
   // switchToOrgAndPrepare. Returns false (having already shown a toast and
   // signed the user out) when the lookup fails or no membership exists.
   async function findAndSwitchToOrg(): Promise<boolean> {
-    const { organizations: orgs } = await fetchAccessibleOrganizations();
-    if (!orgs) {
-      await signOutFromBrowser("local");
-      toast.error("We couldn't confirm your access to that organization. Try again.");
-      return false;
-    }
+    const { organizations: orgs } = await settleWithRequestTimeout(fetchAccessibleOrganizations());
     const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
     if (!targetOrg) {
       await signOutFromBrowser("local");
@@ -196,6 +187,8 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setGridmasterPortalRequired(false);
 
@@ -213,32 +206,27 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(
-            extractErrorMessage(
-              result.error,
-              "Too many sign-in attempts. Wait a few minutes and try again.",
-            ),
-          );
+          toast.error("Too many sign-in attempts. Wait a few minutes and try again.");
           setLoading(false);
           return;
         }
-        if (res.status === 403 && result.code === ACCOUNT_DISABLED_CODE) {
+        if (res.status === 403 && result?.code === ACCOUNT_DISABLED_CODE) {
           setAccountDisabled(true);
           setPassword("");
           setLoading(false);
           return;
         }
-        if (res.status === 403 && result.code === GRIDMASTER_PORTAL_REQUIRED_CODE) {
+        if (res.status === 403 && result?.code === GRIDMASTER_PORTAL_REQUIRED_CODE) {
           setGridmasterPortalRequired(true);
           setPassword("");
           setLoading(false);
           return;
         }
-        if (result.code === "SESSION_REFRESH_FAILED") {
+        if (result?.code === "SESSION_REFRESH_FAILED") {
           toast.error("We couldn't verify your session. Sign in again.");
           setLoading(false);
           return;
@@ -248,10 +236,13 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
           setLoading(false);
           return;
         }
-        toast.error(extractErrorMessage(result.error, "We couldn't sign you in. Try again."));
+        toast.error(
+          getWebAuthRecoveryMessage({ status: res.status }, "We couldn't sign you in. Try again."),
+        );
         setLoading(false);
         return;
       }
+      if (!result) throw Object.assign(new Error("Unexpected login response"), { status: 502 });
 
       // Check if email is confirmed
       if (!result.user.email_confirmed_at) {
@@ -260,10 +251,12 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       }
 
       // Set the session in the client using the tokens from the server.
-      await setBrowserSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      });
+      await settleWithRequestTimeout(
+        setBrowserSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        }),
+      );
 
       // Check if MFA is required before proceeding
       if (result.mfa_required) {
@@ -299,19 +292,10 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       markAuthTransition();
       navigateToDashboard(result.destination, false);
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err, "").toLowerCase();
-      if (isRequestTimeout(err)) {
-        toast.error("That took too long. Check your connection and try again.");
-      } else if (
-        msg.includes("fetch") ||
-        msg.includes("network") ||
-        msg.includes("failed to fetch")
-      ) {
-        toast.error("Check your connection and try again.");
-      } else {
-        toast.error("We couldn't sign you in. Try again.");
-      }
+      toast.error(getWebAuthRecoveryMessage(err, "We couldn't sign you in. Try again."));
       setLoading(false);
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -322,51 +306,49 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
     // factor is verified directly against Supabase from the browser, so
     // this orchestrates org-switch/trial/terms client-side same as before.
     async function proceed() {
-      try {
-        const session = await getBrowserAuthSession();
-        if (!session) {
-          toast.error("Your session expired. Sign in again.");
-          setMfaRequired(false);
-          return;
-        }
-
-        const claims = decodeJwt(session.access_token);
-        const isGridmaster = claims.platform_role === "gridmaster";
-        let didSwitchOrg = false;
-
-        if (!isGridmaster) {
-          const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
-          const signedInOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
-
-          if (userSlug !== orgSlug) {
-            const switched = await findAndSwitchToOrg();
-            if (!switched) {
-              setMfaRequired(false);
-              return;
-            }
-            didSwitchOrg = true;
-          } else {
-            // Already in the right org — still start the trial if
-            // applicable and clear any leftover sandbox from a prior
-            // session, same as switchToOrgAndPrepare does for the switch
-            // case (see that function for why each step exists).
-            if (signedInOrgId) {
-              try {
-                await startBrowserTrial(signedInOrgId);
-              } catch {
-                // Non-fatal: never block sign-in on trial activation.
-              }
-            }
-            void exitSandbox().catch(() => {});
-          }
-        }
-
-        markAuthTransition();
-        navigateToDashboard(await resolvePostLoginDestination(), didSwitchOrg);
-      } catch {
-        toast.error("We couldn't finish signing you in. Try again.");
+      const session = await settleWithRequestTimeout(getBrowserAuthSession());
+      if (!session) {
+        toast.error("Your session expired. Sign in again.");
         setMfaRequired(false);
+        return;
       }
+
+      const claims = decodeJwt(session.access_token);
+      const isGridmaster = claims.platform_role === "gridmaster";
+      let didSwitchOrg = false;
+
+      if (!isGridmaster) {
+        const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+        const signedInOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
+
+        if (userSlug !== orgSlug) {
+          const switched = await findAndSwitchToOrg();
+          if (!switched) {
+            setMfaRequired(false);
+            return;
+          }
+          didSwitchOrg = true;
+        } else {
+          // Already in the right org — still start the trial if
+          // applicable and clear any leftover sandbox from a prior
+          // session, same as switchToOrgAndPrepare does for the switch
+          // case (see that function for why each step exists).
+          if (signedInOrgId) {
+            try {
+              await settleWithRequestTimeout(startBrowserTrial(signedInOrgId));
+            } catch {
+              // Non-fatal: never block sign-in on trial activation.
+            }
+          }
+          void exitSandbox().catch(() => {});
+        }
+      }
+
+      markAuthTransition();
+      navigateToDashboard(
+        await settleWithRequestTimeout(resolvePostLoginDestination()),
+        didSwitchOrg,
+      );
     }
     return proceed();
   }

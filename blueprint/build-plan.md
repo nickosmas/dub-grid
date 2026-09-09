@@ -108,7 +108,7 @@
           warm mobile session restoration and organization bootstrap; remove
           confirmed unnecessary waits and duplicate requests without turning
           slow restoration into premature logout.
-    - [ ] 19c3. **Degraded-network authentication recovery** - keep useful
+    - [x] 19c3. **Degraded-network authentication recovery** - keep useful
           content or an explicit recovery path visible across web and mobile
           during slow, offline, timeout, and retry states, with bounded retries
           and no blank or permanently latched loading screens.

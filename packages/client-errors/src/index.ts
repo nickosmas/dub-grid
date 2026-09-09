@@ -334,3 +334,130 @@ export function formatClientErrorMessage(
 
   return rawMessage;
 }
+
+export const AUTH_RECOVERY_MAX_AUTOMATIC_RETRIES = 3;
+export const AUTH_RECOVERY_BASE_DELAY_MS = 1_000;
+export const AUTH_RECOVERY_MAX_DELAY_MS = 30_000;
+
+type RecoveryErrorShape = {
+  name?: unknown;
+  retryAfter?: unknown;
+  retryAfterMs?: unknown;
+  status?: unknown;
+};
+
+function getRecoveryErrorShape(error: unknown): RecoveryErrorShape | null {
+  return typeof error === "object" && error !== null ? (error as RecoveryErrorShape) : null;
+}
+
+/** True when the caller, rather than the network deadline, cancelled the work. */
+export function isAuthRecoveryCancellation(error: unknown): boolean {
+  return getRecoveryErrorShape(error)?.name === "AbortError";
+}
+
+/** True when an owned request deadline expired. */
+export function isAuthRecoveryTimeout(error: unknown): boolean {
+  const name = getRecoveryErrorShape(error)?.name;
+  return name === "TimeoutError" || name === "RequestTimeoutError";
+}
+
+/** Whether an authentication-entry failure is safe to retry automatically. */
+export function isRetryableAuthRecoveryError(error: unknown): boolean {
+  if (isAuthRecoveryCancellation(error)) return false;
+  if (isAuthRecoveryTimeout(error) || isNetworkConnectionError(error)) return true;
+
+  const status = getRecoveryErrorShape(error)?.status;
+  return (
+    status === 408 ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500 && status < 600)
+  );
+}
+
+/** Parse an HTTP Retry-After value into milliseconds from now. */
+export function parseRetryAfterMs(
+  value: string | null | undefined,
+  nowMs = Date.now(),
+): number | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+
+  if (/^\d+$/.test(normalized)) {
+    const seconds = Number(normalized);
+    return Number.isSafeInteger(seconds) ? seconds * 1_000 : null;
+  }
+
+  if (!/^[A-Za-z]{3},\s/.test(normalized)) return null;
+
+  const timestamp = Date.parse(normalized);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - nowMs) : null;
+}
+
+/** Read Retry-After metadata from either web or shared API-client errors. */
+export function getAuthRecoveryRetryAfterMs(error: unknown, nowMs = Date.now()): number | null {
+  const shape = getRecoveryErrorShape(error);
+  if (!shape) return null;
+
+  if (
+    typeof shape.retryAfterMs === "number" &&
+    Number.isFinite(shape.retryAfterMs) &&
+    shape.retryAfterMs >= 0
+  ) {
+    return shape.retryAfterMs;
+  }
+
+  return typeof shape.retryAfter === "string" ? parseRetryAfterMs(shape.retryAfter, nowMs) : null;
+}
+
+export function shouldRetryAuthRecovery(
+  failureCount: number,
+  error: unknown,
+  maxAutomaticRetries = AUTH_RECOVERY_MAX_AUTOMATIC_RETRIES,
+): boolean {
+  return failureCount < maxAutomaticRetries && isRetryableAuthRecoveryError(error);
+}
+
+export function getAuthRecoveryRetryDelay(
+  error: unknown,
+  failureCount: number,
+  options: {
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    nowMs?: number;
+    random?: () => number;
+  } = {},
+): number {
+  const baseDelayMs = Math.max(0, options.baseDelayMs ?? AUTH_RECOVERY_BASE_DELAY_MS);
+  const maxDelayMs = Math.max(baseDelayMs, options.maxDelayMs ?? AUTH_RECOVERY_MAX_DELAY_MS);
+  const attempt = Math.max(0, Math.floor(failureCount));
+  const cappedDelay = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+  const random = Math.min(1, Math.max(0, (options.random ?? Math.random)()));
+  const jitteredDelay = Math.round(cappedDelay * (0.5 + random * 0.5));
+  const retryAfterMs = getAuthRecoveryRetryAfterMs(error, options.nowMs);
+
+  return retryAfterMs === null ? jitteredDelay : Math.max(jitteredDelay, retryAfterMs);
+}
+
+/** Coalesce concurrent recovery triggers into one underlying attempt. */
+export function createAuthRecoverySingleFlight<Result>(
+  attempt: () => Promise<Result> | Result,
+): () => Promise<Result> {
+  let inFlight: Promise<Result> | null = null;
+
+  return () => {
+    if (inFlight) return inFlight;
+
+    let current: Promise<Result>;
+    try {
+      current = Promise.resolve(attempt());
+    } catch (error) {
+      current = Promise.reject(error);
+    }
+    inFlight = current;
+    const clear = () => {
+      if (inFlight === current) inFlight = null;
+    };
+    void current.then(clear, clear);
+    return current;
+  };
+}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiResponseError } from "@dubgrid/api-client";
+import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
@@ -11,6 +12,7 @@ import { AuthField } from "../components/AuthField";
 import { InlineError } from "../../../shared/components/InlineError";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { AuthShell } from "../components/AuthShell";
+import { NetworkConnectionRecoveryScreen } from "./NetworkConnectionRecoveryScreen";
 import {
   useIsConsentDecisionPending,
   useRecheckConsentDecision,
@@ -24,6 +26,7 @@ import {
 } from "../../../shared/lib/api";
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
 import { authEntryRecorder } from "../lib/auth-entry-measurement";
+import { settleMobileAuthAction } from "../lib/request-deadline";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
@@ -49,7 +52,6 @@ type PendingMfaLogin = MobileAuthLoginResponse & {
   mfa: NonNullable<MobileAuthLoginResponse["mfa"]>;
 };
 
-const SESSION_HANDOFF_TIMEOUT_MS = 15_000;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(value: string): boolean {
@@ -69,33 +71,10 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
   return ".dubgrid.com";
 }
 
-function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(
-        new Error(
-          "Sign-in is taking longer than expected. Check your internet connection and try again.",
-        ),
-      );
-    }, SESSION_HANDOFF_TIMEOUT_MS);
-
-    promise.then(
-      (value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      },
-    );
-  });
-}
-
 export default function LoginScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const { accessToken, isLoading } = useSessionState();
+  const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
   const isConsentDecisionPending = useIsConsentDecisionPending();
   const recheckConsentDecision = useRecheckConsentDecision();
   const emailInputRef = useRef<TextInput>(null);
@@ -123,6 +102,7 @@ export default function LoginScreen() {
   const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [slowSubmission, setSlowSubmission] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(false);
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
@@ -195,6 +175,23 @@ export default function LoginScreen() {
     return null;
   }
 
+  if (restoreError) {
+    return (
+      <NetworkConnectionRecoveryScreen
+        isRetrying={restoringSession}
+        onRetry={async () => {
+          if (restoringSession) return;
+          setRestoringSession(true);
+          try {
+            await retryRestore();
+          } finally {
+            setRestoringSession(false);
+          }
+        }}
+      />
+    );
+  }
+
   if (accessToken) {
     return <Redirect href="/(tabs)/home" />;
   }
@@ -203,7 +200,7 @@ export default function LoginScreen() {
     await saveLastOrg(response.organization);
 
     const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
-    const { error: sessionError } = await withSessionHandoffTimeout(
+    const { error: sessionError } = await settleMobileAuthAction(
       getSupabaseClient().auth.setSession({
         access_token: session.accessToken,
         refresh_token: session.refreshToken,
@@ -229,6 +226,7 @@ export default function LoginScreen() {
     await queryClient.prefetchQuery({
       queryKey: buildBootstrapQueryKey(session.accessToken),
       queryFn: () => getBootstrap(session.accessToken),
+      retry: false,
     });
 
     router.replace("/(tabs)/home");
@@ -329,11 +327,13 @@ export default function LoginScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const verifiedSession = await verifyMobileTotpFactor({
-        session: pendingMfaLogin.session,
-        factorId: pendingMfaLogin.mfa.factorId,
-        code: mfaCode,
-      });
+      const verifiedSession = await settleMobileAuthAction(
+        verifyMobileTotpFactor({
+          session: pendingMfaLogin.session,
+          factorId: pendingMfaLogin.mfa.factorId,
+          code: mfaCode,
+        }),
+      );
 
       await finishLogin(pendingMfaLogin, verifiedSession);
     } catch (mfaError) {
@@ -342,8 +342,10 @@ export default function LoginScreen() {
         fallbackMessage: "We couldn't verify that code right now. Try again in a moment.",
       });
       setError(nextError);
-      setMfaCode("");
-      setTimeout(() => mfaInputRef.current?.focus(), 0);
+      if (!isRetryableAuthRecoveryError(mfaError)) {
+        setMfaCode("");
+        setTimeout(() => mfaInputRef.current?.focus(), 0);
+      }
     } finally {
       setSubmitting(false);
     }

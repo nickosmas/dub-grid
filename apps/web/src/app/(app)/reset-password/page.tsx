@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
@@ -14,6 +14,9 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import {
   exchangeBrowserCodeForSession,
   getBrowserAuthSession,
@@ -22,7 +25,7 @@ import {
   updateBrowserUserPassword,
 } from "@/features/account/client";
 
-type PageState = "loading" | "form" | "success" | "error";
+type PageState = "loading" | "form" | "success" | "error" | "recovery";
 
 function ResetPasswordContent() {
   const [state, setState] = useState<PageState>("loading");
@@ -33,6 +36,51 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const recoveryCodeRef = useRef<string | null>(null);
+  const submittingRef = useRef(false);
+  const checkingRef = useRef(false);
+
+  const checkRecoverySession = useCallback(async (finalAttempt: boolean) => {
+    if (checkingRef.current) return;
+    checkingRef.current = true;
+    setState("loading");
+    stateRef.current = "loading";
+    try {
+      const code = recoveryCodeRef.current;
+      if (code) {
+        const { error } = await settleWithRequestTimeout(exchangeBrowserCodeForSession(code));
+        if (error) throw error;
+        window.history.replaceState({}, "", window.location.pathname);
+        recoveryCodeRef.current = null;
+        setState("form");
+        stateRef.current = "form";
+        return;
+      }
+
+      const session = await settleWithRequestTimeout(getBrowserAuthSession());
+      if (stateRef.current !== "loading") return;
+      if (session) {
+        setState("form");
+        stateRef.current = "form";
+      } else if (finalAttempt) {
+        setState("error");
+        stateRef.current = "error";
+      }
+    } catch (checkError) {
+      if (stateRef.current !== "loading") return;
+      if (isRetryableAuthRecoveryError(checkError)) {
+        setState("recovery");
+        stateRef.current = "recovery";
+      } else {
+        window.history.replaceState({}, "", window.location.pathname);
+        recoveryCodeRef.current = null;
+        setState("error");
+        stateRef.current = "error";
+      }
+    } finally {
+      checkingRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -49,26 +97,14 @@ function ResetPasswordContent() {
     // (set when resetPasswordForEmail was called) is available.
     const code = params.get("code");
     if (code) {
-      // Clean the code from the URL so it can't be reused / bookmarked
-      window.history.replaceState({}, "", window.location.pathname);
-
-      exchangeBrowserCodeForSession(code).then(({ error }: { error: unknown }) => {
-        if (error) {
-          setState("error");
-          stateRef.current = "error";
-        } else {
-          setState("form");
-          stateRef.current = "form";
-        }
-      });
+      // Keep the one-time code only long enough to permit a manual retry after
+      // a transport failure. It is removed immediately on success or a
+      // terminal provider response.
+      recoveryCodeRef.current = code;
+      void checkRecoverySession(false);
     } else {
       // No code — check if session already exists (e.g. from /auth/confirm).
-      void getBrowserAuthSession().then((session) => {
-        if (session && stateRef.current === "loading") {
-          setState("form");
-          stateRef.current = "form";
-        }
-      });
+      void checkRecoverySession(false);
     }
 
     // Fallback: listen for PASSWORD_RECOVERY event (handles implicit flow
@@ -82,11 +118,12 @@ function ResetPasswordContent() {
       }
     });
 
-    // Timeout fallback — if nothing resolves within 15s, the link is invalid/expired.
+    // If no session arrives, offer an explicit recheck instead of claiming a
+    // slow connection proves the link is invalid or expired.
     const timeout = setTimeout(() => {
       if (stateRef.current === "loading") {
-        setState("error");
-        stateRef.current = "error";
+        setState("recovery");
+        stateRef.current = "recovery";
       }
     }, 15000);
 
@@ -94,7 +131,7 @@ function ResetPasswordContent() {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, []);
+  }, [checkRecoverySession]);
 
   // Focus the first password field once the form becomes available.
   useEffect(() => {
@@ -108,6 +145,7 @@ function ResetPasswordContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
     setFormError(null);
 
     if (mismatchError) {
@@ -119,13 +157,14 @@ function ResetPasswordContent() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
 
     try {
-      await updateBrowserUserPassword(password);
+      await settleWithRequestTimeout(updateBrowserUserPassword(password));
 
       // Sign out so user re-authenticates with fresh credentials
-      await signOutFromBrowser("local");
+      await settleWithRequestTimeout(signOutFromBrowser("local"));
 
       setState("success");
       stateRef.current = "success";
@@ -135,12 +174,13 @@ function ResetPasswordContent() {
         setFormError("New password must be different from your current password.");
       } else if (msg.includes("weak") || msg.includes("short")) {
         setFormError("Password is too weak. Please choose a stronger password.");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("We couldn't reach DubGrid. Check your connection and try again.");
+      } else if (isRetryableAuthRecoveryError(err)) {
+        toast.error(getWebAuthRecoveryMessage(err, "We couldn't update your password. Try again."));
       } else {
         toast.error("We couldn't update your password. Try again.");
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -159,6 +199,13 @@ function ResetPasswordContent() {
             icon="spinner"
             heading="Verifying reset link"
             message="Please wait while we verify your password reset link."
+          />
+        ) : state === "recovery" ? (
+          <AuthStateCard
+            heading="Check your connection"
+            message="We couldn't verify this reset link. Check your connection and try again."
+            primaryCta={{ label: "Try again", onClick: () => void checkRecoverySession(true) }}
+            secondaryCta={{ label: "Request new link", href: "/forgot-password" }}
           />
         ) : state === "error" ? (
           <AuthStateCard

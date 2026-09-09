@@ -33,7 +33,8 @@ function toOnlineValue(
 
 export function NetworkStateProvider({ children }: PropsWithChildren) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isOnlineRef = useRef(true);
+  const isOnlineRef = useRef<boolean | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const [hasResolvedState, setHasResolvedState] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
@@ -60,6 +61,13 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
         setIsOnline(false);
         isOnlineRef.current = false;
         onlineManager.setOnline(false);
+        return;
+      }
+
+      if (isOnlineRef.current === null) {
+        setIsOnline(true);
+        isOnlineRef.current = true;
+        onlineManager.setOnline(true);
         return;
       }
 
@@ -121,9 +129,10 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     function onAppStateChange(status: AppStateStatus) {
-      if (Platform.OS !== "web") {
-        focusManager.setFocused(status === "active");
-      }
+      if (Platform.OS === "web" || appStateRef.current === status) return;
+
+      appStateRef.current = status;
+      focusManager.setFocused(status === "active");
     }
 
     const subscription = AppState.addEventListener("change", onAppStateChange);

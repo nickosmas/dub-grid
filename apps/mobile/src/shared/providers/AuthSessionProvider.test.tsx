@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AuthSessionProvider,
@@ -37,12 +37,14 @@ vi.mock("../lib/api", () => ({
 }));
 
 function SessionProbe() {
-  const { accessToken, isLoading } = useSessionState();
+  const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
 
   return (
     <div>
       <span data-testid="loading">{String(isLoading)}</span>
       <span data-testid="token">{accessToken ?? "none"}</span>
+      <span data-testid="restore-error">{String(restoreError)}</span>
+      <button onClick={() => void retryRestore()}>Retry restore</button>
     </div>
   );
 }
@@ -107,7 +109,7 @@ describe("AuthSessionProvider", () => {
     expect(registerMobileSessionPresence).toHaveBeenLastCalledWith("access-token-2");
   });
 
-  it("releases startup when the stored session restore hangs", async () => {
+  it("releases startup into recovery when the stored session restore hangs", async () => {
     vi.useFakeTimers();
     getSession.mockReturnValueOnce(new Promise(() => {}));
 
@@ -132,6 +134,33 @@ describe("AuthSessionProvider", () => {
 
       expect(screen.getByTestId("loading")).toHaveTextContent("false");
       expect(screen.getByTestId("token")).toHaveTextContent("none");
+      expect(screen.getByTestId("restore-error")).toHaveTextContent("true");
+      expect(signOut).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restores the same valid session after a timed-out attempt is retried", async () => {
+    vi.useFakeTimers();
+    getSession
+      .mockReturnValueOnce(new Promise(() => undefined))
+      .mockResolvedValueOnce({ data: { session: { access_token: "restored-token" } } });
+
+    try {
+      render(
+        <AuthSessionProvider>
+          <SessionProbe />
+        </AuthSessionProvider>,
+      );
+
+      await act(async () => vi.advanceTimersByTimeAsync(SESSION_RESTORE_TIMEOUT_MS));
+      expect(screen.getByTestId("restore-error")).toHaveTextContent("true");
+
+      await act(async () => fireEvent.click(screen.getByText("Retry restore")));
+
+      expect(screen.getByTestId("token")).toHaveTextContent("restored-token");
+      expect(screen.getByTestId("restore-error")).toHaveTextContent("false");
       expect(signOut).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -186,5 +215,6 @@ describe("AuthSessionProvider", () => {
 
     expect(signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(screen.getByTestId("token")).toHaveTextContent("none");
+    expect(screen.getByTestId("restore-error")).toHaveTextContent("false");
   });
 });

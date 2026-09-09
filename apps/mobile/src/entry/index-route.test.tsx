@@ -90,6 +90,20 @@ describe("IndexScreen", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
+  it("does not route a recoverable session-restore failure as signed out", () => {
+    useSessionState.mockReturnValue({
+      accessToken: null,
+      isLoading: false,
+      restoreError: true,
+    });
+    useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });
+
+    render(<IndexScreen />);
+
+    expect(screen.getByText("Enter your subdomain")).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalledWith("/(auth)/onboarding");
+  });
+
   it("routes first-run users to the onboarding screen", () => {
     useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
     useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });

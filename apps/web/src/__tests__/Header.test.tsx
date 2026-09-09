@@ -64,6 +64,12 @@ vi.mock("@/features/organization/client/api", () => ({
   fetchOrganizationBootstrap: vi.fn().mockResolvedValue({
     org: { workspaceKind: "real" },
   }),
+  getOrganizationBootstrapQueryPolicy: () => ({
+    queryFn: vi.fn().mockResolvedValue({ org: { workspaceKind: "real" } }),
+    staleTime: 300_000,
+    retry: false,
+    retryOnMount: false,
+  }),
 }));
 
 // NotificationBell starts a realtime subscription once a user is present; stub

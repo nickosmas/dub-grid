@@ -8,6 +8,7 @@ import { createEphemeralSupabaseClient } from "../../../shared/lib/supabase";
 import { AuthActions, AuthFields, AuthHeader, AuthShell, AuthStage } from "../components/AuthShell";
 import { AuthField, AuthFieldError } from "../components/AuthField";
 import { getRecoveryErrorMessage, shouldSurfaceResetRequestError } from "../lib/recovery-errors";
+import { settleMobileAuthAction } from "../lib/request-deadline";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -22,6 +23,8 @@ export default function ForgotPasswordScreen() {
   });
 
   async function requestReset() {
+    if (submitting) return;
+
     const trimmed = email.trim();
     if (!EMAIL_REGEX.test(trimmed)) {
       setError("Enter a valid email address.");
@@ -39,8 +42,9 @@ export default function ForgotPasswordScreen() {
     try {
       // The ephemeral client throughout, so no part of this flow can write a
       // session to storage. See ResetPasswordScreen for why that matters.
-      const { error: resetError } =
-        await createEphemeralSupabaseClient().auth.resetPasswordForEmail(trimmed);
+      const { error: resetError } = await settleMobileAuthAction(
+        createEphemeralSupabaseClient().auth.resetPasswordForEmail(trimmed),
+      );
       requestError = resetError;
     } catch (caught) {
       requestError = caught;

@@ -42,6 +42,27 @@ export async function fetchWithTimeout(
   }
 }
 
+/**
+ * Give an async browser-provider operation the same finite UI deadline as a
+ * fetch. The provider promise may not support cancellation, so callers must
+ * ignore its late settlement and must not automatically replay mutations.
+ */
+export async function settleWithRequestTimeout<T>(
+  request: PromiseLike<T>,
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new RequestTimeoutError(timeoutMs)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(request), deadline]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 /** True when a caught error came from a request deadline rather than a failure. */
 export function isRequestTimeout(err: unknown): boolean {
   return (

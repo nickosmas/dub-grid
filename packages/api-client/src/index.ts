@@ -46,6 +46,7 @@ export class ApiResponseError extends Error {
     message: string,
     public readonly status: number,
     public readonly payload: unknown,
+    public readonly retryAfter: string | null = null,
   ) {
     super(message);
     this.name = "ApiResponseError";
@@ -114,7 +115,12 @@ export async function createJsonApiRequest<T>(input: {
       await onAuthFailure?.();
     }
 
-    throw new ApiResponseError(message, response.status, payload);
+    throw new ApiResponseError(
+      message,
+      response.status,
+      payload,
+      response.headers?.get?.("retry-after") ?? null,
+    );
   }
 
   return parse(payload);
