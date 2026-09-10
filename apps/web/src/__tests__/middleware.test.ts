@@ -163,13 +163,17 @@ function makeNextRequest(
 
 // ── Helper: mock a session with JWT claims ───────────────────────────────────
 function mockSessionWithClaims(claims: Record<string, unknown>) {
+  const resolvedClaims: Record<string, unknown> = {
+    session_id: "auth-session-1",
+    ...claims,
+  };
   const session = {
     access_token: "fake-jwt",
-    user: { id: claims.sub ?? "user-1" },
+    user: { id: resolvedClaims.sub ?? "user-1" },
   };
   mockGetSession.mockResolvedValue({ data: { session } });
-  mockJwtVerify.mockResolvedValue({ payload: claims });
-  mockDecodeJwt.mockReturnValue(claims);
+  mockJwtVerify.mockResolvedValue({ payload: resolvedClaims });
+  mockDecodeJwt.mockReturnValue(resolvedClaims);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -738,13 +742,15 @@ describe("middleware: impersonation", () => {
     mockVerifyImpersonationSession.mockResolvedValue({
       targetUserId: "u-2",
       targetOrgId: "org-2",
+      targetOrgRole: "admin",
+      targetOrgSlug: "acme",
     });
     const impData = {
       sessionId: "s-1",
       targetUserId: "u-2",
       targetOrgId: "org-2",
       targetOrgSlug: "acme",
-      targetOrgRole: "admin",
+      targetOrgRole: "super_admin",
       targetEmail: "test@example.com",
       targetOrgName: "Acme",
       justification: "debug",
@@ -760,7 +766,12 @@ describe("middleware: impersonation", () => {
     expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBe("admin");
     expect((res as { headers: Headers }).headers.get("x-dubgrid-impersonating")).toBe("true");
     expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBe("org-2");
-    expect(mockVerifyImpersonationSession).toHaveBeenCalledWith(expect.anything(), "s-1", "gm-1");
+    expect(mockVerifyImpersonationSession).toHaveBeenCalledWith(
+      expect.anything(),
+      "s-1",
+      "gm-1",
+      "auth-session-1",
+    );
   });
 
   it("clears the cookie and does not override claims when the session isn't verified (forged or expired)", async () => {

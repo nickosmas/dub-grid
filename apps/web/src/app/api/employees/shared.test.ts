@@ -101,4 +101,37 @@ describe("canManageEmployees", () => {
 
     await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
+
+  it("denies a removed or archived membership", async () => {
+    const serviceClient = makeServiceClient({
+      membership: null,
+      profile: { platform_role: "none" },
+      organization: { suspended_at: null, subscription_status: "active", trial_ends_at: null },
+      employee: { status: "active" },
+    });
+
+    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("denies an active admin without the granular employee permission", async () => {
+    const serviceClient = makeServiceClient({
+      membership: { org_role: "admin", admin_permissions: { canManageEmployees: false } },
+      profile: { platform_role: "none" },
+      organization: { suspended_at: null, subscription_status: "active", trial_ends_at: null },
+      employee: { status: "active" },
+    });
+
+    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("denies a member when the organization is archived or missing", async () => {
+    const serviceClient = makeServiceClient({
+      membership: { org_role: "super_admin", admin_permissions: null },
+      profile: { platform_role: "none" },
+      organization: null,
+      employee: { status: "active" },
+    });
+
+    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
 });

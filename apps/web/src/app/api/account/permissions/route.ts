@@ -103,6 +103,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
         serviceClient,
         impersonation.sessionId,
         auth.user.id,
+        auth.sessionId,
       );
 
       if (verified) {
@@ -111,11 +112,9 @@ async function handleGET(req: NextRequest, timer: Timer) {
           .select("org_role, admin_permissions")
           .eq("user_id", verified.targetUserId)
           .eq("org_id", verified.targetOrgId)
+          .is("archived_at", null)
           .single();
-        const targetRole =
-          (targetMembership?.org_role as OrganizationRole | null) ??
-          (impersonation.targetOrgRole as OrganizationRole | null) ??
-          "user";
+        const targetRole = verified.targetOrgRole as OrganizationRole;
 
         return NextResponse.json({
           permissions: buildPerms(

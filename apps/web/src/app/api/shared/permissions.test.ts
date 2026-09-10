@@ -178,7 +178,13 @@ describe("requireOrgPermissions", () => {
   describe("tenant isolation", () => {
     const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
 
-    it("rejects a caller with no membership in the requested org", async () => {
+    it("rejects a stale claimed org and cross-tenant requested org without a live membership", async () => {
+      requireAuthenticatedUser.mockResolvedValue({
+        user: {
+          id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+          app_metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+        },
+      });
       getServiceClient.mockReturnValue(
         createServiceClientMock({
           membership: null,
@@ -197,6 +203,48 @@ describe("requireOrgPermissions", () => {
       expect("response" in result).toBe(true);
       if ("response" in result) {
         expect(result.response.status).toBe(403);
+      }
+    });
+
+    it("rejects a removed membership even when the setup-complete cache is warm", async () => {
+      const ORG = "11111111-1111-4111-8111-111111111111";
+      const { requireOrgPermissions } = await import("./permissions");
+
+      // A successful request warms the positive-only setup cache.
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: { org_role: "admin", admin_permissions: null },
+          profile: { platform_role: "none" },
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+          employee: { status: "active" },
+        }),
+      );
+      const allowed = await requireOrgPermissions(makeRequest(), ORG, () => true);
+      expect("response" in allowed).toBe(false);
+
+      // Membership is removed while the token and setup cache are stale. The
+      // very next request must still fail before cached setup can matter.
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "none" },
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+          employee: { status: "active" },
+        }),
+      );
+      const denied = await requireOrgPermissions(makeRequest(), ORG, () => true);
+
+      expect("response" in denied).toBe(true);
+      if ("response" in denied) {
+        expect(denied.response.status).toBe(403);
       }
     });
 

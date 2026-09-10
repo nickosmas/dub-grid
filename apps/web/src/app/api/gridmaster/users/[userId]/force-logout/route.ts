@@ -6,6 +6,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { revokeAllUserSessions } from "@/lib/auth/revocation";
 
 const paramsSchema = z.object({
   userId: z.string().uuid(),
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     if (result.error) {
       throw result.error;
     }
+
+    // The SQL function removes tracked database sessions and blocks refresh.
+    // Mirror that cutoff into the Route Handler revocation store so the
+    // already-issued access token also fails app APIs immediately.
+    await revokeAllUserSessions(parsed.data.userId);
 
     await writeGridmasterAuditLog({
       serviceClient,

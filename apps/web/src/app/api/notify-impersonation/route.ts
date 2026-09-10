@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { requireGridmasterSession } from "@/lib/api-auth";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { ImpersonationNoticeEmail } from "@/emails/ImpersonationNoticeEmail";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { getSupabaseSecretKey, requireSupabaseUrl } from "@/lib/supabase-keys";
+import { getServiceClient } from "@/lib/supabase-service";
 import { serverEnv } from "@/lib/env.server";
 
 const bodySchema = z.object({
@@ -28,9 +27,9 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   // ── Auth check ──────────────────────────────────────────────────────
-  const auth = await requireAuthenticatedUserWithClaims(req);
+  const auth = await requireGridmasterSession(req);
   if ("response" in auth) return auth.response;
-  const { user, claims } = auth;
+  const { user } = auth;
 
   // ── Rate limit ────────────────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
@@ -48,14 +47,6 @@ export async function POST(req: NextRequest) {
         status: 429,
         headers: { "Retry-After": String(retryAfter) },
       },
-    );
-  }
-
-  // ── Authorization — only gridmaster can trigger impersonation notifications ──
-  if (claims.platform_role !== "gridmaster") {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.GRIDMASTER_ONLY },
-      { status: 403 },
     );
   }
 
@@ -112,14 +103,14 @@ export async function POST(req: NextRequest) {
     // from x-forwarded-for. This is more reliable than client-reported IP.
     if (isStart) {
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-      const serviceRoleKey = getSupabaseSecretKey();
-      if (ip && serviceRoleKey) {
+      if (ip) {
         try {
-          const supabaseAdmin = createClient(requireSupabaseUrl(), serviceRoleKey);
-          await supabaseAdmin
+          await getServiceClient()
             .from("impersonation_sessions")
             .update({ ip_address: ip })
-            .eq("session_id", parsed.data.sessionId);
+            .eq("session_id", parsed.data.sessionId)
+            .eq("gridmaster_id", user.id)
+            .eq("auth_session_id", auth.sessionId);
         } catch {
           // Best-effort — IP capture failure should not break the notification flow
         }

@@ -9,6 +9,7 @@ const serviceFrom = vi.fn();
 const auditInsert = vi.fn();
 const profileSnapshot = vi.fn();
 const dispatchNotificationEvent = vi.fn();
+const revokeAllUserSessions = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({
@@ -38,6 +39,10 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
+vi.mock("@/lib/auth/revocation", () => ({
+  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+}));
+
 import { POST } from "./route";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -59,6 +64,7 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     requestRpc.mockResolvedValue({ error: null });
     auditInsert.mockResolvedValue({ error: null });
     dispatchNotificationEvent.mockResolvedValue({ success: true });
+    revokeAllUserSessions.mockResolvedValue(undefined);
     profileSnapshot.mockResolvedValue({
       data: { org_id: "target-org-id" },
     });
@@ -130,6 +136,7 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     expect(requestRpc).toHaveBeenCalledWith("force_logout_user", {
       p_target_user_id: USER_ID,
     });
+    expect(revokeAllUserSessions).toHaveBeenCalledWith(USER_ID);
     expect(serviceRpc).not.toHaveBeenCalled();
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -3,7 +3,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { createElement } from "react";
 import { render } from "@react-email/components";
-import { getServiceClient } from "@/lib/supabase-service";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
 import { TrialWelcomeEmail } from "@/emails/TrialWelcomeEmail";
 import { sendResendEmail } from "@/lib/resend";
@@ -49,13 +49,24 @@ export async function GET(req: NextRequest) {
 
   const empty: TrialWelcomeState = { shouldShowWelcome: false, trialEndsAt: null };
 
-  // Only org super admins get the trial welcome. Gridmasters have no org trial.
-  if (claims.org_role !== "super_admin" || !claims.org_id) {
+  if (typeof claims.org_id !== "string") {
     return NextResponse.json(empty);
   }
 
-  const orgId = String(claims.org_id);
-  const service = getServiceClient();
+  const orgAuth = await requireOrgPermissions(
+    req,
+    claims.org_id,
+    (permissions) => permissions.isSuperAdmin,
+    {
+      actor: user,
+      allowDuringSetup: true,
+      allowLockedOrganization: true,
+    },
+  );
+  if ("response" in orgAuth) return orgAuth.response;
+
+  const orgId = orgAuth.orgId;
+  const service = orgAuth.serviceClient;
 
   const { data: org, error } = await service
     .from("organizations")
@@ -149,20 +160,32 @@ export async function POST(req: NextRequest) {
 
   const auth = await requireAuthenticatedUserWithClaims(req);
   if ("response" in auth) return auth.response;
-  const { claims } = auth;
+  const { claims, user } = auth;
 
-  if (claims.org_role !== "super_admin" || !claims.org_id) {
+  if (typeof claims.org_id !== "string") {
     return NextResponse.json(
       { success: false, error: API_ERRORS.SUPER_ADMIN_ONLY },
       { status: 403 },
     );
   }
 
-  const service = getServiceClient();
+  const orgAuth = await requireOrgPermissions(
+    req,
+    claims.org_id,
+    (permissions) => permissions.isSuperAdmin,
+    {
+      actor: user,
+      allowDuringSetup: true,
+      allowLockedOrganization: true,
+    },
+  );
+  if ("response" in orgAuth) return orgAuth.response;
+
+  const service = orgAuth.serviceClient;
   const { error } = await service
     .from("organizations")
     .update({ trial_welcome_seen_at: new Date().toISOString() })
-    .eq("id", String(claims.org_id))
+    .eq("id", orgAuth.orgId)
     .is("trial_welcome_seen_at", null);
 
   if (error) {

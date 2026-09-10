@@ -311,8 +311,15 @@ export async function resolveEffectiveOrgId(
   const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (!sandboxCookieValue) return requestedOrgId;
   const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
-  if (!sb || sb.userId !== userId || sb.sandboxOrgId === requestedOrgId) {
-    return requestedOrgId;
+  const auth = await requireAuthenticatedUser(req);
+  if (
+    !sb ||
+    "response" in auth ||
+    auth.user.id !== userId ||
+    sb.userId !== userId ||
+    sb.sessionId !== auth.sessionId
+  ) {
+    throw new Error("Invalid Test Sandbox session state");
   }
   const svc = getServiceClient();
   const { data: ownedSandbox } = await svc
@@ -321,9 +328,10 @@ export async function resolveEffectiveOrgId(
     .eq("id", sb.sandboxOrgId)
     .eq("workspace_kind", "sandbox")
     .eq("sandbox_owner_user_id", userId)
+    .eq("sandbox_owner_session_id", auth.sessionId)
     .is("archived_at", null)
     .maybeSingle();
-  if (!ownedSandbox) return requestedOrgId;
+  if (!ownedSandbox) throw new Error("Invalid Test Sandbox ownership state");
   const { data: profile } = await svc
     .from("profiles")
     .select("platform_role")
@@ -339,7 +347,9 @@ export async function requireOrgPermissions(
   isAllowed: (permissions: PermissionContext) => boolean,
   options?: OrgPermissionOptions,
 ): Promise<AuthorizedOrgRequest | { response: NextResponse }> {
-  const auth = options?.actor ? { user: options.actor } : await requireAuthenticatedUser(req);
+  let auth = options?.actor
+    ? { user: options.actor, sessionId: null as string | null }
+    : await requireAuthenticatedUser(req);
   if ("response" in auth) {
     return { response: auth.response };
   }
@@ -376,25 +386,36 @@ export async function requireOrgPermissions(
     : req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
-    if (sb && sb.userId === auth.user.id && sb.sandboxOrgId !== orgId) {
-      const { data: ownedSandbox } = await serviceClient
-        .from("organizations")
-        .select("id")
-        .eq("id", sb.sandboxOrgId)
-        .eq("workspace_kind", "sandbox")
-        .eq("sandbox_owner_user_id", auth.user.id)
-        .is("archived_at", null)
-        .maybeSingle();
-      if (ownedSandbox) {
-        const { data: profile } = await serviceClient
-          .from("profiles")
-          .select("platform_role")
-          .eq("id", auth.user.id)
-          .maybeSingle();
-        if (profile?.platform_role !== "gridmaster") {
-          orgId = ownedSandbox.id;
-        }
+    if (auth.sessionId == null) {
+      const sessionAuth = await requireAuthenticatedUser(req);
+      if ("response" in sessionAuth || sessionAuth.user.id !== auth.user.id) {
+        return { response: forbiddenResponse() };
       }
+      auth = sessionAuth;
+    }
+    if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
+      return { response: forbiddenResponse() };
+    }
+    const { data: ownedSandbox } = await serviceClient
+      .from("organizations")
+      .select("id")
+      .eq("id", sb.sandboxOrgId)
+      .eq("workspace_kind", "sandbox")
+      .eq("sandbox_owner_user_id", auth.user.id)
+      .eq("sandbox_owner_session_id", auth.sessionId)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (ownedSandbox) {
+      const { data: profile } = await serviceClient
+        .from("profiles")
+        .select("platform_role")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      if (profile?.platform_role !== "gridmaster") {
+        orgId = ownedSandbox.id;
+      }
+    } else {
+      return { response: forbiddenResponse() };
     }
   }
 

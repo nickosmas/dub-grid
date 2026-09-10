@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileOrgStatusResponseSchema } from "@dubgrid/contracts";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import {
   fetchMobileOrganizationMembershipRows,
   fetchMobileOrganizationRowById,
+  fetchMobileProfilePlatformRole,
 } from "@dubgrid/data-access";
 import { extractMobileBearerToken } from "@dubgrid/mobile-api-core";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -39,6 +41,14 @@ export async function GET(req: NextRequest) {
   }
 
   const serviceClient = getServiceClient();
+  const platformRole = await fetchMobileProfilePlatformRole(serviceClient, verified.userId);
+  if (platformRole === "gridmaster") {
+    return NextResponse.json(
+      { error: "Gridmaster mobile access is not supported" },
+      { status: 403 },
+    );
+  }
+
   const membershipRows = await fetchMobileOrganizationMembershipRows(
     serviceClient,
     verified.userId,
@@ -51,16 +61,31 @@ export async function GET(req: NextRequest) {
     typeof verified.claims.org_id === "string" && verified.claims.org_id
       ? verified.claims.org_id
       : null;
-  const currentOrgId = claimOrgId ?? membershipRows[0]!.organization.id;
-  const currentMembership =
-    membershipRows.find((membership) => membership.organization.id === currentOrgId) ??
-    membershipRows[0]!;
+  if (!claimOrgId) {
+    return NextResponse.json(
+      { error: "Your session is not tied to an organization. Sign in again to pick one." },
+      { status: 403 },
+    );
+  }
 
-  const orgRow = await fetchMobileOrganizationRowById(serviceClient, currentOrgId);
+  const currentMembership = membershipRows.find(
+    (membership) => membership.organization.id === claimOrgId,
+  );
+  if (!currentMembership) {
+    return NextResponse.json(
+      { error: "Organization context does not match this user" },
+      { status: 403 },
+    );
+  }
+
+  const orgRow = await fetchMobileOrganizationRowById(serviceClient, claimOrgId);
   if (!orgRow) {
     return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   }
   const org = rowToOrganization(orgRow);
+  if (org.archivedAt) {
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+  }
 
   const billingAccess = evaluateOrganizationBillingAccess({
     suspendedAt: org.suspendedAt,
@@ -69,8 +94,7 @@ export async function GET(req: NextRequest) {
   });
 
   const orgRole = currentMembership.org_role ?? "user";
-  const canViewAccessDetails =
-    orgRole === "super_admin" || verified.claims.platform_role === "gridmaster";
+  const canViewAccessDetails = orgRole === "super_admin";
   const available =
     !billingAccess.isLocked && (billingAccess.state !== "trial_pending" || canViewAccessDetails);
 

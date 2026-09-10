@@ -30,6 +30,7 @@ vi.mock("@/features/test-sandbox/server", () => ({
 
 const USER_ID = "user-1";
 const SOURCE_ORG = "11111111-1111-1111-1111-111111111111";
+const AUTH_SESSION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 /**
  * Service client stub: profiles returns the default org (+ platform_role);
@@ -93,6 +94,7 @@ beforeEach(() => {
   validateCsrfOrigin.mockReturnValue(null);
   requireAuthenticatedUserWithClaims.mockResolvedValue({
     user: { id: USER_ID },
+    sessionId: AUTH_SESSION_ID,
     claims: { org_id: SOURCE_ORG },
   });
   checkRateLimit.mockResolvedValue({ limited: false, reset: 0, misconfigured: false });
@@ -120,7 +122,7 @@ describe("POST /api/test-sandbox", () => {
 
     expect(res.status).toBe(200);
     expect(createSandboxForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceOrgId: SOURCE_ORG }),
+      expect.objectContaining({ sourceOrgId: SOURCE_ORG, sessionId: AUTH_SESSION_ID }),
     );
     expect(res.cookies.get("dubgrid-sandbox")?.value).toBeTruthy();
   });
@@ -145,16 +147,19 @@ describe("POST /api/test-sandbox", () => {
     );
   });
 
-  // The one case where the profile default is still the right source: on reset
-  // a sandbox cookie already exists, so the auth layer has rewritten
-  // claims.org_id to the sandbox itself and it can no longer name the source.
-  it("falls back to the profile default on reset, where the claim names the sandbox", async () => {
+  it("uses the current session's recorded sandbox source on reset", async () => {
     const REAL_ORG = "33333333-3333-3333-3333-333333333333";
     requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: USER_ID },
+      sessionId: AUTH_SESSION_ID,
       claims: { org_id: "sandbox-1", org_role: "super_admin", in_sandbox: true },
     });
     getServiceClient.mockReturnValue(buildServiceClient({ role: "admin", profileOrgId: REAL_ORG }));
+    findActiveSandboxForUser.mockResolvedValue({
+      id: "sandbox-1",
+      slug: "sandbox-abc",
+      sourceOrgId: REAL_ORG,
+    });
 
     const { POST } = await import("./route");
     const res = await POST(makeRequest("reset", { sandboxCookie: true }));
@@ -181,9 +186,15 @@ describe("POST /api/test-sandbox", () => {
     // the sandbox-mode gate, or a demoted user could keep resetting forever.
     requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: USER_ID },
+      sessionId: AUTH_SESSION_ID,
       claims: { org_id: "sandbox-1", org_role: "super_admin", in_sandbox: true },
     });
     getServiceClient.mockReturnValue(buildServiceClient({ role: "user" }));
+    findActiveSandboxForUser.mockResolvedValue({
+      id: "sandbox-1",
+      slug: "sandbox-abc",
+      sourceOrgId: SOURCE_ORG,
+    });
 
     const { POST } = await import("./route");
     const res = await POST(makeRequest("reset"));
@@ -239,7 +250,11 @@ describe("POST /api/test-sandbox", () => {
 
   it("reuses an existing sandbox on enter instead of cloning again", async () => {
     getServiceClient.mockReturnValue(buildServiceClient({ role: "admin" }));
-    findActiveSandboxForUser.mockResolvedValue({ id: "existing-sandbox", slug: "existing-slug" });
+    findActiveSandboxForUser.mockResolvedValue({
+      id: "existing-sandbox",
+      slug: "existing-slug",
+      sourceOrgId: SOURCE_ORG,
+    });
 
     const { POST } = await import("./route");
     const res = await POST(makeRequest("enter"));
@@ -253,7 +268,11 @@ describe("POST /api/test-sandbox", () => {
   it("reset wipes any existing sandbox and clones a fresh one, ignoring reuse", async () => {
     getServiceClient.mockReturnValue(buildServiceClient({ role: "admin" }));
     // Even though a reusable sandbox exists, "reset" must not reuse it.
-    findActiveSandboxForUser.mockResolvedValue({ id: "stale-sandbox", slug: "stale-slug" });
+    findActiveSandboxForUser.mockResolvedValue({
+      id: "stale-sandbox",
+      slug: "stale-slug",
+      sourceOrgId: SOURCE_ORG,
+    });
 
     const { POST } = await import("./route");
     const res = await POST(makeRequest("reset"));

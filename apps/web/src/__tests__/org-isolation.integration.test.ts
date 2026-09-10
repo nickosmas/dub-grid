@@ -17,6 +17,8 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const SUPABASE_URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const ANON_KEY =
@@ -32,6 +34,22 @@ const DB_CONFIG = {
   connectionString: DB_URL,
   ssl: DB_URL.includes("supabase.co") ? { rejectUnauthorized: false } : false,
 } as const;
+
+function authenticatedSecurityDefinerAllowlist(): string[] {
+  const rootMigration = resolve(
+    process.cwd(),
+    "supabase/migrations/016_harden_authorization_boundaries.sql",
+  );
+  const migrationPath = existsSync(rootMigration)
+    ? rootMigration
+    : resolve(process.cwd(), "../../supabase/migrations/016_harden_authorization_boundaries.sql");
+  const migration = readFileSync(migrationPath, "utf8");
+  const block = migration.match(
+    /authenticated_entry_points CONSTANT TEXT\[\] := ARRAY\[([\s\S]*?)\n\s*\];/,
+  )?.[1];
+  if (!block) throw new Error("Missing authenticated SQL entry-point inventory");
+  return [...block.matchAll(/'([a-z0-9_]+)'/g)].map((match) => match[1]).sort();
+}
 
 async function probeSupabase(): Promise<boolean> {
   try {
@@ -256,6 +274,66 @@ async function resetJwt(): Promise<void> {
 }
 
 describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
+  it("keeps the live RLS, search_path, and function grants aligned with the inventory", async () => {
+    const { rows: unprotectedTables } = await sqlDb.query<{ table_name: string }>(`
+      SELECT class.relname AS table_name
+      FROM pg_class AS class
+      JOIN pg_namespace AS namespace ON namespace.oid = class.relnamespace
+      WHERE namespace.nspname = 'public'
+        AND class.relkind = 'r'
+        AND NOT class.relrowsecurity
+      ORDER BY class.relname
+    `);
+    expect(unprotectedTables).toEqual([]);
+
+    const { rows: policylessTables } = await sqlDb.query<{ table_name: string }>(`
+      SELECT class.relname AS table_name
+      FROM pg_class AS class
+      JOIN pg_namespace AS namespace ON namespace.oid = class.relnamespace
+      LEFT JOIN pg_policy AS policy ON policy.polrelid = class.oid
+      WHERE namespace.nspname = 'public'
+        AND class.relkind = 'r'
+      GROUP BY class.relname
+      HAVING COUNT(policy.polname) = 0
+      ORDER BY class.relname
+    `);
+    expect(policylessTables.map((row) => row.table_name)).toEqual(["calendar_feed_tokens"]);
+
+    const { rows: unsafeSearchPaths } = await sqlDb.query<{ function_name: string }>(`
+      SELECT procedure.oid::regprocedure::text AS function_name
+      FROM pg_proc AS procedure
+      JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'public'
+        AND procedure.prosecdef
+        AND NOT COALESCE(procedure.proconfig, '{}'::TEXT[]) @> ARRAY['search_path=public']
+      ORDER BY function_name
+    `);
+    expect(unsafeSearchPaths).toEqual([]);
+
+    const { rows: anonymousFunctions } = await sqlDb.query<{ function_name: string }>(`
+      SELECT procedure.oid::regprocedure::text AS function_name
+      FROM pg_proc AS procedure
+      JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'public'
+        AND has_function_privilege('anon', procedure.oid, 'EXECUTE')
+      ORDER BY function_name
+    `);
+    expect(anonymousFunctions).toEqual([]);
+
+    const { rows: authenticatedFunctions } = await sqlDb.query<{ function_name: string }>(`
+      SELECT DISTINCT procedure.proname AS function_name
+      FROM pg_proc AS procedure
+      JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = 'public'
+        AND procedure.prosecdef
+        AND has_function_privilege('authenticated', procedure.oid, 'EXECUTE')
+      ORDER BY function_name
+    `);
+    expect(authenticatedFunctions.map((row) => row.function_name)).toEqual(
+      authenticatedSecurityDefinerAllowlist(),
+    );
+  });
+
   // This test used to assert the opposite — that a claim-less JWT falls back to
   // profiles.org_id — and that fallback was a cross-tenant read leak, not a
   // feature. The access-token hook strips org_id precisely when the membership
@@ -359,6 +437,116 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
       // Must match the JWT, not the row. Before the fix this returned
       // otherOrgId — which is exactly what made mobile alerts disappear.
       expect(rows[0].cid).toBe(profileOrgId);
+    } finally {
+      await sqlDb.query("ROLLBACK");
+      await resetJwt();
+    }
+  });
+
+  it("denies direct reads and writes after the JWT session row is revoked", async () => {
+    const { userId, profileOrgId, otherOrgId } = await pickSqlFixture();
+    if (!otherOrgId) return;
+
+    const sessionId = "c86048a9-a369-49dd-9db7-e1b81edba078";
+    await sqlDb.query("BEGIN");
+    try {
+      await sqlDb.query(
+        `INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (supabase_session_id) DO UPDATE
+           SET user_id = EXCLUDED.user_id, active_org_id = EXCLUDED.active_org_id`,
+        [userId, sessionId, profileOrgId],
+      );
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        session_id: sessionId,
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+
+      const before = await sqlDb.query<{ org_id: string | null }>(
+        `SELECT public.caller_org_id()::text AS org_id`,
+      );
+      expect(before.rows[0].org_id).toBe(profileOrgId);
+
+      await sqlDb.query("RESET ROLE");
+      await sqlDb.query(`DELETE FROM public.user_sessions WHERE supabase_session_id = $1`, [
+        sessionId,
+      ]);
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        session_id: sessionId,
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+
+      const after = await sqlDb.query<{ org_id: string | null }>(
+        `SELECT public.caller_org_id()::text AS org_id`,
+      );
+      expect(after.rows[0].org_id).toBeNull();
+
+      const crossTenantRead = await sqlDb.query(
+        `SELECT id FROM public.employees WHERE org_id = $1`,
+        [otherOrgId],
+      );
+      expect(crossTenantRead.rowCount).toBe(0);
+
+      const crossTenantWrite = await sqlDb.query(
+        `UPDATE public.employees SET first_name = first_name WHERE org_id = $1`,
+        [otherOrgId],
+      );
+      expect(crossTenantWrite.rowCount).toBe(0);
+    } finally {
+      await sqlDb.query("ROLLBACK");
+      await resetJwt();
+    }
+  });
+
+  it("denies direct tenant access when the account or organization is unavailable", async () => {
+    const { userId, profileOrgId } = await pickSqlFixture();
+    await sqlDb.query("BEGIN");
+    try {
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+
+      await sqlDb.query("RESET ROLE");
+      await sqlDb.query(`UPDATE public.organizations SET suspended_at = NOW() WHERE id = $1`, [
+        profileOrgId,
+      ]);
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+      const suspended = await sqlDb.query<{ org_id: string | null }>(
+        `SELECT public.caller_org_id()::text AS org_id`,
+      );
+      expect(suspended.rows[0].org_id).toBeNull();
+
+      await sqlDb.query("RESET ROLE");
+      await sqlDb.query(`UPDATE public.organizations SET suspended_at = NULL WHERE id = $1`, [
+        profileOrgId,
+      ]);
+      await sqlDb.query(`UPDATE public.profiles SET deactivated_at = NOW() WHERE id = $1`, [
+        userId,
+      ]);
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+      const deactivated = await sqlDb.query<{ org_id: string | null }>(
+        `SELECT public.caller_org_id()::text AS org_id`,
+      );
+      expect(deactivated.rows[0].org_id).toBeNull();
     } finally {
       await sqlDb.query("ROLLBACK");
       await resetJwt();

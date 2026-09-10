@@ -4,6 +4,7 @@ const verifyAccessToken = vi.fn();
 const isSessionRevoked = vi.fn();
 const fetchMobileOrganizationMembershipRows = vi.fn();
 const fetchMobileOrganizationRowById = vi.fn();
+const fetchMobileProfilePlatformRole = vi.fn();
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({}),
@@ -23,6 +24,7 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileOrganizationMembershipRows: (...args: unknown[]) =>
     fetchMobileOrganizationMembershipRows(...args),
   fetchMobileOrganizationRowById: (...args: unknown[]) => fetchMobileOrganizationRowById(...args),
+  fetchMobileProfilePlatformRole: (...args: unknown[]) => fetchMobileProfilePlatformRole(...args),
 }));
 
 function makeRequest(authHeader: string | null) {
@@ -73,6 +75,7 @@ describe("GET mobile org-status route", () => {
       claims: { sub: "user-1", org_id: "org-1" },
     });
     isSessionRevoked.mockResolvedValue(false);
+    fetchMobileProfilePlatformRole.mockResolvedValue("none");
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
       {
         organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
@@ -102,6 +105,56 @@ describe("GET mobile org-status route", () => {
     const { GET } = await import("./org-status");
     const response = await GET(makeRequest("Bearer token-123"));
     expect(response.status).toBe(401);
+  });
+
+  it("rejects a missing organization claim instead of choosing another membership", async () => {
+    verifyAccessToken.mockResolvedValue({
+      userId: "user-1",
+      sessionId: "session-1",
+      email: "user@example.com",
+      issuedAtMs: Date.now(),
+      claims: { sub: "user-1" },
+    });
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+
+    expect(response.status).toBe(403);
+    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale cross-organization claim instead of falling back to another membership", async () => {
+    verifyAccessToken.mockResolvedValue({
+      userId: "user-1",
+      sessionId: "session-1",
+      email: "user@example.com",
+      issuedAtMs: Date.now(),
+      claims: { sub: "user-1", org_id: "other-org" },
+    });
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Organization context does not match this user",
+    });
+    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+  });
+
+  it("rejects an archived organization", async () => {
+    fetchMobileOrganizationRowById.mockResolvedValue({
+      ...ORG_ROW,
+      archived_at: "2026-09-10T00:00:00.000Z",
+    });
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "We're having trouble completing that right now. Try again in a moment.",
+    });
   });
 
   it("redacts a pending trial from a regular user", async () => {
@@ -208,22 +261,23 @@ describe("GET mobile org-status route", () => {
     expect(body.orgRole).toBe("super_admin");
   });
 
-  it("preserves access detail for a Gridmaster", async () => {
+  it("rejects live Gridmaster accounts even when the token claim is stale", async () => {
     verifyAccessToken.mockResolvedValue({
       userId: "gridmaster-1",
       sessionId: "session-1",
       email: "gridmaster@example.com",
       issuedAtMs: Date.now(),
-      claims: { sub: "gridmaster-1", org_id: "org-1", platform_role: "gridmaster" },
+      claims: { sub: "gridmaster-1", org_id: "org-1", platform_role: "none" },
     });
-    fetchMobileOrganizationRowById.mockResolvedValue({
-      ...ORG_ROW,
-      subscription_status: "canceled",
-    });
+    fetchMobileProfilePlatformRole.mockResolvedValue("gridmaster");
 
     const { GET } = await import("./org-status");
-    const body = await (await GET(makeRequest("Bearer token-123"))).json();
+    const response = await GET(makeRequest("Bearer token-123"));
 
-    expect(body.state).toBe("locked");
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Gridmaster mobile access is not supported",
+    });
+    expect(fetchMobileOrganizationMembershipRows).not.toHaveBeenCalled();
   });
 });

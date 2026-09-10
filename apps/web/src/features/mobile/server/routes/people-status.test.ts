@@ -64,6 +64,42 @@ describe("mobile people status route", () => {
     });
   });
 
+  it("does not update a person ID that is outside the authenticated organization", async () => {
+    const selectSingle = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
+    const update = vi.fn();
+    const serviceClient = {
+      from: vi.fn(() => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({ single: selectSingle }),
+          }),
+        }),
+        update,
+      })),
+    };
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "org-1" },
+      permissions: { canManageEmployees: true },
+      serviceClient,
+      user: { id: "user-1", email: "manager@dubgrid.com" },
+    });
+
+    const { PATCH } = await import("./people-status");
+    const response = await PATCH(
+      {
+        headers: new Headers(),
+        json: async () => ({ action: "deactivate", expectedVersion: 7 }),
+      } as never,
+      {
+        params: Promise.resolve({ id: "00000000-0000-0000-0000-000000000099" }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Employee not found" });
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("updates employee status for authorized mobile managers", async () => {
     const selectSingle = vi.fn().mockResolvedValueOnce({ data: createEmployeeRow(), error: null });
     const updateMaybeSingle = vi.fn().mockResolvedValue({

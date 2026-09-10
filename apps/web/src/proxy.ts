@@ -106,6 +106,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
  * These are top-level claims injected by the custom_access_token_hook.
  */
 interface JWTClaims {
+  session_id?: string;
   platform_role?: string;
   org_role?: string;
   org_id?: string;
@@ -278,6 +279,7 @@ export async function proxy(req: NextRequest) {
   // enforced by Supabase RLS, not edge middleware. However, we never trust
   // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
+  let claimsVerified = false;
   try {
     const jwks = getSupabaseJwks();
     if (jwks) {
@@ -285,6 +287,7 @@ export async function proxy(req: NextRequest) {
         jwtVerify(session.access_token, jwks),
       );
       claims = payload as JWTClaims;
+      claimsVerified = true;
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
@@ -304,6 +307,12 @@ export async function proxy(req: NextRequest) {
       Sentry.captureException(e, { extra: { context: "middleware-jwt-decode-fallback" } });
       return NextResponse.redirect(new URL("/login", req.url));
     }
+  }
+
+  if (claims.platform_role === "gridmaster" && !claimsVerified) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("error", "session_invalid");
+    return NextResponse.redirect(loginUrl);
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
@@ -433,7 +442,10 @@ export async function proxy(req: NextRequest) {
           const supabaseUrl3 = getSupabaseUrl();
           const serviceKey3 = getSupabaseSecretKey();
           const verified =
-            typeof impData.sessionId === "string" && supabaseUrl3 && serviceKey3
+            typeof impData.sessionId === "string" &&
+            typeof claims.session_id === "string" &&
+            supabaseUrl3 &&
+            serviceKey3
               ? await timer.time("mw_impersonation_verify", () =>
                   verifyImpersonationSession(
                     createClient(supabaseUrl3, serviceKey3, {
@@ -441,6 +453,7 @@ export async function proxy(req: NextRequest) {
                     }),
                     impData.sessionId,
                     session.user.id,
+                    claims.session_id as string,
                   ),
                 )
               : null;
@@ -454,10 +467,10 @@ export async function proxy(req: NextRequest) {
             claims = {
               ...claims,
               org_id: verified.targetOrgId,
-              org_slug: impData.targetOrgSlug,
-              org_role: impData.targetOrgRole,
+              org_slug: verified.targetOrgSlug,
+              org_role: verified.targetOrgRole,
             };
-            effectiveRole = impData.targetOrgRole ?? "user";
+            effectiveRole = verified.targetOrgRole;
           } else {
             // No matching active session — the cookie doesn't correspond to
             // a real, still-active impersonation. Clear it rather than
@@ -487,7 +500,10 @@ export async function proxy(req: NextRequest) {
   if (!isImpersonating && session?.user?.id) {
     const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
     if (sandboxCookie) {
-      if (sandboxCookie.userId !== session?.user?.id) {
+      if (
+        sandboxCookie.userId !== session?.user?.id ||
+        sandboxCookie.sessionId !== claims.session_id
+      ) {
         // Cookie was set for a different user — clear it.
         res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
       } else {
@@ -505,6 +521,7 @@ export async function proxy(req: NextRequest) {
                 .eq("id", sandboxCookie.sandboxOrgId)
                 .eq("workspace_kind", "sandbox")
                 .eq("sandbox_owner_user_id", session?.user?.id)
+                .eq("sandbox_owner_session_id", claims.session_id)
                 .is("archived_at", null)
                 .maybeSingle(),
             );

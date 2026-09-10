@@ -29,6 +29,18 @@ import { CacheKey, TTL } from "@/lib/cache";
 import { GET } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
+let currentOrgRow: OrgRow | null = null;
+let currentOrgError: unknown = null;
+let currentMembership: { org_role: string } | null = { org_role: "user" };
+let currentProfile: {
+  platform_role: string;
+  deactivated_at: string | null;
+  scheduled_deletion_at: string | null;
+} | null = {
+  platform_role: "none",
+  deactivated_at: null,
+  scheduled_deletion_at: null,
+};
 
 type OrgRow = {
   suspended_at: string | null;
@@ -61,13 +73,7 @@ function orgRow(overrides: Partial<OrgRow> = {}): OrgRow {
 }
 
 function respondWith(row: OrgRow | null) {
-  const query = {
-    select: vi.fn(() => query),
-    eq: vi.fn(() => query),
-    maybeSingle: vi.fn(() => Promise.resolve({ data: row, error: null })),
-  };
-  serviceFrom.mockReturnValue(query);
-  return query;
+  currentOrgRow = row;
 }
 
 function request() {
@@ -79,6 +85,33 @@ describe("GET /api/organization/access-status", () => {
     vi.clearAllMocks();
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth());
     cacheSet.mockResolvedValue(undefined);
+    currentOrgRow = null;
+    currentOrgError = null;
+    currentMembership = { org_role: "user" };
+    currentProfile = {
+      platform_role: "none",
+      deactivated_at: null,
+      scheduled_deletion_at: null,
+    };
+    serviceFrom.mockImplementation((table: string) => {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        is: vi.fn(() => query),
+        maybeSingle: vi.fn(() =>
+          Promise.resolve({
+            data:
+              table === "organization_memberships"
+                ? currentMembership
+                : table === "profiles"
+                  ? currentProfile
+                  : currentOrgRow,
+            error: table === "organizations" ? currentOrgError : null,
+          }),
+        ),
+      };
+      return query;
+    });
   });
 
   it("returns the caller's auth failure untouched", async () => {
@@ -119,6 +152,7 @@ describe("GET /api/organization/access-status", () => {
 
   it("lets a super admin through the same unstarted trial", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = { org_role: "super_admin" };
     respondWith(orgRow());
 
     expect(await (await GET(request())).json()).toEqual({
@@ -185,10 +219,17 @@ describe("GET /api/organization/access-status", () => {
 
   it("preserves recovery detail for Super Admins and Gridmasters", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = { org_role: "super_admin" };
     respondWith(orgRow({ subscription_status: "canceled" }));
     expect(await (await GET(request())).json()).toEqual({ available: false, state: "locked" });
 
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth("user", "gridmaster"));
+    currentMembership = null;
+    currentProfile = {
+      platform_role: "gridmaster",
+      deactivated_at: null,
+      scheduled_deletion_at: null,
+    };
     respondWith(orgRow({ archived_at: "2026-01-01T00:00:00.000Z" }));
     expect(await (await GET(request())).json()).toEqual({
       available: false,
@@ -197,19 +238,24 @@ describe("GET /api/organization/access-status", () => {
   });
 
   it("never claims the organization is open when the lookup fails", async () => {
-    const query = {
-      select: vi.fn(() => query),
-      eq: vi.fn(() => query),
-      maybeSingle: vi.fn(() =>
-        Promise.resolve({ data: null, error: new Error("database unavailable") }),
-      ),
-    };
-    serviceFrom.mockReturnValue(query);
+    currentOrgError = new Error("database unavailable");
 
     expect(await (await GET(request())).json()).toEqual({
       available: false,
       state: "unavailable",
     });
+  });
+
+  it("returns no organization state after the caller's membership is removed", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = null;
+    respondWith(orgRow({ subscription_status: "active" }));
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 
   it("skips the gate for a caller with no organization claim", async () => {

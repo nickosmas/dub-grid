@@ -316,7 +316,7 @@ export async function resolveMobileAuthContext<
   TOrganizationRow,
   TOrganization extends Pick<
     Organization,
-    "id" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
+    "id" | "archivedAt" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
   > = Organization,
 >(input: {
   accessToken: string;
@@ -400,7 +400,8 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 
-  if (claims.platform_role === "gridmaster") {
+  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
+  if (platformRole === "gridmaster") {
     throw new MobileApiRequestError(403, "Gridmaster mobile access is not supported");
   }
 
@@ -438,10 +439,12 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(404, "Organization not found");
   }
 
-  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
   const adminPermissions = currentMembership.admin_permissions ?? null;
   const orgRole = currentMembership.org_role ?? "user";
   const currentOrg = input.mapOrganization(currentOrgRow);
+  if (currentOrg.archivedAt) {
+    throw new MobileApiRequestError(403, "Organization unavailable. Please try again later.");
+  }
   const billingAccess = evaluateOrganizationBillingAccess({
     suspendedAt: currentOrg.suspendedAt,
     subscriptionStatus: currentOrg.subscriptionStatus,

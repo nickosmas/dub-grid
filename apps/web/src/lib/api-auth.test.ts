@@ -76,6 +76,7 @@ import { resetSupabaseJwksCache } from "./auth/verify-token";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
+const SANDBOX_ORG_ID = "33333333-3333-4333-8333-333333333333";
 
 let privateKey: CryptoKey;
 let wrongPrivateKey: CryptoKey;
@@ -84,7 +85,7 @@ interface TokenOptions {
   issuer?: string;
   audience?: string;
   expiresIn?: number;
-  issuedAt?: number;
+  issuedAt?: number | null;
   sessionId?: string | null;
   claims?: Record<string, unknown>;
   signWithWrongKey?: boolean;
@@ -92,7 +93,7 @@ interface TokenOptions {
 
 async function signToken(options: TokenOptions = {}): Promise<string> {
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const issuedAt = options.issuedAt ?? nowSeconds;
+  const issuedAt = options.issuedAt === undefined ? nowSeconds : options.issuedAt;
   const payload: Record<string, unknown> = {
     sub: USER_ID,
     email: "user@example.com",
@@ -102,13 +103,13 @@ async function signToken(options: TokenOptions = {}): Promise<string> {
     ...options.claims,
   };
 
-  return new SignJWT(payload)
+  let token = new SignJWT(payload)
     .setProtectedHeader({ alg: "ES256" })
     .setIssuer(options.issuer ?? `${SUPABASE_URL}/auth/v1`)
-    .setAudience(options.audience ?? "authenticated")
-    .setIssuedAt(issuedAt)
-    .setExpirationTime(issuedAt + (options.expiresIn ?? 3600))
-    .sign(options.signWithWrongKey ? wrongPrivateKey : privateKey);
+    .setAudience(options.audience ?? "authenticated");
+  if (issuedAt !== null) token = token.setIssuedAt(issuedAt);
+  token = token.setExpirationTime((issuedAt ?? nowSeconds) + (options.expiresIn ?? 3600));
+  return token.sign(options.signWithWrongKey ? wrongPrivateKey : privateKey);
 }
 
 function cookieRequest() {
@@ -123,7 +124,7 @@ function bearerRequest(token: string) {
 
 function sandboxBearerRequest(token: string) {
   const sandboxCookie = encodeURIComponent(
-    JSON.stringify({ sandboxOrgId: "sandbox-org", userId: USER_ID }),
+    JSON.stringify({ sandboxOrgId: SANDBOX_ORG_ID, userId: USER_ID, sessionId: SESSION_ID }),
   );
   return new NextRequest("http://localhost/api/test", {
     headers: {
@@ -173,35 +174,40 @@ describe("api auth helpers", () => {
   });
 
   describe("token verification", () => {
-    it("rejects a malformed token", async () => {
-      const result = await requireAuthenticatedSession(bearerRequest("not-a-jwt"));
-      expect("response" in result && result.response.status).toBe(401);
-    });
+    it.each([
+      ["a malformed token", async () => "not-a-jwt"],
+      ["a token signed by the wrong key", () => signToken({ signWithWrongKey: true })],
+      [
+        "an expired token",
+        () =>
+          signToken({
+            issuedAt: Math.floor(Date.now() / 1000) - 7200,
+            expiresIn: 3600,
+          }),
+      ],
+      [
+        "a token from the wrong issuer",
+        () => signToken({ issuer: "https://evil.example.com/auth/v1" }),
+      ],
+      ["a token with the wrong audience", () => signToken({ audience: "anon" })],
+      ["a signed token without its subject", () => signToken({ claims: { sub: undefined } })],
+      [
+        "a signed token without its authenticated role",
+        () => signToken({ claims: { role: "anon" } }),
+      ],
+      ["a signed token without its session ID", () => signToken({ sessionId: null })],
+      ["a signed token with an empty session ID", () => signToken({ sessionId: "" })],
+      ["a signed token without its issued-at timestamp", () => signToken({ issuedAt: null })],
+    ] satisfies ReadonlyArray<readonly [string, () => Promise<string>]>)(
+      "rejects %s before consulting revocation state",
+      async (_case, createToken) => {
+        const token = await createToken();
+        const result = await requireAuthenticatedSession(bearerRequest(token));
 
-    it("rejects a token signed by the wrong key, with no unverified fallback", async () => {
-      const token = await signToken({ signWithWrongKey: true });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects an expired token", async () => {
-      const twoHoursAgo = Math.floor(Date.now() / 1000) - 7200;
-      const token = await signToken({ issuedAt: twoHoursAgo, expiresIn: 3600 });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects a token from the wrong issuer", async () => {
-      const token = await signToken({ issuer: "https://evil.example.com/auth/v1" });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects a token with the wrong audience", async () => {
-      const token = await signToken({ audience: "anon" });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
+        expect("response" in result && result.response.status).toBe(401);
+        expect(cacheMocks.cacheGetMany).not.toHaveBeenCalled();
+      },
+    );
 
     it("accepts a valid token and resolves the user from its claims", async () => {
       const token = await signToken();
@@ -241,6 +247,41 @@ describe("api auth helpers", () => {
     it("rejects a request carrying no token at all", async () => {
       authMocks.getSession.mockResolvedValue({ data: { session: null } });
       const result = await requireAuthenticatedUser(cookieRequest());
+      expect("response" in result && result.response.status).toBe(401);
+    });
+
+    it("uses an explicit Bearer token instead of a conflicting cookie session", async () => {
+      const cookieUserId = "33333333-3333-4333-8333-333333333333";
+      authMocks.getSession.mockResolvedValue({
+        data: { session: { access_token: await signToken({ claims: { sub: cookieUserId } }) } },
+      });
+      const bearerToken = await signToken();
+
+      const result = await requireAuthenticatedUser(
+        new NextRequest("http://localhost/api/test", {
+          headers: {
+            Authorization: `Bearer ${bearerToken}`,
+            Cookie: "sb-test-auth-token=conflicting-cookie",
+          },
+        }),
+      );
+
+      expect(authMocks.getSession).not.toHaveBeenCalled();
+      expect("response" in result).toBe(false);
+      if (!("response" in result)) expect(result.user.id).toBe(USER_ID);
+    });
+
+    it("does not fall back to a cookie when an explicit Bearer token is invalid", async () => {
+      const result = await requireAuthenticatedUser(
+        new NextRequest("http://localhost/api/test", {
+          headers: {
+            Authorization: "Bearer forged-token",
+            Cookie: "sb-test-auth-token=valid-cookie-session",
+          },
+        }),
+      );
+
+      expect(authMocks.getSession).not.toHaveBeenCalled();
       expect("response" in result && result.response.status).toBe(401);
     });
   });
@@ -337,7 +378,34 @@ describe("api auth helpers", () => {
       }
     });
 
+    it("rejects a Test Sandbox cookie stolen from another auth session", async () => {
+      const token = await signToken({
+        sessionId: "44444444-4444-4444-8444-444444444444",
+        claims: { org_id: "real-org" },
+      });
+
+      const result = await requireAuthenticatedUserWithClaims(sandboxBearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(403);
+      expect(authMocks.serviceFrom).not.toHaveBeenCalled();
+    });
+
     it("allows a gridmaster whose JWT platform_role is gridmaster", async () => {
+      authMocks.serviceFrom.mockReturnValueOnce({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () =>
+              Promise.resolve({
+                data: {
+                  platform_role: "gridmaster",
+                  deactivated_at: null,
+                  scheduled_deletion_at: null,
+                },
+                error: null,
+              }),
+          }),
+        }),
+      });
       const token = await signToken({ claims: { platform_role: "gridmaster" } });
       const result = await requireGridmasterSession(bearerRequest(token));
 
@@ -345,6 +413,13 @@ describe("api auth helpers", () => {
       if (!("response" in result)) {
         expect(result.user.id).toBe(USER_ID);
       }
+    });
+
+    it("rejects a stale gridmaster claim when the live profile no longer has that role", async () => {
+      const token = await signToken({ claims: { platform_role: "gridmaster" } });
+      const result = await requireGridmasterSession(bearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(403);
     });
 
     it("rejects a non-gridmaster from a gridmaster-only route", async () => {

@@ -1,4 +1,5 @@
 import { CacheKey, TTL, cacheGetMany, cacheSet, cacheDel } from "@/lib/cache";
+import { getServiceClient } from "@/lib/supabase-service";
 import { withTimeout } from "@/lib/with-timeout";
 
 /**
@@ -140,6 +141,12 @@ function forgetMemoizedUser(userId: string): void {
 export async function revokeSession(sessionId: string): Promise<void> {
   memo.delete(sessionId);
   await cacheSet(CacheKey.revokedSession(sessionId), Date.now(), TTL.ACCESS_TOKEN);
+
+  const { error } = await getServiceClient()
+    .from("user_sessions")
+    .delete()
+    .eq("supabase_session_id", sessionId);
+  if (error) throw error;
 }
 
 /**
@@ -152,6 +159,9 @@ export async function revokeSession(sessionId: string): Promise<void> {
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   forgetMemoizedUser(userId);
   await cacheSet(CacheKey.revokedAfter(userId), Date.now(), TTL.ACCESS_TOKEN);
+
+  const { error } = await getServiceClient().from("user_sessions").delete().eq("user_id", userId);
+  if (error) throw error;
 }
 
 /**

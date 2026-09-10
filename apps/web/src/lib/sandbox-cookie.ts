@@ -10,7 +10,10 @@ export const SANDBOX_COOKIE_NAME = "dubgrid-sandbox";
 export interface SandboxCookieData {
   sandboxOrgId: string;
   userId: string;
+  sessionId: string;
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Parse the sandbox cookie out of a raw cookie string.
@@ -31,12 +34,21 @@ export function getSandboxFromCookie(cookieString: string): SandboxCookieData | 
       !data ||
       typeof data.sandboxOrgId !== "string" ||
       typeof data.userId !== "string" ||
+      typeof data.sessionId !== "string" ||
       !data.sandboxOrgId ||
-      !data.userId
+      !data.userId ||
+      !data.sessionId ||
+      !UUID_PATTERN.test(data.sandboxOrgId) ||
+      !UUID_PATTERN.test(data.userId) ||
+      !UUID_PATTERN.test(data.sessionId)
     ) {
       return null;
     }
-    return { sandboxOrgId: data.sandboxOrgId, userId: data.userId };
+    return {
+      sandboxOrgId: data.sandboxOrgId,
+      userId: data.userId,
+      sessionId: data.sessionId,
+    };
   } catch {
     return null;
   }

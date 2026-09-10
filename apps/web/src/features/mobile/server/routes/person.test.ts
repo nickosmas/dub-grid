@@ -160,6 +160,27 @@ describe("mobile person route", () => {
     });
   });
 
+  it("does not return a person ID that is outside the authenticated organization", async () => {
+    const auth = makeAuth();
+    requireMobileAuth.mockResolvedValue(auth);
+    fetchMobileEmployeeRowById.mockResolvedValue(null);
+
+    const { GET } = await import("./person");
+    const employeeId = "d660d308-4e0d-4daf-84fd-6753405e6740";
+    const response = await GET(
+      new Request(`http://localhost/api/mobile/v1/people/${employeeId}`) as never,
+      { params: Promise.resolve({ id: employeeId }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Employee not found" });
+    expect(fetchMobileEmployeeRowById).toHaveBeenCalledWith(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      employeeId,
+    );
+  });
+
   it("rejects management profiles for viewers without manage rights", async () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),

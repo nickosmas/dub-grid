@@ -38,12 +38,14 @@ export async function canManageEmployees(
         .select("org_role, admin_permissions")
         .eq("user_id", actorId)
         .eq("org_id", orgId)
+        .is("archived_at", null)
         .maybeSingle(),
       serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
       serviceClient
         .from("organizations")
         .select("suspended_at, subscription_status, trial_ends_at")
         .eq("id", orgId)
+        .is("archived_at", null)
         .maybeSingle(),
       isCallerInactive(serviceClient, actorId, orgId),
     ]);
@@ -51,6 +53,9 @@ export async function canManageEmployees(
   const isGridmaster = profile?.platform_role === "gridmaster";
   const isSuperAdmin = membership?.org_role === "super_admin";
   const isAdmin = membership?.org_role === "admin";
+  if (!organization && !isGridmaster) {
+    return false;
+  }
   const billingAccess = evaluateOrganizationBillingAccess({
     suspendedAt: organization?.suspended_at ?? null,
     subscriptionStatus: organization?.subscription_status ?? null,

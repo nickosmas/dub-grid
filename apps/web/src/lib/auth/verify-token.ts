@@ -36,10 +36,10 @@ export type VerifiedClaims = JWTPayload & {
 export interface VerifiedToken {
   userId: string;
   /** Supabase session id — the unit revocation is keyed on. */
-  sessionId: string | null;
+  sessionId: string;
   email: string | null;
   /** Token issue time in epoch ms, compared against the per-user revocation watermark. */
-  issuedAtMs: number | null;
+  issuedAtMs: number;
   claims: VerifiedClaims;
 }
 
@@ -120,13 +120,22 @@ export async function verifyAccessToken(token: string): Promise<VerifiedToken | 
     });
 
     const claims = payload as VerifiedClaims;
-    if (!claims.sub) return null;
+    if (
+      !claims.sub ||
+      claims.role !== "authenticated" ||
+      typeof claims.session_id !== "string" ||
+      claims.session_id.length === 0 ||
+      typeof claims.iat !== "number" ||
+      !Number.isFinite(claims.iat)
+    ) {
+      return null;
+    }
 
     return {
       userId: claims.sub,
-      sessionId: typeof claims.session_id === "string" ? claims.session_id : null,
+      sessionId: claims.session_id,
       email: typeof claims.email === "string" ? claims.email : null,
-      issuedAtMs: typeof claims.iat === "number" ? claims.iat * 1000 : null,
+      issuedAtMs: claims.iat * 1000,
       claims,
     };
   } catch {

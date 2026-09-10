@@ -33,12 +33,37 @@ export async function GET(req: NextRequest) {
   // No org claim means the proxy skips the gate entirely for this caller.
   if (!orgId) return NextResponse.json({ available: true, state: "active" });
 
-  const canViewAccessDetails =
-    auth.claims.org_role === "super_admin" || auth.claims.platform_role === "gridmaster";
-
   let org: OrgAccessRow;
+  let canViewAccessDetails = false;
   try {
-    const { data, error } = await getServiceClient()
+    const serviceClient = getServiceClient();
+    const [membershipResult, profileResult] = await Promise.all([
+      serviceClient
+        .from("organization_memberships")
+        .select("org_role")
+        .eq("user_id", auth.user.id)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .maybeSingle(),
+      serviceClient
+        .from("profiles")
+        .select("platform_role, deactivated_at, scheduled_deletion_at")
+        .eq("id", auth.user.id)
+        .maybeSingle(),
+    ]);
+    if (membershipResult.error) throw membershipResult.error;
+    if (profileResult.error) throw profileResult.error;
+
+    const liveGridmaster =
+      profileResult.data?.platform_role === "gridmaster" &&
+      profileResult.data.deactivated_at == null &&
+      profileResult.data.scheduled_deletion_at == null;
+    if (!liveGridmaster && !membershipResult.data) {
+      return NextResponse.json({ available: false, state: "unavailable" });
+    }
+    canViewAccessDetails = liveGridmaster || membershipResult.data?.org_role === "super_admin";
+
+    const { data, error } = await serviceClient
       .from("organizations")
       .select("suspended_at, archived_at, subscription_status, trial_ends_at")
       .eq("id", orgId)

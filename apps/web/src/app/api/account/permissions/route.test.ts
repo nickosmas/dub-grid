@@ -70,6 +70,7 @@ function makeAuth(opts?: {
   return {
     user: { id: USER_ID, email: "user@example.com", factors: opts?.factors },
     session: { access_token: "test-token" },
+    sessionId: "auth-session-1",
     claims: {
       sub: USER_ID,
       platform_role: opts?.platformRole ?? "none",
@@ -430,6 +431,8 @@ describe("GET /api/account/permissions", () => {
       verifyImpersonationSession.mockResolvedValue({
         targetOrgId: ORG_ID,
         targetUserId: "target-user",
+        targetOrgRole: "user",
+        targetOrgSlug: "calm-haven",
       });
       requireAuthenticatedUserWithClaims.mockResolvedValue(
         makeAuth({
@@ -448,6 +451,7 @@ describe("GET /api/account/permissions", () => {
         expect.anything(),
         "session-1",
         USER_ID,
+        "auth-session-1",
       );
     });
 

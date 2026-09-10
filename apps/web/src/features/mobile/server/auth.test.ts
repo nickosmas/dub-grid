@@ -49,7 +49,7 @@ function createSetupResult(data: unknown[], count?: number) {
   return { data, count: count ?? null, error: null };
 }
 
-function createThenableQuery(result: unknown) {
+function createThenableQuery(result: unknown, maybeSingleResult: unknown = result) {
   const query: {
     select: ReturnType<typeof vi.fn>;
     eq: ReturnType<typeof vi.fn>;
@@ -60,7 +60,7 @@ function createThenableQuery(result: unknown) {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     is: vi.fn(() => Promise.resolve(result)),
-    maybeSingle: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(maybeSingleResult)),
     then: Promise.resolve(result).then.bind(Promise.resolve(result)),
   };
 
@@ -70,6 +70,7 @@ function createThenableQuery(result: unknown) {
 function createServiceClient(input?: {
   setupComplete?: boolean;
   claims?: Record<string, unknown>;
+  employeeStatus?: "active" | "inactive";
   factors?: Array<{
     id: string;
     factor_type: "totp";
@@ -147,7 +148,14 @@ function createServiceClient(input?: {
         error: null,
       }),
     },
-    from: vi.fn((table: string) => createThenableQuery(setupResults[table])),
+    from: vi.fn((table: string) =>
+      createThenableQuery(
+        setupResults[table],
+        table === "employees"
+          ? { data: { status: input?.employeeStatus ?? "active" }, error: null }
+          : setupResults[table],
+      ),
+    ),
   };
 }
 
@@ -173,6 +181,7 @@ describe("requireMobileAuth", () => {
     ]);
     fetchMobileOrganizationRowById.mockResolvedValue({
       id: ORG_ID,
+      archivedAt: null,
       suspendedAt: null,
       subscriptionStatus: "active",
       trialEndsAt: null,
@@ -267,11 +276,12 @@ describe("requireMobileAuth", () => {
     },
   );
 
-  it("rejects Gridmaster accounts before resolving organization membership", async () => {
+  it("rejects a live Gridmaster account before resolving organization membership", async () => {
+    fetchMobileProfilePlatformRole.mockResolvedValue("gridmaster");
     getServiceClient.mockReturnValue(
       createServiceClient({
         setupComplete: true,
-        claims: { platform_role: "gridmaster" },
+        claims: { platform_role: "none" },
       }),
     );
 
@@ -289,6 +299,105 @@ describe("requireMobileAuth", () => {
       error: "Gridmaster mobile access is not supported",
     });
     expect(fetchMobileOrganizationMembershipRows).not.toHaveBeenCalled();
+  });
+
+  it("does not reject a regular account because of a stale Gridmaster claim", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClient({
+        setupComplete: true,
+        claims: { platform_role: "gridmaster" },
+      }),
+    );
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer stale-gridmaster-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(false);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["malformed", "not-an-organization-id"],
+  ])("rejects a %s organization claim without reading organization data", async (_label, orgId) => {
+    getServiceClient.mockReturnValue(
+      createServiceClient({ setupComplete: true, claims: { org_id: orgId } }),
+    );
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer invalid-org-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(403);
+    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+  });
+
+  it("rejects a removed or archived organization membership", async () => {
+    fetchMobileOrganizationMembershipRows.mockResolvedValue([]);
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer removed-membership-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(403);
+    expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
+  });
+
+  it("rejects an archived organization", async () => {
+    fetchMobileOrganizationRowById.mockResolvedValue({
+      id: ORG_ID,
+      archivedAt: "2026-09-10T00:00:00.000Z",
+      suspendedAt: null,
+      subscriptionStatus: "active",
+      trialEndsAt: null,
+    });
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer archived-org-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(403);
+    expect(await result.response.json()).toEqual({
+      error: "Organization unavailable. Please try again later.",
+    });
+  });
+
+  it("keeps inactive employees authenticated without management capabilities", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClient({ setupComplete: true, employeeStatus: "inactive" }),
+    );
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer inactive-employee-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(false);
+    if ("response" in result) return;
+    expect(result.permissions.canManageEmployees).toBe(false);
+    expect(result.permissions.canEditShifts).toBe(false);
   });
 
   it("allows an aal1 mobile session when no verified TOTP factor exists", async () => {

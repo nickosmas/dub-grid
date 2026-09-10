@@ -116,11 +116,24 @@
           repair cross-tab sign-in/sign-out, token rotation and refresh,
           foreground/resume, and organization-switch races without stale
           identity, permissions, or tenant data.
-  - [ ] 19d. **Authentication security hardening** - verify tenant and session
-        isolation, current membership enforcement, stale-claim handling, MFA
-        assurance, invite/recovery expiry and replay protection, redirect safety,
-        CSRF protection, enumeration resistance, rate limiting, token secrecy,
-        auditability, and RLS-backed authorization.
+  - [ ] 19d. **Authentication security hardening** - complete the following
+        bounded security passes without weakening authentication performance or
+        tenant isolation:
+    - [x] 19d1. **Live tenant, membership, and session authorization** - verify
+          stale claims, archived memberships, session revocation, tenant
+          isolation, service-role boundaries, sandbox and impersonation
+          boundaries, and RLS enforcement across web and mobile APIs.
+    - [ ] 19d2. **MFA assurance and sensitive-action reauthentication** - require
+          the appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
+          sessions, exports, account deletion, and other irreversible actions.
+    - [ ] 19d3. **Invite, recovery, redirect, and CSRF integrity** - verify token
+          expiry, single use, and replay protection; safe redirects; origin
+          validation; generic failure responses; and public state-changing
+          endpoints.
+    - [ ] 19d4. **Abuse resistance, token secrecy, and security auditability** -
+          verify enumeration resistance, distributed and per-target rate limits,
+          production fail-closed behavior, token secrecy across URLs, logs, and
+          telemetry, and complete security-event audit coverage.
   - [ ] 19e. **Authentication release qualification** - add a durable automated
         role/state/browser matrix and complete authenticated browser plus native
         device checks; close every confirmed in-scope defect and report any
