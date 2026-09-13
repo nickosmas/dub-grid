@@ -16,7 +16,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
-import { signOutFromBrowser } from "./auth";
+import { completeBrowserPasswordRecovery, signOutFromBrowser } from "./auth";
 
 describe("signOutFromBrowser recovery", () => {
   beforeEach(() => {
@@ -89,6 +89,23 @@ describe("signOutFromBrowser recovery", () => {
       code: "STEP_UP_REQUIRED",
     });
     expect(mocks.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+    expect(mocks.clear).toHaveBeenCalledOnce();
+  });
+
+  it("completes recovery through the dedicated global revocation path and clears locally", async () => {
+    mocks.signOut.mockResolvedValue({ error: null });
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true })));
+
+    await completeBrowserPasswordRecovery();
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/auth/sign-out",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ scope: "global", reason: "password_recovery" }),
+      }),
+    );
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(mocks.clear).toHaveBeenCalledOnce();
   });
 });

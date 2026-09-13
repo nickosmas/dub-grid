@@ -7,10 +7,11 @@ const replace = vi.fn();
 const recordCurrentTermsAcceptance = vi.fn();
 const signOutFromBrowser = vi.fn();
 const toastError = vi.fn();
+let searchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
 }));
 vi.mock("sonner", () => ({ toast: { error: (...args: unknown[]) => toastError(...args) } }));
 vi.mock("@/components/AuthProvider", () => ({
@@ -46,8 +47,18 @@ function renderPage() {
 describe("AcceptTermsPage recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParams = new URLSearchParams();
     recordCurrentTermsAcceptance.mockResolvedValue({ success: true });
     signOutFromBrowser.mockResolvedValue(undefined);
+  });
+
+  it("falls back to the dashboard when the next value is external", async () => {
+    searchParams = new URLSearchParams("next=https://evil.example");
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept and continue" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
   });
 
   it("waits for a slow successful acceptance before navigating", async () => {

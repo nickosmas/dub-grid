@@ -6,6 +6,7 @@ import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,9 @@ const bodySchema = z.object({
  * Rate-limited per-user via the standard `apiLimiter`.
  */
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
   const { user } = auth;

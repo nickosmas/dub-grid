@@ -56,6 +56,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/employees/check-phone", () => {
+  it("rejects a cross-origin request before authentication", async () => {
+    const { POST } = await importRoute();
+    const req = makeRequest({ phone: "(415) 555-0199", orgId: ORG_ID });
+    req.headers.set("origin", "https://attacker.test");
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(requireAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
   it("reports no conflict when the phone is free", async () => {
     employeesSelect.mockResolvedValue({
       data: [{ id: OTHER_EMPLOYEE_ID, phone: "(415) 555-0100" }],

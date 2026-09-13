@@ -59,9 +59,9 @@ authenticated context.
       or resend stays recoverable, password save follows the established global
       revocation contract, and the app cannot enter tabs before recovery ends.
 - [x] **Step 4 - Verify the recovery slice** - run focused web and mobile
-      suites, then `npm run test:web`, `npm run test:mobile`, `npm run
-      type-check`, and `npm run build`. _Done when:_ all affected routes and
-      screens pass without logging secrets, weakening CSRF/RLS, or leaking
+      suites, then run `npm run test:web`, `npm run test:mobile`,
+      `npm run type-check`, and `npm run build`. _Done when:_ all affected routes
+      and screens pass without logging secrets, weakening CSRF/RLS, or leaking
       account-existence information.
 
 ## Files / areas

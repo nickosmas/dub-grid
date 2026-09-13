@@ -21,6 +21,7 @@ import * as Sentry from "@/lib/sentry";
 import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
+import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,6 @@ const bodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
-
-const POST_LOGIN_DESTINATION = "/dashboard";
 
 interface SessionTokens {
   access_token: string;

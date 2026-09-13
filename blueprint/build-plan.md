@@ -126,7 +126,7 @@
     - [x] 19d2. **MFA assurance and sensitive-action reauthentication** - require
           the appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
           sessions, exports, account deletion, and other irreversible actions.
-    - [ ] 19d3. **Invite, recovery, redirect, and CSRF integrity** - verify token
+    - [x] 19d3. **Invite, recovery, redirect, and CSRF integrity** - verify token
           expiry, single use, and replay protection; safe redirects; origin
           validation; generic failure responses; and public state-changing
           endpoints.

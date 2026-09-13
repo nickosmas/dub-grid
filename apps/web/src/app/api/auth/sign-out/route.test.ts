@@ -8,6 +8,7 @@ const revokeAllUserSessions = vi.fn();
 const revokeSession = vi.fn();
 const getSession = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
+const requireLiveAuthenticatedSession = vi.fn();
 const providerSignOut = vi.fn();
 const createTokenScopedClient = vi.fn();
 const revokeOtherUserSessions = vi.fn();
@@ -27,6 +28,7 @@ vi.mock("@/lib/auth/revocation", () => ({
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: () => ({ auth: { getSession } }),
   requireSensitiveActionAuth: (...args: unknown[]) => requireSensitiveActionAuth(...args),
+  requireLiveAuthenticatedSession: (...args: unknown[]) => requireLiveAuthenticatedSession(...args),
   createTokenScopedClient: (...args: unknown[]) => createTokenScopedClient(...args),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
@@ -54,6 +56,12 @@ describe("POST /api/auth/sign-out", () => {
       user: { id: "user-1" },
       sessionId: "fresh-session",
       session: { access_token: "fresh-token" },
+    });
+    requireLiveAuthenticatedSession.mockResolvedValue({
+      user: { id: "user-1" },
+      sessionId: "recovery-session",
+      session: { access_token: "recovery-token" },
+      claims: { amr: [{ method: "otp", timestamp: Math.floor(Date.now() / 1000) }] },
     });
     providerSignOut.mockResolvedValue({ error: null });
     createTokenScopedClient.mockReturnValue({ auth: { admin: { signOut: providerSignOut } } });
@@ -90,6 +98,31 @@ describe("POST /api/auth/sign-out", () => {
     expect(revokeSession).not.toHaveBeenCalled();
     expect(createTokenScopedClient).toHaveBeenCalledWith("fresh-token");
     expect(providerSignOut).toHaveBeenCalledWith("fresh-token", "global");
+  });
+
+  it("allows fresh recovery proof to revoke all prior sessions", async () => {
+    const response = await POST(makeRequest({ scope: "global", reason: "password_recovery" }));
+
+    expect(response.status).toBe(200);
+    expect(requireLiveAuthenticatedSession).toHaveBeenCalledOnce();
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    expect(providerSignOut).toHaveBeenCalledWith("recovery-token", "global");
+    expect(revokeAllUserSessions).toHaveBeenCalledWith("user-1");
+  });
+
+  it("rejects missing or stale recovery proof before provider mutation", async () => {
+    requireLiveAuthenticatedSession.mockResolvedValueOnce({
+      user: { id: "user-1" },
+      sessionId: "ordinary-session",
+      session: { access_token: "ordinary-token" },
+      claims: { amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }] },
+    });
+
+    const response = await POST(makeRequest({ scope: "global", reason: "password_recovery" }));
+
+    expect(response.status).toBe(403);
+    expect(providerSignOut).not.toHaveBeenCalled();
+    expect(revokeAllUserSessions).not.toHaveBeenCalled();
   });
 
   it("never escalates local sign-out to all devices when the token lacks a session id", async () => {

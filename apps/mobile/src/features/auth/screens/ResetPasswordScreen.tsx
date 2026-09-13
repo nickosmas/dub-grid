@@ -133,20 +133,36 @@ export default function ResetPasswordScreen() {
 
     setError(null);
     setSubmitting(true);
+    let passwordUpdated = false;
     try {
       const { error: updateError } = await settleMobileAuthAction(
         supabase.auth.updateUser({ password }),
       );
       if (updateError) throw updateError;
+      passwordUpdated = true;
 
       // Revoke everywhere: a password reset usually means the old one was
       // compromised, so any session still holding it has to go. Same posture as
       // the in-app password change.
-      await settleMobileAuthAction(supabase.auth.signOut({ scope: "global" }));
+      const { error: signOutError } = await settleMobileAuthAction(
+        supabase.auth.signOut({ scope: "global" }),
+      );
+      if (signOutError) throw signOutError;
 
       pushToast({ message: "Password updated. Sign in with your new password!", tone: "success" });
       router.replace("/(auth)/login");
     } catch (caught) {
+      if (passwordUpdated) {
+        await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(
+          () => undefined,
+        );
+        pushToast({
+          message: "Password updated. Sign in and review your active sessions.",
+          tone: "info",
+        });
+        router.replace("/(auth)/login");
+        return;
+      }
       setError(getRecoveryErrorMessage(caught));
     } finally {
       setSubmitting(false);

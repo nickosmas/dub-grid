@@ -14,6 +14,7 @@ import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
+import { AUTH_ACTION_DESTINATIONS } from "@/lib/auth/integrity-contract";
 
 function ForgotPasswordContent() {
   const [email, setEmail] = useState("");
@@ -28,7 +29,10 @@ function ForgotPasswordContent() {
     setLoading(true);
 
     try {
-      const redirectTo = `${window.location.origin}/reset-password`;
+      const redirectTo = new URL(
+        AUTH_ACTION_DESTINATIONS.recovery,
+        window.location.origin,
+      ).toString();
       const { error } = await settleWithRequestTimeout(
         resetBrowserPasswordForEmail(email, redirectTo),
       );

@@ -6,8 +6,9 @@ import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
+import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 
-export const POST_LOGIN_DESTINATION = "/dashboard";
+export { POST_LOGIN_DESTINATION };
 
 /**
  * Resolves where to send the user after a successful sign-in: either the

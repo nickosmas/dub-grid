@@ -19,11 +19,14 @@ import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import {
   exchangeBrowserCodeForSession,
-  getBrowserAuthSession,
-  signOutFromBrowser,
+  completeBrowserPasswordRecovery,
   subscribeToBrowserAuthChanges,
   updateBrowserUserPassword,
 } from "@/features/account/client";
+import {
+  clearBrowserRecoveryVerification,
+  consumeBrowserRecoveryVerification,
+} from "@/lib/auth/browser-recovery-capability";
 
 type PageState = "loading" | "form" | "success" | "error" | "recovery";
 
@@ -57,9 +60,8 @@ function ResetPasswordContent() {
         return;
       }
 
-      const session = await settleWithRequestTimeout(getBrowserAuthSession());
       if (stateRef.current !== "loading") return;
-      if (session) {
+      if (consumeBrowserRecoveryVerification()) {
         setState("form");
         stateRef.current = "form";
       } else if (finalAttempt) {
@@ -72,6 +74,7 @@ function ResetPasswordContent() {
         setState("recovery");
         stateRef.current = "recovery";
       } else {
+        clearBrowserRecoveryVerification();
         window.history.replaceState({}, "", window.location.pathname);
         recoveryCodeRef.current = null;
         setState("error");
@@ -87,6 +90,7 @@ function ResetPasswordContent() {
 
     // Check for error flag from /auth/confirm route (invalid/expired token)
     if (params.get("error") === "invalid_link") {
+      clearBrowserRecoveryVerification();
       setState("error");
       stateRef.current = "error";
       return;
@@ -164,7 +168,7 @@ function ResetPasswordContent() {
       await settleWithRequestTimeout(updateBrowserUserPassword(password));
 
       // Sign out so user re-authenticates with fresh credentials
-      await settleWithRequestTimeout(signOutFromBrowser("local"));
+      await settleWithRequestTimeout(completeBrowserPasswordRecovery());
 
       setState("success");
       stateRef.current = "success";

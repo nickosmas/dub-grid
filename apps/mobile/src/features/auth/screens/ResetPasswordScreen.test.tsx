@@ -139,6 +139,22 @@ describe("ResetPasswordScreen", () => {
     expect(screen.queryByText(/Token has expired/)).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["a code for another account", "otp_expired"],
+    ["an already-used code", "otp_expired"],
+  ])("rejects %s without opening the password stage", async (_case, code) => {
+    verifyOtp.mockResolvedValue({ error: { code, message: "private provider wording" } });
+
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    expect(screen.queryByText("Set a new password")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("That code has expired or isn't right. Request a new one."),
+    ).toBeInTheDocument();
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
   it("rejects a code that is not six digits without calling the API", async () => {
     render(<ResetPasswordScreen />);
     await enterCode("123");
@@ -174,6 +190,30 @@ describe("ResetPasswordScreen", () => {
     // Global, not local: a reset usually means the old password leaked, so any
     // session still holding it has to go.
     expect(signOut).toHaveBeenCalledWith({ scope: "global" });
+    expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+  });
+
+  it("clears the ephemeral session and returns to sign in when global revocation fails", async () => {
+    signOut
+      .mockResolvedValueOnce({ error: { code: "provider_error", message: "private" } })
+      .mockResolvedValueOnce({ error: null });
+    render(<ResetPasswordScreen />);
+    await enterCode();
+
+    fireEvent.change(screen.getByPlaceholderText("New password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm password"), {
+      target: { value: "Str0ng!Passphrase" },
+    });
+    await act(async () => fireEvent.click(screen.getByText("Update password")));
+
+    expect(signOut).toHaveBeenNthCalledWith(1, { scope: "global" });
+    expect(signOut).toHaveBeenNthCalledWith(2, { scope: "local" });
+    expect(pushToast).toHaveBeenCalledWith({
+      message: "Password updated. Sign in and review your active sessions.",
+      tone: "info",
+    });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
 

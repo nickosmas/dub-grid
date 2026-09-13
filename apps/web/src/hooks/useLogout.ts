@@ -1,6 +1,7 @@
 // src/hooks/useLogout.ts
 import { beginLogout } from "@/lib/logout-state";
 import { signOutFromBrowser } from "@/features/account/client";
+import { parseInternalDestination } from "@/lib/auth/integrity-contract";
 
 export type SignOutScope = "local" | "global";
 
@@ -32,9 +33,10 @@ export interface SignOutOptions {
 export function useLogout() {
   function signOut({ scope = "local", redirectTo = "/goodbye" }: SignOutOptions = {}): void {
     beginLogout();
-    const url = new URL(redirectTo, window.location.origin);
+    const destination = parseInternalDestination(redirectTo, "/goodbye");
+    const url = new URL(destination, window.location.origin);
     url.searchParams.set("scope", scope);
-    window.location.replace(url.pathname + url.search);
+    window.location.replace(url.pathname + url.search + url.hash);
   }
 
   async function signOutOthers(): Promise<void> {

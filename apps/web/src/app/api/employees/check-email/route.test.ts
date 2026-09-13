@@ -79,6 +79,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/employees/check-email", () => {
+  it("rejects a cross-origin request before authentication", async () => {
+    const { POST } = await importRoute();
+    const req = makeRequest({ email: "free@test.com", orgId: ORG_ID });
+    req.headers.set("origin", "https://attacker.test");
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(requireAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
   it("reports no conflict when the email is free", async () => {
     const { POST } = await importRoute();
     const res = await POST(makeRequest({ email: "free@test.com", orgId: ORG_ID }));

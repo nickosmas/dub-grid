@@ -9,11 +9,33 @@ import {
 import {
   createRequestSupabaseClient,
   createTokenScopedClient,
+  requireLiveAuthenticatedSession,
   requireSensitiveActionAuth,
 } from "@/lib/api-auth";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
+
+const RECOVERY_PROOF_MAX_AGE_SECONDS = 15 * 60;
+
+function hasFreshRecoveryProof(claims: unknown): boolean {
+  if (!claims || typeof claims !== "object") return false;
+  const methods = (claims as { amr?: unknown }).amr;
+  if (!Array.isArray(methods)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return methods.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const proof = entry as { method?: unknown; timestamp?: unknown };
+    return (
+      proof.method === "otp" &&
+      typeof proof.timestamp === "number" &&
+      Number.isSafeInteger(proof.timestamp) &&
+      proof.timestamp <= now + 60 &&
+      now - proof.timestamp <= RECOVERY_PROOF_MAX_AGE_SECONDS
+    );
+  });
+}
 
 /**
  * Marks the caller's session revoked on sign-out.
@@ -35,16 +57,23 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   let scope: "local" | "others" | "global" = "local";
+  let recoveryCompletion = false;
   try {
     const body = await req.json();
     if (body?.scope === "global" || body?.scope === "others") scope = body.scope;
+    recoveryCompletion = scope === "global" && body?.reason === "password_recovery";
   } catch {
     // No body is fine — "local" is the default.
   }
 
   if (scope !== "local") {
-    const auth = await requireSensitiveActionAuth(req);
+    const auth = recoveryCompletion
+      ? await requireLiveAuthenticatedSession(req)
+      : await requireSensitiveActionAuth(req);
     if ("response" in auth) return auth.response;
+    if (recoveryCompletion && !hasFreshRecoveryProof(auth.claims)) {
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    }
     if (!auth.sessionId) {
       return NextResponse.json(
         { error: "Please sign in again before managing devices." },

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
 
 const querySchema = z.object({
-  token: z.string().min(1),
+  token: z.string().uuid(),
 });
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       token: req.nextUrl.searchParams.get("token") ?? "",
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
+      return deadInvitationResponse();
     }
 
     // Only resolve org metadata for a LIVE invitation (not expired, accepted, or
@@ -22,11 +22,12 @@ export async function GET(req: NextRequest) {
     // value and lets expired tokens still surface org details.
     const { data, error } = await getServiceClient()
       .from("invitations")
-      .select("organizations(name, slug)")
+      .select("organizations!inner(name, slug, archived_at)")
       .eq("token", parsed.data.token)
       .gt("expires_at", new Date().toISOString())
       .is("accepted_at", null)
       .is("revoked_at", null)
+      .is("organizations.archived_at", null)
       .maybeSingle();
 
     if (error) {
@@ -39,10 +40,7 @@ export async function GET(req: NextRequest) {
     if (!organization) {
       // Unknown / expired / accepted / revoked — same 404 for all so a caller
       // can't distinguish a real-but-dead token from a non-existent one.
-      return NextResponse.json(
-        { error: "Invitation not found or no longer valid" },
-        { status: 404 },
-      );
+      return deadInvitationResponse();
     }
 
     return NextResponse.json({

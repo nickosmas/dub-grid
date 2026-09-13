@@ -55,7 +55,7 @@ const TEMPLATES = [
   {
     file: "recovery.html",
     Component: RecoveryEmail,
-    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+    expects: ["{{ .TokenHash }}", "{{ .Token }}", "{{ .SiteURL }}", "/auth/verify"],
   },
   {
     file: "magic_link.html",

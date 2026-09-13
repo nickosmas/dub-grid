@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { Button } from "@/components/Button";
@@ -10,6 +9,8 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { verifyBrowserOtp } from "@/features/account/client";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
+import { resolveAuthActionDestination } from "@/lib/auth/integrity-contract";
+import { markBrowserRecoveryVerified } from "@/lib/auth/browser-recovery-capability";
 
 /**
  * Intermediate click-through page for email verification links.
@@ -29,20 +30,21 @@ export default function AuthVerifyPage() {
   const [error, setError] = useState(false);
 
   const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
-
-  const isRecovery = type === "recovery";
+  const authAction = resolveAuthActionDestination(
+    searchParams.get("type"),
+    searchParams.get("next"),
+  );
+  const isRecovery = authAction?.action === "recovery";
 
   async function handleVerify() {
-    if (!tokenHash || !type) {
+    if (!tokenHash || !authAction) {
       setError(true);
       return;
     }
 
     setLoading(true);
     const { error: verifyError } = await verifyBrowserOtp({
-      type,
+      type: authAction.action,
       token_hash: tokenHash,
     });
 
@@ -50,7 +52,8 @@ export default function AuthVerifyPage() {
       setError(true);
       setLoading(false);
     } else {
-      router.replace(next);
+      markBrowserRecoveryVerified();
+      router.replace(authAction.destination);
     }
   }
 
@@ -62,7 +65,7 @@ export default function AuthVerifyPage() {
           <DubGridWordmark />
         </ApexLandingLink>
 
-        {!tokenHash || !type || error ? (
+        {!tokenHash || !authAction || error ? (
           <AuthStateCard
             heading="Invalid or expired link"
             message="This link is invalid or has expired. Please request a new one."

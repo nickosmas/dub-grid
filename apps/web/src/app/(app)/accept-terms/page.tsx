@@ -14,16 +14,7 @@ import { recordCurrentTermsAcceptance, signOutFromBrowser } from "@/features/acc
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
-
-// Default next destination if none provided. Matches the login form's default.
-const DEFAULT_NEXT = "/dashboard";
-
-// Only allow internal navigations (open redirect defense).
-function safeNext(raw: string | null): string {
-  if (!raw) return DEFAULT_NEXT;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return DEFAULT_NEXT;
-  return raw;
-}
+import { parseInternalDestination, POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 
 export default function AcceptTermsPage() {
   const router = useRouter();
@@ -33,7 +24,7 @@ export default function AcceptTermsPage() {
   const { data: terms, isLoading: termsLoading } = useTermsAcceptanceStatus();
   const acceptingRef = useRef(false);
 
-  const next = safeNext(searchParams.get("next"));
+  const next = parseInternalDestination(searchParams.get("next"), POST_LOGIN_DESTINATION);
 
   // Redirect unauth users to /login (preserving `next`).
   useEffect(() => {

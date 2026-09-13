@@ -53,6 +53,23 @@ export async function signOutFromBrowser(scope: "local" | "others" | "global"): 
   }
 }
 
+export async function completeBrowserPasswordRecovery(): Promise<void> {
+  try {
+    const response = await fetchWithTimeout("/api/auth/sign-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: "global", reason: "password_recovery" }),
+    });
+    if (!response.ok) throw new Error("Recovery session revocation failed");
+  } finally {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      clearSupabaseBrowserAuthState();
+    }
+  }
+}
+
 export async function updateBrowserUserEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ email });
   if (error) {

@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { verifyOtp, exchangeCodeForSession, createServerClient, cookies } = vi.hoisted(() => ({
-  verifyOtp: vi.fn(),
+const { exchangeCodeForSession, createServerClient, cookies } = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(),
   createServerClient: vi.fn(),
   cookies: vi.fn(),
@@ -27,38 +26,41 @@ describe("web recovery routes", () => {
     vi.clearAllMocks();
     cookies.mockResolvedValue({ getAll: () => [], set: vi.fn() });
     createServerClient.mockReturnValue({
-      auth: { verifyOtp, exchangeCodeForSession },
+      auth: { exchangeCodeForSession },
     });
-    verifyOtp.mockResolvedValue({ error: null });
     exchangeCodeForSession.mockResolvedValue({ error: null });
   });
 
-  it("confirms a recovery token and redirects only to its relative reset target", async () => {
+  it("forwards a recovery token to the scanner-safe interstitial without consuming it", async () => {
     const response = await confirmRecovery(
       request("/auth/confirm?token_hash=recovery-token&type=recovery&next=/reset-password"),
     );
 
-    expect(verifyOtp).toHaveBeenCalledWith({ type: "recovery", token_hash: "recovery-token" });
-    expect(response.headers.get("location")).toBe("https://calmhaven.localhost/reset-password");
+    expect(createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toBe(
+      "https://calmhaven.localhost/auth/verify?token_hash=recovery-token&type=recovery&next=%2Freset-password",
+    );
   });
 
-  it("rejects an external confirmation redirect even after a valid recovery token", async () => {
+  it("uses the fixed recovery destination when an external destination is supplied", async () => {
     const response = await confirmRecovery(
       request("/auth/confirm?token_hash=recovery-token&type=recovery&next=https://evil.example"),
     );
 
-    expect(response.headers.get("location")).toBe("https://calmhaven.localhost/");
+    expect(createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toBe(
+      "https://calmhaven.localhost/auth/verify?token_hash=recovery-token&type=recovery&next=%2Freset-password",
+    );
   });
 
-  it("sends invalid recovery links to the reset recovery state without retaining the token", async () => {
-    verifyOtp.mockResolvedValue({ error: { message: "expired" } });
-
+  it("rejects unsupported Auth action types before token consumption", async () => {
     const response = await confirmRecovery(
-      request("/auth/confirm?token_hash=expired-token&type=recovery&next=/reset-password"),
+      request("/auth/confirm?token_hash=signup-token&type=signup&next=/reset-password"),
     );
 
+    expect(createServerClient).not.toHaveBeenCalled();
     expect(response.headers.get("location")).toBe(
-      "https://calmhaven.localhost/reset-password?error=invalid_link",
+      "https://calmhaven.localhost/login?error=invalid_link",
     );
   });
 
@@ -69,6 +71,17 @@ describe("web recovery routes", () => {
 
     expect(exchangeCodeForSession).toHaveBeenCalledWith("one-time-code");
     expect(response.headers.get("location")).toBe("https://calmhaven.localhost/");
+  });
+
+  it("preserves an internal PKCE destination query and fragment without retaining the code", async () => {
+    const response = await exchangeRecoveryCode(
+      request("/auth/callback?code=one-time-code&next=/reset-password%3Ffrom%3Demail%23form"),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://calmhaven.localhost/reset-password?from=email#form",
+    );
+    expect(response.headers.get("location")).not.toContain("one-time-code");
   });
 
   it("returns failed PKCE exchanges to the reset recovery state", async () => {

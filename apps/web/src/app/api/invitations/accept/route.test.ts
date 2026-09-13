@@ -95,6 +95,22 @@ describe("POST /api/invitations/accept", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it.each(["unknown", "expired", "revoked", "accepted", "wrong-account", "replayed"])(
+    "normalizes a %s invitation rejection and emits no notification",
+    async () => {
+      rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: "INVITATION_INVALID" },
+      });
+
+      const res = await POST(request({ token: "invite-token" }));
+
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toMatchObject({ code: "INVITATION_INVALID" });
+      expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+    },
+  );
+
   it("does not emit an organization event when the RPC returns no organization", async () => {
     rpc.mockResolvedValueOnce({
       data: { status: "already_accepted", org_id: "", role: "user", org_slug: null },
