@@ -8,6 +8,11 @@ const serviceMocks = vi.hoisted(() => ({
   from: vi.fn(),
   delete: vi.fn(),
   eq: vi.fn(),
+  select: vi.fn(),
+  selectEq: vi.fn(),
+  neq: vi.fn(),
+  order: vi.fn(),
+  range: vi.fn(),
 }));
 
 vi.mock("@/lib/cache", async (importOriginal) => {
@@ -19,7 +24,7 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: serviceMocks.from }),
 }));
 
-import { revokeAllUserSessions, revokeSession } from "./revocation";
+import { revokeAllUserSessions, revokeOtherUserSessions, revokeSession } from "./revocation";
 
 describe("session revocation persistence", () => {
   beforeEach(() => {
@@ -27,7 +32,12 @@ describe("session revocation persistence", () => {
     cacheMocks.cacheSet.mockResolvedValue(undefined);
     serviceMocks.eq.mockResolvedValue({ error: null });
     serviceMocks.delete.mockReturnValue({ eq: serviceMocks.eq });
-    serviceMocks.from.mockReturnValue({ delete: serviceMocks.delete });
+    serviceMocks.from.mockReturnValue({ delete: serviceMocks.delete, select: serviceMocks.select });
+    serviceMocks.select.mockReturnValue({ eq: serviceMocks.selectEq });
+    serviceMocks.selectEq.mockReturnValue({ neq: serviceMocks.neq });
+    serviceMocks.neq.mockReturnValue({ order: serviceMocks.order });
+    serviceMocks.order.mockReturnValue({ range: serviceMocks.range });
+    serviceMocks.range.mockReset().mockResolvedValue({ data: [], error: null });
   });
 
   it("removes the tracked database session used by direct PostgREST RLS", async () => {
@@ -51,5 +61,45 @@ describe("session revocation persistence", () => {
 
     await expect(revokeSession("session-1")).rejects.toThrow("database unavailable");
     expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+  });
+
+  it("revokes only the user's tracked peers, including sessions without a refresh hash", async () => {
+    serviceMocks.range.mockResolvedValueOnce({
+      data: [
+        { supabase_session_id: "peer-1" },
+        { supabase_session_id: "peer-1" },
+        { supabase_session_id: "current" },
+        { supabase_session_id: null },
+      ],
+      error: null,
+    });
+    await revokeOtherUserSessions("user-1", "current");
+    expect(serviceMocks.selectEq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(serviceMocks.neq).toHaveBeenCalledWith("supabase_session_id", "current");
+    expect(serviceMocks.eq).toHaveBeenCalledExactlyOnceWith("supabase_session_id", "peer-1");
+    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+  });
+
+  it("collects every page before deletion so offsets cannot skip peers", async () => {
+    serviceMocks.range
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 1000 }, () => ({ supabase_session_id: "peer-1" })),
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: [{ supabase_session_id: "peer-2" }], error: null });
+    await revokeOtherUserSessions("user-1", "current");
+    expect(serviceMocks.range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(serviceMocks.range).toHaveBeenNthCalledWith(2, 1000, 1999);
+    expect(serviceMocks.eq).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.range.mock.invocationCallOrder[1]).toBeLessThan(
+      serviceMocks.delete.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("does not silently ignore lookup failures", async () => {
+    serviceMocks.range.mockResolvedValueOnce({ data: null, error: new Error("lookup failed") });
+    await expect(revokeOtherUserSessions("user-1", "current")).rejects.toThrow("lookup failed");
+    expect(serviceMocks.delete).not.toHaveBeenCalled();
+    expect(cacheMocks.cacheSet).not.toHaveBeenCalled();
   });
 });

@@ -3,18 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@supabase/supabase-js";
 
 import { ProfilePanel } from "@/components/account/ProfilePanel";
-import { updateBrowserUserEmail } from "@/features/account/client";
+import { requireCredentialAssurance, updateBrowserUserEmail } from "@/features/account/client";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import type { Employee } from "@/types";
 
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+const stepUpRun = vi.hoisted(() => vi.fn());
 
 vi.mock("sonner", () => ({ toast }));
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
 
 vi.mock("@/features/account/client", () => ({
   cancelOwnProfileChangeRequest: vi.fn(),
   createOwnProfileChangeRequest: vi.fn(),
   fetchOwnProfileChangeRequests: vi.fn().mockResolvedValue({ requests: [] }),
+  requireCredentialAssurance: vi.fn(),
   updateBrowserUserEmail: vi.fn(),
   updateSelfProfileDetails: vi.fn(),
   updateSelfProfilePhone: vi.fn(),
@@ -144,6 +149,11 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
 describe("ProfilePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    vi.mocked(requireCredentialAssurance).mockResolvedValue({ success: true });
     vi.mocked(updateEmployee).mockResolvedValue({ ...employee, roleIds: [3], version: 5 });
   });
 
@@ -163,8 +173,12 @@ describe("ProfilePanel", () => {
     expect(screen.getByLabelText("First name")).toHaveValue("Draft");
   });
 
-  it("saves staff data before email and reports a later email failure as partial success", async () => {
+  it("confirms credential assurance before saving a draft that changes email", async () => {
     const order: string[] = [];
+    vi.mocked(requireCredentialAssurance).mockImplementation(async () => {
+      order.push("assurance");
+      return { success: true };
+    });
     vi.mocked(updateEmployee).mockImplementation(async () => {
       order.push("employee");
       return { ...employee, roleIds: [3], version: 5 };
@@ -184,10 +198,31 @@ describe("ProfilePanel", () => {
       within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm save" }),
     );
 
-    await waitFor(() => expect(order).toEqual(["employee", "email"]));
+    await waitFor(() => expect(order).toEqual(["assurance", "employee", "email"]));
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
     expect(toast.error).toHaveBeenCalledWith(
       "Your profile was saved, but we couldn't start the email change. Try the email again.",
     );
+  });
+
+  it("keeps the typed account draft and confirmation when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm save" }),
+    );
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText("First name")).toHaveValue("Draft");
+    expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
+    expect(screen.getByRole("dialog", { name: "Save changes?" })).toBeInTheDocument();
+    expect(requireCredentialAssurance).not.toHaveBeenCalled();
+    expect(updateEmployee).not.toHaveBeenCalled();
+    expect(updateBrowserUserEmail).not.toHaveBeenCalled();
   });
 
   it("adopts the latest authoritative staff profile after a version conflict", async () => {

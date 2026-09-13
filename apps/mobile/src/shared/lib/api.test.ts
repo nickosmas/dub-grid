@@ -48,6 +48,26 @@ describe("mobileApiRequest", () => {
     expect(headers.get("Content-Type")).toBeNull();
   });
 
+  it("preflights credential mutations with the exact promoted bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { requireMobileCredentialAssurance } = await import("./api");
+
+    await expect(requireMobileCredentialAssurance("promoted-token")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://app.dubgrid.com/api/mobile/v1/profile/credential-assurance",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(request.headers).get("Authorization")).toBe("Bearer promoted-token");
+  });
+
   it("adds schedule query params when a mobile date range is supplied", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -568,6 +588,10 @@ describe("mobileApiRequest", () => {
         body: JSON.stringify({ refreshTokenHash: "hash" }),
       }),
     );
+    const revokeHeaders = new Headers(
+      (fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.headers,
+    );
+    expect(revokeHeaders.get("Authorization")).toBe("Bearer token-123");
   });
 
   it("updates teammate status through the mobile people endpoint", async () => {

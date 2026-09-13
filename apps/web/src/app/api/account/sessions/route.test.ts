@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedUser = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
+const validateCsrfOrigin = vi.fn();
 const requireAuthenticatedUserWithClaims = vi.fn();
 const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
@@ -9,12 +10,12 @@ const dispatchNotificationEvent = vi.fn();
 const sessionRowSnapshot = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
-  validateCsrfOrigin: () => null,
+  validateCsrfOrigin: () => validateCsrfOrigin(),
 }));
 
 vi.mock("@/features/account/server", () => ({
@@ -47,7 +48,8 @@ import { DELETE, GET } from "./route";
 describe("/api/account/sessions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAuthenticatedUser.mockResolvedValue({
+    validateCsrfOrigin.mockReturnValue(null);
+    requireSensitiveActionAuth.mockResolvedValue({
       user: { id: "user-id" },
     });
     requireAuthenticatedUserWithClaims.mockResolvedValue({
@@ -93,6 +95,49 @@ describe("/api/account/sessions", () => {
 
     expect(response.status).toBe(200);
     expect(revokeUserSessionForUser).toHaveBeenCalledWith("user-id", "hash");
+    expect(requireSensitiveActionAuth).toHaveBeenCalledOnce();
+  });
+
+  it.each(["password", "totp"])(
+    "requires fresh %s proof before reading or revoking a session",
+    async (method) => {
+      const body = {
+        code: "STEP_UP_REQUIRED",
+        method,
+        error: "Confirm your identity, then try again.",
+      };
+      requireSensitiveActionAuth.mockResolvedValueOnce({
+        response: NextResponse.json(body, { status: 403 }),
+      });
+      const response = await DELETE(
+        new NextRequest("http://localhost/api/account/sessions", {
+          method: "DELETE",
+          body: JSON.stringify({ refreshTokenHash: "hash" }),
+        }),
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(body);
+      expect(sessionRowSnapshot).not.toHaveBeenCalled();
+      expect(revokeUserSessionForUser).not.toHaveBeenCalled();
+      expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps CSRF protection ahead of the assurance lookup", async () => {
+    validateCsrfOrigin.mockReturnValueOnce(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    );
+    const response = await DELETE(
+      new NextRequest("http://localhost/api/account/sessions", { method: "DELETE" }),
+    );
+    expect(response.status).toBe(403);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+    expect(revokeUserSessionForUser).not.toHaveBeenCalled();
+  });
+
+  it("does not require step-up to list devices", async () => {
+    await GET(new NextRequest("http://localhost/api/account/sessions"));
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });
 
   it("dispatches security_session_revoked with the captured device label", async () => {

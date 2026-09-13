@@ -6,8 +6,8 @@ const repoRoot = path.resolve(process.cwd(), "..", "..");
 const apiRoot = path.join(repoRoot, "apps", "web", "src", "app", "api");
 
 const canonicalAuthorizationCall =
-  /\b(?:requireAuthenticatedSession|requireAuthenticatedUserWithClaims|requireAuthenticatedUser|requireGridmasterSession|requireOrgPermissions)\s*\(/;
-const delegatedAuthorizationCall = /\bauthorizeAuditLogRead\s*\(/;
+  /\b(?:requireAuthenticatedSession|requireAuthenticatedUserWithClaims|requireAuthenticatedUser|requireLiveAuthenticatedSession|requireSensitiveActionAuth|requireGridmasterSession|requireOrgPermissions)\s*\(/;
+const delegatedAuthorizationCall = /\b(?:authorizeAuditLogRead|createMfaLifecycleHandler)\s*\(/;
 
 /**
  * Route Handlers that are intentionally reachable without a DubGrid user
@@ -18,8 +18,6 @@ const delegatedAuthorizationCall = /\bauthorizeAuditLogRead\s*\(/;
 const PUBLIC_OR_SYSTEM_ROUTE_ALLOWLIST: Record<string, string> = {
   "apps/web/src/app/api/auth/login/route.ts":
     "Public credential exchange with CSRF and rate limits.",
-  "apps/web/src/app/api/auth/sign-out/route.ts":
-    "Idempotent teardown verifies a token when present but must also succeed after the session is gone.",
   "apps/web/src/app/api/calendar/feed/[token]/route.ts":
     "The opaque calendar-feed token is the read credential.",
   "apps/web/src/app/api/consent/route.ts":
@@ -100,5 +98,28 @@ describe("web API authorization boundaries", () => {
 
     expect(source).toMatch(/\brequireGridmasterSession\s*\(/);
     expect(source).toMatch(/\brequireOrgPermissions\s*\(/);
+  });
+
+  it("keeps MFA delegation wired to live and sensitive authentication for both transports", () => {
+    const web = readFileSync(path.join(apiRoot, "account/mfa-lifecycle/route.ts"), "utf8");
+    const mobile = readFileSync(
+      path.join(repoRoot, "apps/web/src/features/mobile/server/routes/mfa-lifecycle.ts"),
+      "utf8",
+    );
+    expect(web).toMatch(/liveAuth: adapt\(requireLiveAuthenticatedSession\)/);
+    expect(web).toMatch(/sensitiveAuth: adapt\(requireSensitiveActionAuth\)/);
+    expect(web).toMatch(/validateCsrfOrigin\(req\)/);
+    expect(mobile).toMatch(/liveAuth: \(req\) => requireMobileStepUpSession\(req\)/);
+    expect(mobile).toMatch(/sensitiveAuth: \(req\) => requireMobileSensitiveActionAuth\(req\)/);
+    const handler = readFileSync(
+      path.join(repoRoot, "apps/web/src/features/account/server/mfa-lifecycle.ts"),
+      "utf8",
+    );
+    expect(handler).toMatch(
+      /input\.action === "enroll" \|\| input\.action === "remove"[\s\S]*?options\.sensitiveAuth\(req\)/,
+    );
+    expect(handler.indexOf('if ("response" in auth)')).toBeLessThan(
+      handler.indexOf("client.auth.mfa.enroll"),
+    );
   });
 });

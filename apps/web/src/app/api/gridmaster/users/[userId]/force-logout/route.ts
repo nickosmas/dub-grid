@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+  requireSensitiveActionAuth,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -22,6 +26,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) {
       return auth.response;
+    }
+
+    const assurance = await requireSensitiveActionAuth(req);
+    if ("response" in assurance) {
+      return assurance.response;
     }
 
     const params = await context.params;

@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
 import type { NextRequest } from "next/server";
+import type { AuthenticationAssuranceClaims } from "@dubgrid/authz";
 import { getSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
@@ -16,22 +17,23 @@ import { getSupabaseUrl } from "@/lib/supabase-keys";
  * signs out. See lib/auth/revocation.ts for that half; callers must do both.
  */
 
-export type VerifiedClaims = JWTPayload & {
-  sub: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  aal?: string;
-  session_id?: string;
-  is_anonymous?: boolean;
-  app_metadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
-  platform_role?: unknown;
-  org_id?: unknown;
-  org_slug?: unknown;
-  org_role?: unknown;
-  in_sandbox?: unknown;
-};
+export type VerifiedClaims = JWTPayload &
+  AuthenticationAssuranceClaims & {
+    sub: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+    aal?: string;
+    session_id?: string;
+    is_anonymous?: boolean;
+    app_metadata?: Record<string, unknown>;
+    user_metadata?: Record<string, unknown>;
+    platform_role?: unknown;
+    org_id?: unknown;
+    org_slug?: unknown;
+    org_role?: unknown;
+    in_sandbox?: unknown;
+  };
 
 export interface VerifiedToken {
   userId: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Employee } from "@dubgrid/domain";
+import type { MfaLifecycleRequest } from "@dubgrid/contracts";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { RecurringShift, ShiftMap } from "@/types";
@@ -148,7 +149,7 @@ async function requestJson<T>(
   if (!response.ok) {
     throw Object.assign(
       new Error(formatClientErrorMessage(body?.error, "Account request failed.")),
-      { status: response.status },
+      { status: response.status, code: body?.code, method: body?.method },
     );
   }
 
@@ -318,11 +319,15 @@ export function resolvePeopleProfileChangeRequest(input: {
   requestId: string;
   action: "approve" | "reject";
   resolverNote?: string;
+  accessToken?: string;
 }): Promise<{ success: true; request: ProfileChangeRequest }> {
   const params = new URLSearchParams({ orgId: input.orgId });
   return requestJson(`/api/people/change-requests/${input.requestId}?${params}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+    },
     body: JSON.stringify({
       action: input.action,
       resolverNote: input.resolverNote,
@@ -346,14 +351,47 @@ export function saveNotificationPreferences(
   });
 }
 
-export function updateMfaStatus(enabled: boolean): Promise<{
+export function requestMfaLifecycle(body: MfaLifecycleRequest, accessToken?: string) {
+  return requestJson<unknown>(
+    "/api/account/mfa-lifecycle",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+    { deadline: true },
+  );
+}
+
+export function updateMfaStatus(accessToken?: string): Promise<{
   profile: SelfProfileRecord | null;
 }> {
-  return requestJson("/api/account/mfa-status", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
+  return requestJson(
+    "/api/account/mfa-status",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({}),
+    },
+    { deadline: true },
+  );
+}
+
+export function requireCredentialAssurance(accessToken: string): Promise<{ success: true }> {
+  return requestJson(
+    "/api/account/credential-assurance",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+    { deadline: true },
+  );
 }
 
 export function fetchAccountSessions(): Promise<{
@@ -363,12 +401,37 @@ export function fetchAccountSessions(): Promise<{
   return requestJson("/api/account/sessions");
 }
 
-export function revokeAccountSession(refreshTokenHash: string): Promise<{ success: true }> {
-  return requestJson("/api/account/sessions", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshTokenHash }),
-  });
+export function signOutAccountSessions(
+  scope: "others" | "global",
+  accessToken: string,
+): Promise<{ success: true }> {
+  return requestJson(
+    "/api/auth/sign-out",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ scope }),
+    },
+    { deadline: true },
+  );
+}
+
+export function revokeAccountSession(
+  refreshTokenHash: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestJson(
+    "/api/account/sessions",
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ refreshTokenHash }),
+    },
+    { deadline: true },
+  );
 }
 
 export function fetchAccessibleOrganizations(): Promise<{

@@ -1,5 +1,9 @@
 import type { MobileAuthLoginBody, MobileAuthLoginResponse } from "@dubgrid/contracts";
-import { buildPermissionContext, type PermissionContext } from "@dubgrid/authz";
+import {
+  buildPermissionContext,
+  type AuthenticationAssuranceClaims,
+  type PermissionContext,
+} from "@dubgrid/authz";
 import type {
   BillingAccessResult,
   AdminPermissions,
@@ -31,7 +35,7 @@ type SignedInSession = {
   token_type: string;
 };
 
-export type MobileAuthClaims = {
+export type MobileAuthClaims = AuthenticationAssuranceClaims & {
   aal?: string;
   org_id?: string;
   org_role?: string;
@@ -357,6 +361,8 @@ export async function resolveMobileAuthContext<
     sessionId: string | null;
     issuedAtMs: number | null;
   }) => Promise<boolean>;
+  /** Lets the sensitive-action adapter turn AAL1 into its structured step-up response. */
+  allowAal1ForStepUp?: boolean;
 }): Promise<ResolvedMobileAuthContext<TOrganization>> {
   const verified = await input.verifyToken(input.accessToken);
   if (!verified) {
@@ -396,7 +402,7 @@ export async function resolveMobileAuthContext<
   const hasVerifiedTotpFactor = (user.factors ?? []).some(
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );
-  if (hasVerifiedTotpFactor && claims.aal !== "aal2") {
+  if (hasVerifiedTotpFactor && claims.aal !== "aal2" && !input.allowAal1ForStepUp) {
     throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 

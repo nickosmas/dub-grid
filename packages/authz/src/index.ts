@@ -1,6 +1,8 @@
 import type { AdminPermissions } from "@dubgrid/domain";
 import type { Session } from "@supabase/supabase-js";
 
+export * from "./assurance";
+
 export const ROLE_LEVEL: Record<string, number> = {
   gridmaster: 4,
   super_admin: 3,

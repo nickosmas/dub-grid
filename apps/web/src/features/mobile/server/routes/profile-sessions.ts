@@ -8,7 +8,7 @@ import {
   fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
-import { requireMobileAuth } from "@/features/mobile/server";
+import { requireMobileAuth, requireMobileSensitiveActionAuth } from "@/features/mobile/server";
 
 function mapSession(
   session: Awaited<ReturnType<typeof fetchUserSessionOverviewForUser>>["active"][number],
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requireMobileAuth(req);
+  const auth = await requireMobileSensitiveActionAuth(req);
   if ("response" in auth) return auth.response;
 
   let body: unknown;

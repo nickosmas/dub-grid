@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 
 import { SectionCard } from "@/components/settings/shared";
@@ -16,9 +17,12 @@ import { SessionList } from "@/components/profile/SessionList";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { useLogout } from "@/hooks";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { queryKeys } from "@/lib/query-keys";
 import {
-  signInBrowserWithPassword,
+  requireCredentialAssurance,
   updateBrowserUserPassword,
+  signOutAccountSessions,
   type SelfProfileRecord,
 } from "@/features/account/client";
 import type { User } from "@supabase/supabase-js";
@@ -31,11 +35,12 @@ interface SecurityPanelProps {
 }
 
 export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps) {
-  const { signOut, signOutOthers } = useLogout();
+  const { signOut } = useLogout();
+  const stepUp = useStepUpAction();
+  const queryClient = useQueryClient();
   const mfaEnabled = profile?.mfa_enabled ?? false;
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -52,12 +57,10 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setOtherSessionCount(count);
   }, []);
 
-  const hasPasswordChanges =
-    currentPassword.length > 0 || newPassword.length > 0 || confirmPassword.length > 0;
+  const hasPasswordChanges = newPassword.length > 0 || confirmPassword.length > 0;
 
   function openForm() {
     setError(null);
-    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -66,7 +69,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
 
   function closeForm() {
     setError(null);
-    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -75,7 +77,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
 
   function discardChanges() {
     setError(null);
-    setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -84,14 +85,12 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
   // Derived so the warning appears as the user types the confirmation, matching
   // the mobile in-app change screen.
   const mismatchError = getPasswordMismatchError(newPassword, confirmPassword);
-  const canSubmitPassword =
-    Boolean(currentPassword) && isPasswordAcceptable(newPassword) && mismatchError === null;
+  const canSubmitPassword = isPasswordAcceptable(newPassword) && mismatchError === null;
 
   function requestPasswordChange(e: FormEvent) {
     e.preventDefault();
     if (saving) return;
     setError(null);
-    if (!currentPassword) return setError("Enter your current password.");
     if (mismatchError) return setError(mismatchError);
     if (!isPasswordAcceptable(newPassword)) return setError("Choose a stronger password.");
     setPendingConfirm(true);
@@ -104,22 +103,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     let passwordUpdated = false;
     let shouldRedirect = false;
     try {
-      const accountEmail = user?.email?.trim();
-      if (!accountEmail) {
-        setError(
-          "This account does not have an email address available for password verification.",
-        );
-        return;
-      }
-      const verify = await signInBrowserWithPassword({
-        email: accountEmail,
-        password: currentPassword,
+      const completed = await stepUp.run(async (accessToken) => {
+        // The preflight must finish before calling Supabase's public mutation.
+        // The mutation is never automatically replayed after an ambiguous error.
+        await requireCredentialAssurance(accessToken);
+        await updateBrowserUserPassword(newPassword);
       });
-      if (verify.error) {
-        setError("That password did not match this account.");
-        return;
-      }
-      await updateBrowserUserPassword(newPassword);
+      if (!completed) return;
       passwordUpdated = true;
       shouldRedirect = true;
       // Rotate session everywhere after a password change. /goodbye handles teardown.
@@ -141,30 +131,36 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       }
     } finally {
       if (!shouldRedirect) {
-        setPendingConfirm(false);
         setSaving(false);
       }
     }
   }
 
-  async function handleSignOutOthers() {
-    setSigningOut("others");
+  async function handleSessionSignOut(scope: "others" | "global") {
+    if (signingOut !== null) return;
+    setSigningOut(scope);
     try {
-      await signOutOthers();
-      setOtherSessionCount(0);
-      toast.success("Your other devices are signed out.");
+      const completed = await stepUp.run((token) => signOutAccountSessions(scope, token));
+      if (!completed) return;
+      setPendingSessionSignOut(null);
+      if (scope === "global") {
+        // The protected bulk mutation finished before navigation and teardown.
+        signOut({ scope: "local" });
+      } else {
+        setOtherSessionCount(0);
+        toast.success("Your other devices are signed out.");
+      }
     } catch {
-      toast.error("We couldn't sign out your other devices. Try again.");
+      toast.error(
+        "We couldn't finish signing out those devices. Check your sessions before trying again.",
+      );
     } finally {
       setSigningOut(null);
-      setPendingSessionSignOut(null);
+      // Password confirmation can replace the current browser session even
+      // when the action is subsequently cancelled or fails.
+      if (user)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.account.sessions(user.id) });
     }
-  }
-
-  function handleSignOutAll() {
-    setSigningOut("global");
-    setPendingSessionSignOut(null);
-    signOut({ scope: "global" });
   }
 
   return (
@@ -197,18 +193,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               onSubmit={requestPasswordChange}
               style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
-              <div>
-                <label className="dg-label">Current Password</label>
-                <PasswordInput
-                  placeholder="Enter current password"
-                  value={currentPassword}
-                  onChange={setCurrentPassword}
-                  showPassword={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                  autoComplete="current-password"
-                  className="dg-input"
-                />
-              </div>
               <div>
                 <label className="dg-label">New Password</label>
                 <PasswordInput
@@ -287,6 +271,9 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 last_name: current?.last_name ?? null,
                 mfa_enabled: enabled,
               }));
+              if (user) {
+                void queryClient.invalidateQueries({ queryKey: queryKeys.account.all(user.id) });
+              }
             }}
           />
         </div>
@@ -302,12 +289,12 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               Manage sign-in state across browsers and devices.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
               onClick={() => setPendingSessionSignOut("others")}
               disabled={signingOut !== null || otherSessionCount === 0}
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary w-full"
             >
               <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
                 Sign out other devices
@@ -317,7 +304,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               type="button"
               onClick={() => setPendingSessionSignOut("global")}
               disabled={signingOut !== null}
-              className="dg-btn dg-btn-danger"
+              className="dg-btn dg-btn-danger w-full"
             >
               <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
                 Sign out everywhere
@@ -338,7 +325,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
         </div>
       </SectionCard>
 
-      {pendingConfirm && (
+      {pendingConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Update password?"
           message="Confirm that you want to update your password. You will be signed out of every session."
@@ -351,7 +338,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           }}
         />
       )}
-      {pendingSessionSignOut && (
+      {stepUp.dialog}
+      {pendingSessionSignOut && !stepUp.dialog && (
         <ConfirmDialog
           title={
             pendingSessionSignOut === "others" ? "Sign out other devices?" : "Sign out everywhere?"
@@ -366,7 +354,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           }
           variant="danger"
           isLoading={signingOut === pendingSessionSignOut}
-          onConfirm={pendingSessionSignOut === "others" ? handleSignOutOthers : handleSignOutAll}
+          onConfirm={() => handleSessionSignOut(pendingSessionSignOut)}
           onCancel={() => {
             if (signingOut === null) setPendingSessionSignOut(null);
           }}

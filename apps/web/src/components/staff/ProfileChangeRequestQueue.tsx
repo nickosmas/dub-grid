@@ -7,6 +7,7 @@ import type { Department, FocusArea, NamedItem } from "@/types";
 import { Button } from "@/components/Button";
 import {
   fetchPeopleProfileChangeRequests,
+  requireCredentialAssurance,
   resolvePeopleProfileChangeRequest,
   type ProfileChangeRequest,
 } from "@/features/account/client";
@@ -17,6 +18,7 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
 import { Inbox } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 
 interface ReferenceItem {
   id: number;
@@ -264,6 +266,7 @@ export function ProfileChangeRequestQueue({
   departments,
 }: ProfileChangeRequestQueueProps) {
   const queryClient = useQueryClient();
+  const stepUp = useStepUpAction();
   const [pendingResolution, setPendingResolution] = useState<{
     request: ProfileChangeRequest;
     action: "approve" | "reject";
@@ -293,11 +296,16 @@ export function ProfileChangeRequestQueue({
   const loading = requestsQuery.isPending;
 
   const resolveMutation = useMutation({
-    mutationFn: (input: { requestId: string; action: "approve" | "reject" }) =>
+    mutationFn: (input: {
+      requestId: string;
+      action: "approve" | "reject";
+      accessToken?: string;
+    }) =>
       resolvePeopleProfileChangeRequest({
         orgId,
         requestId: input.requestId,
         action: input.action,
+        accessToken: input.accessToken,
       }),
     onSuccess: (_, variables) => {
       queryClient.setQueryData<ProfileChangeRequest[]>(
@@ -315,6 +323,26 @@ export function ProfileChangeRequestQueue({
   const resolvingId = resolveMutation.isPending
     ? (resolveMutation.variables?.requestId ?? null)
     : null;
+
+  async function confirmResolution() {
+    if (!pendingResolution) return;
+    const input = {
+      requestId: pendingResolution.request.id,
+      action: pendingResolution.action,
+    };
+    const deletesAccount =
+      pendingResolution.request.type === "account_deletion" &&
+      pendingResolution.action === "approve";
+    if (!deletesAccount) {
+      await resolveMutation.mutateAsync(input);
+      return;
+    }
+
+    await stepUp.run(async (accessToken) => {
+      await requireCredentialAssurance(accessToken);
+      await resolveMutation.mutateAsync({ ...input, accessToken });
+    });
+  }
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -411,7 +439,7 @@ export function ProfileChangeRequestQueue({
           </div>
         ))
       )}
-      {pendingResolution ? (
+      {pendingResolution && !stepUp.dialog ? (
         <ConfirmDialog
           title={
             pendingResolution.action === "approve"
@@ -434,17 +462,13 @@ export function ProfileChangeRequestQueue({
               : "warning"
           }
           isLoading={resolvingId === pendingResolution.request.id}
-          onConfirm={() => {
-            return resolveMutation.mutateAsync({
-              requestId: pendingResolution.request.id,
-              action: pendingResolution.action,
-            });
-          }}
+          onConfirm={confirmResolution}
           onCancel={() => {
             if (!resolvingId) setPendingResolution(null);
           }}
         />
       ) : null}
+      {stepUp.dialog}
     </div>
   );
 }

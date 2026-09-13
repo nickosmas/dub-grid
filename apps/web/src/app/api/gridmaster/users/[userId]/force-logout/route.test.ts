@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireGridmasterSession = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const requestRpc = vi.fn();
 const serviceRpc = vi.fn();
@@ -16,6 +17,7 @@ vi.mock("@/lib/api-auth", () => ({
     rpc: requestRpc,
   }),
   requireGridmasterSession: (req: NextRequest) => requireGridmasterSession(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -61,6 +63,11 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
+    requireSensitiveActionAuth.mockResolvedValue({
+      user: { id: "gridmaster-user", email: "gm@example.com" },
+      session: { access_token: "fresh-token" },
+      claims: { platform_role: "gridmaster" },
+    });
     requestRpc.mockResolvedValue({ error: null });
     auditInsert.mockResolvedValue({ error: null });
     dispatchNotificationEvent.mockResolvedValue({ success: true });
@@ -95,9 +102,29 @@ describe("POST /api/gridmaster/users/[userId]/force-logout", () => {
     });
 
     expect(response.status).toBe(403);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
     expect(requireGridmasterSession).not.toHaveBeenCalled();
     expect(requestRpc).not.toHaveBeenCalled();
     expect(serviceRpc).not.toHaveBeenCalled();
+  });
+
+  it("returns STEP_UP_REQUIRED before resolving a target or revoking sessions", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json(
+        { error: "Confirm your identity.", code: "STEP_UP_REQUIRED", method: "totp" },
+        { status: 403 },
+      ),
+    });
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ userId: USER_ID }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
+    expect(requestRpc).not.toHaveBeenCalled();
+    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
   });
 
   it("rejects non-gridmaster sessions before parameter validation", async () => {

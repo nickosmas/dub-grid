@@ -23,6 +23,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { AssignableOrganizationRole, GridmasterAccount, Organization } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { requireCredentialAssurance } from "@/features/account/client";
 
 function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
   if (!deactivatedAt) return null;
@@ -86,6 +88,7 @@ export default function GridmasterAccountsView({
   currentUserId: string | null | undefined;
 }) {
   const queryClient = useQueryClient();
+  const stepUp = useStepUpAction();
   const [search, setSearch] = useState("");
   const [promoteEmail, setPromoteEmail] = useState("");
   const [promoteConfirmEmail, setPromoteConfirmEmail] = useState<string | null>(null);
@@ -186,7 +189,11 @@ export default function GridmasterAccountsView({
   async function handleForceLogout(account: GridmasterAccount) {
     setActionLoading(account.id);
     try {
-      await forceLogoutGridmasterUser(account.id);
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await forceLogoutGridmasterUser(account.id, accessToken);
+      });
+      if (!completed) return;
       toast.success("Gridmaster sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
@@ -511,7 +518,7 @@ export default function GridmasterAccountsView({
         />
       )}
 
-      {forceLogoutConfirm && (
+      {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Force logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
@@ -522,6 +529,7 @@ export default function GridmasterAccountsView({
           onCancel={() => setForceLogoutConfirm(null)}
         />
       )}
+      {stepUp.dialog}
 
       {resetConfirm && (
         <ConfirmDialog

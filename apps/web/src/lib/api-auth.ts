@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import {
+  createSensitiveActionStepUpRequired,
+  evaluateSensitiveActionAssurance,
+  resolveVerifiedTotpFactorPresence,
+} from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
@@ -23,6 +28,10 @@ type UserAuthResult = { user: User; sessionId: string } | { response: NextRespon
 
 type ClaimsAuthResult =
   { session: Session; user: User; sessionId: string; claims: Claims } | { response: NextResponse };
+
+type SensitiveActionAuthResult =
+  | { session: Session; user: User; sessionId: string; claims: VerifiedClaims }
+  | { response: NextResponse };
 
 /**
  * A user-scoped Supabase client for this request, honouring whichever
@@ -185,37 +194,61 @@ export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAu
   return { user: auth.user, sessionId: auth.verified.sessionId };
 }
 
-/**
- * Confirms the caller is still live according to Supabase Auth, rather than
- * only according to a token we verified locally.
- *
- * Local verification accepts a token for its full lifetime, so a caller can be
- * up to an hour stale. That is the right trade for ordinary reads and writes,
- * where the revocation markers cover the cases that matter. It is NOT the
- * right trade for irreversible or credential-level actions — account deletion,
- * GDPR erasure, data export, credential and MFA changes, ownership transfer.
- * Those pay the round trip deliberately, by calling this after their normal
- * auth check:
- *
- *   const stale = await requireFreshAuth(req, auth.user.id);
- *   if (stale) return stale;
- *
- * Returns null when the caller is still valid, or the 401 to return when not.
- */
-export async function requireFreshAuth(
+export async function requireLiveAuthenticatedSession(
   req: NextRequest,
-  expectedUserId: string,
-): Promise<NextResponse | null> {
+): Promise<SensitiveActionAuthResult> {
+  const auth = await authenticateRequest(req);
+  if ("response" in auth) return auth;
+
   const supabase = createRequestSupabaseClient(req);
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
-  if (!user || user.id !== expectedUserId) {
-    return expiredSessionResponse();
+  if (error) {
+    return {
+      response: NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 }),
+    };
   }
 
-  return null;
+  if (!user || user.id !== auth.user.id) {
+    return { response: expiredSessionResponse() };
+  }
+
+  return {
+    session: auth.session,
+    user,
+    sessionId: auth.verified.sessionId,
+    claims: auth.verified.claims,
+  };
+}
+
+export async function requireSensitiveActionAuth(
+  req: NextRequest,
+): Promise<SensitiveActionAuthResult> {
+  const auth = await requireLiveAuthenticatedSession(req);
+  if ("response" in auth) return auth;
+  const hasVerifiedTotpFactor = resolveVerifiedTotpFactorPresence(auth.user.factors);
+  if (hasVerifiedTotpFactor === null) {
+    return {
+      response: NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 }),
+    };
+  }
+
+  const decision = evaluateSensitiveActionAssurance({
+    claims: auth.claims,
+    hasVerifiedTotpFactor,
+  });
+  if (!decision.allowed) {
+    return {
+      response: NextResponse.json(createSensitiveActionStepUpRequired(decision.requiredMethod), {
+        status: 403,
+      }),
+    };
+  }
+
+  return auth;
 }
 
 /**

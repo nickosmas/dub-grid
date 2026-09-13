@@ -9,6 +9,7 @@ import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
+import { fetchSelfProfileSnapshot } from "@/features/account/server/profile";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -38,14 +39,6 @@ const NO_SELF_EMPLOYMENT_FLAGS: SelfEmploymentFlags = {
 // §13.1: a dismissible in-app nag, not a hard block, to avoid locking out
 // existing admin/gridmaster accounts that haven't enrolled yet.
 const MFA_NAGGED_ROLES = new Set(["admin", "super_admin", "gridmaster"]);
-
-function hasVerifiedTotpFactor(user: {
-  factors?: { factor_type: string; status: string }[] | null;
-}) {
-  return (user.factors ?? []).some(
-    (factor) => factor.factor_type === "totp" && factor.status === "verified",
-  );
-}
 
 async function getSelfEmploymentFlags(
   serviceClient: SupabaseClient,
@@ -91,8 +84,11 @@ async function handleGET(req: NextRequest, timer: Timer) {
     const claimOrgRole = (auth.claims.org_role as string) || "user";
     const effectiveRole = auth.claims.platform_role === "gridmaster" ? "gridmaster" : claimOrgRole;
     const orgId = claimOrgId;
-    const hasTotp = hasVerifiedTotpFactor(auth.user);
-    const mfaNagFor = (role: string) => MFA_NAGGED_ROLES.has(role) && !hasTotp;
+    // Locally verified JWT users have no factor list. This advisory display
+    // uses the profile reconciled by the MFA lifecycle, never to grant access.
+    const profileSnapshot = await fetchSelfProfileSnapshot(auth.user.id);
+    const mfaNagFor = (role: string) =>
+      MFA_NAGGED_ROLES.has(role) && profileSnapshot?.mfaEnabled === false;
     const mfaNagRequired = mfaNagFor(effectiveRole);
 
     if (impersonation && auth.claims.platform_role === "gridmaster") {

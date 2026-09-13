@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import {
   fetchPeopleProfileChangeRequests,
+  requireCredentialAssurance,
   resolvePeopleProfileChangeRequest,
   type ProfileChangeRequest,
 } from "@/features/account/client";
@@ -13,6 +14,7 @@ const { mockToastError, mockToastSuccess } = vi.hoisted(() => ({
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
 }));
+const stepUpRun = vi.hoisted(() => vi.fn());
 
 vi.mock("sonner", () => ({
   toast: {
@@ -20,9 +22,13 @@ vi.mock("sonner", () => ({
     success: mockToastSuccess,
   },
 }));
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
 
 vi.mock("@/features/account/client", () => ({
   fetchPeopleProfileChangeRequests: vi.fn(),
+  requireCredentialAssurance: vi.fn(),
   resolvePeopleProfileChangeRequest: vi.fn(),
 }));
 
@@ -122,6 +128,11 @@ function renderQueue() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+    await action("fresh-token");
+    return true;
+  });
+  vi.mocked(requireCredentialAssurance).mockResolvedValue({ success: true });
   vi.mocked(resolvePeopleProfileChangeRequest).mockResolvedValue({
     success: true,
     request: makeRequest({ status: "approved" }),
@@ -185,5 +196,43 @@ describe("ProfileChangeRequestQueue", () => {
     await waitFor(() => {
       expect(fetchPeopleProfileChangeRequests).toHaveBeenCalledWith("org-1", "pending");
     });
+  });
+
+  it("requires fresh assurance only when approving account deletion", async () => {
+    vi.mocked(fetchPeopleProfileChangeRequests).mockResolvedValue({
+      requests: [makeRequest({ type: "account_deletion", requestedChanges: {} })],
+    });
+    renderQueue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog", { name: "Approve Account deletion?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(resolvePeopleProfileChangeRequest).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(resolvePeopleProfileChangeRequest).toHaveBeenCalledWith({
+      orgId: "org-1",
+      requestId: "request-1",
+      action: "approve",
+      accessToken: "fresh-token",
+    });
+  });
+
+  it("does not require step-up when rejecting an account deletion request", async () => {
+    vi.mocked(fetchPeopleProfileChangeRequests).mockResolvedValue({
+      requests: [makeRequest({ type: "account_deletion", requestedChanges: {} })],
+    });
+    renderQueue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Reject Account deletion?" })).getByRole("button", {
+        name: "Reject",
+      }),
+    );
+
+    await waitFor(() => expect(resolvePeopleProfileChangeRequest).toHaveBeenCalledOnce());
+    expect(stepUpRun).not.toHaveBeenCalled();
+    expect(requireCredentialAssurance).not.toHaveBeenCalled();
   });
 });

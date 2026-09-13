@@ -123,7 +123,7 @@
           stale claims, archived memberships, session revocation, tenant
           isolation, service-role boundaries, sandbox and impersonation
           boundaries, and RLS enforcement across web and mobile APIs.
-    - [ ] 19d2. **MFA assurance and sensitive-action reauthentication** - require
+    - [x] 19d2. **MFA assurance and sensitive-action reauthentication** - require
           the appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
           sessions, exports, account deletion, and other irreversible actions.
     - [ ] 19d3. **Invite, recovery, redirect, and CSRF integrity** - verify token
@@ -137,7 +137,9 @@
   - [ ] 19e. **Authentication release qualification** - add a durable automated
         role/state/browser matrix and complete authenticated browser plus native
         device checks; close every confirmed in-scope defect and report any
-        unavailable evidence explicitly before marking the epic complete.
+        unavailable evidence explicitly before marking the epic complete. The
+        native matrix must include a TOTP-enabled account and physical-device
+        coverage; feature 19d2 verified the no-TOTP Android-emulator path only.
 - [ ] 20. **Explicit schedule-indicator removal** - make removing an active
       shift note/indicator discoverable in the shift slideover, without relying
       on clicking the active indicator itself. Preserve authorization,

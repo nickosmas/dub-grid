@@ -385,10 +385,12 @@ the device fully working.
 
 **Two deliberate exceptions.**
 
-- `requireFreshAuth(req, userId)` re-checks against Supabase Auth over the network, for
-  irreversible or credential-level actions: `delete-account`, `gdpr-erase`,
-  `data-export`. A locally verified token can be up to an hour old, which is fine for
-  ordinary reads and writes and not fine for these.
+- `requireLiveAuthenticatedSession(req)` re-checks against Supabase Auth over the
+  network. `requireSensitiveActionAuth(req)` builds on that live check and enforces the
+  canonical five-minute password or verified-TOTP assurance policy before credential,
+  factor, session, export, or destructive account and organization actions. A locally
+  verified token can be up to an hour old, which is fine for ordinary reads and writes
+  and not fine for these.
 - `packages/mobile-api-core/src/auth.ts` still calls `getUser()`, solely to read enrolled
   MFA factors. `auth.mfa_factors` is not exposed through PostgREST and factors are not in
   the JWT, so there is no local answer to "does this user have a verified factor?", and
@@ -418,8 +420,14 @@ non-mobile Route Handler. A handler must call a canonical authorization helper,
 delegate to a helper whose live authorization is itself asserted, or appear in
 the exact public/system allowlist with its independent credential or public-purpose
 reason. Adding an unclassified handler fails the structural test. Mobile v1 routes
-are deliberately excluded here because their equivalent full inventory is enforced
-as a separate mobile-parity boundary.
+have a separate complete authorization inventory.
+
+`apps/web/src/__tests__/sensitive-action-authorization-boundaries.test.ts` separately
+inventories every credential, factor, session-changing, export, and destructive
+account or organization entry point. It records whether the policy is direct,
+conditional, delegated to a mobile handler, or an authorized operational revocation
+of another user's sessions. A newly added matching endpoint must be classified and
+must satisfy the declared policy before the structural suite passes.
 
 `apps/web/src/__tests__/privileged-authorization-boundaries.test.ts` separately
 inventories every non-mobile source file that can create or receive the

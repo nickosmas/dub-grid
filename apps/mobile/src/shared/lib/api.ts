@@ -1,5 +1,6 @@
 import {
   mobileAuthLoginResponseSchema,
+  mfaMutationResponseSchema,
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestResponseSchema,
   mobileDashboardResponseSchema,
@@ -482,7 +483,7 @@ export function updateProfileAccount(accessToken: string, body: MobileProfileAcc
 
 export function updateProfileMfaStatus(
   accessToken: string,
-  body: MobileProfileMfaStatusUpdateBody,
+  body: MobileProfileMfaStatusUpdateBody = {},
 ) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/mfa-status",
@@ -492,6 +493,15 @@ export function updateProfileMfaStatus(
       body: JSON.stringify(body),
     },
     (value) => mobileProfileMfaStatusUpdateResponseSchema.parse(value),
+  );
+}
+
+export function requireMobileCredentialAssurance(accessToken: string) {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile/credential-assurance",
+    accessToken,
+    { method: "POST" },
+    (value) => mfaMutationResponseSchema.parse(value),
   );
 }
 

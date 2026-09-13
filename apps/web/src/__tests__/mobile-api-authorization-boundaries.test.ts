@@ -16,7 +16,7 @@ const implementationRoot = path.join(
 );
 
 const delegatedMobileAuthorization =
-  /\b(?:requireMobileAuth|requireManagementAccessActor|requireManagementRosterActor)\s*\(/;
+  /\b(?:requireMobileAuth|requireMobileSensitiveActionAuth|requireMobileStepUpSession|requireManagementAccessActor|requireManagementRosterActor)\s*\(/;
 
 const INDEPENDENT_ROUTE_IMPLEMENTATIONS: Record<string, string> = {
   "auth-login": "Public credential exchange with organization membership reconciliation.",

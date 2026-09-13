@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  fetchProfileChangeRequestForResolution,
   resolveProfileChangeRequest,
   resolveProfileChangeRequestSchema,
 } from "@/features/account/server";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { requireSensitiveActionAuth } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -41,6 +43,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const { id } = await context.params;
   try {
+    const pendingRequest = await fetchProfileChangeRequestForResolution(
+      auth.serviceClient,
+      auth.orgId,
+      id,
+    );
+    if (parsed.data.action === "approve" && pendingRequest.type === "account_deletion") {
+      const assurance = await requireSensitiveActionAuth(req);
+      if ("response" in assurance) return assurance.response;
+    }
+
     const request = await resolveProfileChangeRequest({
       serviceClient: auth.serviceClient,
       actor: auth.actor,
@@ -50,6 +62,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       requestId: id,
       action: parsed.data.action,
       resolverNote: parsed.data.resolverNote,
+      request: pendingRequest,
     });
     return NextResponse.json({ success: true, request });
   } catch (error) {

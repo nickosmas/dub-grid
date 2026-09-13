@@ -74,8 +74,9 @@ function createServiceClient(input?: {
   factors?: Array<{
     id: string;
     factor_type: "totp";
-    status: "verified";
+    status: "verified" | "unverified";
   }>;
+  omitFactors?: boolean;
 }) {
   const setupComplete = input?.setupComplete ?? true;
 
@@ -131,7 +132,7 @@ function createServiceClient(input?: {
           user: {
             id: USER_ID,
             email: "manager@dubgrid.com",
-            factors: input?.factors ?? [],
+            ...(input?.omitFactors ? {} : { factors: input?.factors ?? [] }),
             user_metadata: {},
           },
         },
@@ -159,7 +160,7 @@ function createServiceClient(input?: {
   };
 }
 
-describe("requireMobileAuth", () => {
+describe("mobile auth server boundaries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isSessionRevoked.mockResolvedValue(false);
@@ -477,5 +478,120 @@ describe("requireMobileAuth", () => {
     if ("response" in result) return;
     expect(result.currentOrg.id).toBe(ORG_ID);
     expect(result.permissions.orgId).toBe(ORG_ID);
+  });
+
+  describe("sensitive-action assurance", () => {
+    it("returns the shared step-up contract for stale bearer proof", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClient({
+          claims: {
+            aal: "aal1",
+            amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) - 301 }],
+          },
+        }),
+      );
+
+      const { requireMobileSensitiveActionAuth } = await import("./auth");
+      const result = await requireMobileSensitiveActionAuth(
+        new Request("http://localhost/api/mobile/v1/profile/sessions", {
+          headers: { authorization: "Bearer stale-token" },
+        }) as never,
+      );
+
+      expect("response" in result).toBe(true);
+      if (!("response" in result)) return;
+      expect(result.response.status).toBe(403);
+      await expect(result.response.json()).resolves.toEqual({
+        code: "STEP_UP_REQUIRED",
+        method: "password",
+        error: "Confirm your identity, then try again.",
+      });
+    });
+
+    it.each([
+      {
+        label: "password",
+        factors: [],
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      },
+      {
+        label: "TOTP",
+        factors: [{ id: "factor-123", factor_type: "totp", status: "verified" }] as const,
+        claims: {
+          aal: "aal2",
+          amr: [{ method: "totp", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      },
+    ])(
+      "accepts recent $label proof selected from live factor state",
+      async ({ factors, claims }) => {
+        getServiceClient.mockReturnValue(createServiceClient({ factors: [...factors], claims }));
+
+        const { requireMobileSensitiveActionAuth } = await import("./auth");
+        const result = await requireMobileSensitiveActionAuth(
+          new Request("http://localhost/api/mobile/v1/profile/sessions", {
+            headers: { authorization: "Bearer fresh-token" },
+          }) as never,
+        );
+
+        expect("response" in result).toBe(false);
+      },
+    );
+
+    it("ignores an untrusted requested method and requires TOTP from live factors", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClient({
+          factors: [{ id: "factor-123", factor_type: "totp", status: "verified" }],
+          claims: {
+            aal: "aal1",
+            amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+          },
+        }),
+      );
+
+      const { requireMobileSensitiveActionAuth } = await import("./auth");
+      const result = await requireMobileSensitiveActionAuth(
+        new Request("http://localhost/api/mobile/v1/profile/sessions", {
+          method: "DELETE",
+          headers: {
+            authorization: "Bearer aal1-token",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ method: "password" }),
+        }) as never,
+      );
+
+      expect("response" in result).toBe(true);
+      if (!("response" in result)) return;
+      await expect(result.response.json()).resolves.toEqual({
+        code: "STEP_UP_REQUIRED",
+        method: "totp",
+        error: "Confirm your identity, then try again.",
+      });
+    });
+
+    it("accepts Supabase's omitted empty factors with fresh password proof", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClient({
+          omitFactors: true,
+          claims: {
+            aal: "aal1",
+            amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+          },
+        }),
+      );
+
+      const { requireMobileSensitiveActionAuth } = await import("./auth");
+      const result = await requireMobileSensitiveActionAuth(
+        new Request("http://localhost/api/mobile/v1/profile/sessions", {
+          headers: { authorization: "Bearer no-factor-state-token" },
+        }) as never,
+      );
+
+      expect("response" in result).toBe(false);
+    });
   });
 });

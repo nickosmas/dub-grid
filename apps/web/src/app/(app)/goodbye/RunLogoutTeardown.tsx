@@ -84,12 +84,17 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
         });
         await clearRealtimeChannels();
         await signOutFromBrowser(scope);
-        clearDubgridSessionState();
       } catch (err) {
         Sentry.captureException(err);
+        if (scope === "global") {
+          toast.error(
+            "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
+          );
+        }
         // Best-effort. User is on /goodbye and the session is at least
         // partially cleared; signing back in will reset everything.
       } finally {
+        clearDubgridSessionState();
         // Drop ?scope= from the URL so a refresh doesn't re-run teardown.
         // Use history.replaceState (not router.replace) — the page is
         // force-dynamic, so router.replace would trigger an RSC fetch and

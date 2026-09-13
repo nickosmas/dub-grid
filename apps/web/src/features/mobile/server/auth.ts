@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createSensitiveActionStepUpRequired,
+  evaluateSensitiveActionAssurance,
+  resolveVerifiedTotpFactorPresence,
+} from "@dubgrid/authz";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import type { Organization } from "@dubgrid/domain";
 import {
   fetchMobileOrganizationMembershipRows,
@@ -22,8 +28,9 @@ import { createMobileUserClient } from "./client";
 
 export type MobileAuthContext = ResolvedMobileAuthContext<Organization>;
 
-export async function requireMobileAuth(
+async function resolveMobileRequestAuth(
   req: NextRequest,
+  allowAal1ForStepUp: boolean,
 ): Promise<MobileAuthContext | { response: NextResponse }> {
   if (!(await isFeatureEnabled("mobile_api"))) {
     return {
@@ -67,6 +74,7 @@ export async function requireMobileAuth(
         };
       },
       isRevoked: (token) => isSessionRevoked(token),
+      allowAal1ForStepUp,
     });
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
@@ -85,4 +93,43 @@ export async function requireMobileAuth(
       ),
     };
   }
+}
+
+export function requireMobileAuth(
+  req: NextRequest,
+): Promise<MobileAuthContext | { response: NextResponse }> {
+  return resolveMobileRequestAuth(req, false);
+}
+
+/** Only identity/step-up handlers may admit AAL1 while a verified factor exists. */
+export function requireMobileStepUpSession(req: NextRequest) {
+  return resolveMobileRequestAuth(req, true);
+}
+
+export async function requireMobileSensitiveActionAuth(
+  req: NextRequest,
+): Promise<MobileAuthContext | { response: NextResponse }> {
+  const auth = await resolveMobileRequestAuth(req, true);
+  if ("response" in auth) return auth;
+
+  const hasVerifiedTotpFactor = resolveVerifiedTotpFactorPresence(auth.user.factors);
+  if (hasVerifiedTotpFactor === null) {
+    return {
+      response: NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 }),
+    };
+  }
+
+  const decision = evaluateSensitiveActionAssurance({
+    claims: auth.claims,
+    hasVerifiedTotpFactor,
+  });
+  if (!decision.allowed) {
+    return {
+      response: NextResponse.json(createSensitiveActionStepUpRequired(decision.requiredMethod), {
+        status: 403,
+      }),
+    };
+  }
+
+  return auth;
 }

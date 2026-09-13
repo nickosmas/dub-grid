@@ -139,7 +139,10 @@ async function requestGridmasterJson<T>(input: string, init?: RequestInit): Prom
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Gridmaster request failed."));
+    throw Object.assign(
+      new Error(formatClientErrorMessage(body?.error, "Gridmaster request failed.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return body as T;
@@ -204,9 +207,13 @@ export function fetchGridmasterUserMemberships(
   return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/memberships`);
 }
 
-export function forceLogoutGridmasterUser(userId: string): Promise<{ success: true }> {
+export function forceLogoutGridmasterUser(
+  userId: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
   return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/force-logout`, {
     method: "POST",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
   });
 }
 

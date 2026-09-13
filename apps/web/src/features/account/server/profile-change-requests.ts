@@ -465,7 +465,7 @@ export async function cancelOwnProfileChangeRequest(input: {
   return mapProfileChangeRequest(data as Record<string, unknown>);
 }
 
-async function fetchRequestForResolution(
+export async function fetchProfileChangeRequestForResolution(
   serviceClient: SupabaseClient,
   orgId: string,
   requestId: string,
@@ -581,12 +581,18 @@ export async function resolveProfileChangeRequest(input: {
   requestId: string;
   action: "approve" | "reject";
   resolverNote?: string;
+  request?: ProfileChangeRequestRecord;
 }): Promise<ProfileChangeRequestRecord> {
-  const request = await fetchRequestForResolution(
-    input.serviceClient,
-    input.orgId,
-    input.requestId,
-  );
+  const request =
+    input.request ??
+    (await fetchProfileChangeRequestForResolution(
+      input.serviceClient,
+      input.orgId,
+      input.requestId,
+    ));
+  if (request.id !== input.requestId || request.orgId !== input.orgId) {
+    throw new Error("Request not found.");
+  }
   if (request.status !== "pending") {
     throw new Error("Only pending requests can be resolved.");
   }

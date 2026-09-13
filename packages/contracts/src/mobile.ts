@@ -274,7 +274,8 @@ export const mobileProfilePhoneUpdateResponseSchema = z.object({
 });
 
 export const mobileProfileMfaStatusUpdateBodySchema = z.object({
-  enabled: z.boolean(),
+  // Accepted for older clients; the server derives status from live Auth factors.
+  enabled: z.boolean().optional(),
 });
 
 export const mobileProfileMfaStatusUpdateResponseSchema = z.object({

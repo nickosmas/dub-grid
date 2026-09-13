@@ -72,6 +72,7 @@ export const queryKeys = {
     operationsAll: (orgId: string) => ["reports", "operations", orgId] as const,
   },
   account: {
+    all: (userId: string) => ["account", userId] as const,
     /**
      * The caller's org id + gridmaster flag. Deliberately not keyed by user or
      * org: it is what *resolves* those, and every transition that could change
