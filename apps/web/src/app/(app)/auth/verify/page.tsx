@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { Button } from "@/components/Button";
@@ -11,6 +11,7 @@ import { verifyBrowserOtp } from "@/features/account/client";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
 import { resolveAuthActionDestination } from "@/lib/auth/integrity-contract";
 import { markBrowserRecoveryVerified } from "@/lib/auth/browser-recovery-capability";
+import { scrubBrowserSecretQuery } from "@/lib/auth/browser-secret-query";
 
 /**
  * Intermediate click-through page for email verification links.
@@ -29,12 +30,16 @@ export default function AuthVerifyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const tokenHash = searchParams.get("token_hash");
-  const authAction = resolveAuthActionDestination(
-    searchParams.get("type"),
-    searchParams.get("next"),
-  );
+  const [credential] = useState(() => ({
+    tokenHash: searchParams.get("token_hash"),
+    authAction: resolveAuthActionDestination(searchParams.get("type"), searchParams.get("next")),
+  }));
+  const { tokenHash, authAction } = credential;
   const isRecovery = authAction?.action === "recovery";
+
+  useEffect(() => {
+    scrubBrowserSecretQuery(["token_hash", "type", "next"]);
+  }, []);
 
   async function handleVerify() {
     if (!tokenHash || !authAction) {

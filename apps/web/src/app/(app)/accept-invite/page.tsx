@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -22,6 +22,7 @@ import {
   signOutFromBrowser,
 } from "@/features/account/client";
 import { acceptInvitation } from "@/features/organization/client";
+import { scrubBrowserSecretQuery } from "@/lib/auth/browser-secret-query";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success";
 
@@ -45,12 +46,15 @@ function AcceptInviteContent() {
   // it, someone whose password predates the current strength rules can never
   // satisfy `isPasswordAcceptable` and the invitation is a dead end.
   const [existingAccount, setExistingAccount] = useState(false);
+  const capturedUrlSecrets = useRef(false);
 
   // Extract token and email from URL on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("token");
-    const emailParam = params.get("email");
+    if (capturedUrlSecrets.current) return;
+    capturedUrlSecrets.current = true;
+    const captured = scrubBrowserSecretQuery(["token", "email"]);
+    const t = captured.token;
+    const emailParam = captured.email;
     if (!t) {
       setState("no-token");
     } else {

@@ -96,7 +96,7 @@
       - [x] 19b5b. **Trial and billing recovery gates** - verify pending,
             active, grace, and locked trial paths, including Super Admin billing
             recovery and non-admin restrictions across web and mobile.
-  - [ ] 19c. **Authentication speed and resilience** - measure cold and warm
+  - [x] 19c. **Authentication speed and resilience** - measure cold and warm
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
         and verify slow, offline, retry, cross-tab, and token-refresh behavior.
@@ -130,7 +130,7 @@
           expiry, single use, and replay protection; safe redirects; origin
           validation; generic failure responses; and public state-changing
           endpoints.
-    - [ ] 19d4. **Abuse resistance, token secrecy, and security auditability** -
+    - [x] 19d4. **Abuse resistance, token secrecy, and security auditability** -
           verify enumeration resistance, distributed and per-target rate limits,
           production fail-closed behavior, token secrecy across URLs, logs, and
           telemetry, and complete security-event audit coverage.
@@ -152,7 +152,13 @@
       pills, and give the compact Roles table content-aware column widths so it
       does not consume unnecessary horizontal space. Prevent horizontal clipping
       or overflow without changing settings behavior, and add regression coverage.
-- [ ] 22. **Production migration safety** - final release gate only after all
+- [ ] 22. **Scheduler open-shift staffing** - when a scheduler clicks an open
+      shift in the web schedule, show active staff who are qualified for its
+      focus area, role, and certification requirements and have no absence or
+      overlapping shift that day. Let the scheduler assign a selected person
+      through the normal draft/publish workflow, while regular staff retain the
+      existing volunteer flow.
+- [ ] 23. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

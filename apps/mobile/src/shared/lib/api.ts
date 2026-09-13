@@ -622,6 +622,23 @@ export function loginToOrganization(input: {
   );
 }
 
+export function requestPasswordRecovery(email: string): Promise<{ success: true }> {
+  return mobilePublicApiRequest(
+    "/api/mobile/v1/auth/recovery-request",
+    { method: "POST", body: JSON.stringify({ email }) },
+    (value) => {
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        (value as { success?: unknown }).success !== true
+      ) {
+        throw new Error("Recovery request failed");
+      }
+      return { success: true as const };
+    },
+  );
+}
+
 function mapSupabaseSessionToMobileAuthSession(
   session: Pick<
     SupabaseSessionLike,

@@ -88,6 +88,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
   "apps/web/src/lib/api-auth.ts": "Owns verified request and live Gridmaster authorization.",
   "apps/web/src/lib/auth/revocation.ts":
     "Internal revocation helper writes the token cutoff first, then deletes only the verified session or user's tracked rows.",
+  "apps/web/src/lib/auth/security-audit.ts":
+    "Server-only best-effort writer accepts only the closed, secret-free security event contract.",
   "apps/web/src/lib/audit/authorize.ts":
     "Delegates to canonical organization or Gridmaster authorization.",
   "apps/web/src/lib/feature-flags.ts":

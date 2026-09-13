@@ -3,10 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const checkRateLimit = vi.fn();
 const getServiceClient = vi.fn();
 const createClient = vi.fn();
+const writeSecurityAuditEvent = vi.fn();
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit,
+  loginIpLimiter: {},
   loginLimiter: {},
+  loginSurgeLimiter: {},
+}));
+
+vi.mock("@/lib/auth/security-audit", () => ({
+  writeSecurityAuditEvent,
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -199,6 +206,7 @@ describe("mobile auth login route", () => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
+    writeSecurityAuditEvent.mockResolvedValue(undefined);
   });
 
   it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a terminated employee", async () => {

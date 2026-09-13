@@ -21,6 +21,8 @@ const delegatedMobileAuthorization =
 const INDEPENDENT_ROUTE_IMPLEMENTATIONS: Record<string, string> = {
   "auth-login": "Public credential exchange with organization membership reconciliation.",
   "auth-organization": "Public organization discovery returns no authenticated tenant data.",
+  "auth-recovery-request":
+    "Public recovery request uses enumeration resistance and layered distributed rate limits.",
   "org-status":
     "Recovery route independently verifies identity, revocation, live role, and membership.",
 };

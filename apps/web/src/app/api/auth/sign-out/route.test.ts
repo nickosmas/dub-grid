@@ -32,6 +32,7 @@ vi.mock("@/lib/api-auth", () => ({
   createTokenScopedClient: (...args: unknown[]) => createTokenScopedClient(...args),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
+vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
 
 import { POST } from "./route";
 

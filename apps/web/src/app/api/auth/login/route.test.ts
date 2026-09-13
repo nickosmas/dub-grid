@@ -54,6 +54,8 @@ vi.mock("@/lib/sentry", () => ({
   captureMessage: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: vi.fn() }));
+
 import { POST } from "@/app/api/auth/login/route";
 import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 

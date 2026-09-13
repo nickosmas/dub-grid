@@ -3,9 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
 const routerReplace = vi.fn();
-const resetPasswordForEmail = vi.fn();
-const createEphemeralSupabaseClient = vi.fn();
-const getSupabaseClient = vi.fn();
+const requestPasswordRecovery = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -18,9 +16,8 @@ vi.mock("expo-router", async () => {
   };
 });
 
-vi.mock("../../../shared/lib/supabase", () => ({
-  createEphemeralSupabaseClient: () => createEphemeralSupabaseClient(),
-  getSupabaseClient: () => getSupabaseClient(),
+vi.mock("../../../shared/lib/api", () => ({
+  requestPasswordRecovery: (...args: unknown[]) => requestPasswordRecovery(...args),
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", async () => {
@@ -36,8 +33,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetPasswordForEmail.mockResolvedValue({ error: null });
-  createEphemeralSupabaseClient.mockReturnValue({ auth: { resetPasswordForEmail } });
+  requestPasswordRecovery.mockResolvedValue({ success: true });
 });
 
 async function submit() {
@@ -58,15 +54,14 @@ describe("ForgotPasswordScreen", () => {
     render(<ForgotPasswordScreen />);
     await submit();
 
-    expect(resetPasswordForEmail).toHaveBeenCalledWith("nurse@dubgrid.test");
+    expect(requestPasswordRecovery).toHaveBeenCalledWith("nurse@dubgrid.test");
   });
 
-  it("uses the ephemeral client, never the persistent one", async () => {
+  it("uses the distributed server boundary instead of a client Auth request", async () => {
     render(<ForgotPasswordScreen />);
     await submit();
 
-    expect(createEphemeralSupabaseClient).toHaveBeenCalled();
-    expect(getSupabaseClient).not.toHaveBeenCalled();
+    expect(requestPasswordRecovery).toHaveBeenCalledOnce();
   });
 
   it("advances to the reset screen carrying the email", async () => {
@@ -91,9 +86,7 @@ describe("ForgotPasswordScreen", () => {
    * user was advanced to wait for an email that had never been sent.
    */
   it("advances even when the address has no account", async () => {
-    resetPasswordForEmail.mockResolvedValue({
-      error: { message: "User not found", status: 400 },
-    });
+    requestPasswordRecovery.mockResolvedValue({ success: true });
 
     render(<ForgotPasswordScreen />);
     await submit();
@@ -103,8 +96,9 @@ describe("ForgotPasswordScreen", () => {
   });
 
   it("surfaces rate limiting inline instead of advancing", async () => {
-    resetPasswordForEmail.mockResolvedValue({
-      error: { status: 429, message: "over_email_send_rate_limit" },
+    requestPasswordRecovery.mockRejectedValue({
+      status: 429,
+      message: "Too many requests. Wait a few minutes and try again.",
     });
 
     render(<ForgotPasswordScreen />);
@@ -117,9 +111,7 @@ describe("ForgotPasswordScreen", () => {
   });
 
   it("surfaces a network failure inline instead of advancing", async () => {
-    resetPasswordForEmail.mockResolvedValue({
-      error: { message: "Failed to fetch", status: 0 },
-    });
+    requestPasswordRecovery.mockRejectedValue({ message: "Failed to fetch", status: 0 });
 
     render(<ForgotPasswordScreen />);
     await submit();
@@ -131,7 +123,7 @@ describe("ForgotPasswordScreen", () => {
   });
 
   it("surfaces a thrown transport failure inline instead of advancing", async () => {
-    resetPasswordForEmail.mockRejectedValue(new TypeError("Network request failed"));
+    requestPasswordRecovery.mockRejectedValue(new TypeError("Network request failed"));
 
     render(<ForgotPasswordScreen />);
     await submit();
@@ -144,7 +136,7 @@ describe("ForgotPasswordScreen", () => {
 
   it("releases a stalled request at its deadline and preserves the email", async () => {
     vi.useFakeTimers();
-    resetPasswordForEmail.mockReturnValue(new Promise(() => undefined));
+    requestPasswordRecovery.mockReturnValue(new Promise(() => undefined));
     render(<ForgotPasswordScreen />);
 
     fireEvent.click(screen.getByText("Send reset code"));
@@ -158,8 +150,8 @@ describe("ForgotPasswordScreen", () => {
   });
 
   it("coalesces repeated reset requests while one is active", async () => {
-    let resolveRequest: ((value: { error: null }) => void) | undefined;
-    resetPasswordForEmail.mockReturnValue(
+    let resolveRequest: ((value: { success: true }) => void) | undefined;
+    requestPasswordRecovery.mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve;
       }),
@@ -169,8 +161,8 @@ describe("ForgotPasswordScreen", () => {
     fireEvent.click(screen.getByText("Send reset code"));
     fireEvent.click(screen.getByText("Send reset code"));
 
-    expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
-    await act(async () => resolveRequest?.({ error: null }));
+    expect(requestPasswordRecovery).toHaveBeenCalledTimes(1);
+    await act(async () => resolveRequest?.({ success: true }));
   });
 
   it("rejects a malformed address without calling the API", async () => {
@@ -178,7 +170,7 @@ describe("ForgotPasswordScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("Email"), { target: { value: "not-an-email" } });
     await submit();
 
-    expect(resetPasswordForEmail).not.toHaveBeenCalled();
+    expect(requestPasswordRecovery).not.toHaveBeenCalled();
     expect(screen.getByText("Enter a valid email address.")).toBeInTheDocument();
   });
 });

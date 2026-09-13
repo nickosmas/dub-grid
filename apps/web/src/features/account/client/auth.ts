@@ -134,7 +134,20 @@ export async function refreshBrowserSession(): Promise<Session | null> {
 }
 
 export async function resetBrowserPasswordForEmail(email: string, redirectTo: string) {
-  return supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  void redirectTo;
+  const response = await fetchWithTimeout("/api/auth/recovery-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (response.ok) return { error: null };
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+  return {
+    error: {
+      message: payload?.error ?? "Recovery request failed",
+      status: response.status,
+    },
+  };
 }
 
 export async function exchangeBrowserCodeForSession(code: string) {

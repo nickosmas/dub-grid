@@ -4,7 +4,7 @@ import type { TextInput } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { Button } from "../../../shared/components/Button";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { createEphemeralSupabaseClient } from "../../../shared/lib/supabase";
+import { requestPasswordRecovery } from "../../../shared/lib/api";
 import { AuthActions, AuthFields, AuthHeader, AuthShell, AuthStage } from "../components/AuthShell";
 import { AuthField, AuthFieldError } from "../components/AuthField";
 import { getRecoveryErrorMessage, shouldSurfaceResetRequestError } from "../lib/recovery-errors";
@@ -40,12 +40,7 @@ export default function ForgotPasswordScreen() {
     // mocked a rejection. The catch stays for a transport-level throw.
     let requestError: unknown = null;
     try {
-      // The ephemeral client throughout, so no part of this flow can write a
-      // session to storage. See ResetPasswordScreen for why that matters.
-      const { error: resetError } = await settleMobileAuthAction(
-        createEphemeralSupabaseClient().auth.resetPasswordForEmail(trimmed),
-      );
-      requestError = resetError;
+      await settleMobileAuthAction(requestPasswordRecovery(trimmed));
     } catch (caught) {
       requestError = caught;
     }

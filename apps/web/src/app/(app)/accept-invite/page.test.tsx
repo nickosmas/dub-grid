@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 import AcceptInvitePage from "./page";
 
 const mocks = vi.hoisted(() => ({
@@ -99,7 +100,7 @@ function setLocation(search: string) {
       hostname: "localhost",
       protocol: "http:",
       search,
-      href: "",
+      href: `http://localhost:3000/accept-invite${search}`,
     },
   });
 }
@@ -118,7 +119,11 @@ describe("AcceptInvitePage", () => {
   it("shows a recoverable login route when the link has no invitation token", async () => {
     setLocation("");
 
-    render(<AcceptInvitePage />);
+    render(
+      <StrictMode>
+        <AcceptInvitePage />
+      </StrictMode>,
+    );
 
     expect(await screen.findByRole("heading", { name: "Invalid link" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Go to login" })).toBeInTheDocument();
@@ -127,7 +132,11 @@ describe("AcceptInvitePage", () => {
 
   it("accepts a valid invitation then directs the user to the accepted organization", async () => {
     setLocation("?token=invite-token&email=new.user%40example.com");
-    render(<AcceptInvitePage />);
+    render(
+      <StrictMode>
+        <AcceptInvitePage />
+      </StrictMode>,
+    );
 
     expect(await screen.findByText("Calm Haven")).toBeInTheDocument();
     expect(screen.getByDisplayValue("new.user@example.com")).toHaveAttribute("readonly");

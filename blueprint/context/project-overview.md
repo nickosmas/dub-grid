@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 16dbfc041e22b8683003a0a41d8ce1fd449c503476766526bcfcac967efd3aee -->
+<!-- blueprint:source-hash 14c37a4bde7b3876c71202ffb921185c6e657cc6f73fa489dbe5b7e459f7b985 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 19-22.
+Everything below is already shipped except the unchecked work in items 19-23.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -117,10 +117,23 @@ Everything below is already shipped except the unchecked work in items 19-22.
       - **19c4. Authentication session continuity under change** - preserve
         current identity, permissions, and tenant data through cross-tab auth,
         token rotation, foreground/resume, and organization switching.
-    - **19d. Authentication security hardening** - verify tenant/session
-      isolation, live membership, stale claims, MFA assurance, replay/expiry,
-      redirect and CSRF safety, enumeration resistance, rate limiting, token
-      secrecy, auditability, and RLS authorization.
+    - **19d. Authentication security hardening** - complete four bounded
+      security passes without weakening authentication performance or tenant
+      isolation.
+      - **19d1. Live tenant, membership, and session authorization** - verify
+        stale claims, archived memberships, session revocation, tenant
+        isolation, service-role boundaries, sandbox and impersonation
+        boundaries, and RLS enforcement across web and mobile APIs.
+      - **19d2. MFA assurance and sensitive-action reauthentication** - require
+        appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
+        sessions, exports, account deletion, and irreversible actions.
+      - **19d3. Invite, recovery, redirect, and CSRF integrity** - verify token
+        expiry, single use, and replay protection; safe redirects; origin
+        validation; generic failures; and public state-changing endpoints.
+      - **19d4. Abuse resistance, token secrecy, and security auditability** -
+        verify enumeration resistance, distributed and per-target rate limits,
+        production fail-closed behavior, token secrecy, and security-event
+        audit coverage.
     - **19e. Authentication release qualification** - maintain an automated
       role/state/browser matrix, run authenticated browser and native device
       checks, close confirmed defects, and disclose unavailable evidence.
@@ -132,7 +145,13 @@ Everything below is already shipped except the unchecked work in items 19-22.
     selectable at supported desktop widths and browser zoom levels; render role
     names as plain table text and use content-aware widths for the compact Roles table.
 
-22. **Production migration safety** - the final release gate after all product
+22. **Scheduler open-shift staffing** - when a scheduler clicks an open shift in
+    the web schedule, show active staff who satisfy its focus-area, role, and
+    certification requirements and have no absence or overlapping shift that
+    day. Let the scheduler assign a selected person through the normal
+    draft/publish workflow, while regular staff keep the existing volunteer flow.
+
+23. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
@@ -216,7 +235,7 @@ Everything below is already shipped except the unchecked work in items 19-22.
 - **Next.js 16 (App Router) + React 19** - web app, TypeScript strict
 - **Expo SDK 54 + Expo Router** - mobile app
 - **npm workspaces + Turborepo** - monorepo across `apps/web`,
-  `apps/mobile`, and 10 shared `packages/*`
+  `apps/mobile`, and 11 shared `packages/*`
 - **Supabase** - Postgres, Auth, Realtime, Row Level Security (no ORM;
   RLS is the real security boundary)
 - **Tailwind CSS v4** - styling, CSS-first `@theme` config, dark mode first
@@ -287,5 +306,7 @@ Main route groups (web, App Router):
 
 ## Open questions
 
+- The project plan says there are 10 shared packages but names 11; the
+  repository currently contains 11.
 - Exact per-seat billing price points / tier breaks are unconfirmed.
 - Deployment env vars, health check path, and domain notes are unconfirmed.

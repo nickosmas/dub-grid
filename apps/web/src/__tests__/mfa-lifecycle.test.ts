@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   rate: vi.fn(),
   csrf: vi.fn(),
+  audit: vi.fn(),
 }));
 vi.mock("@/lib/api-auth", () => ({
   requireLiveAuthenticatedSession: mocks.live,
@@ -42,6 +43,7 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: mocks.rate,
 }));
 vi.mock("@/lib/csrf", () => ({ validateCsrfOrigin: mocks.csrf }));
+vi.mock("@/lib/auth/security-audit", () => ({ writeSecurityAuditEvent: mocks.audit }));
 
 const factorId = "00000000-0000-4000-8000-000000000001";
 const user = { id: "user-1", email: "test@example.com", factors: [] as object[] };

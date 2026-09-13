@@ -22,6 +22,7 @@ import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -291,6 +292,12 @@ export async function POST(req: NextRequest) {
   );
 
   if (limits.some((limit) => limit.misconfigured)) {
+    await writeSecurityAuditEvent({
+      event: "security.auth.login",
+      outcome: "failed",
+      reason: "service_unavailable",
+      metadata: { targetHash: emailHash, surface: "web" },
+    });
     return NextResponse.json(
       { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
@@ -308,6 +315,12 @@ export async function POST(req: NextRequest) {
       "Login rate limited",
     );
     Sentry.captureMessage("Login load shed", "warning");
+    await writeSecurityAuditEvent({
+      event: "security.auth.login",
+      outcome: "throttled",
+      reason: "rate_limited",
+      metadata: { targetHash: emailHash, surface: "web" },
+    });
     return NextResponse.json(
       {
         success: false,
@@ -356,11 +369,23 @@ export async function POST(req: NextRequest) {
     // misleading. Only a genuine credential rejection (4xx) gets the
     // generic "Invalid email or password" (to avoid email enumeration).
     if (typeof error.status === "number" && error.status >= 500) {
+      await writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: "failed",
+        reason: "service_unavailable",
+        metadata: { targetHash: emailHash, surface: "web" },
+      });
       return NextResponse.json(
         { success: false, error: "DubGrid is unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
+    await writeSecurityAuditEvent({
+      event: "security.auth.login",
+      outcome: "rejected",
+      reason: "invalid_credentials",
+      metadata: { targetHash: emailHash, surface: "web" },
+    });
     return NextResponse.json(
       { success: false, error: "Check your email and password and try again." },
       { status: 401 },
@@ -442,5 +467,13 @@ export async function POST(req: NextRequest) {
     res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   }
   timer.applyTo(res.headers);
+  await writeSecurityAuditEvent({
+    event: "security.auth.login",
+    outcome: "succeeded",
+    reason: "accepted",
+    actorId: data.user.id,
+    orgId: typeof claims.org_id === "string" ? claims.org_id : null,
+    metadata: { targetHash: emailHash, surface: "web" },
+  });
   return res;
 }

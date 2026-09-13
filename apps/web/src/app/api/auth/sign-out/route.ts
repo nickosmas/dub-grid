@@ -14,6 +14,7 @@ import {
 } from "@/lib/api-auth";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,17 @@ export async function POST(req: NextRequest) {
       if (error) throw new Error("Provider sign-out failed");
       if (scope === "global") await revokeAllUserSessions(auth.user.id);
       else await revokeOtherUserSessions(auth.user.id, auth.sessionId);
+      await writeSecurityAuditEvent({
+        event: recoveryCompletion ? "security.auth.recovery" : "security.auth.session",
+        outcome: "succeeded",
+        reason: recoveryCompletion ? "recovery_completed" : "session_revoked",
+        actorId: auth.user.id,
+        orgId: auth.claims && typeof auth.claims.org_id === "string" ? auth.claims.org_id : null,
+        metadata: {
+          scope,
+          ...(recoveryCompletion ? { method: "otp" as const } : {}),
+        },
+      });
       return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       // A partial failure is not success and must not trigger automatic replay.

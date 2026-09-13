@@ -27,6 +27,7 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/auth/gdpr-erase/route.ts",
   "apps/web/src/app/api/auth/login/route.ts",
   "apps/web/src/app/api/auth/organizations/route.ts",
+  "apps/web/src/app/api/auth/recovery-request/route.ts",
   "apps/web/src/app/api/auth/sign-out/route.ts",
   "apps/web/src/app/api/auth/start-trial/route.ts",
   "apps/web/src/app/api/auth/track-session/route.ts",

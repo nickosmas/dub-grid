@@ -84,6 +84,9 @@ export const loginSurgeLimiter = createSlidingWindowLimiter(
   "10 s",
 );
 
+/** Global circuit breaker for recovery-email abuse and provider protection. */
+export const recoverySurgeLimiter = createSlidingWindowLimiter(100, "10 s");
+
 /**
  * Per-TARGET-email limiter — 5 emails per hour to a single recipient, keyed by
  * `hashEmail(targetEmail)`. Layers on top of the per-actor limiters so one

@@ -18,6 +18,8 @@ const delegatedAuthorizationCall = /\b(?:authorizeAuditLogRead|createMfaLifecycl
 const PUBLIC_OR_SYSTEM_ROUTE_ALLOWLIST: Record<string, string> = {
   "apps/web/src/app/api/auth/login/route.ts":
     "Public credential exchange with CSRF and rate limits.",
+  "apps/web/src/app/api/auth/recovery-request/route.ts":
+    "Public recovery request with CSRF, enumeration resistance, and layered rate limits.",
   "apps/web/src/app/api/calendar/feed/[token]/route.ts":
     "The opaque calendar-feed token is the read credential.",
   "apps/web/src/app/api/consent/route.ts":
