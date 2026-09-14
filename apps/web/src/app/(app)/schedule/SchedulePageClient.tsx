@@ -5634,29 +5634,44 @@ function SchedulerContent() {
   const staffingCandidates = useMemo(() => {
     if (!staffingOpenShift || !canEditShifts) return [];
     const dateKey = staffingOpenShift.date;
+    const date = parseLocalDateKey(dateKey);
     const scheduleByEmployeeId = new Map<string, StaffingScheduleState | null>();
+    const adjacentScheduleByEmployeeId = new Map<
+      string,
+      { previous: StaffingScheduleState | null; next: StaffingScheduleState | null }
+    >();
+    const staffingStateFor = (
+      employeeId: string,
+      targetDateKey: string,
+    ): StaffingScheduleState | null => {
+      const effective = shifts[`${employeeId}_${targetDateKey}`]?.effective ?? null;
+      return effective
+        ? {
+            kind: effective.kind,
+            segments: effective.segments,
+            assignmentIds: effective.assignmentIds,
+            absenceTypeId: effective.absenceTypeId ?? null,
+            customStartTime: effective.customStartTime ?? null,
+            customEndTime: effective.customEndTime ?? null,
+            seriesId: effective.seriesId ?? null,
+            fromRecurring: effective.fromRecurring ?? false,
+          }
+        : null;
+    };
+    const previousDateKey = formatDateKey(addDays(date, -1));
+    const nextDateKey = formatDateKey(addDays(date, 1));
     for (const employee of employees) {
-      const effective = shifts[`${employee.id}_${dateKey}`]?.effective ?? null;
-      scheduleByEmployeeId.set(
-        employee.id,
-        effective
-          ? {
-              kind: effective.kind,
-              segments: effective.segments,
-              assignmentIds: effective.assignmentIds,
-              absenceTypeId: effective.absenceTypeId ?? null,
-              customStartTime: effective.customStartTime ?? null,
-              customEndTime: effective.customEndTime ?? null,
-              seriesId: effective.seriesId ?? null,
-              fromRecurring: effective.fromRecurring ?? false,
-            }
-          : null,
-      );
+      scheduleByEmployeeId.set(employee.id, staffingStateFor(employee.id, dateKey));
+      adjacentScheduleByEmployeeId.set(employee.id, {
+        previous: staffingStateFor(employee.id, previousDateKey),
+        next: staffingStateFor(employee.id, nextDateKey),
+      });
     }
     return buildOpenShiftStaffingCandidates({
       openShift: staffingOpenShift,
       employees,
       scheduleByEmployeeId,
+      adjacentScheduleByEmployeeId,
       assignments,
       shiftCategories,
       jobs,
@@ -7035,6 +7050,7 @@ function SchedulerContent() {
                   staffingOpenShift.assignmentLabel
                 }
                 assignmentLabelById={assignmentNameMap}
+                absenceTypeLabelById={absenceTypeMap}
                 candidates={staffingCandidates}
                 dateLabel={parseLocalDateKey(staffingOpenShift.date).toLocaleDateString(undefined, {
                   weekday: "long",
@@ -7042,6 +7058,7 @@ function SchedulerContent() {
                   day: "numeric",
                 })}
                 needed={staffingOpenShift.needed ?? 1}
+                currentEmployeeId={currentEmpId}
                 onAssign={handleStaffOpenShift}
                 onClose={() => setStaffingOpenShift(null)}
               />

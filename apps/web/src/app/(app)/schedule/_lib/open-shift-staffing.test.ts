@@ -160,7 +160,7 @@ describe("buildOpenShiftStaffingCandidates", () => {
     expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["role", "cert"]);
   });
 
-  it("excludes absences and overlaps but allows an adjacent same-day shift", () => {
+  it("includes absences and adjacent same-day shifts but excludes overlapping work", () => {
     const worked = (assignmentId: number): StaffingScheduleState => ({
       kind: "worked",
       segments: [
@@ -194,7 +194,51 @@ describe("buildOpenShiftStaffingCandidates", () => {
       ],
       scheduleByEmployeeId: schedule,
     });
-    expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["adjacent"]);
+    expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["absence", "adjacent"]);
+    expect(candidates[0].existingState?.absenceTypeId).toBe(9);
+    expect(candidates[1].existingAssignments).toEqual([
+      { assignmentId: 101, timeRange: { start: "15:00", end: "23:00" } },
+    ]);
+  });
+
+  it("excludes previous-day and next-day overnight overlaps", () => {
+    const state = (assignmentId: number, start: string, end: string): StaffingScheduleState => ({
+      kind: "worked",
+      segments: [{ shiftId: 1, jobId: 10, position: 0, isMentored: false }],
+      assignmentIds: [assignmentId],
+      absenceTypeId: null,
+      customStartTime: start,
+      customEndTime: end,
+    });
+    const employees = [employee({ id: "conflict" }), employee({ id: "available" })];
+
+    const afterPreviousOvernight = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      openShift: gap({ eligibleAssignmentDefinitionIds: [100] }),
+      employees,
+      scheduleByEmployeeId: new Map(),
+      adjacentScheduleByEmployeeId: new Map([
+        ["conflict", { previous: state(101, "23:00", "08:00"), next: null }],
+      ]),
+    });
+    expect(afterPreviousOvernight.map((candidate) => candidate.employee.id)).toEqual(["available"]);
+
+    const beforeNextDayWork = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      openShift: gap({
+        source: "calloff",
+        assignmentIds: [100],
+        eligibleAssignmentDefinitionIds: undefined,
+        customStartTime: "22:00",
+        customEndTime: "08:00",
+      }),
+      employees,
+      scheduleByEmployeeId: new Map(),
+      adjacentScheduleByEmployeeId: new Map([
+        ["conflict", { previous: null, next: state(100, "07:00", "15:00") }],
+      ]),
+    });
+    expect(beforeNextDayWork.map((candidate) => candidate.employee.id)).toEqual(["available"]);
   });
 
   it("requires every exact calloff segment to be qualified and conflict-free", () => {
@@ -281,7 +325,7 @@ describe("buildStaffedOpenShiftInput", () => {
     });
   });
 
-  it("refuses to replace an absence or build an unresolved assignment", () => {
+  it("replaces an absence with staffed work but refuses an unresolved assignment", () => {
     const absence: StaffingScheduleState = {
       kind: "absence",
       segments: [],
@@ -296,7 +340,15 @@ describe("buildStaffedOpenShiftInput", () => {
         existingState: absence,
         option: { assignmentIds: [100], alignedTimeRanges: [null], timeRanges: [] },
       }),
-    ).toBeNull();
+    ).toEqual({
+      kind: "worked",
+      segments: [{ shiftId: 1, jobId: 10, position: 0, isMentored: false }],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
     expect(
       buildStaffedOpenShiftInput({
         ...baseContext,

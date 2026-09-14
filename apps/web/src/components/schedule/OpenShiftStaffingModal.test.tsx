@@ -44,7 +44,12 @@ const eveningOption = {
 
 function candidates(): OpenShiftStaffingCandidate[] {
   return [
-    { employee: employee("ada", "Ada"), options: [dayOption, eveningOption], existingState: null },
+    {
+      employee: employee("ada", "Ada"),
+      options: [dayOption, eveningOption],
+      existingState: null,
+      existingAssignments: [],
+    },
     {
       employee: employee("grace", "Grace", "part_time"),
       options: [dayOption],
@@ -56,6 +61,20 @@ function candidates(): OpenShiftStaffingCandidate[] {
         customStartTime: null,
         customEndTime: null,
       },
+      existingAssignments: [{ assignmentId: 101, timeRange: { start: "15:00", end: "23:00" } }],
+    },
+    {
+      employee: employee("lin", "Lin"),
+      options: [dayOption],
+      existingState: {
+        kind: "absence",
+        segments: [],
+        assignmentIds: [],
+        absenceTypeId: 9,
+        customStartTime: null,
+        customEndTime: null,
+      },
+      existingAssignments: [],
     },
   ];
 }
@@ -72,6 +91,7 @@ function renderModal(overrides: Partial<React.ComponentProps<typeof OpenShiftSta
           [101, "Evening · Support"],
         ])
       }
+      absenceTypeLabelById={new Map([[9, "Annual leave"]])}
       candidates={candidates()}
       dateLabel="Monday, September 14"
       needed={2}
@@ -90,11 +110,26 @@ describe("OpenShiftStaffingModal", () => {
     expect(within(dialog).getAllByText("Day shift · Nurse").length).toBeGreaterThan(0);
     expect(within(dialog).getByText("2 people needed")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada Nurse")).toBeInTheDocument();
-    expect(within(dialog).getByText("Part-time · Already working that day")).toBeInTheDocument();
+    expect(within(dialog).getByText("Full-time · Available all day")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Part-time · Working: Evening · Support, 3:00 PM–11:00 PM"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Full-time · Absent: Annual leave")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: /Ada Nurse/ })).toHaveAttribute(
       "aria-checked",
-      "true",
+      "false",
     );
+    expect(within(dialog).getByRole("button", { name: "Assign to schedule" })).toBeDisabled();
+  });
+
+  it("pins and identifies the current employee without selecting them automatically", () => {
+    renderModal({ currentEmployeeId: "grace" });
+    const radios = screen.getAllByRole("radio");
+    expect(radios[0]).toHaveAccessibleName(/Grace Nurse \(You\)/);
+    expect(radios[0]).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(radios[0]);
+    expect(screen.getByRole("button", { name: "Assign myself" })).toBeEnabled();
   });
 
   it("searches candidates and reports a no-match state", () => {
@@ -117,6 +152,21 @@ describe("OpenShiftStaffingModal", () => {
     expect(onAssign).toHaveBeenCalledWith(
       expect.objectContaining({ employee: expect.objectContaining({ id: "grace" }) }),
       dayOption,
+    );
+  });
+
+  it("cannot submit a selected person after search hides them", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("radio", { name: /Grace Nurse/ }));
+    expect(screen.getByRole("button", { name: "Assign to schedule" })).toBeEnabled();
+
+    fireEvent.change(screen.getByPlaceholderText("Search eligible staff"), {
+      target: { value: "Ada" },
+    });
+    expect(screen.getByRole("button", { name: "Assign to schedule" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Ada Nurse/ })).toHaveAttribute(
+      "aria-checked",
+      "false",
     );
   });
 

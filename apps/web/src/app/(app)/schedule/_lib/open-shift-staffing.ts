@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 import type { Employee } from "@dubgrid/domain";
 import { isEmployeeQualifiedForAssignmentDefinition } from "@/lib/assignable-shifts";
-import { timesOverlap, type TimeRange } from "@/lib/schedule-logic";
+import { checkCrossDateOverlap, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 
 export interface StaffingScheduleState {
   kind: ScheduleCellInput["kind"];
@@ -29,10 +29,21 @@ export interface OpenShiftStaffingOption {
   timeRanges: TimeRange[];
 }
 
+export interface OpenShiftStaffingExistingAssignment {
+  assignmentId: number;
+  timeRange: TimeRange | null;
+}
+
 export interface OpenShiftStaffingCandidate {
   employee: Employee;
   options: OpenShiftStaffingOption[];
   existingState: StaffingScheduleState | null;
+  existingAssignments: OpenShiftStaffingExistingAssignment[];
+}
+
+interface AdjacentStaffingSchedule {
+  previous: StaffingScheduleState | null;
+  next: StaffingScheduleState | null;
 }
 
 interface StaffingContext {
@@ -46,6 +57,7 @@ interface BuildCandidatesInput extends StaffingContext {
   openShift: GridOpenShift;
   employees: Employee[];
   scheduleByEmployeeId: ReadonlyMap<string, StaffingScheduleState | null>;
+  adjacentScheduleByEmployeeId?: ReadonlyMap<string, AdjacentStaffingSchedule>;
   sortBy?: "seniority" | "name";
 }
 
@@ -91,10 +103,10 @@ function assignmentTimeRange(
   return shift?.startTime && shift.endTime ? { start: shift.startTime, end: shift.endTime } : null;
 }
 
-export function getStaffingStateTimeRanges(
+function getStaffingStateAlignedTimeRanges(
   state: StaffingScheduleState | null,
   context: Pick<StaffingContext, "assignments" | "shiftCategories">,
-): TimeRange[] {
+): Array<TimeRange | null> {
   if (!state || state.kind !== "worked") return [];
   const startTimes = splitAlignedTimes(state.customStartTime, state.segments.length);
   const endTimes = splitAlignedTimes(state.customEndTime, state.segments.length);
@@ -102,14 +114,39 @@ export function getStaffingStateTimeRanges(
     context.assignments.map((assignment) => [assignment.id, assignment]),
   );
 
-  return state.assignmentIds.flatMap((assignmentId, index) => {
+  return state.assignmentIds.map((assignmentId, index) => {
     const customStart = startTimes[index];
     const customEnd = endTimes[index];
-    if (customStart && customEnd) return [{ start: customStart, end: customEnd }];
+    if (customStart && customEnd) return { start: customStart, end: customEnd };
     const assignment = assignmentById.get(assignmentId);
-    const range = assignment ? assignmentTimeRange(assignment, context.shiftCategories) : null;
-    return range ? [range] : [];
+    return assignment ? assignmentTimeRange(assignment, context.shiftCategories) : null;
   });
+}
+
+export function getStaffingStateTimeRanges(
+  state: StaffingScheduleState | null,
+  context: Pick<StaffingContext, "assignments" | "shiftCategories">,
+): TimeRange[] {
+  return getStaffingStateAlignedTimeRanges(state, context).filter(
+    (range): range is TimeRange => range != null,
+  );
+}
+
+function hasAdjacentDateConflict(
+  option: OpenShiftStaffingOption,
+  adjacent: AdjacentStaffingSchedule | undefined,
+  context: Pick<StaffingContext, "assignments" | "shiftCategories">,
+): boolean {
+  if (!adjacent) return false;
+  const previousRanges = getStaffingStateTimeRanges(adjacent.previous, context);
+  const nextRanges = getStaffingStateTimeRanges(adjacent.next, context);
+
+  return option.timeRanges.some(
+    (range) =>
+      previousRanges.some(
+        (previous) => checkCrossDateOverlap(range, { prev: previous }).length > 0,
+      ) || nextRanges.some((next) => checkCrossDateOverlap(range, { next }).length > 0),
+  );
 }
 
 function buildOptions(
@@ -159,6 +196,7 @@ export function buildOpenShiftStaffingCandidates({
   openShift,
   employees,
   scheduleByEmployeeId,
+  adjacentScheduleByEmployeeId,
   sortBy = "seniority",
   ...context
 }: BuildCandidatesInput): OpenShiftStaffingCandidate[] {
@@ -173,8 +211,8 @@ export function buildOpenShiftStaffingCandidates({
         return [];
       }
       const existingState = scheduleByEmployeeId.get(employee.id) ?? null;
-      if (existingState?.kind === "absence" || existingState?.absenceTypeId != null) return [];
       const existingRanges = getStaffingStateTimeRanges(existingState, context);
+      const existingAlignedRanges = getStaffingStateAlignedTimeRanges(existingState, context);
       const qualifiedOptions = options.filter(
         (option) =>
           option.assignmentIds.every((assignmentId) => {
@@ -188,10 +226,23 @@ export function buildOpenShiftStaffingCandidates({
                 orgRoles: context.orgRoles,
               })
             );
-          }) && !timesOverlap(existingRanges, option.timeRanges),
+          }) &&
+          !timesOverlap(existingRanges, option.timeRanges) &&
+          !hasAdjacentDateConflict(option, adjacentScheduleByEmployeeId?.get(employee.id), context),
       );
       return qualifiedOptions.length > 0
-        ? [{ employee, options: qualifiedOptions, existingState }]
+        ? [
+            {
+              employee,
+              options: qualifiedOptions,
+              existingState,
+              existingAssignments:
+                existingState?.assignmentIds.map((assignmentId, index) => ({
+                  assignmentId,
+                  timeRange: existingAlignedRanges[index] ?? null,
+                })) ?? [],
+            },
+          ]
         : [];
     })
     .sort((left, right) => {
@@ -209,7 +260,6 @@ export function buildStaffedOpenShiftInput({
   option,
   assignments,
 }: BuildStaffedInput): ScheduleCellInput | null {
-  if (existingState?.kind === "absence" || existingState?.absenceTypeId != null) return null;
   const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
   const addedSegments = option.assignmentIds.flatMap((assignmentId, index) => {
     const assignment = assignmentById.get(assignmentId);
@@ -225,7 +275,8 @@ export function buildStaffedOpenShiftInput({
   });
   if (addedSegments.length !== option.assignmentIds.length) return null;
 
-  const existingSegments = existingState?.kind === "worked" ? existingState.segments : [];
+  const existingWorkedState = existingState?.kind === "worked" ? existingState : null;
+  const existingSegments = existingWorkedState?.segments ?? [];
   const existingStarts = splitAlignedTimes(existingState?.customStartTime, existingSegments.length);
   const existingEnds = splitAlignedTimes(existingState?.customEndTime, existingSegments.length);
   const addedStarts = option.alignedTimeRanges.map((range) => range?.start ?? null);
@@ -242,8 +293,8 @@ export function buildStaffedOpenShiftInput({
     absenceTypeId: null,
     customStartTime: joinAlignedTimes([...existingStarts, ...addedStarts]),
     customEndTime: joinAlignedTimes([...existingEnds, ...addedEnds]),
-    seriesId: existingState?.seriesId ?? null,
-    fromRecurring: existingState?.fromRecurring ?? false,
+    seriesId: existingWorkedState?.seriesId ?? null,
+    fromRecurring: existingWorkedState?.fromRecurring ?? false,
   };
 }
 

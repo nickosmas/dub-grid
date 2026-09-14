@@ -3161,8 +3161,7 @@ button {
   gap: 2px;
 }
 
-.dg-open-shift-staffing-person-copy strong,
-.dg-open-shift-staffing-person-copy span {
+.dg-open-shift-staffing-person-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3171,6 +3170,8 @@ button {
 .dg-open-shift-staffing-person-copy span {
   color: var(--dg-color-text-muted);
   font-size: var(--dg-fs-footnote);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .dg-open-shift-staffing-assignment {

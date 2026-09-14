@@ -5,6 +5,7 @@ import { Search, UserRound } from "lucide-react";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
+import { fmt12h } from "@/components/shiftEditTime";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import type {
   OpenShiftStaffingCandidate,
@@ -14,9 +15,11 @@ import type {
 interface OpenShiftStaffingModalProps {
   assignmentLabel: string;
   assignmentLabelById: ReadonlyMap<number, string>;
+  absenceTypeLabelById: ReadonlyMap<number, string>;
   candidates: OpenShiftStaffingCandidate[];
   dateLabel: string;
   needed: number;
+  currentEmployeeId?: string | null;
   isSubmitting?: boolean;
   onAssign: (candidate: OpenShiftStaffingCandidate, option: OpenShiftStaffingOption) => unknown;
   onClose: () => void;
@@ -35,38 +38,64 @@ function optionLabel(
     .join(" / ");
 }
 
+function existingWorkLabel(
+  candidate: OpenShiftStaffingCandidate,
+  assignmentLabelById: ReadonlyMap<number, string>,
+  absenceTypeLabelById: ReadonlyMap<number, string>,
+): string {
+  if (candidate.existingState?.absenceTypeId != null) {
+    const absenceLabel =
+      absenceTypeLabelById.get(candidate.existingState.absenceTypeId) ?? "Unknown absence";
+    return `Absent: ${absenceLabel}`;
+  }
+  if (candidate.existingAssignments.length === 0) return "Available all day";
+
+  const assignments = candidate.existingAssignments.map(({ assignmentId, timeRange }) => {
+    const label = assignmentLabelById.get(assignmentId) ?? "Unavailable assignment";
+    return timeRange ? `${label}, ${fmt12h(timeRange.start)}–${fmt12h(timeRange.end)}` : label;
+  });
+  return `Working: ${assignments.join("; ")}`;
+}
+
 export function OpenShiftStaffingModal({
   assignmentLabel,
   assignmentLabelById,
+  absenceTypeLabelById,
   candidates,
   dateLabel,
   needed,
+  currentEmployeeId = null,
   isSubmitting = false,
   onAssign,
   onClose,
 }: OpenShiftStaffingModalProps) {
   const [query, setQuery] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(candidates[0]?.employee.id ?? "");
-  const selectedCandidate =
-    candidates.find((candidate) => candidate.employee.id === selectedEmployeeId) ?? null;
-  const [selectedOptionKey, setSelectedOptionKey] = useState(
-    selectedCandidate?.options[0] ? optionKey(selectedCandidate.options[0]) : "",
-  );
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [selectedOptionKey, setSelectedOptionKey] = useState("");
 
   useEffect(() => {
-    if (selectedCandidate) return;
-    const first = candidates[0] ?? null;
-    setSelectedEmployeeId(first?.employee.id ?? "");
-    setSelectedOptionKey(first?.options[0] ? optionKey(first.options[0]) : "");
-  }, [candidates, selectedCandidate]);
+    if (!selectedEmployeeId) return;
+    if (candidates.some((candidate) => candidate.employee.id === selectedEmployeeId)) return;
+    setSelectedEmployeeId("");
+    setSelectedOptionKey("");
+  }, [candidates, selectedEmployeeId]);
 
   const visibleCandidates = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return candidates;
-    return candidates.filter((candidate) =>
-      getEmployeeDisplayName(candidate.employee).toLowerCase().includes(normalized),
-    );
-  }, [candidates, query]);
+    const filtered = normalized
+      ? candidates.filter((candidate) =>
+          getEmployeeDisplayName(candidate.employee).toLowerCase().includes(normalized),
+        )
+      : candidates;
+    return [...filtered].sort((left, right) => {
+      if (left.employee.id === currentEmployeeId) return -1;
+      if (right.employee.id === currentEmployeeId) return 1;
+      return 0;
+    });
+  }, [candidates, currentEmployeeId, query]);
+
+  const selectedCandidate =
+    visibleCandidates.find((candidate) => candidate.employee.id === selectedEmployeeId) ?? null;
 
   const selectedOption =
     selectedCandidate?.options.find((option) => optionKey(option) === selectedOptionKey) ??
@@ -77,6 +106,8 @@ export function OpenShiftStaffingModal({
     setSelectedEmployeeId(candidate.employee.id);
     setSelectedOptionKey(optionKey(candidate.options[0]));
   };
+  const assignLabel =
+    selectedCandidate?.employee.id === currentEmployeeId ? "Assign myself" : "Assign to schedule";
 
   return (
     <Modal
@@ -97,7 +128,7 @@ export function OpenShiftStaffingModal({
           <Button
             type="button"
             className="dg-btn dg-btn-primary"
-            aria-label="Assign to schedule"
+            aria-label={assignLabel}
             disabled={!selectedCandidate || !selectedOption || isSubmitting}
             loading={isSubmitting}
             onClick={() =>
@@ -106,7 +137,7 @@ export function OpenShiftStaffingModal({
                 : undefined
             }
           >
-            Assign to schedule
+            {assignLabel}
           </Button>
         </div>
       }
@@ -125,7 +156,19 @@ export function OpenShiftStaffingModal({
             className="dg-input"
             value={query}
             placeholder="Search eligible staff"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
+              if (
+                selectedCandidate &&
+                !getEmployeeDisplayName(selectedCandidate.employee)
+                  .toLowerCase()
+                  .includes(nextQuery.trim().toLowerCase())
+              ) {
+                setSelectedEmployeeId("");
+                setSelectedOptionKey("");
+              }
+            }}
           />
         </label>
       ) : null}
@@ -134,9 +177,7 @@ export function OpenShiftStaffingModal({
         <div className="dg-open-shift-staffing-empty" role="status">
           <UserRound aria-hidden="true" size={22} />
           <strong>No eligible staff</strong>
-          <span>
-            Everyone is unavailable, absent, outside this focus area, or missing a requirement.
-          </span>
+          <span>Everyone is unavailable, outside this focus area, or missing a requirement.</span>
         </div>
       ) : visibleCandidates.length === 0 ? (
         <div className="dg-open-shift-staffing-empty" role="status">
@@ -148,6 +189,7 @@ export function OpenShiftStaffingModal({
           {visibleCandidates.map((candidate) => {
             const employee = candidate.employee;
             const selected = employee.id === selectedEmployeeId;
+            const isCurrentEmployee = employee.id === currentEmployeeId;
             const employment = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
             return (
               <button
@@ -160,12 +202,13 @@ export function OpenShiftStaffingModal({
               >
                 <span className="dg-open-shift-staffing-radio" aria-hidden="true" />
                 <span className="dg-open-shift-staffing-person-copy">
-                  <strong>{getEmployeeDisplayName(employee)}</strong>
+                  <strong>
+                    {getEmployeeDisplayName(employee)}
+                    {isCurrentEmployee ? " (You)" : ""}
+                  </strong>
                   <span>
-                    {employment}
-                    {candidate.existingState?.kind === "worked"
-                      ? " · Already working that day"
-                      : ""}
+                    {employment} ·{" "}
+                    {existingWorkLabel(candidate, assignmentLabelById, absenceTypeLabelById)}
                   </span>
                 </span>
               </button>
