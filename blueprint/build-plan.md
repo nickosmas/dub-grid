@@ -172,4 +172,6 @@
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,
       tenant isolation, and the migration ledger. This item must remain last and
-      does not itself authorize production changes.
+      does not itself authorize production changes. Local safety tooling and
+      qualification are preserved in checkpoint `ee4207e0`; resume with the
+      hosted production-data branch rehearsal when product work is complete.
