@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatDateKey } from "@/lib/utils";
 import {
@@ -1687,24 +1688,17 @@ const SectionBlock = memo(function SectionBlock({
                                   </span>
                                 ) : null}
                               </span>
-                              <span
+                              <NumericBadge
+                                aria-label={`${needed} needed`}
+                                value={needed}
                                 style={{
-                                  width: 16,
-                                  height: 16,
-                                  borderRadius: "50%",
                                   background: scPill?.text ?? "var(--dg-color-warning)",
                                   color: scPill?.color ?? "var(--dg-color-text-inverse)",
                                   fontSize: "var(--dg-type-badge-size)",
                                   fontWeight: 600,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
                                   lineHeight: 1,
-                                  flexShrink: 0,
                                 }}
-                              >
-                                {needed}
-                              </span>
+                              />
                             </Button>
                           </MaybeHint>
                         );

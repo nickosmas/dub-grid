@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { resolveShiftPillColors } from "@/lib/colors";
 
 function useMockupIsDark(): boolean {
@@ -381,24 +382,17 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
           </span>
         )}
       </span>
-      <span
+      <NumericBadge
+        aria-label={`${needed} needed`}
+        value={needed}
         style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
           background: WARNING_SOLID,
           color: "var(--dg-color-text-inverse)",
           fontSize: 10,
           fontWeight: 700,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
           lineHeight: 1,
-          flexShrink: 0,
         }}
-      >
-        {needed}
-      </span>
+      />
     </span>
   );
 }
