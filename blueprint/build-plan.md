@@ -140,7 +140,7 @@
         unavailable evidence explicitly before marking the epic complete. The
         native matrix must include a TOTP-enabled account and physical-device
         coverage; feature 19d2 verified the no-TOTP Android-emulator path only.
-- [ ] 20. **Explicit schedule-indicator removal** - make removing an active
+- [x] 20. **Explicit schedule-indicator removal** - make removing an active
       shift note/indicator discoverable in the shift slideover, without relying
       on clicking the active indicator itself. Preserve authorization,
       confirmation, audit, and save behavior; provide an accessible explicit

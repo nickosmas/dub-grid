@@ -3113,22 +3113,79 @@ export default function ShiftEditPanel({
           const isActive = getActiveIndicatorIds
             ? getActiveIndicatorIds(focusAreaId).includes(id)
             : false;
+          if (isActive) {
+            return (
+              <div
+                key={id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  border: `1.5px solid ${color}`,
+                  borderRadius: 20,
+                  background: `${color}18`,
+                  color,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    paddingLeft: 10,
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {name}
+                </div>
+                <Button
+                  aria-label={`Remove ${name} indicator`}
+                  onClick={() => onNoteToggle?.(id, false, focusAreaId)}
+                  className="dg-btn dg-btn-ghost"
+                  style={{
+                    height: 28,
+                    minHeight: 28,
+                    padding: "0 9px",
+                    marginLeft: 6,
+                    borderLeft: `1px solid ${color}40`,
+                    borderRadius: 0,
+                    fontSize: "var(--dg-fs-footnote)",
+                    color,
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          }
           return (
             <Button
               key={id}
-              onClick={() => onNoteToggle?.(id, !isActive, focusAreaId)}
+              aria-label={`Add ${name} indicator`}
+              onClick={() => onNoteToggle?.(id, true, focusAreaId)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 10px",
-                border: `1.5px solid ${isActive ? color : "var(--dg-color-border)"}`,
+                border: "1.5px solid var(--dg-color-border)",
                 borderRadius: 20,
-                background: isActive ? `${color}18` : "var(--dg-color-surface)",
+                background: "var(--dg-color-surface)",
                 cursor: "pointer",
                 fontSize: "var(--dg-fs-footnote)",
-                fontWeight: isActive ? 600 : 400,
-                color: isActive ? color : "var(--dg-color-text-subtle)",
+                fontWeight: 600,
+                color: "var(--dg-color-text-subtle)",
                 fontFamily: "inherit",
                 transition: "border-color 150ms ease, background 150ms ease",
               }}
@@ -3138,7 +3195,7 @@ export default function ShiftEditPanel({
                   width: 7,
                   height: 7,
                   borderRadius: "50%",
-                  background: isActive ? color : "var(--dg-color-border)",
+                  background: "var(--dg-color-border)",
                   flexShrink: 0,
                 }}
               />
@@ -3160,25 +3217,8 @@ export default function ShiftEditPanel({
             const isActive = getActiveIndicatorIds
               ? getActiveIndicatorIds(activeTab).includes(id)
               : false;
-            return (
-              <Button
-                key={id}
-                onClick={() => onNoteToggle?.(id, !isActive, activeTab)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 12px",
-                  border: `1.5px solid ${isActive ? color : "var(--dg-color-border)"}`,
-                  borderRadius: "var(--dg-radius-md)",
-                  background: isActive ? `${color}18` : "var(--dg-color-surface)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "border-color 150ms ease, background 150ms ease",
-                  width: "100%",
-                  fontFamily: "inherit",
-                }}
-              >
+            const identity = (
+              <>
                 <div
                   style={{
                     width: 10,
@@ -3209,18 +3249,64 @@ export default function ShiftEditPanel({
                     Appears as a colored dot
                   </div>
                 </div>
-                {isActive && (
-                  <div
+              </>
+            );
+
+            if (isActive) {
+              return (
+                <div
+                  key={id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 8px 8px 12px",
+                    border: `1.5px solid ${color}`,
+                    borderRadius: "var(--dg-radius-md)",
+                    background: `${color}18`,
+                    width: "100%",
+                  }}
+                >
+                  {identity}
+                  <Button
+                    aria-label={`Remove ${name} indicator`}
+                    onClick={() => onNoteToggle?.(id, false, activeTab)}
+                    className="dg-btn dg-btn-secondary"
                     style={{
-                      fontSize: "var(--dg-fs-badge)",
-                      fontWeight: 700,
+                      height: 32,
+                      minHeight: 32,
+                      padding: "0 10px",
+                      fontSize: "var(--dg-fs-footnote)",
                       color,
-                      flexShrink: 0,
                     }}
                   >
-                    ON
-                  </div>
-                )}
+                    Remove
+                  </Button>
+                </div>
+              );
+            }
+
+            return (
+              <Button
+                key={id}
+                aria-label={`Add ${name} indicator`}
+                onClick={() => onNoteToggle?.(id, true, activeTab)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  border: "1.5px solid var(--dg-color-border)",
+                  borderRadius: "var(--dg-radius-md)",
+                  background: "var(--dg-color-surface)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "border-color 150ms ease, background 150ms ease",
+                  width: "100%",
+                  fontFamily: "inherit",
+                }}
+              >
+                {identity}
               </Button>
             );
           })}

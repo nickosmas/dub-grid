@@ -15,6 +15,7 @@ import {
   EditModalState,
   Employee,
   FocusArea,
+  IndicatorType,
   JobDefinition,
   NamedItem,
   ScheduleCellInput,
@@ -161,6 +162,11 @@ const focusAreas: FocusArea[] = [
   { id: 2, orgId: "org-1", name: "South", sortOrder: 1, departmentId: null },
 ];
 
+const indicatorTypes: IndicatorType[] = [
+  { id: 80, orgId: "org-1", name: "Float", color: "#2563EB", sortOrder: 0 },
+  { id: 81, orgId: "org-1", name: "Training", color: "#D97706", sortOrder: 1 },
+];
+
 const employees: Employee[] = [
   {
     id: "emp-1",
@@ -256,6 +262,10 @@ function renderPanel(
     assignmentsOverride?: AssignmentDefinition[];
     certificationsOverride?: NamedItem[];
     shiftDisplayMode?: ShiftDisplayMode;
+    indicatorTypesOverride?: IndicatorType[];
+    canEditScheduleIndicators?: boolean;
+    getActiveIndicatorIds?: (focusAreaId: number) => number[];
+    onNoteToggle?: ReturnType<typeof vi.fn>;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -290,6 +300,10 @@ function renderPanel(
       certifications={overrides.certificationsOverride ?? certifications}
       shiftDisplayMode={overrides.shiftDisplayMode ?? "code"}
       auditInfo={overrides.auditInfo}
+      indicatorTypes={overrides.indicatorTypesOverride}
+      canEditScheduleIndicators={overrides.canEditScheduleIndicators}
+      getActiveIndicatorIds={overrides.getActiveIndicatorIds}
+      onNoteToggle={overrides.onNoteToggle}
     />,
   );
   return { ...result, onSelect, onClose };
@@ -664,6 +678,47 @@ describe("ShiftEditPanel", () => {
       expect(backdrop).not.toBeNull();
       fireEvent.click(backdrop!);
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Schedule indicators", () => {
+    it("gives active and inactive single-shift indicators explicit actions", async () => {
+      const user = userEvent.setup();
+      const onNoteToggle = vi.fn();
+      renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        indicatorTypesOverride: indicatorTypes,
+        canEditScheduleIndicators: true,
+        getActiveIndicatorIds: () => [80],
+        onNoteToggle,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remove Float indicator" }));
+      expect(onNoteToggle).toHaveBeenLastCalledWith(80, false, 1);
+
+      await user.click(screen.getByRole("button", { name: "Add Training indicator" }));
+      expect(onNoteToggle).toHaveBeenLastCalledWith(81, true, 1);
+    });
+
+    it("routes explicit split-shift indicator removal to the matching focus area", async () => {
+      const user = userEvent.setup();
+      const onNoteToggle = vi.fn();
+      renderPanel({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [
+          { shiftId: 11, jobId: 102, position: 0, label: "D", isMentored: false },
+          { shiftId: 12, jobId: 102, position: 1, label: "E", isMentored: false },
+        ],
+        indicatorTypesOverride: indicatorTypes,
+        canEditScheduleIndicators: true,
+        getActiveIndicatorIds: (focusAreaId) => (focusAreaId === 1 ? [80] : [81]),
+        onNoteToggle,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remove Training indicator" }));
+      expect(onNoteToggle).toHaveBeenLastCalledWith(81, false, 2);
     });
   });
 
