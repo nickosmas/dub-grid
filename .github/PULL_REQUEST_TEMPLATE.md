@@ -22,7 +22,7 @@
 ## Migration Impact
 
 - [ ] No database changes
-- [ ] Modified migration file(s): <!-- which file(s)? 001/002/003/004 -->
+- [ ] Added migration file(s) and checksum: <!-- next NNN_name.sql only; never edit applied files -->
 - [ ] Requires `npm run db:reset` after pull
 - [ ] Affects JWT hook — tested via `signInWithPassword`
 

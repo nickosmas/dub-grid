@@ -20,6 +20,7 @@ import { Client } from "pg";
 import { batchStatements, inlineParams, splitStatements } from "./sql-text";
 
 const MANAGEMENT_API = "https://api.supabase.com";
+const MANAGEMENT_API_TIMEOUT_MS = 15_000;
 
 /**
  * Cap on a single Management API request body. Anything larger (the 300KB
@@ -131,6 +132,7 @@ class ManagementApiClient implements SqlClient {
     try {
       response = await fetch(`${MANAGEMENT_API}/v1/projects/${this.projectRef}/database/query`, {
         method: "POST",
+        signal: AbortSignal.timeout(MANAGEMENT_API_TIMEOUT_MS),
         headers: {
           Authorization: `Bearer ${this.token}`,
           "Content-Type": "application/json",
