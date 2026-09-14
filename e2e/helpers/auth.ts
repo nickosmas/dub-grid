@@ -7,10 +7,19 @@ import { expect, test } from "@playwright/test";
 // account for scripted verification.
 export const QA_SUPER_ADMIN_EMAIL = "qa-super-admin@dubgrid.test";
 export const QA_SUPER_ADMIN_PASSWORD = "password123";
+export const QA_REGULAR_EMAIL = "qa-regular@dubgrid.test";
+export const QA_MANAGEMENT_EMAIL = "qa-management@dubgrid.test";
+export const QA_INACTIVE_EMAIL = "qa-inactive@dubgrid.test";
+export const QA_MFA_EMAIL_BY_BROWSER = {
+  chromium: "qa-mfa-chromium@dubgrid.test",
+  firefox: "qa-mfa-firefox@dubgrid.test",
+  webkit: "qa-mfa-webkit@dubgrid.test",
+} as const;
 
 const PORT = process.env.PORT || 3000;
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const QA_SUPER_ADMIN_ORIGIN = `http://ardenwood.${BASE_DOMAIN}:${PORT}`;
+export const QA_CALM_HAVEN_ORIGIN = `http://calmhaven.${BASE_DOMAIN}:${PORT}`;
 
 /**
  * Clears dismissible overlays (cookie consent, an MFA nag banner, etc.) that
@@ -20,7 +29,7 @@ const QA_SUPER_ADMIN_ORIGIN = `http://ardenwood.${BASE_DOMAIN}:${PORT}`;
  * (a single-shot check can run before either has appeared); it just spends a
  * bounded window proactively trying each known dismiss control a few times.
  */
-async function clearBlockingOverlays(page: Page): Promise<void> {
+export async function clearBlockingOverlays(page: Page): Promise<void> {
   const dismissControls = [
     page.getByRole("button", { name: "Essential only" }), // cookie consent banner
     page.getByRole("button", { name: "Dismiss" }), // MFA nag banner
@@ -57,11 +66,8 @@ export async function waitForClientHydration(page: Page): Promise<void> {
 /** A timeout of 0 means the run has no limit, so it is never lowered. */
 const LOGIN_TIMEOUT_FLOOR_MS = 60_000;
 
-/** Logs in as the seeded QA super admin on an organization subdomain. */
-export async function loginAsQaSuperAdmin(
-  page: Page,
-  origin = QA_SUPER_ADMIN_ORIGIN,
-): Promise<void> {
+/** Logs in as a seeded QA account on an organization subdomain. */
+export async function loginAsQaAccount(page: Page, email: string, origin: string): Promise<void> {
   // A first-ever login for a fresh seed runs through up to four sequential
   // gates (terms, onboarding, trial modal, cookie consent), each with its
   // own multi-second wait budget - comfortably past Playwright's default
@@ -79,7 +85,7 @@ export async function loginAsQaSuperAdmin(
   await page.goto(`${origin}/login`);
   await waitForClientHydration(page);
 
-  await page.getByLabel("Email").fill(QA_SUPER_ADMIN_EMAIL);
+  await page.getByLabel("Email").fill(email);
   // Plain getByLabel("Password") is ambiguous here — it also matches the
   // adjacent "Show password" toggle button. The role-scoped variant only
   // matches the text input.
@@ -147,4 +153,12 @@ export async function loginAsQaSuperAdmin(
   await clearBlockingOverlays(page);
 
   await expect(dashboardLink).toBeVisible({ timeout: 15_000 });
+}
+
+/** Logs in as the original seeded QA super admin used by existing specs. */
+export async function loginAsQaSuperAdmin(
+  page: Page,
+  origin = QA_SUPER_ADMIN_ORIGIN,
+): Promise<void> {
+  await loginAsQaAccount(page, QA_SUPER_ADMIN_EMAIL, origin);
 }

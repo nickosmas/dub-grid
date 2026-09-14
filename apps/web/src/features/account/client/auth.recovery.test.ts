@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
-const mocks = vi.hoisted(() => ({ signOut: vi.fn(), getSession: vi.fn(), clear: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  signOut: vi.fn(),
+  getSession: vi.fn(),
+  clear: vi.fn(),
+  broadcast: vi.fn(),
+}));
 
 vi.mock("@/lib/browser-auth", () => ({
   clearSupabaseBrowserAuthState: mocks.clear,
@@ -15,6 +20,9 @@ vi.mock("@/lib/supabase", () => ({
     channel: vi.fn(),
   },
 }));
+vi.mock("@/lib/auth-boundary-broadcast", () => ({
+  broadcastBrowserSignOut: mocks.broadcast,
+}));
 
 import { completeBrowserPasswordRecovery, signOutFromBrowser } from "./auth";
 
@@ -24,6 +32,7 @@ describe("signOutFromBrowser recovery", () => {
     mocks.signOut.mockReset();
     mocks.getSession.mockResolvedValue({ access_token: "exact-token" });
     mocks.clear.mockClear();
+    mocks.broadcast.mockClear();
   });
 
   afterEach(() => {
@@ -41,6 +50,7 @@ describe("signOutFromBrowser recovery", () => {
     await assertion;
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(mocks.clear).toHaveBeenCalledOnce();
+    expect(mocks.broadcast).toHaveBeenCalledOnce();
   });
 
   it("sends others unchanged and never invokes the browser SDK's bulk bypass", async () => {
@@ -90,6 +100,7 @@ describe("signOutFromBrowser recovery", () => {
     });
     expect(mocks.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     expect(mocks.clear).toHaveBeenCalledOnce();
+    expect(mocks.broadcast).toHaveBeenCalledOnce();
   });
 
   it("completes recovery through the dedicated global revocation path and clears locally", async () => {
@@ -107,5 +118,6 @@ describe("signOutFromBrowser recovery", () => {
     );
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(mocks.clear).toHaveBeenCalledOnce();
+    expect(mocks.broadcast).toHaveBeenCalledOnce();
   });
 });

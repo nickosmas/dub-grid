@@ -62,7 +62,7 @@
   - [x] 18c. **Canonical mobile dashboard experience** - present the canonical
         dashboard data in native mobile cards and read-only detail screens,
         without adding schedule editing or publishing.
-- [ ] 19. **Authentication and onboarding release hardening** - leave no known
+- [x] 19. **Authentication and onboarding release hardening** - leave no known
       correctness, performance, resilience, or security defects across the
       complete web and mobile entry lifecycle before production readiness.
   - [x] 19a. **Admission and onboarding state correctness** - make durable
@@ -116,7 +116,7 @@
           repair cross-tab sign-in/sign-out, token rotation and refresh,
           foreground/resume, and organization-switch races without stale
           identity, permissions, or tenant data.
-  - [ ] 19d. **Authentication security hardening** - complete the following
+  - [x] 19d. **Authentication security hardening** - complete the following
         bounded security passes without weakening authentication performance or
         tenant isolation:
     - [x] 19d1. **Live tenant, membership, and session authorization** - verify
@@ -134,7 +134,7 @@
           verify enumeration resistance, distributed and per-target rate limits,
           production fail-closed behavior, token secrecy across URLs, logs, and
           telemetry, and complete security-event audit coverage.
-  - [ ] 19e. **Authentication release qualification** - add a durable automated
+  - [x] 19e. **Authentication release qualification** - add a durable automated
         role/state/browser matrix and complete authenticated browser plus native
         device checks; close every confirmed in-scope defect and report any
         unavailable evidence explicitly before marking the epic complete. The

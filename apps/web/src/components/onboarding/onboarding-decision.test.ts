@@ -13,6 +13,7 @@ function input(overrides: Partial<OnboardingDecisionInput> = {}): OnboardingDeci
     setupComplete: true,
     canCompleteSetup: false,
     orgDataReliable: true,
+    isInactive: false,
     frozenPhase: null,
     ...overrides,
   };
@@ -58,6 +59,21 @@ describe("resolveOnboardingDecision", () => {
     expect(
       resolveOnboardingDecision(
         input({ appAlreadyShown: true, setupComplete: false, canCompleteSetup: true }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+  });
+
+  it("keeps an inactive member in the read-only app instead of onboarding", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          isInactive: true,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: true,
+            billingLocked: null,
+          },
+        }),
       ),
     ).toEqual({ kind: "app", settled: true });
   });

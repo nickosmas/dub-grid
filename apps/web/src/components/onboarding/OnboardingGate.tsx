@@ -105,6 +105,7 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
         orgId={perms.orgId}
         role={perms.role}
         canManageOrg={perms.canManageOrg}
+        isInactive={perms.isInactive}
         pathname={pathname}
       >
         {children}
@@ -139,6 +140,7 @@ function OnboardingCheck({
   orgId,
   role,
   canManageOrg,
+  isInactive,
   pathname,
   section,
   children,
@@ -147,6 +149,7 @@ function OnboardingCheck({
   orgId: string;
   role: string;
   canManageOrg: boolean;
+  isInactive: boolean;
   pathname: string;
   section: string | null;
   children: React.ReactNode;
@@ -204,6 +207,7 @@ function OnboardingCheck({
     // switch, useOrganizationData can briefly resolve the previous org, which
     // must not decide the next org's onboarding, billing, or setup access.
     orgDataReliable: Boolean(org) && org?.id === orgId,
+    isInactive,
     frozenPhase: getOnboardingPhase(userId, orgId),
   });
 

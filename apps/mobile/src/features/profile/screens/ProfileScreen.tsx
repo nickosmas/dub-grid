@@ -343,16 +343,10 @@ export default function ProfileScreen() {
     if (!action) return;
 
     if (action.kind === "switch-org") {
-      // Two modals, one at a time. The confirmation leaves first (above), then
-      // the picker under it — dismissing both in one commit is the case iOS
-      // drops, and it left the picker on screen over the switched org.
-      //
-      // The switch still runs only once the picker is closed, which is what the
-      // same-tick version was protecting: the refreshSession() cascade (new
-      // accessToken → query refetches → realtime channel rebuild) must not land
-      // while a sheet is still mounted over it.
+      // The picker already left before this confirmation was presented. Let
+      // the confirmation finish leaving before the refreshSession() cascade
+      // starts so no previous-organization surface remains mounted over it.
       handoff(() => {
-        setIsSwitchModalVisible(false);
         void handleSwitchOrganization(action.membership);
       });
       return;
@@ -645,7 +639,13 @@ export default function ProfileScreen() {
                     !membership.isCurrent &&
                     !memberships[index + 1]?.isCurrent
                   }
-                  onPress={() => setPendingConfirmation({ kind: "switch-org", membership })}
+                  onPress={() => {
+                    // UIKit will not present the confirmation over an existing
+                    // native sheet. Close the picker first, then present the
+                    // confirmation after its dismissal animation finishes.
+                    setIsSwitchModalVisible(false);
+                    handoff(() => setPendingConfirmation({ kind: "switch-org", membership }));
+                  }}
                 />
               ))}
             </ProfileList>

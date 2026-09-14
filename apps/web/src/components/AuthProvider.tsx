@@ -15,6 +15,7 @@ import {
 } from "@/features/account/client";
 import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
 import { createSessionRegistration } from "@/features/account/client/session-registration";
+import { listenForBrowserSignOut } from "@/lib/auth-boundary-broadcast";
 
 /**
  * Track session via API route so the server can capture the client IP address.
@@ -151,10 +152,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       })();
     });
 
+    const stopListeningForBrowserSignOut = listenForBrowserSignOut(() => {
+      const generation = ++authGenerationRef.current;
+      clearBrowserAuthState();
+      commitAuthState(generation, null, null);
+    });
+
     return () => {
       isMounted = false;
       authGenerationRef.current += 1;
       subscription.unsubscribe();
+      stopListeningForBrowserSignOut();
     };
   }, []);
 

@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { mfaEnrollmentResponseSchema, mfaReauthenticationResponseSchema } from "@dubgrid/contracts";
+import { broadcastBrowserSignOut } from "@/lib/auth-boundary-broadcast";
 import { requestMfaLifecycle, signOutAccountSessions } from "./api";
 
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
@@ -50,6 +51,7 @@ export async function signOutFromBrowser(scope: "local" | "others" | "global"): 
     if (error) throw error;
   } finally {
     clearSupabaseBrowserAuthState();
+    broadcastBrowserSignOut();
   }
 }
 
@@ -66,6 +68,7 @@ export async function completeBrowserPasswordRecovery(): Promise<void> {
       await supabase.auth.signOut({ scope: "local" });
     } finally {
       clearSupabaseBrowserAuthState();
+      broadcastBrowserSignOut();
     }
   }
 }

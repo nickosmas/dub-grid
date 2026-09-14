@@ -25,6 +25,8 @@ export interface OnboardingDecisionInput {
   canCompleteSetup: boolean;
   /** Bootstrap has resolved the org this session is actually acting as. */
   orgDataReliable: boolean;
+  /** Inactive staff retain read-only app access but cannot complete onboarding. */
+  isInactive: boolean;
   frozenPhase: OnboardingPhase | null;
 }
 
@@ -58,6 +60,12 @@ export function resolveOnboardingDecision(input: OnboardingDecisionInput): Onboa
       destination: input.canRecoverBilling ? "recovery" : "organization-gate",
     };
   }
+
+  // Deactivation deliberately reduces a staff member to the read-only app
+  // rather than removing their membership. They cannot advance organization
+  // setup or their own onboarding, so never strand them in a wizard they have
+  // no authority to complete. AppShell owns the inactivity banner.
+  if (input.isInactive) return { kind: "app", settled: true };
 
   // Once the app itself has been shown off settled data, this mount keeps
   // showing it. `setupComplete` is org-wide and live: an admin who adds a focus

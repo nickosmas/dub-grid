@@ -207,6 +207,16 @@ const bootstrapData = {
   unreadNotificationCount: 0,
 };
 
+async function chooseHiddenClinic() {
+  fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
+
+  // The picker has to leave before iOS can present the confirmation.
+  expect(screen.queryByRole("button", { name: "Hidden Clinic" })).not.toBeInTheDocument();
+  const confirmation = await screen.findByRole("alert");
+  return within(confirmation).getByRole("button", { name: "Switch" });
+}
+
 const singleOrgBootstrapData = {
   ...bootstrapData,
   memberships: [bootstrapData.memberships[0]],
@@ -647,9 +657,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     expect(await screen.findByText("Switching to Hidden Clinic")).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("switch_org", {
@@ -691,9 +699,7 @@ describe("ProfileScreen", () => {
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    const confirm = within(screen.getByRole("alert")).getByRole("button", { name: "Switch" });
+    const confirm = await chooseHiddenClinic();
     fireEvent.click(confirm);
     fireEvent.click(confirm);
 
@@ -718,9 +724,7 @@ describe("ProfileScreen", () => {
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => expect(refreshSession).toHaveBeenCalledTimes(1));
     expect(replaceAuthSession).not.toHaveBeenCalled();
@@ -745,9 +749,7 @@ describe("ProfileScreen", () => {
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
     expect(queryClientCancel).toHaveBeenCalled();
@@ -767,9 +769,7 @@ describe("ProfileScreen", () => {
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
     expect(queryClientClear).toHaveBeenCalled();
@@ -790,9 +790,7 @@ describe("ProfileScreen", () => {
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
     expect(saveLastOrg).toHaveBeenCalledWith({ slug: "hidden-clinic", name: "Hidden Clinic" });
@@ -805,9 +803,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalled();

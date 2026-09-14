@@ -12,13 +12,21 @@ function collectRuntimeFailures(page: Page): RuntimeFailures {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !/Failed to load resource: the server responded with a status of 401/.test(message.text())
+      !/Failed to load resource: the server responded with a status of (?:401|403)/.test(
+        message.text(),
+      ) &&
+      !/WebSocket connection to 'ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(message.text())
     ) {
       failures.unexpected.push(`console:${message.text()}`);
     }
   });
   page.on("response", (response) => {
     const path = new URL(response.url()).pathname;
+    if (path === "/v1/speed-insights/script.debug.js") {
+      // Vercel's development-only telemetry endpoint is not part of DubGrid's
+      // auth boundary and returns 403 outside a Vercel runtime.
+      return;
+    }
     if (response.status() === 401 && path === "/api/organization/bootstrap") {
       // A request already accepted by the browser can reach the server after
       // the sibling tab revokes the shared session. The boundary still aborts
