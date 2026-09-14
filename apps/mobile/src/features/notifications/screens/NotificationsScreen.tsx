@@ -47,6 +47,7 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileElevation,
   mobileRadii,
+  mobilePillOverflow,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -621,6 +622,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     priorityChip: {
       ...mobileTextWeighted("caption", "bold"),
+      ...mobilePillOverflow.displayText,
       color: mobileColors.danger,
       letterSpacing: 0.5,
     },
@@ -632,6 +634,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     groupBadge: {
       ...mobileText.caption,
+      ...mobilePillOverflow.displayText,
       color: mobileColors.textMuted,
       backgroundColor: mobileColors.surfaceSecondary,
       paddingHorizontal: 6,

@@ -6,6 +6,7 @@ import {
   mobileColors,
   mobileSoftGradientStops,
   mobileRadii,
+  mobilePillOverflow,
   mobileSpacing,
   mobileText,
   mobileTextWeighted,
@@ -23,6 +24,19 @@ describe("mobileAvatarText", () => {
     expect(style.fontSize).toBe(20);
     expect(style.maxWidth).toBe("100%");
     expect(style.lineHeight).toBeGreaterThan(style.fontSize!);
+  });
+});
+
+describe("mobilePillOverflow", () => {
+  it("lets display pills wrap while bounding both pill modes", () => {
+    expect(mobilePillOverflow.displayContainer).toMatchObject({ maxWidth: "100%", minWidth: 0 });
+    expect(mobilePillOverflow.displayText).toMatchObject({ flexShrink: 1, flexWrap: "wrap" });
+    expect(mobilePillOverflow.interactiveContainer).toMatchObject({
+      maxWidth: "100%",
+      minWidth: 0,
+      overflow: "hidden",
+    });
+    expect(mobilePillOverflow.interactiveText).toMatchObject({ flexShrink: 1 });
   });
 });
 

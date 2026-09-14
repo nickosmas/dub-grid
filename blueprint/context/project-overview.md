@@ -153,7 +153,12 @@ Everything below is already shipped except the unchecked work in items 19-23.
     day. Let the scheduler assign a selected person through the normal
     draft/publish workflow, while regular staff keep the existing volunteer flow.
 
-23. **Production migration safety** - the final release gate after all product
+23. **App-wide pill overflow resilience** - keep pill, chip, tag, badge, and
+    segmented-choice text within its visual bounds on web and mobile. Display
+    values may wrap and grow; interactive controls remain one line and truncate
+    safely while retaining the full accessible value.
+
+24. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,

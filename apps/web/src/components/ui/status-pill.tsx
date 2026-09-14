@@ -79,7 +79,7 @@ export function StatusPill({
       aria-label={ariaLabel}
       data-status-pill-variant={variant}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2 py-0.5 tracking-normal whitespace-nowrap",
+        "dg-pill-display inline-flex items-center gap-1.5 px-2 py-0.5 tracking-normal",
         variant === "category"
           ? "rounded-[4px] text-[length:var(--dg-fs-footnote)] font-semibold"
           : "rounded-md text-[length:var(--dg-type-badge-size)] font-medium",

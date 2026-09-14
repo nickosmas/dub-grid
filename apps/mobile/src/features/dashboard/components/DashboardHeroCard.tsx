@@ -5,6 +5,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileElevation,
+  mobilePillOverflow,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -154,6 +155,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 6,
     },
     statusPill: {
+      ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: 999,
       borderWidth: 1,
@@ -162,6 +164,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     statusPillLabel: {
       ...mobileText.badge,
+      ...mobilePillOverflow.displayText,
     },
     title: {
       ...mobileText.sectionTitle,

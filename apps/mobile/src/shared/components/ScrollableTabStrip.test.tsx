@@ -52,6 +52,17 @@ describe("ScrollableTabStrip", () => {
     expect(screen.getByRole("tab", { name: "Approved" })).toBeInTheDocument();
   });
 
+  it("keeps a long tab label to one line while retaining its full accessible name", () => {
+    const label = "Journal Listed Christian Science Nurse";
+    render(
+      <ScrollableTabStrip activeKey="long" onSelect={vi.fn()} tabs={[{ key: "long", label }]} />,
+    );
+
+    expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
+    expect(screen.getByText(label)).toHaveAttribute("data-number-of-lines", "1");
+    expect(screen.getByText(label)).toHaveAttribute("data-ellipsize-mode", "tail");
+  });
+
   // Requests used role="tab" while Schedule used role="button" with a "Select X"
   // label. One role, one naming convention, so assistive tech announces both
   // strips the same way.

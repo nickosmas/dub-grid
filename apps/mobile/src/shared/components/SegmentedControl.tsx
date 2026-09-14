@@ -8,6 +8,7 @@ import { useMobileColors, useThemeMode } from "../providers/ThemeModeProvider";
 import {
   mobileElevation,
   mobileMotion,
+  mobilePillOverflow,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -130,6 +131,7 @@ export function SegmentedControl<Value extends string>({
           <Pressable
             key={option.value}
             accessibilityRole="button"
+            accessibilityLabel={option.label}
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
             hitSlop={4}
@@ -142,8 +144,11 @@ export function SegmentedControl<Value extends string>({
             style={[styles.segment, { paddingHorizontal: metrics.paddingHorizontal }]}
           >
             <Text
+              ellipsizeMode="tail"
+              numberOfLines={1}
               style={[
                 mobileText[metrics.labelVariant],
+                mobilePillOverflow.interactiveText,
                 selected ? styles.labelSelected : styles.labelIdle,
               ]}
             >
@@ -166,6 +171,7 @@ export function SegmentedControl<Value extends string>({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     track: {
+      ...mobilePillOverflow.interactiveContainer,
       flexDirection: "row",
       alignSelf: "flex-start",
       alignItems: "stretch",
@@ -199,8 +205,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     segment: {
       alignItems: "center",
       flexDirection: "row",
+      flexShrink: 1,
       gap: mobileSpace.sm,
       justifyContent: "center",
+      minWidth: 0,
+      overflow: "hidden",
     },
     labelIdle: {
       color: mobileColors.textSecondary,

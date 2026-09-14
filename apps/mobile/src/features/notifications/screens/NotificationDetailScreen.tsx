@@ -29,6 +29,7 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileElevation,
   mobileRadii,
+  mobilePillOverflow,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -372,6 +373,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     priorityChip: {
+      ...mobilePillOverflow.displayContainer,
+      ...mobilePillOverflow.displayText,
       ...mobileTextWeighted("caption", "bold"),
       letterSpacing: 0.5,
       paddingHorizontal: 8,

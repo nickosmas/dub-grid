@@ -7,6 +7,7 @@ import { getScreenGutter } from "./screen-layout";
 import { SkeletonBlock } from "./skeleton";
 import {
   mobileRadii,
+  mobilePillOverflow,
   mobileSpace,
   mobileSpacing,
   mobileText,
@@ -162,6 +163,7 @@ export function ScrollableTabStrip({
             style={[styles.tab, isActive && styles.tabActive]}
           >
             <Text
+              ellipsizeMode="tail"
               numberOfLines={1}
               style={[styles.label, isActive ? styles.labelActive : styles.labelIdle]}
             >
@@ -239,6 +241,7 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 2,
     },
     tab: {
+      ...mobilePillOverflow.interactiveContainer,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
@@ -262,7 +265,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     label: {
       ...mobileText.bodyStrong,
-      flexShrink: 1,
+      ...mobilePillOverflow.interactiveText,
     },
     labelIdle: {
       color: mobileColors.textSecondary,

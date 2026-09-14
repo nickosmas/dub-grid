@@ -94,6 +94,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   certification requirements and have no absence or overlapping shift that
   day. Let the scheduler assign a selected person through the normal
   draft/publish workflow, while regular staff keep the existing volunteer flow.
+- App-wide pill overflow resilience: keep every pill, chip, tag, badge, and
+  segmented-choice label inside its visual bounds on web and mobile. Display
+  values may wrap and grow; interactive controls remain one line and truncate
+  safely while preserving the full accessible value.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -105,11 +109,12 @@ The roadmap starts with management-only assignment visibility in item 17, then
 the mobile release catch-up in item 18, authentication and onboarding release
 hardening in item 19, explicit schedule-indicator removal in item 20, and
 production display-mode layout resilience in item 21. Scheduler open-shift
-staffing is benched as item 22, followed by production migration safety in item 23. Item 18 is deliberately split into role
+staffing is item 22, app-wide pill overflow resilience is item 23, and production
+migration safety remains last as item 24. Item 18 is deliberately split into role
 eligibility, the shared dashboard model, and native dashboard presentation so
 each can be reviewed independently. Item 19 is split into state correctness,
 full journey coverage, performance and resilience, security, and release
-qualification. Item 23 must remain last.
+qualification. Item 24 must remain last.
 
 ## 4. Data - What are we storing?
 

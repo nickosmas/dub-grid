@@ -161,7 +161,7 @@
       overlapping shift that day. Let the scheduler assign a selected person
       through the normal draft/publish workflow, while regular staff retain the
       existing volunteer flow.
-- [ ] 23. **App-wide pill overflow resilience** - make every pill, chip, tag,
+- [x] 23. **App-wide pill overflow resilience** - make every pill, chip, tag,
       badge, and segmented-choice label keep its text inside its visual bounds
       across web and mobile. Long labels must remain readable through a
       consistent combination of wrapping, intrinsic sizing, truncation, or a

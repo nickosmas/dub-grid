@@ -2,6 +2,29 @@
 @import "tw-animate-css";
 @import "./shadcn-tailwind.css";
 
+.dg-pill-display {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  block-size: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dg-pill-action {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.dg-pill-action-label {
+  display: block;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /*
   ┌────────────────────────────────────────────────────────────────────┐
   │  DubGrid Design System — Responsive Strategy                      │
@@ -2888,7 +2911,8 @@ button {
 }
 
 .dg-role-requirement-view-pill {
-  flex: none;
+  flex: 0 1 auto;
+  max-width: 100%;
 }
 
 .dg-role-department-edit-pills > button,
@@ -2916,7 +2940,9 @@ button {
 
 .dg-role-requirement-pill-label {
   display: block;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .dg-role-requirement-measurer {
@@ -2928,6 +2954,10 @@ button {
 
 .dg-role-requirement-measurer > span {
   display: inline-block;
+}
+
+.dg-role-requirement-measurer .dg-role-requirement-pill-label {
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {

@@ -408,6 +408,25 @@ export const MAX_FONT_SCALE_FIXED = 1.3;
 
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 
+export const mobilePillOverflow = {
+  displayContainer: {
+    maxWidth: "100%",
+    minWidth: 0,
+  } satisfies ViewStyle,
+  displayText: {
+    flexShrink: 1,
+    flexWrap: "wrap",
+  } satisfies TextStyle,
+  interactiveContainer: {
+    maxWidth: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  } satisfies ViewStyle,
+  interactiveText: {
+    flexShrink: 1,
+  } satisfies TextStyle,
+} as const;
+
 export type MobileTextVariant = keyof typeof mobileTypographyTokens.text;
 // Keyed off fontWeight, not fontFamily: the family map carries an extra
 // `base` alias that has no matching weight.

@@ -6,6 +6,7 @@ import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
+  mobilePillOverflow,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -69,7 +70,12 @@ export function Chip({
       ) : null}
       <Text
         maxFontSizeMultiplier={MAX_FONT_SCALE}
-        style={[mobileText.label, { color: mobileColors[palette.label] }]}
+        {...(onPress ? { ellipsizeMode: "tail" as const, numberOfLines: 1 } : {})}
+        style={[
+          mobileText.label,
+          onPress ? mobilePillOverflow.interactiveText : mobilePillOverflow.displayText,
+          { color: mobileColors[palette.label] },
+        ]}
       >
         {children ?? label}
       </Text>
@@ -78,6 +84,7 @@ export function Chip({
 
   const chipStyle = [
     styles.chip,
+    onPress ? mobilePillOverflow.interactiveContainer : mobilePillOverflow.displayContainer,
     { backgroundColor: mobileColors[palette.background] },
     disabled && styles.chipDisabled,
   ];

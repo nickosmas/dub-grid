@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
 import { createIconControlStyle } from "../../../shared/components/icon-control-style";
 import {
+  mobilePillOverflow,
   mobileAvatarText,
   mobileElevation,
   mobileMotion,
@@ -970,6 +971,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 12,
     },
     jobPill: {
+      ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
@@ -982,12 +984,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 5,
     },
     jobPillTextStack: {
+      minWidth: 0,
       gap: 2,
     },
     jobPillInlineTextRow: {
       flexDirection: "row",
       alignItems: "center",
+      flexWrap: "wrap",
       gap: 4,
+      minWidth: 0,
     },
     jobPillEyebrowText: {
       ...mobileText.micro,
@@ -997,6 +1002,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillText: {
       ...mobileText.badge,
+      ...mobilePillOverflow.displayText,
       textTransform: "uppercase",
     },
     jobPillMentoredText: {
@@ -1019,11 +1025,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
+      ...mobilePillOverflow.displayText,
     },
     jobPillValueTextCompact: {
       fontSize: 12,
     },
     mentoredPill: {
+      ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
@@ -1036,6 +1044,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     mentoredPillText: {
       ...mobileText.badge,
+      ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
     },
     meCollaboratorList: {
