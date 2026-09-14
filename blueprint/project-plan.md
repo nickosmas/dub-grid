@@ -103,6 +103,19 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark and every
   landing or marketing title and heading, preserve the existing semantic type
   scale, and use tabular numerals for scheduling data.
+- Web UI consistency and interaction resilience: review every project-owned web
+  route, component, primitive, and rendered state; consolidate equivalent
+  controls and presentation; repair confirmed clipping, overlap, reflow,
+  first-paint, loading, error, empty-state, keyboard, focus, and responsive
+  defects; and qualify the complete role, theme, viewport, zoom, permission,
+  loading, empty, error, and overlay matrix with reproducible browser evidence.
+  The review may use `better-ui` for surfaces, radii, optical alignment, icon
+  state, explicit transitions, and theme-switch behavior, and
+  `emil-design-eng` for motion purpose, interruptibility, easing, gesture
+  physics, perceived performance, and reduced-motion review. These are review
+  references only: preserve DubGrid's tokens, density, platform-specific
+  motion, and existing accessibility contracts, and do not add a dependency
+  solely to satisfy either checklist.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -115,11 +128,12 @@ the mobile release catch-up in item 18, authentication and onboarding release
 hardening in item 19, explicit schedule-indicator removal in item 20, and
 production display-mode layout resilience in item 21. Scheduler open-shift
 staffing is item 22, app-wide pill overflow resilience is item 23, and Inter
-product typography is item 24. Production migration safety remains last as item 25. Item 18 is deliberately split into role
-eligibility, the shared dashboard model, and native dashboard presentation so
-each can be reviewed independently. Item 19 is split into state correctness,
-full journey coverage, performance and resilience, security, and release
-qualification. Item 25 must remain last.
+product typography is item 24. Web UI consistency and interaction resilience is
+item 25, and production migration safety remains last as item 26. Item 18 is
+deliberately split into role eligibility, the shared dashboard model, and native
+dashboard presentation so each can be reviewed independently. Item 19 is split
+into state correctness, full journey coverage, performance and resilience,
+security, and release qualification. Item 26 must remain last.
 
 ## 4. Data - What are we storing?
 

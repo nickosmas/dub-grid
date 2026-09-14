@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 946bacee1e547ea1d08bd4edb852c25c6c50f9dacce2e282e3893e5ff8fcb606 -->
+<!-- blueprint:source-hash 25304129495ef215832d359e5ac6d37218827c9e01fe607de39eeb29b159fca8 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 24-25.
+Everything below is already shipped except the unchecked work in items 25-26.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -165,7 +165,25 @@ Everything below is already shipped except the unchecked work in items 24-25.
     semantic type scale, use tabular numerals for scheduling data, and verify
     fallbacks, layout, browser zoom, and native text scaling.
 
-25. **Production migration safety** - the final release gate after all product
+25. **Web UI consistency and interaction resilience** - audit and repair every
+    project-owned web route, component, primitive, and rendered state so
+    equivalent elements share one visual and interaction contract and no known
+    clipping, overlap, reflow, first-paint, loading, error, empty-state,
+    keyboard, focus, or responsive defect remains. Consolidate repeated visual
+    primitives, repair the confirmed dashboard and high-zoom layout defects,
+    restore the Inter-aware browser audit, and qualify the complete role, theme,
+    viewport, zoom, permission, loading, empty, error, and overlay matrix with
+    reproducible evidence. Split this epic into bounded sub-features during
+    `/feature`. Use `better-ui` for surface depth, concentric radii, optical icon
+    alignment, explicit transition properties, theme-switch snapping, and
+    hit-area polish. Use `emil-design-eng` for motion purpose and frequency,
+    interruptible states, origin-aware popovers, gesture velocity, perceived
+    loading speed, and slow-motion or device review. Preserve DubGrid's tokens,
+    density, platform-specific mobile motion, and reduced-motion behavior; these
+    references guide review and do not authorize a new dependency or wholesale
+    visual rewrite.
+
+26. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
@@ -296,6 +314,14 @@ and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
 native Inter 400/500/600/700 faces. The existing semantic size hierarchy stays
 in place, and schedules, dates, times, durations, and totals use tabular
 numerals.
+
+For future web UI consistency work, `better-ui` is a reference for surfaces,
+radii, optical alignment, icon state, explicit transitions, and theme-switch
+behavior. `emil-design-eng` is a reference for motion purpose, interruptibility,
+easing, gesture physics, perceived performance, and reduced-motion review. Both
+are review guidance only: preserve DubGrid's tokens, density, platform-specific
+motion, and accessibility contracts, and do not add a dependency solely to
+satisfy either checklist.
 
 Main route groups (web, App Router):
 

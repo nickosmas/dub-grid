@@ -173,7 +173,27 @@
       the wordmark and every landing or marketing title and heading, preserve
       the existing semantic type scale, use tabular numerals for scheduling
       data, and verify fallbacks, layout, browser zoom, and native text scaling.
-- [ ] 25. **Production migration safety** - final release gate only after all
+- [ ] 25. **Web UI consistency and interaction resilience** - audit and repair
+      every project-owned web route, component, primitive, and rendered state so
+      equivalent elements share one visual and interaction contract and no known
+      clipping, overlap, reflow, first-paint, loading, error, empty-state,
+      keyboard, focus, or responsive defect remains. Consolidate numeric counts,
+      semantic statuses, switches, auth actions, empty states, and action copy;
+      repair the tablet dashboard, high-zoom Alerts and Schedule overflow,
+      breakpoint-dependent first paint, and app-shell-aware route boundaries;
+      then restore the Inter-aware browser audit and qualify the full route,
+      role, theme, viewport, zoom, permission, loading, empty, error, and overlay
+      matrix with reproducible evidence. Split this epic into bounded
+      sub-features during `/feature` rather than attempting one large build pass.
+      Use the `better-ui` reference for surface depth, concentric radii, optical
+      icon alignment, explicit transition properties, theme-switch snapping, and
+      hit-area polish. Use `emil-design-eng` for motion purpose and frequency,
+      interruptible open/close states, origin-aware popovers, gesture velocity,
+      perceived loading speed, and slow-motion or device review. Preserve
+      DubGrid's shared tokens, platform-specific mobile motion, reduced-motion
+      behavior, and established density; these references guide review and do
+      not authorize a new dependency or a wholesale visual rewrite.
+- [ ] 26. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,
