@@ -4,11 +4,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import {
   useFonts,
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_600SemiBold,
-  DMSans_700Bold,
-} from "@expo-google-fonts/dm-sans";
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
+import { DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -209,14 +210,13 @@ function RootLayoutSurface({
 export default function RootLayout() {
   const envValidation = validateMobileEnv();
 
-  // Hold the splash screen until DM Sans loads so brand text never flashes
-  // in the system font fallback. If loading errors out (rare — the fonts
-  // are bundled into the binary), we still proceed so the app isn't stuck
-  // on the splash.
+  // Hold the splash screen until product Inter and the DM Sans wordmark load.
+  // If bundled font loading errors, still proceed so the app remains usable.
   const [fontsLoaded, fontsError] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
     DMSans_700Bold,
   });
   if (!fontsLoaded && !fontsError) {

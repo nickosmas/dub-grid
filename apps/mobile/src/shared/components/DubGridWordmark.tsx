@@ -1,5 +1,6 @@
 import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
 import { useMobileColors } from "../providers/ThemeModeProvider";
+import { MAX_FONT_SCALE_FIXED, mobileBrandTypography } from "../theme/tokens";
 
 /**
  * The DubGrid brand wordmark for native.
@@ -32,6 +33,7 @@ export function DubGridWordmark({
   return (
     <Text
       {...rest}
+      maxFontSizeMultiplier={MAX_FONT_SCALE_FIXED}
       style={[
         styles.wordmark,
         { fontSize, color: color ?? mobileColors.textPrimary, letterSpacing: fontSize * -0.02 },
@@ -47,7 +49,7 @@ const styles = StyleSheet.create({
   wordmark: {
     // Family only. The file is already bold, and adding `fontWeight: "700"`
     // next to it drops Android onto the system font instead.
-    fontFamily: "DMSans_700Bold",
+    fontFamily: mobileBrandTypography.wordmark.fontFamily,
     // includeFontPadding (Android) leaves visible whitespace above and below
     // the glyph baseline that throws off the brand spacing.
     includeFontPadding: false,

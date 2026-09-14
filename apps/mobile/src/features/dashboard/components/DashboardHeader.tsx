@@ -4,7 +4,7 @@ import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButto
 import { TimeZoneClocks } from "../../../shared/components/TimeZoneClocks";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileTabularText, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type GreetingBucket = "morning" | "afternoon" | "evening";
 
@@ -117,6 +117,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     timeZoneClock: {
       ...mobileText.caption,
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
   });

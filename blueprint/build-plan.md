@@ -167,7 +167,13 @@
       consistent combination of wrapping, intrinsic sizing, truncation, or a
       full-value affordance appropriate to the component, without colliding
       with adjacent content or breaking narrow layouts.
-- [ ] 24. **Production migration safety** - final release gate only after all
+- [x] 24. **Inter product typography** - use Inter for all product UI and
+      ordinary copy across web and mobile, with Inter Variable optical sizing
+      on web and native Inter 400/500/600/700 faces on mobile. Keep DM Sans for
+      the wordmark and every landing or marketing title and heading, preserve
+      the existing semantic type scale, use tabular numerals for scheduling
+      data, and verify fallbacks, layout, browser zoom, and native text scaling.
+- [ ] 25. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

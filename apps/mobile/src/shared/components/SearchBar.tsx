@@ -4,7 +4,13 @@ import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "rea
 import Animated from "react-native-reanimated";
 import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileMotion, mobileRadii, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileInputText,
+  mobileMotion,
+  mobileRadii,
+  type MobileColors,
+} from "../theme/tokens";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 
 const DEFAULT_DEBOUNCE_MS = 300;
@@ -71,6 +77,7 @@ export function SearchBar({
         autoCapitalize="none"
         autoCorrect={false}
         autoFocus={autoFocus}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
@@ -146,13 +153,9 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingRight: 12,
     },
     input: {
-      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-      // Omitting `fontFamily` also avoids the Android EditText
-      // non-interactive bug when DM Sans hasn't loaded.
+      ...mobileInputText("regular"),
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "400",
       // Explicit rather than left to the platform default, so this field
       // can't inherit stray tracking from a native fallback font.
       letterSpacing: 0,

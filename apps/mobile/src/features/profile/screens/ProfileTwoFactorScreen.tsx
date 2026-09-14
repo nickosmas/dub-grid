@@ -388,7 +388,6 @@ export default function ProfileTwoFactorScreen() {
               autoComplete="one-time-code"
               inputMode="numeric"
               keyboardType="number-pad"
-              textContentType="oneTimeCode"
               label="Verification code"
               maxLength={6}
               placeholder="000000"

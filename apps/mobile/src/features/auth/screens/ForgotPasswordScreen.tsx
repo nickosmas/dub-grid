@@ -80,7 +80,6 @@ export default function ForgotPasswordScreen() {
             hasError={Boolean(error)}
             inputAccessoryViewID={inputAccessoryViewID}
             keyboardType="email-address"
-            textContentType="emailAddress"
             onChangeText={(value) => {
               setEmail(value);
               if (error) setError(null);

@@ -1,16 +1,5 @@
 import * as React from "react";
-import {
-  Body,
-  Container,
-  Font,
-  Head,
-  Html,
-  Img,
-  Link,
-  Preview,
-  Section,
-  Text,
-} from "@react-email/components";
+import { Body, Container, Html, Img, Link, Preview, Section, Text } from "@react-email/components";
 import { emailTheme, styles } from "./theme";
 
 // Go templates have no date function, so this can't be computed at send
@@ -37,25 +26,6 @@ export type EmailLayoutProps = {
 export function EmailLayout({ logoUrl, preview, children }: EmailLayoutProps) {
   return (
     <Html lang="en">
-      <Head>
-        {/* DM Sans is a variable font: one woff2 covers every weight. We
-            declare 400 + 700 so body (400) and headings/wordmark (700) both
-            resolve. Gmail strips web fonts, so the logo carries the brand
-            there; Apple Mail and the dev preview honor this. */}
-        {[400, 700].map((weight) => (
-          <Font
-            key={weight}
-            fontFamily="DM Sans"
-            fallbackFontFamily="Arial"
-            webFont={{
-              url: "https://fonts.gstatic.com/s/dmsans/v17/rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K6z9mXg.woff2",
-              format: "woff2",
-            }}
-            fontWeight={weight}
-            fontStyle="normal"
-          />
-        ))}
-      </Head>
       {preview ? <Preview>{preview}</Preview> : null}
       <Body style={styles.body}>
         <Container style={styles.container}>

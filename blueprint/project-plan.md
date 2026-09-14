@@ -98,6 +98,11 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   segmented-choice label inside its visual bounds on web and mobile. Display
   values may wrap and grow; interactive controls remain one line and truncate
   safely while preserving the full accessible value.
+- Inter product typography: use Inter for all product UI and ordinary copy on
+  web and mobile. Use Inter Variable with optical sizing on web and native
+  Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark and every
+  landing or marketing title and heading, preserve the existing semantic type
+  scale, and use tabular numerals for scheduling data.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -109,12 +114,12 @@ The roadmap starts with management-only assignment visibility in item 17, then
 the mobile release catch-up in item 18, authentication and onboarding release
 hardening in item 19, explicit schedule-indicator removal in item 20, and
 production display-mode layout resilience in item 21. Scheduler open-shift
-staffing is item 22, app-wide pill overflow resilience is item 23, and production
-migration safety remains last as item 24. Item 18 is deliberately split into role
+staffing is item 22, app-wide pill overflow resilience is item 23, and Inter
+product typography is item 24. Production migration safety remains last as item 25. Item 18 is deliberately split into role
 eligibility, the shared dashboard model, and native dashboard presentation so
 each can be reviewed independently. Item 19 is split into state correctness,
 full journey coverage, performance and resilience, security, and release
-qualification. Item 24 must remain last.
+qualification. Item 25 must remain last.
 
 ## 4. Data - What are we storing?
 
@@ -191,6 +196,12 @@ before conversion is required.
 - Mobile has its own primitive component set (`AppText`, `Button`,
   `PressableRow`, motion primitives) - never override `fontWeight` on a
   text token
+- DM Sans is the brand-heading typeface for the wordmark and every landing or
+  marketing title and heading. Inter is the product typeface for all product UI
+  and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
+  native Inter 400/500/600/700 faces. Preserve the existing semantic size
+  hierarchy and use tabular numerals for schedules, dates, times, durations,
+  and totals.
 - Neutral grays carry a deliberate tint: light-mode grays are slate
   (blue-tinted), dark-mode grays are zinc; any new gray must match
 - Terminology is customizable per organization (e.g. "Wings" can be

@@ -133,7 +133,14 @@ Shared primitives — use before creating alternatives:
 `<EmptyState size="...">`, `<ConfirmDialog>`, `<Modal>`, `<ErrorBoundary>`,
 `<NotFoundBoundary>`, `<CustomSelect>`.
 
-Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
+Product UI and ordinary copy use Inter (`var(--font-sans)`). The DubGrid
+wordmark and landing or marketing headings use DM Sans through the explicit
+`dg-font-brand-heading` boundary. Never apply DM Sans to product controls or
+body copy, and never replace the wordmark's brand face. Operational dates,
+times, hours, counts, and schedule figures use the bounded
+`dg-tabular-nums` utility; prose must not inherit tabular figures. Email body
+copy and printed schedules follow the Inter product contract, while wordmark
+art remains branded. Never Geist.
 
 ## Dialogs and sheets
 

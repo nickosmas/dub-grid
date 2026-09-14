@@ -112,6 +112,15 @@ describe("LoginScreen", () => {
     vi.unstubAllEnvs();
   });
 
+  it("places the organization help link below the primary action", () => {
+    render(<LoginScreen />);
+
+    const primaryAction = screen.getByRole("button", { name: "Continue" });
+    const helpLink = screen.getByRole("button", { name: "Need help with your subdomain?" });
+
+    expect(primaryAction.compareDocumentPosition(helpLink)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("auto-skips to the credentials stage when the remembered organization resolves", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     lookupOrganization.mockResolvedValue({
@@ -130,6 +139,15 @@ describe("LoginScreen", () => {
     expect(screen.getByText(/Continue to/)).toBeInTheDocument();
     expect(screen.getByText("DubGrid Health")).toBeInTheDocument();
     expect(screen.queryByText("dubgrid-health")).not.toBeInTheDocument();
+    const primaryAction = screen.getByRole("button", { name: "Sign In" });
+    const switchOrganization = screen.getByRole("button", { name: "Switch organization" });
+    const forgotPassword = screen.getByRole("button", { name: "Forgot password?" });
+    expect(primaryAction.compareDocumentPosition(switchOrganization)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(primaryAction.compareDocumentPosition(forgotPassword)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(lookupOrganization).toHaveBeenCalledWith("dubgrid-health");
     // Cache the refreshed name so the next launch has it before the network.
     await waitFor(() => {

@@ -57,6 +57,14 @@
 - Mobile has its own design primitives (`AppText`, `Button`,
   `PressableRow`, motion primitives) and `mobile*` design tokens - never
   override `fontWeight` on a text token
+- Product UI and ordinary copy use Inter on web and mobile. DM Sans is reserved
+  for the DubGrid wordmark and explicit landing or marketing headings. On
+  mobile, select weight through the registered Inter family aliases; editable
+  fields use the load-safe `mobileInputText()` fallback so Android controls
+  remain interactive if a font is unavailable.
+- Operational dates, times, hours, counts, and schedule figures use the shared
+  tabular-numeral utility (`dg-tabular-nums` on web,
+  `mobileTabularText` on mobile). Do not apply tabular figures to prose.
 
 ## Naming
 

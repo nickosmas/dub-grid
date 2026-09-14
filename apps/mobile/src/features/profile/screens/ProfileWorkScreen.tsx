@@ -679,7 +679,6 @@ function EditPanel({
             keyboardType="email-address"
             autoComplete="email"
             autoCorrect={false}
-            textContentType="emailAddress"
             label="Email"
             placeholder="Email"
             value={draft.email}
@@ -695,7 +694,6 @@ function EditPanel({
               focused={focusedField === "phone"}
               keyboardType="phone-pad"
               autoComplete="tel"
-              textContentType="telephoneNumber"
               label="Phone"
               placeholder="Phone"
               value={draft.phone}

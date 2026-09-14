@@ -70,7 +70,7 @@ function BillingRecoverySettings({ orgId }: { orgId: string }) {
   return (
     <div
       style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         background: "var(--dg-color-bg)",
         minHeight: "100vh",
         color: "var(--dg-color-text-primary)",
@@ -194,7 +194,7 @@ function SettingsPageContent() {
   return (
     <div
       style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         background: "var(--dg-color-bg)",
         minHeight: "100vh",
         color: "var(--dg-color-text-primary)",

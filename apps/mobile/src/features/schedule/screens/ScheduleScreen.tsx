@@ -2310,10 +2310,8 @@ function ShiftChangeBadge({
     <View
       accessibilityLabel={`Shift ${SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
       style={
-        // The inverse chip replaces the base styling outright rather than
-        // layering onto it: `shiftChangeBadgeText` carries a numeric
-        // `fontWeight`, which would send the bold DM Sans face to Android's
-        // system-font fallback once the inverse style names that family.
+        // The inverse chip replaces the base styling outright so the hero
+        // treatment does not inherit the standard status-chip surface.
         inverse
           ? styles.shiftChangeBadgeInverse
           : [

@@ -1094,7 +1094,7 @@ export default function DashboardView({
 
   if (shiftsLoading) {
     return (
-      <div style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <div className="no-print" style={stickyBarStyle}>
           <div style={toolbarContainerStyle}>
             <DashboardHeader {...headerProps} />
@@ -1165,7 +1165,7 @@ export default function DashboardView({
   return (
     <div
       style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         ...(userLockLayout
           ? {
               display: "flex",

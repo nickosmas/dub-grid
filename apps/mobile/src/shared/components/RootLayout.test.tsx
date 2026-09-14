@@ -8,6 +8,10 @@ import {
 import * as envModule from "../lib/env";
 
 const navigationThemeValues: Array<{ colors?: { background?: string; card?: string } }> = [];
+const fontState = vi.hoisted(() => ({
+  loadedMaps: [] as Array<Record<string, unknown>>,
+  result: [true, null] as [boolean, unknown],
+}));
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -28,11 +32,18 @@ vi.mock("expo-splash-screen", () => ({
   hideAsync: () => Promise.resolve(),
 }));
 
+vi.mock("@expo-google-fonts/inter", () => ({
+  useFonts: (fonts: Record<string, unknown>) => {
+    fontState.loadedMaps.push(fonts);
+    return fontState.result;
+  },
+  Inter_400Regular: "Inter_400Regular",
+  Inter_500Medium: "Inter_500Medium",
+  Inter_600SemiBold: "Inter_600SemiBold",
+  Inter_700Bold: "Inter_700Bold",
+}));
+
 vi.mock("@expo-google-fonts/dm-sans", () => ({
-  useFonts: () => [true, null],
-  DMSans_400Regular: "DMSans_400Regular",
-  DMSans_500Medium: "DMSans_500Medium",
-  DMSans_600SemiBold: "DMSans_600SemiBold",
   DMSans_700Bold: "DMSans_700Bold",
 }));
 
@@ -167,6 +178,8 @@ describe("RootLayout", () => {
   beforeEach(() => {
     validateMobileEnvSpy.mockReset();
     navigationThemeValues.length = 0;
+    fontState.loadedMaps.length = 0;
+    fontState.result = [true, null];
   });
 
   it("shows the mobile setup screen when env validation fails", () => {
@@ -212,5 +225,28 @@ describe("RootLayout", () => {
       background: "#FFFFFF",
       card: "#FFFFFF",
     });
+    expect(fontState.loadedMaps.at(-1)).toEqual({
+      Inter_400Regular: "Inter_400Regular",
+      Inter_500Medium: "Inter_500Medium",
+      Inter_600SemiBold: "Inter_600SemiBold",
+      Inter_700Bold: "Inter_700Bold",
+      DMSans_700Bold: "DMSans_700Bold",
+    });
+  });
+
+  it("keeps the app usable when bundled font loading fails", () => {
+    fontState.result = [false, new Error("font load failed")];
+    validateMobileEnvSpy.mockReturnValue({
+      status: "ready",
+      config: {
+        supabaseUrl: "https://example.supabase.co",
+        supabaseAnonKey: "anon-key",
+        apiBaseUrl: "https://dubgrid.com",
+      },
+    });
+
+    render(<RootLayout />);
+
+    expect(screen.getByTestId("stack")).toBeInTheDocument();
   });
 });

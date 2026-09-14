@@ -308,7 +308,6 @@ export default function ProfilePasswordScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               autoCorrect={false}
-              textContentType="newPassword"
               focused={focusedPasswordField === "newPassword"}
               label="New password"
               placeholder="New password"
@@ -331,7 +330,6 @@ export default function ProfilePasswordScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               autoCorrect={false}
-              textContentType="newPassword"
               error={confirmPasswordError}
               focused={focusedPasswordField === "confirmPassword"}
               label="Confirm new password"

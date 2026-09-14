@@ -65,7 +65,7 @@ export default function OnboardingPage() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+          fontFamily: "var(--font-sans)",
         }}
       >
         Loading
@@ -81,7 +81,7 @@ export default function OnboardingPage() {
         justifyContent: "center",
         minHeight: "100vh",
         padding: "24px",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         background:
           "linear-gradient(to bottom, var(--dg-color-bg) 0%, var(--dg-color-brand-bg) 100%)",
       }}

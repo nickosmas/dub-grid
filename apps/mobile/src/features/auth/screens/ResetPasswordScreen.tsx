@@ -198,7 +198,6 @@ export default function ResetPasswordScreen() {
               placeholder="000000"
               ref={codeInputRef}
               returnKeyType="go"
-              textContentType="oneTimeCode"
               value={code}
               variant="code"
             />
@@ -258,7 +257,6 @@ export default function ResetPasswordScreen() {
               ref={passwordInputRef}
               returnKeyType="next"
               secureTextEntry={!showPassword}
-              textContentType="newPassword"
               trailingAccessory={
                 <Button
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
@@ -286,7 +284,6 @@ export default function ResetPasswordScreen() {
               ref={confirmPasswordInputRef}
               returnKeyType="go"
               secureTextEntry={!showPassword}
-              textContentType="newPassword"
               value={confirmPassword}
             />
             {mismatchError ? <AuthFieldError message={mismatchError} /> : null}

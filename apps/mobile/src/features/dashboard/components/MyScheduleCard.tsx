@@ -11,6 +11,7 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import {
   mobileRadius,
   mobileText,
+  mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -309,6 +310,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dayHeader: {
       ...mobileText.label,
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     // Multiple shifts in one day (a "double shift") lay out side by side in
@@ -345,6 +347,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // ellipsizing.
     shiftTime: {
       ...mobileText.caption,
+      ...mobileTabularText,
       fontSize: 11,
       lineHeight: 14,
       color: mobileColors.textMuted,

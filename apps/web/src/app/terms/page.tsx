@@ -20,7 +20,7 @@ export default function TermsOfServicePage() {
       style={{
         minHeight: "100vh",
         background: "var(--dg-color-surface)",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         color: "var(--dg-color-text-primary)",
         padding: "48px 24px 80px",
       }}

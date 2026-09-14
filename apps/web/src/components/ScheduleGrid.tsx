@@ -601,6 +601,7 @@ function ShiftDetailHoverCard({
                   ) : null}
                   {entry.timeLabel ? (
                     <div
+                      className="dg-tabular-nums"
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         color: "var(--dg-color-text-muted)",
@@ -1413,6 +1414,7 @@ const SectionBlock = memo(function SectionBlock({
                     >
                       <div className="dg-grid-slot__chrome" aria-hidden="true" />
                       <div
+                        className="dg-tabular-nums"
                         style={{
                           fontSize: "var(--dg-fs-caption)",
                           fontWeight: 600,
@@ -3704,7 +3706,7 @@ const SectionBlock = memo(function SectionBlock({
                       return (
                         <div
                           key={`${row.label}-${date.toISOString()}`}
-                          className="dg-grid-slot dg-grid-slot--tally"
+                          className="dg-grid-slot dg-grid-slot--tally dg-tabular-nums"
                           data-tally-count={`${row.categoryId}-${index}`}
                           data-tally-status={
                             hasRequirement ? (isMet ? "covered" : "short") : "none"

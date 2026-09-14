@@ -223,6 +223,9 @@ const documentedOpacityTextCounts = {
 };
 
 const globalsCss = readFileSync(path.resolve(webSource, "app/globals.css"), "utf8");
+const rootLayout = readFileSync(path.resolve(webSource, "app/layout.tsx"), "utf8");
+const landingPage = readFileSync(path.resolve(webSource, "app/page.tsx"), "utf8");
+const logo = readFileSync(path.resolve(webSource, "components/Logo.tsx"), "utf8");
 const sharedButton = readFileSync(path.resolve(webSource, "components/ui/button.tsx"), "utf8");
 const sharedInput = readFileSync(path.resolve(webSource, "components/ui/input.tsx"), "utf8");
 const sharedSidebar = readFileSync(path.resolve(webSource, "components/ui/sidebar.tsx"), "utf8");
@@ -235,6 +238,29 @@ const sharedStyles = readFileSync(path.resolve(webSource, "lib/styles.ts"), "utf
 const formField = readFileSync(path.resolve(webSource, "components/FormField.tsx"), "utf8");
 const sharedTable = readFileSync(path.resolve(webSource, "components/ui/table.tsx"), "utf8");
 const requestDemoPage = readFileSync(path.resolve(webSource, "app/request-demo/page.tsx"), "utf8");
+const printScheduleView = readFileSync(
+  path.resolve(webSource, "components/PrintScheduleView.tsx"),
+  "utf8",
+);
+const emailTheme = readFileSync(path.resolve(webSource, "emails/components/theme.ts"), "utf8");
+const emailLayout = readFileSync(
+  path.resolve(webSource, "emails/components/EmailLayout.tsx"),
+  "utf8",
+);
+const scheduleGrid = readFileSync(path.resolve(webSource, "components/ScheduleGrid.tsx"), "utf8");
+const mobileDayView = readFileSync(path.resolve(webSource, "components/MobileDayView.tsx"), "utf8");
+const dashboardHero = readFileSync(
+  path.resolve(webSource, "components/dashboard/DashboardHero.tsx"),
+  "utf8",
+);
+const userDashboard = readFileSync(
+  path.resolve(webSource, "components/dashboard/UserDashboard.tsx"),
+  "utf8",
+);
+const reportsPage = readFileSync(
+  path.resolve(webSource, "app/(app)/reports/ReportsPageContent.tsx"),
+  "utf8",
+);
 const cookiePolicyPage = readFileSync(
   path.resolve(webSource, "app/cookie-policy/page.tsx"),
   "utf8",
@@ -264,6 +290,72 @@ const productiveRoles = [
 ] as const;
 
 describe("productive typography contract", () => {
+  it("separates the Inter product family from the DM Sans brand family", () => {
+    expect(rootLayout).toContain('import { DM_Sans, DM_Mono, Inter } from "next/font/google";');
+    expect(rootLayout).toContain('variable: "--font-inter"');
+    expect(rootLayout).toContain(
+      'className={cn(inter.variable, dmSans.variable, dmMono.variable, "font-sans")}',
+    );
+    expect(globalsCss).toContain('--font-sans: var(--font-inter), "Inter", system-ui, sans-serif;');
+    expect(globalsCss).toContain(
+      '--font-brand: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;',
+    );
+    expect(globalsCss).toMatch(
+      /html,\s*body\s*\{[\s\S]*?font-family:\s*var\(--font-inter\), "Inter", system-ui, sans-serif;/,
+    );
+    expect(globalsCss).toMatch(/html,\s*body\s*\{[\s\S]*?font-optical-sizing:\s*auto;/);
+  });
+
+  it("keeps brand typography behind an explicit DM Sans boundary", () => {
+    expect(globalsCss).toMatch(
+      /\.dg-font-brand-heading\s*\{[\s\S]*?font-family:\s*var\(--font-dm-sans\), "DM Sans", system-ui, sans-serif;/,
+    );
+    expect(landingPage).toMatch(/<h1 className="dg-font-brand-heading\s/);
+    expect(logo).toContain("fontFamily: \"'DM Sans', sans-serif\"");
+  });
+
+  it("bounds every production DM Sans use to an explicit brand surface", () => {
+    expect(
+      collectUnexpectedMatchCounts(/(?:var\(--font-dm-sans\)|["']DM Sans["'])/g, {
+        "app/globals.css": 4,
+        "app/logo-grid.tsx": 2,
+        "app/opengraph-image.tsx": 1,
+        "app/twitter-image.tsx": 1,
+        "components/Logo.tsx": 1,
+      }),
+    ).toEqual([]);
+
+    const landingHeadings = landingPage.match(/<h[123]\b/g) ?? [];
+    const brandedLandingHeadings =
+      landingPage.match(/<h[123]\s+className="dg-font-brand-heading\b/g) ?? [];
+    expect(brandedLandingHeadings).toHaveLength(landingHeadings.length);
+
+    const requestDemoHeadings = requestDemoPage.match(/<h1\b/g) ?? [];
+    const brandedRequestDemoHeadings =
+      requestDemoPage.match(/<h1\s+className="dg-font-brand-heading"/g) ?? [];
+    expect(brandedRequestDemoHeadings).toHaveLength(requestDemoHeadings.length);
+  });
+
+  it("keeps ordinary email and print copy on Inter", () => {
+    expect(emailTheme).toContain('"Inter, -apple-system');
+    expect(emailTheme).not.toContain("DM Sans");
+    expect(emailLayout).not.toContain('fontFamily="DM Sans"');
+    expect(printScheduleView).toContain("font-family: 'Inter'");
+    expect(printScheduleView).toContain("fontFamily: \"'Inter'");
+  });
+
+  it("uses one bounded tabular-numeral contract for operational figures", () => {
+    expect(globalsCss).toMatch(/\.dg-tabular-nums\s*\{\s*font-variant-numeric:\s*tabular-nums;/);
+    expect(scheduleGrid).toContain('className="dg-tabular-nums"');
+    expect(scheduleGrid).toContain("dg-grid-slot--tally dg-tabular-nums");
+    expect(mobileDayView).toContain('className="dg-tabular-nums"');
+    expect(dashboardHero).toContain('className="dg-tabular-nums"');
+    expect(userDashboard).toContain('className="dg-tabular-nums"');
+    expect(reportsPage).toContain('className="dg-tabular-nums"');
+    expect(printScheduleView).toContain('fontVariantNumeric: "tabular-nums"');
+    expect(globalsCss).not.toMatch(/html,\s*body\s*\{[^}]*font-variant-numeric:/);
+  });
+
   it("enforces real public, auth, onboarding, and landing UI", () => {
     const enforcedPaths = new Set(
       typographyEnforcementSourceFiles.map((filePath) =>

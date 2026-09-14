@@ -8,6 +8,7 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpacing,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   mobileTypography,
@@ -69,6 +70,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meWelcomeDate: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textSubtle,
     },
     meWelcomeTitle: {
@@ -96,6 +98,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meWeekNavigatorRangeLabel: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
     meWeekNavigatorActions: {
@@ -247,6 +250,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDateDay: {
       ...mobileText.heroMetric,
+      ...mobileTabularText,
       color: mobileColors.textInverse,
     },
     meHeroDateText: {
@@ -347,9 +351,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 6,
     },
     shiftChangeBadgeText: {
-      ...mobileText.micro,
+      ...mobileTextWeighted("micro", "bold"),
       color: mobileColors.textSecondary,
-      fontWeight: "700",
       textTransform: "uppercase",
       // Android's font padding pushes uppercase glyphs high inside a pill this
       // tight, leaving the label visibly off-center in its own chip.
@@ -421,6 +424,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroTimeText: {
       ...mobileText.sectionTitle,
+      ...mobileTabularText,
       color: mobileColors.textInverse,
       flexShrink: 1,
     },
@@ -439,6 +443,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroTimePillText: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textInverse,
     },
     meHeroTimePillTextMuted: {
@@ -594,6 +599,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     upcomingHoursBadgeText: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.brand,
     },
     upcomingShiftsCard: {
@@ -694,6 +700,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     upcomingDateDay: {
       ...mobileText.sectionTitle,
+      ...mobileTabularText,
       fontSize: 20,
       lineHeight: 24,
       color: mobileColors.textSecondary,
@@ -744,6 +751,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // secondary to the shift name, not competing with it for attention.
     upcomingShiftTimeText: {
       ...mobileText.caption,
+      ...mobileTabularText,
       fontSize: 13,
       lineHeight: 18,
       color: mobileColors.textSubtle,
@@ -803,6 +811,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     scheduleRowDate: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     scheduleRowTitle: {
@@ -836,6 +845,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     scheduleRowTimeText: {
       ...mobileTextWeighted("rowTitle", "medium"),
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     scheduleRowArrow: {
@@ -890,6 +900,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     openShiftCountBadgeText: {
       ...mobileText.badge,
+      ...mobileTabularText,
       color: mobileColors.brand,
     },
     openShiftCard: {
@@ -964,6 +975,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     requestDateText: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     requestActions: {
@@ -1148,6 +1160,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meSelectedDateTitle: {
       ...mobileTextWeighted("sectionTitle", "bold"),
+      ...mobileTabularText,
       fontSize: 26,
       lineHeight: 32,
       flex: 1,
@@ -1251,6 +1264,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       opacity: 0.4,
     },
     dateHighlightText: {
+      ...mobileTabularText,
       color: mobileColors.textPrimary,
       fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 15,
@@ -1315,6 +1329,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     shiftGroupTime: {
       flexShrink: 0,
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textSubtle,
       textAlign: "right",
     },
@@ -1326,6 +1341,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     weekDayTitle: {
       ...mobileText.sectionTitle,
+      ...mobileTabularText,
       fontSize: 17,
       color: mobileColors.textPrimary,
     },
@@ -1405,6 +1421,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     teamMemberTime: {
       ...mobileText.bodyStrong,
+      ...mobileTabularText,
       color: mobileColors.textSubtle,
     },
     teamMemberSplitBadgeRow: {

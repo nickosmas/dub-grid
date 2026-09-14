@@ -256,6 +256,7 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
         </div>
       </div>
       <div
+        className="dg-tabular-nums"
         style={{
           fontSize: "clamp(1.45rem, 1.8vw, 1.85rem)",
           fontWeight: 700,

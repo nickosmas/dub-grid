@@ -8,6 +8,7 @@ import {
   mobilePillOverflow,
   mobileRadii,
   mobileSpace,
+  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -218,6 +219,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     tileValue: {
       ...mobileText.heroMetric,
+      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     tileDetail: {

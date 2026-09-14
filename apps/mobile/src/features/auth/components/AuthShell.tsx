@@ -1,11 +1,11 @@
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import type { ReactNode } from "react";
 import { Image, Platform, StyleSheet, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { Pressable } from "../../../shared/components/Pressable";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { getActionItems } from "../../../shared/components/action-button-layout";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
+import { Pressable } from "../../../shared/components/Pressable";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
@@ -116,7 +116,25 @@ export function AuthActions({
   children?: ReactNode;
   primaryAction?: ReactNode;
 }) {
-  return <ActionButtons primaryAction={primaryAction}>{children}</ActionButtons>;
+  const primaryItems = getActionItems(primaryAction, "primary");
+  const secondaryItems = getActionItems(children, "secondary");
+
+  return (
+    <View style={styles.actionGroup}>
+      {primaryItems.map(({ key, node }) => (
+        <View key={key}>{node}</View>
+      ))}
+      {secondaryItems.length > 0 ? (
+        <View style={styles.secondaryActions}>
+          {secondaryItems.map(({ key, node }) => (
+            <View key={key} style={styles.secondaryAction}>
+              {node}
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -168,5 +186,17 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: mobileSpace.md,
+  },
+  actionGroup: {
+    alignSelf: "stretch",
+    gap: mobileSpace.sm,
+  },
+  secondaryActions: {
+    flexDirection: "row",
+    gap: mobileSpace.sm,
+  },
+  secondaryAction: {
+    flex: 1,
+    minWidth: 0,
   },
 });

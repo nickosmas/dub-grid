@@ -2555,7 +2555,11 @@ function MyWeekSection({
         <div>
           <div className="dg-card-title">{isTwoWeekView ? "Your Schedule" : "Your Week"}</div>
           <div className="dg-card-subtitle">
-            {hoursLabel ?? `Your published shifts for ${periodLabel}`}
+            {hoursLabel ? (
+              <span className="dg-tabular-nums">{hoursLabel}</span>
+            ) : (
+              `Your published shifts for ${periodLabel}`
+            )}
           </div>
         </div>
       </div>
@@ -2961,6 +2965,7 @@ function WeekShiftRow({
           </div>
           {timeRange ? (
             <div
+              className="dg-tabular-nums"
               style={{
                 alignItems: "center",
                 color: "var(--dg-color-text-muted)",
@@ -3132,6 +3137,7 @@ function DateTile({
         {parts.weekday}
       </span>
       <span
+        className="dg-tabular-nums"
         style={{
           color: compact ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
           fontSize: compact ? 17 : 20,

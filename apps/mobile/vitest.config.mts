@@ -37,6 +37,14 @@ export default defineConfig(async () => {
           find: /^react-native$/,
           replacement: path.resolve(__dirname, "./src/test/react-native-shim.ts"),
         },
+        {
+          find: /^@expo-google-fonts\/inter$/,
+          replacement: path.resolve(__dirname, "./src/test/expo-google-fonts-inter-stub.ts"),
+        },
+        {
+          find: /^@expo-google-fonts\/dm-sans$/,
+          replacement: path.resolve(__dirname, "./src/test/expo-google-fonts-dm-sans-stub.ts"),
+        },
         // react-native-reanimated eagerly evaluates react-native-worklets, whose
         // native bindings throw under jsdom ("Native part of Worklets doesn't
         // seem to be initialized"). Any screen importing it (AppSplashScreen,

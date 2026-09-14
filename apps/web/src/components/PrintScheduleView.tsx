@@ -1101,7 +1101,7 @@ export default function PrintScheduleView({
       print-color-adjust: exact !important;
     }
     @page { size: A3 landscape; margin: 0.5in; }
-    html, body { margin: 0; padding: 0; background: #fff; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; }
+    html, body { margin: 0; padding: 0; background: #fff; font-family: 'Inter', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; }
   </style>
 </head><body>${contentEl.outerHTML}</body></html>`);
 
@@ -1230,7 +1230,8 @@ export default function PrintScheduleView({
           style={{
             background: "#fff",
             fontSize: `${fontSize}px`,
-            fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontVariantNumeric: "tabular-nums",
             padding: "0.5in",
             maxWidth: "none",
             boxShadow: "0 4px 24px rgba(0,0,0,0.15)",

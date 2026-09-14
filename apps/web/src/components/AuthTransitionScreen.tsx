@@ -76,7 +76,7 @@ export default function AuthTransitionScreen({
         justifyContent: "center",
         padding: 24,
         background: "var(--dg-color-bg)",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>

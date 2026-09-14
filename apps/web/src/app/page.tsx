@@ -358,7 +358,7 @@ export default function RootPage() {
       <section className="landing-hero relative flex items-center justify-center overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-28 sm:pb-32">
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-white leading-[1.05]">
+          <h1 className="dg-font-brand-heading text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-white leading-[1.05]">
             Scheduling, done right.
             <br />
             <span className="text-white/80">Ditch the spreadsheet.</span>
@@ -405,7 +405,7 @@ export default function RootPage() {
       <RevealSection id="features" className="py-16 sm:py-20 lg:py-24">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+            <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               Everything you need, nothing you don't
             </h2>
             <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
@@ -427,7 +427,7 @@ export default function RootPage() {
                       className="text-[var(--dg-color-text-muted)] group-hover:text-[var(--dg-color-text-muted)] transition-colors duration-150"
                     />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)] mb-2">
+                  <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)] mb-2">
                     {feature.title}
                   </h3>
                   <p className="text-sm text-[var(--dg-color-text-muted)] leading-relaxed">
@@ -444,7 +444,7 @@ export default function RootPage() {
       <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+            <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               The full picture
             </h2>
             <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
@@ -454,7 +454,7 @@ export default function RootPage() {
           <div className="grid items-center gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,4fr)_minmax(0,1fr)]">
             <div className="space-y-6 text-center xl:text-left">
               <div>
-                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)]">
                   See coverage at a glance
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
@@ -463,7 +463,7 @@ export default function RootPage() {
                 </p>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)]">
                   Plan with real numbers
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
@@ -480,7 +480,7 @@ export default function RootPage() {
 
             <div className="space-y-6 text-center xl:text-left">
               <div>
-                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)]">
                   Resolve gaps faster
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
@@ -488,7 +488,7 @@ export default function RootPage() {
                 </p>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)]">
+                <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)]">
                   Follow changes as they happen
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--dg-color-text-muted)]">
@@ -505,7 +505,7 @@ export default function RootPage() {
       <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+            <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               Your whole team, one screen
             </h2>
             <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
@@ -526,7 +526,7 @@ export default function RootPage() {
       <RevealSection className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+            <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               Your schedule, in your pocket
             </h2>
             <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
@@ -544,7 +544,7 @@ export default function RootPage() {
       <RevealSection className="landing-section-alt py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
+            <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
               Security that stays out of your way
             </h2>
             <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
@@ -562,7 +562,7 @@ export default function RootPage() {
                   <div className="w-10 h-10 rounded-xl bg-[var(--dg-color-bg-secondary)] flex items-center justify-center mb-4">
                     <Icon size={20} className="text-[var(--dg-color-text-muted)]" />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--dg-color-text-secondary)] mb-2">
+                  <h3 className="dg-font-brand-heading text-base font-semibold text-[var(--dg-color-text-secondary)] mb-2">
                     {feature.title}
                   </h3>
                   <p className="text-sm text-[var(--dg-color-text-muted)] leading-relaxed">
@@ -578,7 +578,7 @@ export default function RootPage() {
       {/* ── CTA ── */}
       <RevealSection className="landing-cta-section py-12 sm:py-16 lg:py-20">
         <div className="landing-cta max-w-5xl mx-auto px-6 py-14 sm:px-10 sm:py-16 lg:px-16 lg:py-20 text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-[var(--dg-color-text-primary)]">
+          <h2 className="dg-font-brand-heading text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-[var(--dg-color-text-primary)]">
             Done with
             <br />
             the spreadsheet?

@@ -17,7 +17,7 @@ export const emailTheme = {
 } as const;
 
 export const fontStack =
-  "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+  "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 /**
  * `logoUrl` used only by the react-email dev preview (via PreviewProps), so

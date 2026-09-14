@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 3a90c4b16bcfa6e56fa1af7a9ebd2a39e9ec8eb869dd9d27551f5489e1bf5476 -->
+<!-- blueprint:source-hash 946bacee1e547ea1d08bd4edb852c25c6c50f9dacce2e282e3893e5ff8fcb606 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 19-23.
+Everything below is already shipped except the unchecked work in items 24-25.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -158,7 +158,14 @@ Everything below is already shipped except the unchecked work in items 19-23.
     values may wrap and grow; interactive controls remain one line and truncate
     safely while retaining the full accessible value.
 
-24. **Production migration safety** - the final release gate after all product
+24. **Inter product typography** - use Inter for all product UI and ordinary
+    copy across web and mobile, with Inter Variable optical sizing on web and
+    native Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark
+    and every landing or marketing title and heading, preserve the existing
+    semantic type scale, use tabular numerals for scheduling data, and verify
+    fallbacks, layout, browser zoom, and native text scaling.
+
+25. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
@@ -282,6 +289,13 @@ apps don't share component code, only the visual language). Neutral
 grays carry a deliberate tint - slate in light mode, zinc in dark mode.
 All org-customizable terminology (Wings, Skill Levels, etc.) is read
 through the org's terminology config, never hardcoded.
+
+DM Sans is the brand-heading typeface for the wordmark and every landing or
+marketing title and heading. Inter is the product typeface for all product UI
+and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
+native Inter 400/500/600/700 faces. The existing semantic size hierarchy stays
+in place, and schedules, dates, times, durations, and totals use tabular
+numerals.
 
 Main route groups (web, App Router):
 

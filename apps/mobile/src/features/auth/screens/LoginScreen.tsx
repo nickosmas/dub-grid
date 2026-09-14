@@ -6,12 +6,11 @@ import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { Button } from "../../../shared/components/Button";
 import { AuthField } from "../components/AuthField";
 import { InlineError } from "../../../shared/components/InlineError";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { AuthShell } from "../components/AuthShell";
+import { AuthActions, AuthShell } from "../components/AuthShell";
 import { NetworkConnectionRecoveryScreen } from "./NetworkConnectionRecoveryScreen";
 import {
   useIsConsentDecisionPending,
@@ -37,6 +36,7 @@ import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -77,7 +77,6 @@ export default function LoginScreen() {
   const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
   const isConsentDecisionPending = useIsConsentDecisionPending();
   const recheckConsentDecision = useRecheckConsentDecision();
-  const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const mfaInputRef = useRef<TextInput>(null);
   // One bar serves every stage's field: the keyboard covers the stage's submit
@@ -149,7 +148,6 @@ export default function LoginScreen() {
         await saveLastOrg(result.organization);
         if (!active) return;
         setStage("credentials");
-        setTimeout(() => emailInputRef.current?.focus(), 0);
       } catch (organizationError) {
         if (!active) return;
         const nextError = getInlineErrorMessageOrToast(pushToast, {
@@ -253,7 +251,6 @@ export default function LoginScreen() {
       setOrgSlug(result.organization.slug);
       setOrgName(result.organization.name);
       setStage("credentials");
-      setTimeout(() => emailInputRef.current?.focus(), 0);
     } catch (organizationError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: organizationError,
@@ -367,12 +364,16 @@ export default function LoginScreen() {
   // finding out. `styles.subtitle` reserves its height so nothing shifts.
   const orgSubtitle = orgName ? (
     <>
-      Continue to <Text style={styles.subtitleStrong}>{orgName}</Text>.
+      Continue to{" "}
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitleStrong}>
+        {orgName}
+      </Text>
+      .
     </>
   ) : isResolvingOrgName ? null : (
     <>
       Signing in at{" "}
-      <Text style={styles.subtitleStrong}>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitleStrong}>
         {orgSlug}
         {orgSuffix}
       </Text>
@@ -409,8 +410,12 @@ export default function LoginScreen() {
       {stage === "organization" ? (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Sign in</Text>
-            <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Sign in
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              Enter the subdomain for your team.
+            </Text>
           </View>
 
           <View style={styles.fields}>
@@ -435,7 +440,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={orgLoading || !orgSlug.trim()}
@@ -451,9 +456,13 @@ export default function LoginScreen() {
                 onPress={() => setShowOrgHelp((current) => !current)}
                 tone="link"
               />
-            </ActionButtons>
+            </AuthActions>
             {orgLoading ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 {slowSubmission
                   ? "This is taking longer than usual. We’re still checking your Organization."
                   : "Checking your workspace…"}
@@ -461,10 +470,16 @@ export default function LoginScreen() {
             ) : null}
 
             {showOrgHelp ? (
-              <Text style={styles.helperText}>
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperText}>
                 Your subdomain is the first part of your organization URL - for example, the{" "}
-                <Text style={styles.helperStrong}>yourorg</Text> in{" "}
-                <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg
+                </Text>{" "}
+                in{" "}
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg{orgSuffix}
+                </Text>
+                .
               </Text>
             ) : null}
           </View>
@@ -472,24 +487,27 @@ export default function LoginScreen() {
       ) : stage === "credentials" ? (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome back!</Text>
-            <Text style={styles.subtitle}>{orgSubtitle}</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Welcome back!
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              {orgSubtitle}
+            </Text>
           </View>
 
           <View style={styles.fields}>
             <AuthField
               accessibilityLabel="Email"
-              autoCapitalize="none"
               autoComplete="email"
+              autoFocus
+              autoCapitalize="none"
               autoCorrect={false}
               blurOnSubmit={false}
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
               keyboardType="email-address"
               placeholder="Email"
-              ref={emailInputRef}
               returnKeyType="next"
-              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               onSubmitEditing={() => passwordInputRef.current?.focus()}
@@ -498,7 +516,7 @@ export default function LoginScreen() {
             <AuthField
               accessibilityLabel="Password"
               autoCapitalize="none"
-              autoComplete="password"
+              autoComplete="current-password"
               autoCorrect={false}
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
@@ -506,7 +524,6 @@ export default function LoginScreen() {
               ref={passwordInputRef}
               returnKeyType="done"
               secureTextEntry={!showPassword}
-              textContentType="password"
               trailingAccessory={
                 <View style={styles.eyeButton}>
                   <Button
@@ -527,7 +544,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={submitting || !isValidEmail(email) || !password}
@@ -550,9 +567,13 @@ export default function LoginScreen() {
                   });
                 }}
               />
-            </ActionButtons>
+            </AuthActions>
             {submitting && slowSubmission ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 Signing in is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}
@@ -561,8 +582,12 @@ export default function LoginScreen() {
       ) : (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Two-factor authentication</Text>
-            <Text style={styles.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Two-factor authentication
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              Enter the 6-digit code from your authenticator app.
+            </Text>
           </View>
 
           <View style={styles.fields}>
@@ -577,7 +602,6 @@ export default function LoginScreen() {
               placeholder="000000"
               ref={mfaInputRef}
               returnKeyType="done"
-              textContentType="oneTimeCode"
               value={mfaCode}
               variant="code"
               onChangeText={(value) => {
@@ -591,7 +615,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={submitting || mfaCode.length !== 6}
@@ -611,9 +635,13 @@ export default function LoginScreen() {
                   setError(null);
                 }}
               />
-            </ActionButtons>
+            </AuthActions>
             {submitting && slowSubmission ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 Verification is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}

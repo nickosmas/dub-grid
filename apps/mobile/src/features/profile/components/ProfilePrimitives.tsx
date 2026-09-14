@@ -29,6 +29,7 @@ import {
   mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
+  mobileInputText,
   mobilePillOverflow,
   mobileRadii,
   mobileText,
@@ -422,6 +423,7 @@ export function ProfileTextInput({
             accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
             {...resolvedInputProps}
             inputAccessoryViewID={inputAccessoryViewID}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
             placeholderTextColor={mobileColors.textSubtle}
             style={[
               styles.input,
@@ -438,6 +440,7 @@ export function ProfileTextInput({
           accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
           {...resolvedInputProps}
           inputAccessoryViewID={inputAccessoryViewID}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           placeholderTextColor={mobileColors.textSubtle}
           style={[
             styles.input,
@@ -885,13 +888,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
     },
     input: {
-      // Explicit regular weight — don't spread a `mobileText.*` token that
-      // carries a bold `fontFamily`, since the named family overrides
-      // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
-      // EditText non-interactive bug when DM Sans hasn't loaded.
+      ...mobileInputText("regular"),
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "400",
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.control,
