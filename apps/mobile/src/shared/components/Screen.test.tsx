@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 
 const nativeScrollTo = vi.fn();
 
@@ -245,7 +246,7 @@ describe("Screen", () => {
     expect(contentStyle.paddingBottom).toBe(16);
   });
 
-  it("gives the footer its own, smaller bottom-padding clearance than trailing scroll content would carry", () => {
+  it("gives a tab-hidden footer only safe-area and breathing-room clearance", () => {
     render(
       <Screen bottomPaddingMode="tabbed" footer={<span>Footer content</span>}>
         <div>Content</div>
@@ -256,14 +257,28 @@ describe("Screen", () => {
     const footerNode = footerText.parentElement;
     const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
 
-    // 30 (14 safe area + 16 breathing room), not the 86 `getScreenBottomPadding`
-    // produces for the same mode: a footer is permanently visible, not
-    // invisible space past the end of a scroll, and on iOS the safe-area
-    // inset already accounts for the tab bar itself (see
-    // `getFooterBottomPadding`'s doc comment) — stacking the scroll-content
-    // number on top would read as a wall of dead space under the footer.
+    // This test is outside the iOS tab-layout provider, so only the 14pt
+    // physical safe area and 16pt breathing room belong below the footer.
     expect(footerStyle).toEqual(
       expect.arrayContaining([expect.objectContaining({ paddingBottom: 30 })]),
+    );
+  });
+
+  it("clears the native iOS tab bar for nested routes regardless of padding mode", () => {
+    render(
+      <NativeTabBarPresenceProvider>
+        <Screen bottomPaddingMode="stack" footer={<span>Footer content</span>}>
+          <div>Content</div>
+        </Screen>
+      </NativeTabBarPresenceProvider>,
+    );
+
+    const footerNode = screen.getByText("Footer content").parentElement;
+    const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
+
+    // 14pt safe area + UIKit's 49pt tab-bar content + 16pt breathing room.
+    expect(footerStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ paddingBottom: 79 })]),
     );
   });
 

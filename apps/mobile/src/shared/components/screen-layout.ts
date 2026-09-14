@@ -68,22 +68,23 @@ const FOOTER_BOTTOM_BREATHING_ROOM = 16;
 /** The tallest bottom inset a screen with nothing below it can honestly have. */
 const HOME_INDICATOR_INSET = 34;
 
+/** The content height of UIKit's standard bottom tab bar, excluding the safe area. */
+const IOS_NATIVE_TAB_BAR_CONTENT_HEIGHT = 49;
+
 /**
  * Bottom padding for a *sticky* `Screen` footer, as opposed to
  * `getScreenBottomPadding`'s padding on trailing scroll content.
  *
  * A footer is permanently visible, not invisible space past the end of a
- * scroll, so it can't reuse `tabbed` mode's iOS number unchanged: on iOS the
- * tab bar already inflates `safeAreaBottom` itself (the comment above
- * explains why `tabbed` skips real clearance there), so stacking that mode's
- * 72pt "breathing room" on top of an already tab-bar-sized inset reads as a
- * wall of dead space under the footer, not a gap above a tab bar the footer
- * was never behind in the first place. Android's floating tab bar still needs
- * its real clearance, since nothing else keeps a footer out from behind it.
+ * scroll. Native iOS routes can report either the physical safe area or an
+ * inset already enlarged by the tab bar, so visible-bar clearance normalizes
+ * both shapes instead of assuming one. Android's floating tab bar still uses
+ * its measured footprint.
  */
 export function getFooterBottomPadding(
   mode: ScreenBottomPaddingMode,
   safeAreaBottom: number,
+  nativeTabBarVisible = false,
 ): number {
   const safeArea = Math.max(safeAreaBottom, 0);
 
@@ -91,12 +92,16 @@ export function getFooterBottomPadding(
     return getFloatingTabBarClearance(safeArea) + FLOATING_TAB_BAR_BREATHING_ROOM;
   }
 
-  // Only a `tabbed` screen may spend the whole inset, because only there does
-  // it stand for a bar the footer has to sit above. Everywhere else the inset
-  // can only legitimately be the home indicator, so cap it: a screen pushed
-  // over the tab bar can still be handed the tab-inflated value, and spending
-  // that on a footer with no tab bar beneath it reads as a wall of dead space.
-  const clearance = mode === "tabbed" ? safeArea : Math.min(safeArea, HOME_INDICATOR_INSET);
+  if (Platform.OS === "ios" && nativeTabBarVisible) {
+    const nativeTabClearance =
+      safeArea > HOME_INDICATOR_INSET ? safeArea : safeArea + IOS_NATIVE_TAB_BAR_CONTENT_HEIGHT;
+
+    return nativeTabClearance + FOOTER_BOTTOM_BREATHING_ROOM;
+  }
+
+  // A tab-hidden route can still inherit an enlarged inset from the navigator
+  // that presented it. Nothing remains below its footer but the home indicator.
+  const clearance = Math.min(safeArea, HOME_INDICATOR_INSET);
 
   return clearance + FOOTER_BOTTOM_BREATHING_ROOM;
 }

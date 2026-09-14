@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
@@ -147,8 +148,13 @@ export function Screen({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
+  const nativeTabBarVisible = useNativeTabBarPresence();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
-  const resolvedFooterBottomPadding = getFooterBottomPadding(bottomPaddingMode, insets.bottom);
+  const resolvedFooterBottomPadding = getFooterBottomPadding(
+    bottomPaddingMode,
+    insets.bottom,
+    nativeTabBarVisible,
+  );
   const internalScrollViewRef = useRef<ScrollView>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was

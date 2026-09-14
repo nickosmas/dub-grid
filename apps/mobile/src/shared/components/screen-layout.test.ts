@@ -54,13 +54,20 @@ describe("getScreenBottomPadding", () => {
 });
 
 describe("getFooterBottomPadding", () => {
-  it("spends the whole inset only for a tabbed screen, which really sits above a bar", () => {
+  it("adds a native iOS tab bar when the safe area only reports the home indicator", () => {
     platform.OS = "ios";
 
-    expect(getFooterBottomPadding("tabbed", 83)).toBe(99);
+    expect(getFooterBottomPadding("tabbed", 34, true)).toBe(99);
+    expect(getFooterBottomPadding("stack", 14, true)).toBe(79);
   });
 
-  it("caps a stack or modal footer at the home indicator", () => {
+  it("does not double-count a native iOS tab bar already included in the inset", () => {
+    platform.OS = "ios";
+
+    expect(getFooterBottomPadding("tabbed", 83, true)).toBe(99);
+  });
+
+  it("caps a tab-hidden footer at the home indicator", () => {
     platform.OS = "ios";
 
     // A screen pushed over the tab bar can still be handed the tab-inflated
@@ -68,6 +75,7 @@ describe("getFooterBottomPadding", () => {
     // out the full 83 put a tab bar's worth of dead space under the buttons.
     expect(getFooterBottomPadding("stack", 83)).toBe(50);
     expect(getFooterBottomPadding("modal", 83)).toBe(50);
+    expect(getFooterBottomPadding("tabbed", 83)).toBe(50);
   });
 
   it("passes an honest inset straight through, so the cap is a ceiling not a floor", () => {
@@ -76,6 +84,14 @@ describe("getFooterBottomPadding", () => {
     expect(getFooterBottomPadding("stack", 34)).toBe(50);
     expect(getFooterBottomPadding("stack", 14)).toBe(30);
     expect(getFooterBottomPadding("stack", 0)).toBe(16);
+  });
+
+  it("keeps Android floating-tab clearance unchanged", () => {
+    platform.OS = "android";
+
+    expect(getFooterBottomPadding("tabbed", 0, true)).toBe(98);
+    expect(getFooterBottomPadding("tabbed", 24, true)).toBe(114);
+    expect(getFooterBottomPadding("stack", 24, true)).toBe(40);
   });
 });
 
