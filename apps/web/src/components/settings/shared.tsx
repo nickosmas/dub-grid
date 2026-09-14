@@ -45,10 +45,12 @@ export function SectionCard({
   children,
   maxWidth = 1120,
   noPadding = false,
+  align = "center",
 }: {
   children: React.ReactNode;
   maxWidth?: number;
   noPadding?: boolean;
+  align?: "center" | "start";
 }) {
   return (
     <div
@@ -57,7 +59,7 @@ export function SectionCard({
         ...sectionStyle,
         width: "100%",
         maxWidth,
-        margin: "0 auto",
+        margin: align === "start" ? 0 : "0 auto",
         flexShrink: 0,
       }}
     >

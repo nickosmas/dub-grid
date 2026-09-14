@@ -15,6 +15,7 @@ import { hint } from "@/components/ui/hint.types";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { StatusPill } from "@/components/ui/status-pill";
 import { SectionCard } from "./shared";
+import { getAdaptiveSettingsTableLayout } from "./settings-table-layout";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
 import {
@@ -46,7 +47,6 @@ export default function StringListSettings({
   certifications,
   showRequiredCertifications = false,
   maxWidth,
-  wideTable = false,
 }: {
   label: string;
   items: NamedItem[];
@@ -77,8 +77,6 @@ export default function StringListSettings({
   showRequiredCertifications?: boolean;
   /** Optional max width for the card wrapper when this list is shown as a settings section. */
   maxWidth?: number;
-  /** Give dense multi-column staff label tables more room per column. */
-  wideTable?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isWizardMode = useWizardMode();
@@ -112,7 +110,7 @@ export default function StringListSettings({
     setLocal(items);
   }, [isWizardMode, items]);
   const nextTmpId = useRef(-1);
-  const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const nameRefs = useRef<Map<number, HTMLTextAreaElement>>(new Map());
   const abbrRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // Clean comparison: ignore empty uncommitted rows
@@ -399,7 +397,7 @@ export default function StringListSettings({
   };
 
   const handleNameKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
     item: NamedItem,
     idx: number,
   ) => {
@@ -435,7 +433,7 @@ export default function StringListSettings({
   };
 
   const handleNameBackspace = (
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
     item: NamedItem,
     idx: number,
   ) => {
@@ -471,48 +469,81 @@ export default function StringListSettings({
 
   const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
-  const useBalancedRoleColumns = showCerts;
-  const deptCol = showDept
-    ? useBalancedRoleColumns
-      ? " minmax(0, 0.75fr)"
-      : isMobile
-        ? " minmax(100px, 1fr)"
-        : wideTable
-          ? " minmax(130px, 160px)"
-          : " minmax(140px, 1fr)"
-    : "";
-  const scheduleRoleCol = showScheduleRoleToggle
-    ? useBalancedRoleColumns
-      ? " minmax(0, 1fr)"
-      : wideTable && !isMobile
-        ? " 150px"
-        : " 160px"
-    : "";
-  const certCol = showCerts
-    ? useBalancedRoleColumns
-      ? " minmax(0, 2fr)"
-      : isMobile
-        ? " minmax(100px, 1fr)"
-        : wideTable
-          ? " minmax(150px, 180px)"
-          : " minmax(140px, 1fr)"
-    : "";
-  const rankCol = "";
-  const nameCol = useBalancedRoleColumns
-    ? " minmax(0, 1.25fr)"
-    : wideTable && !isMobile
-      ? " minmax(200px, 1fr)"
-      : " 2fr";
-  // Role settings share the available table width evenly. Their cell content
-  // truncates or wraps within the track rather than making individual rows scroll.
-  const tableMinWidth = !useBalancedRoleColumns && wideTable && !isMobile ? 820 : undefined;
-  const gridCols = hideAbbrFields
-    ? isEditing
-      ? `24px${nameCol}${scheduleRoleCol}${deptCol}${certCol}${rankCol} auto`
-      : `${nameCol.trimStart()}${scheduleRoleCol}${deptCol}${certCol}${rankCol}`
-    : isEditing
-      ? `24px${nameCol} 1fr${scheduleRoleCol}${deptCol}${certCol}${rankCol} auto`
-      : `${nameCol.trimStart()} 1fr${scheduleRoleCol}${deptCol}${certCol}${rankCol}`;
+  const useCompactRoleColumns = showScheduleRoleToggle;
+  const tableColumns = useMemo(() => {
+    const columns = [
+      {
+        header: hideAbbrFields ? "Name" : "Full name",
+        values: displayList.map((item) => item.name),
+        minWidth: 220,
+        maxWidth: 360,
+      },
+    ];
+
+    if (!hideAbbrFields) {
+      columns.push({
+        header: "Abbreviation",
+        values: displayList.map((item) => item.abbr),
+        minWidth: 120,
+        maxWidth: 180,
+      });
+    }
+    if (showScheduleRoleToggle) {
+      columns.push({
+        header: "Schedule eligibility",
+        values: ["Yes", "No"],
+        minWidth: 170,
+        maxWidth: 200,
+      });
+    }
+    if (showDept) {
+      columns.push({
+        header: "Department",
+        values: activeDepts.map((department) => department.name),
+        minWidth: 150,
+        maxWidth: isEditing ? 300 : 260,
+      });
+    }
+    if (showCerts) {
+      columns.push({
+        header: "Requires",
+        values: activeCerts.map((certification) => certification.name),
+        minWidth: 220,
+        maxWidth: isEditing ? 420 : 380,
+      });
+    }
+
+    return columns;
+  }, [
+    activeCerts,
+    activeDepts,
+    displayList,
+    hideAbbrFields,
+    isEditing,
+    showCerts,
+    showDept,
+    showScheduleRoleToggle,
+  ]);
+  const tableLayout = useMemo(
+    () =>
+      getAdaptiveSettingsTableLayout({
+        columns: tableColumns,
+        isEditing,
+        availableWidth: maxWidth ?? 1120,
+      }),
+    [isEditing, maxWidth, tableColumns],
+  );
+  const gridCols = tableLayout.gridTemplateColumns;
+
+  useLayoutEffect(() => {
+    if (!isEditing) return;
+
+    for (const field of nameRefs.current.values()) {
+      const borderHeight = field.offsetHeight - field.clientHeight;
+      field.style.height = "0px";
+      field.style.height = `${Math.max(36, field.scrollHeight + borderHeight)}px`;
+    }
+  }, [gridCols, isEditing, local]);
 
   const showReadOnlyEditAction = !isWizardMode && !isEditing && canEdit && displayList.length > 0;
   const footerActions = isWizardMode ? null : isEditing ? (
@@ -597,14 +628,16 @@ export default function StringListSettings({
         />
       ) : (
         <div
-          style={tableMinWidth ? { overflowX: "auto", overscrollBehaviorX: "contain" } : undefined}
+          data-compact-role-table={useCompactRoleColumns ? "true" : undefined}
+          data-settings-table-layout="adaptive"
+          data-settings-table-mode={isEditing ? "edit" : "read"}
+          style={{ width: "100%", maxWidth: tableLayout.maxWidth }}
         >
           {/* Column headers */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: gridCols,
-              minWidth: tableMinWidth,
               padding: "8px 16px",
               gap: 16,
               alignItems: "start",
@@ -695,7 +728,6 @@ export default function StringListSettings({
                     "--dg-settings-reorder-offset": `${motion.offsetY}px`,
                     display: "grid",
                     gridTemplateColumns: gridCols,
-                    minWidth: tableMinWidth,
                     padding: isEditing ? "10px 16px" : "11px 16px",
                     gap: 16,
                     alignItems: isEditing ? "start" : undefined,
@@ -728,11 +760,12 @@ export default function StringListSettings({
 
                 {isEditing ? (
                   <div>
-                    <input
+                    <textarea
                       ref={(el) => {
                         if (el) nameRefs.current.set(item.id, el);
                         else nameRefs.current.delete(item.id);
                       }}
+                      rows={1}
                       value={item.name}
                       onChange={(e) => handleItemChange(i, "name", e.target.value)}
                       onKeyDown={(e) => {
@@ -745,6 +778,12 @@ export default function StringListSettings({
                       placeholder="Full name"
                       style={{
                         ...fieldStyle,
+                        minHeight: 36,
+                        lineHeight: 1.4,
+                        resize: "none",
+                        overflowY: "hidden",
+                        whiteSpace: "pre-wrap",
+                        overflowWrap: "anywhere",
                         ...(currentErrors.name ? { borderColor: "var(--dg-color-danger)" } : {}),
                       }}
                     />
@@ -762,16 +801,19 @@ export default function StringListSettings({
                     ) : null}
                   </div>
                 ) : item.name && showScheduleRoleToggle ? (
-                  <div style={{ minWidth: 0 }}>
-                    <MaybeHint content={item.name}>
-                      <StatusPill
-                        tone="neutral"
-                        variant="category"
-                        className="dg-role-name-view-pill max-w-full whitespace-normal"
-                      >
-                        {item.name}
-                      </StatusPill>
-                    </MaybeHint>
+                  <div
+                    data-role-name-text="true"
+                    style={{
+                      minWidth: 0,
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      lineHeight: 1.4,
+                      color: "var(--dg-color-text-primary)",
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {item.name}
                   </div>
                 ) : (
                   <div
@@ -1043,7 +1085,7 @@ export default function StringListSettings({
 
           {/* Dashed add button — only in edit mode */}
           {isEditing && (
-            <div style={{ minWidth: tableMinWidth, padding: "8px 16px 12px" }}>
+            <div style={{ padding: "8px 16px 12px" }}>
               <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {placeholder.toLowerCase()}
               </Button>
@@ -1156,7 +1198,7 @@ export default function StringListSettings({
 
   if (sectionTitle) {
     return (
-      <SectionCard noPadding maxWidth={maxWidth}>
+      <SectionCard noPadding maxWidth={tableLayout.maxWidth} align="start">
         {content}
       </SectionCard>
     );

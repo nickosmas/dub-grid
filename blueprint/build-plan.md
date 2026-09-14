@@ -145,13 +145,16 @@
       on clicking the active indicator itself. Preserve authorization,
       confirmation, audit, and save behavior; provide an accessible explicit
       removal affordance and regression coverage.
-- [ ] 21. **Production display-mode layout resilience** - repair the production
+- [x] 21. **Production display-mode layout resilience** - repair the production
       Settings display-mode preview layout so both choices remain fully visible,
       readable, selectable, and responsive at supported desktop widths and
       browser zoom levels. Also make role names plain table text rather than
-      pills, and give the compact Roles table content-aware column widths so it
-      does not consume unnecessary horizontal space. Prevent horizontal clipping
-      or overflow without changing settings behavior, and add regression coverage.
+      pills, and make Settings data tables size themselves from the columns and
+      content they actually show: compact for sparse read-only tables, wider only
+      when more columns or edit controls need it, and full-width for genuinely
+      dense tables. Prevent horizontal clipping or overflow without changing
+      settings behavior, and add regression coverage for read, edit, narrow,
+      empty, and long-content states.
 - [ ] 22. **Scheduler open-shift staffing** - when a scheduler clicks an open
       shift in the web schedule, show active staff who are qualified for its
       focus area, role, and certification requirements and have no absence or

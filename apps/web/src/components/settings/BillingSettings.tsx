@@ -227,8 +227,18 @@ function BillingOperations({ operations }: { operations: BillingOperationSummary
               title="No billing activity yet"
             />
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div
+              data-settings-table-layout="distributed"
+              style={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  minWidth: 680,
+                  maxWidth: "100%",
+                  borderCollapse: "collapse",
+                }}
+              >
                 <thead>
                   <tr>
                     <th style={thStyle}>Activity</th>

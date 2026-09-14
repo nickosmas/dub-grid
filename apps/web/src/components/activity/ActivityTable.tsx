@@ -53,7 +53,7 @@ export function ActivityTable<T extends ActivityTableEntry>({
   const columnCount = 4 + (showTarget ? 1 : 0) + (showOrganization ? 1 : 0);
 
   return (
-    <div className="dg-activity-table-shell">
+    <div className="dg-activity-table-shell" data-settings-table-layout="available">
       <Table scrollable={false} className="dg-activity-table">
         <TableHeader>
           <TableRow className="dg-activity-head-row hover:bg-transparent">

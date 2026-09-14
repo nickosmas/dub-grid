@@ -377,16 +377,19 @@ describe("StringListSettings — role certification requirements", () => {
     ).toBeVisible();
 
     const row = container.querySelector<HTMLElement>(".dg-settings-reorder-item");
+    const table = container.querySelector<HTMLElement>("[data-compact-role-table]");
     expect(row).not.toBeNull();
-    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 1.25fr)");
-    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 1fr)");
-    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 0.75fr)");
-    expect(row!.style.gridTemplateColumns).toContain("minmax(0, 2fr)");
+    expect(table?.style.width).toBe("100%");
+    expect(table?.style.maxWidth).toBe("1120px");
+    expect(table).toHaveAttribute("data-settings-table-mode", "read");
+    expect(row!.style.gridTemplateColumns).toBe(
+      "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
+    );
     expect(row!.style.minWidth).toBe("");
     expect(row!.parentElement?.style.overflowX).toBe("");
   });
 
-  it("uses the same compact category-pill treatment for role names in view mode", () => {
+  it("renders role names as plain text in a compact, bounded table", () => {
     const { container } = render(
       <StringListSettings
         label="Roles"
@@ -407,11 +410,79 @@ describe("StringListSettings — role certification requirements", () => {
       />,
     );
 
-    const roleName = container.querySelector<HTMLElement>(
-      '.dg-role-name-view-pill[data-status-pill-variant="category"]',
-    );
+    const roleName = screen.getByText("Director of Christian Science Nursing");
     expect(roleName).toHaveTextContent("Director of Christian Science Nursing");
-    expect(roleName).toHaveClass("max-w-full", "whitespace-normal");
+    expect(roleName).toHaveAttribute("data-role-name-text", "true");
+    expect(roleName).toHaveStyle({
+      whiteSpace: "normal",
+      overflowWrap: "anywhere",
+    });
+    expect(container.querySelector(".dg-role-name-view-pill")).not.toBeInTheDocument();
+
+    const table = container.querySelector<HTMLElement>("[data-compact-role-table]");
+    const row = container.querySelector<HTMLElement>(".dg-settings-reorder-item");
+    expect(table?.style.width).toBe("100%");
+    expect(table?.style.maxWidth).toBe("1120px");
+    expect(row?.style.gridTemplateColumns).toBe("minmax(0, 1fr) minmax(0, 1fr)");
+  });
+
+  it("widens the table envelope only while edit controls are visible", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <StringListSettings
+        label="Roles"
+        items={[rn()]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        sectionTitle="Roles"
+        maxWidth={1280}
+        hideAbbr
+        showScheduleRoleToggle
+      />,
+    );
+
+    const table = () =>
+      container.querySelector<HTMLElement>('[data-settings-table-layout="adaptive"]');
+    const readWidth = Number.parseFloat(table()?.style.maxWidth ?? "0");
+    expect(table()).toHaveAttribute("data-settings-table-mode", "read");
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(table()).toHaveAttribute("data-settings-table-mode", "edit");
+    expect(Number.parseFloat(table()?.style.maxWidth ?? "0")).toBeGreaterThan(readWidth);
+    expect(
+      container.querySelector<HTMLElement>(".dg-settings-reorder-item")?.style.gridTemplateColumns,
+    ).toMatch(/^24px .* 72px$/);
+  });
+
+  it("wraps and auto-grows long editable names so the complete value remains visible", () => {
+    render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          {
+            ...rn(),
+            name: "Director of Visiting Christian Science Nursing",
+          },
+        ]}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        placeholder="Role"
+        initialEditing
+        hideAbbr
+        showScheduleRoleToggle
+      />,
+    );
+
+    const field = screen.getByDisplayValue("Director of Visiting Christian Science Nursing");
+    expect(field.tagName).toBe("TEXTAREA");
+    expect(field).toHaveAttribute("rows", "1");
+    expect(field).toHaveStyle({
+      minHeight: "36px",
+      resize: "none",
+      overflowY: "hidden",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    });
   });
 
   it("keeps long visible requirements complete rather than truncating them", () => {

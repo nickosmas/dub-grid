@@ -468,7 +468,15 @@ export default function DisplayMode({
         </div>
 
         <div style={{ padding: 18 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div
+            data-display-mode-options
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+              gap: 16,
+              minWidth: 0,
+            }}
+          >
             {modes.map((mode) => {
               const isActive = selected === mode.id;
               return (
@@ -480,6 +488,9 @@ export default function DisplayMode({
                   style={{
                     display: "flex",
                     flexDirection: "column",
+                    width: "100%",
+                    minWidth: 0,
+                    maxWidth: "100%",
                     gap: 12,
                     padding: 16,
                     borderRadius: "var(--dg-radius-md)",
@@ -489,6 +500,8 @@ export default function DisplayMode({
                     background: isActive ? "var(--dg-color-brand-bg)" : "var(--dg-color-surface)",
                     cursor: "pointer",
                     textAlign: "left",
+                    whiteSpace: "normal",
+                    overflow: "hidden",
                     transition: "border-color 150ms ease, background 150ms ease",
                   }}
                 >

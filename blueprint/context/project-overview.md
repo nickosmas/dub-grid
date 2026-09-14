@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 14c37a4bde7b3876c71202ffb921185c6e657cc6f73fa489dbe5b7e459f7b985 -->
+<!-- blueprint:source-hash 3a90c4b16bcfa6e56fa1af7a9ebd2a39e9ec8eb869dd9d27551f5489e1bf5476 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -143,7 +143,9 @@ Everything below is already shipped except the unchecked work in items 19-23.
 21. **Production display-mode layout resilience** - repair the Settings
     display-mode preview layout so choices remain fully visible, readable, and
     selectable at supported desktop widths and browser zoom levels; render role
-    names as plain table text and use content-aware widths for the compact Roles table.
+    names as plain table text; and make Settings data tables use the Departments
+    width as their desktop floor, grow for edit or dense modes, distribute columns
+    across the surface, align with page headings, and show complete field values.
 
 22. **Scheduler open-shift staffing** - when a scheduler clicks an open shift in
     the web schedule, show active staff who satisfy its focus-area, role, and
