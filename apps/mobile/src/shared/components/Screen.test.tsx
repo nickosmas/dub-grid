@@ -210,7 +210,7 @@ describe("Screen", () => {
     expect(contentStyle.paddingBottom).toBe(86);
   });
 
-  it("renders a footer as a sibling of the scroll view, not inside it", () => {
+  it("renders a footer as a shallow sibling of the scroll view, not inside or wrapping it", () => {
     const { container } = render(
       <Screen footer={<span>Footer content</span>}>
         <div>Content</div>
@@ -221,11 +221,12 @@ describe("Screen", () => {
     const footerText = screen.getByText("Footer content");
 
     expect(scrollView.contains(footerText)).toBe(false);
-    // Supplying only `footer` (no stickyHeader/renderOverlay) still has to
-    // force the wrapped-root path — a footer can't render as a sibling of a
-    // scroll view that is itself the top-level element.
-    expect(container.firstElementChild).not.toBe(scrollView);
-    expect(container.firstElementChild?.contains(footerText)).toBe(true);
+    // Supplying only `footer` (no stickyHeader/renderOverlay) must keep the
+    // scroll view a top-level element rather than nesting it inside an extra
+    // wrapping View — iOS's native large-title collapse only tracks a scroll
+    // view that shallow, and an intervening wrapper silently breaks it.
+    expect(container.firstElementChild).toBe(scrollView);
+    expect(container.contains(footerText)).toBe(true);
   });
 
   it("gives scroll content a small gap instead of the full bottom-padding clearance once a footer takes over that job", () => {

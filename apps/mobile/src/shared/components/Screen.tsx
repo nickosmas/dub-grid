@@ -164,6 +164,13 @@ export function Screen({
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
+  // iOS's native large-title collapse only tracks a scroll view that is a
+  // shallow child of the screen, not one nested inside an extra wrapping
+  // `View`. A footer alone doesn't need that wrapper — `styles.root`'s only
+  // job is stacking children in a flex column, which the screen's own native
+  // container already does — so it renders as a sibling of the scroll view
+  // instead, keeping the scroll view shallow and the title collapsing.
+  const shouldRenderFooterAsSibling = !stickyHeader && !renderOverlay && Boolean(footer);
   // The floating shell is `position: absolute; top: 0`, so it spans the status
   // bar and has to pad itself clear of it. The non-scrolling shell sits in
   // normal flow, already below the system bars, where that same inset is pure
@@ -350,6 +357,15 @@ export function Screen({
 
   if (shouldExposeNativeScrollRoot) {
     return scrollView;
+  }
+
+  if (shouldRenderFooterAsSibling) {
+    return (
+      <>
+        {scrollView}
+        {footerBar}
+      </>
+    );
   }
 
   return (
