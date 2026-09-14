@@ -155,13 +155,19 @@
       dense tables. Prevent horizontal clipping or overflow without changing
       settings behavior, and add regression coverage for read, edit, narrow,
       empty, and long-content states.
-- [ ] 22. **Scheduler open-shift staffing** - when a scheduler clicks an open
+- [x] 22. **Scheduler open-shift staffing** - when a scheduler clicks an open
       shift in the web schedule, show active staff who are qualified for its
       focus area, role, and certification requirements and have no absence or
       overlapping shift that day. Let the scheduler assign a selected person
       through the normal draft/publish workflow, while regular staff retain the
       existing volunteer flow.
-- [ ] 23. **Production migration safety** - final release gate only after all
+- [ ] 23. **App-wide pill overflow resilience** - make every pill, chip, tag,
+      badge, and segmented-choice label keep its text inside its visual bounds
+      across web and mobile. Long labels must remain readable through a
+      consistent combination of wrapping, intrinsic sizing, truncation, or a
+      full-value affordance appropriate to the component, without colliding
+      with adjacent content or breaking narrow layouts.
+- [ ] 24. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

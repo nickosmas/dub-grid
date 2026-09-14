@@ -1606,14 +1606,18 @@ const SectionBlock = memo(function SectionBlock({
                         const isMentoredOpenShift =
                           os.segments?.some((segment) => segment.isMentored === true) ?? false;
                         const needed = os.needed ?? 1;
-                        // Viewers who see every open shift (schedulers/admins) but
-                        // aren't personally eligible for this one get routed to a
-                        // read-only details view on click, not the claim flow.
+                        const viewerAction =
+                          os.viewerAction ??
+                          (os.viewerEligible === false ? "details" : "volunteer");
+                        const actionHint =
+                          viewerAction === "assign"
+                            ? "click to assign"
+                            : viewerAction === "details"
+                              ? "click for details"
+                              : "click to volunteer";
                         const openShiftHint = os.calledOffBy
-                          ? `Called off by ${os.calledOffBy}`
-                          : os.viewerEligible === false
-                            ? `${needed} needed, click for details`
-                            : `${needed} needed, click to volunteer`;
+                          ? `Called off by ${os.calledOffBy}, ${actionHint}`
+                          : `${needed} needed, ${actionHint}`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button

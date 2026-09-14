@@ -3038,6 +3038,153 @@ button {
   justify-content: flex-end;
 }
 
+.dg-open-shift-staffing-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.dg-open-shift-staffing-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-bg-secondary);
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-caption);
+}
+
+.dg-open-shift-staffing-summary strong {
+  width: 100%;
+  color: var(--dg-color-text-primary);
+  font-size: var(--dg-fs-body);
+}
+
+.dg-open-shift-staffing-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.dg-open-shift-staffing-search > svg {
+  position: absolute;
+  left: 13px;
+  color: var(--dg-color-text-muted);
+  pointer-events: none;
+}
+
+.dg-open-shift-staffing-search .dg-input {
+  width: 100%;
+  padding-left: 39px;
+}
+
+.dg-open-shift-staffing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dg-open-shift-staffing-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-btn-radius);
+  background: var(--dg-color-surface);
+  color: var(--dg-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dg-open-shift-staffing-person:hover,
+.dg-open-shift-staffing-person[aria-checked="true"] {
+  border-color: var(--dg-color-brand);
+  background: var(--dg-color-brand-bg);
+}
+
+.dg-open-shift-staffing-radio {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid var(--dg-color-border-strong);
+  border-radius: 50%;
+  background: var(--dg-color-surface);
+  box-shadow: inset 0 0 0 4px var(--dg-color-surface);
+}
+
+.dg-open-shift-staffing-person[aria-checked="true"] .dg-open-shift-staffing-radio {
+  border-color: var(--dg-color-brand);
+  background: var(--dg-color-brand);
+}
+
+.dg-open-shift-staffing-person-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dg-open-shift-staffing-person-copy strong,
+.dg-open-shift-staffing-person-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dg-open-shift-staffing-person-copy span {
+  color: var(--dg-color-text-muted);
+  font-size: var(--dg-fs-footnote);
+}
+
+.dg-open-shift-staffing-assignment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.dg-open-shift-staffing-assignment > label {
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+}
+
+.dg-open-shift-staffing-empty {
+  display: flex;
+  min-height: 150px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--dg-color-text-muted);
+  text-align: center;
+}
+
+.dg-open-shift-staffing-empty strong {
+  color: var(--dg-color-text-primary);
+}
+
+.dg-open-shift-staffing-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dg-open-shift-staffing-actions .dg-btn {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 /* Custom checkbox — replaces native checkboxes for brand consistency */
 .dg-checkbox {
   appearance: none;

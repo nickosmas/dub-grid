@@ -3305,6 +3305,29 @@ describe("ScheduleGrid", () => {
     expect(northGrid.querySelector('[data-tally-count="1-0"]')?.textContent).toBe("1");
   });
 
+  it("describes scheduler open shifts as assignments instead of volunteer actions", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      openShifts: [
+        {
+          id: "open-1",
+          source: "coverage_gap",
+          focusAreaId: 1,
+          date: "2024-01-07",
+          assignmentIds: [1],
+          assignmentLabel: "D",
+          customStartTime: null,
+          customEndTime: null,
+          needed: 1,
+          viewerAction: "assign",
+        },
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "1 needed, click to assign" })).toBeInTheDocument();
+  });
+
   it("colors covered category totals green and short staffing red", () => {
     observedWidth = 1600;
 
