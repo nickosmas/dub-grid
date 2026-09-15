@@ -197,7 +197,7 @@
         pattern for numeric counts, semantic statuses, switches, auth actions,
         empty states, and action copy, currently duplicated and inconsistent
         across routes. Foundation for 25b's repairs.
-  - [ ] 25b. **Repair known layout defects** - the tablet dashboard, high-zoom
+  - [x] 25b. **Repair known layout defects** - the tablet dashboard, high-zoom
         Alerts and Schedule overflow, breakpoint-dependent first paint,
         app-shell-aware route boundaries, and the Schedule grid's inconsistent
         border lines (some vertical/horizontal divider junctions show a visible
@@ -221,11 +221,19 @@
           `minWidth: 0` / wrap handling already applied to its nav and filter
           zones, so it overflows at high zoom the same way those zones used
           to.
-    - [ ] 25b5. **Fix the Gridmaster sidebar's hardcoded header height** - it
-          hardcodes `top: 56` / `calc(100dvh - 56px)` instead of reading the
-          app shell's measured `--dg-app-shell-header-height`, so it
-          overlaps or gaps whenever a banner stacks above the header.
-    - [ ] 25b6. **Fix the Schedule grid's totals-row border-junction break** -
+    - [x] 25b5. ~~**Fix the Gridmaster sidebar's hardcoded header height**~~ -
+          invalidated by `/feature` on 2026-09-15: `/gridmaster` is not in
+          `AppShell.tsx`'s `isAppRoute()` list, so the shared app-shell
+          banners and header never render there, and
+          `--dg-app-shell-header-height` reflects an effectively-empty
+          header for this route. `GridmasterPortal.tsx:734-750` renders its
+          own separate, literal `height: 56` sticky header (explicitly
+          commented as intentional), which the sidebar's hardcoded
+          `top: 56` / `calc(100dvh - 56px)` already correctly matches.
+          Swapping in the shared CSS variable would read the wrong header's
+          height and could only introduce a mismatch where none exists
+          today. No fix needed.
+    - [x] 25b6. **Fix the Schedule grid's totals-row border-junction break** -
           the totals-row label cell still draws its bottom divider with a
           real `border-bottom` on a `position: sticky` cell, which Chromium
           clips at fractional browser zoom, while its neighboring cells

@@ -3671,9 +3671,19 @@ const SectionBlock = memo(function SectionBlock({
                         letterSpacing: "0.04em",
                         display: "flex",
                         alignItems: "center",
-                        borderBottom: isLastRow
-                          ? undefined
-                          : "1px solid var(--dg-color-border-light)",
+                        // A real border-bottom on a position:sticky element
+                        // gets clipped by Chromium at fractional browser
+                        // zoom; drawn as a background image instead, same
+                        // as the header's Staff cell above.
+                        ...(isLastRow
+                          ? {}
+                          : {
+                              backgroundImage:
+                                "linear-gradient(var(--dg-color-border-light), var(--dg-color-border-light))",
+                              backgroundPosition: "0 100%",
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "100% 1px",
+                            }),
                         boxShadow: joinBoxShadows(
                           "1px 0 0 0 var(--dg-color-border-light)",
                           "2px 0 4px rgba(0,0,0,0.02)",
