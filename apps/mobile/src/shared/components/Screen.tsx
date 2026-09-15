@@ -371,12 +371,14 @@ export function Screen({
   return (
     <View style={styles.root}>
       {stickyHeader ? (
+        // The shadow lives on this outer wrapper, not the clipped shell
+        // below: `overflow: "hidden"` on the same view as a shadow clips the
+        // shadow itself on iOS (`clipsToBounds` cuts anything drawn outside
+        // the view's own bounds, which is exactly where a shadow is drawn).
+        // Android's `elevation` isn't affected the same way, which is why
+        // this was invisible on iOS but fine on Android before the split.
         <View
-          style={[
-            styles.stickyHeaderShell,
-            stickyHeaderShellStyle,
-            { paddingTop: resolvedStickyHeaderTopPadding },
-          ]}
+          style={styles.stickyHeaderShadow}
           onLayout={(event) => {
             const nextHeight = event.nativeEvent.layout.height;
 
@@ -398,7 +400,15 @@ export function Screen({
             }
           }}
         >
-          {stickyHeader}
+          <View
+            style={[
+              styles.stickyHeaderShell,
+              stickyHeaderShellStyle,
+              { paddingTop: resolvedStickyHeaderTopPadding },
+            ]}
+          >
+            {stickyHeader}
+          </View>
         </View>
       ) : null}
       {scrollView}
@@ -477,12 +487,18 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.md,
     },
-    stickyHeaderShell: {
+    // Carries only the shadow, positioning, and stacking — see the JSX for
+    // why this can't share a view with `stickyHeaderShell`'s `overflow:
+    // "hidden"` on iOS.
+    stickyHeaderShadow: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       zIndex: 10,
+      ...mobileElevation("header", isDark),
+    },
+    stickyHeaderShell: {
       // The fill has to stay opaque: content scrolls under this shell and must
       // not show through. `overflow: hidden` clips whatever the header draws to
       // the shell's own bounds.
@@ -495,17 +511,22 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
       // No divider. The bar separates from the content scrolling under it by
-      // shadow alone, which is what the `header` level exists for, and why it
-      // is heavier than the `raised` lift it replaced, which only ever had to
-      // stop a bordered bar looking pasted on. Its `elevation` also clears the
-      // `card`-level tiles beneath it on Android, where that number doubles as
-      // draw order and this shell is the earlier sibling, so it loses ties.
-      ...mobileElevation("header", isDark),
+      // shadow alone (`stickyHeaderShadow`, above), which is what the `header`
+      // level exists for, and why it is heavier than the `raised` lift it
+      // replaced, which only ever had to stop a bordered bar looking pasted
+      // on. Its `elevation` also clears the `card`-level tiles beneath it on
+      // Android, where that number doubles as draw order and this shell is
+      // the earlier sibling, so it loses ties. The floating case gets its
+      // shadow from the `stickyHeaderShadow` wrapper instead; putting it here
+      // too would just be clipped by this view's own `overflow: "hidden"`.
     },
     nonScrollStickyHeaderShell: {
-      // Overrides `stickyHeaderShell`'s absolute positioning: nothing scrolls
-      // under it in this mode, so it sits in normal flow instead of floating.
+      // Nothing scrolls under this variant, so it sits in normal flow
+      // instead of floating and carries its own (harmless, since nothing
+      // passes beneath it) shadow directly rather than needing the floating
+      // case's separate unclipped wrapper.
       position: "relative",
+      ...mobileElevation("header", isDark),
     },
     overlayLayer: {
       ...StyleSheet.absoluteFillObject,

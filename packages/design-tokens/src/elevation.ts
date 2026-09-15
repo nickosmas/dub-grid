@@ -123,9 +123,9 @@ export const mobileElevationTokens: Record<MobileElevationLevel, MobileElevation
    */
   header: {
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
     elevation: 4,
   },
   /**
