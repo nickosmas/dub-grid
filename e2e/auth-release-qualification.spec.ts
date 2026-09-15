@@ -17,15 +17,20 @@ import {
   generateLocalTotp,
   setLocalOrganizationSubscription,
 } from "./helpers/local-auth-state";
+import { isKnownBenignConsoleNoise, isKnownBenignResponsePath } from "./helpers/runtime-noise";
 
 function collectUnexpectedRuntimeFailures(page: Page): string[] {
   const failures: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") failures.push(`console:${message.text()}`);
+    if (message.type() === "error" && !isKnownBenignConsoleNoise(message.text())) {
+      failures.push(`console:${message.text()}`);
+    }
   });
   page.on("response", (response) => {
     const path = new URL(response.url()).pathname;
-    if (response.status() >= 500) failures.push(`response:${response.status()}:${path}`);
+    if (response.status() >= 500 && !isKnownBenignResponsePath(path)) {
+      failures.push(`response:${response.status()}:${path}`);
+    }
   });
   return failures;
 }

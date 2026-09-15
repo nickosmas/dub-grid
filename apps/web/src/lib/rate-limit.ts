@@ -63,10 +63,18 @@ export const demoLimiter = createSlidingWindowLimiter(3, "1 h");
 export const passwordResetLimiter = createSlidingWindowLimiter(5, "15 m");
 
 /**
- * Login rate limiter — 15 attempts per 15 minutes per key (email hash).
- * Provides brute-force protection at the application level.
+ * Login rate limiter — 15 attempts per 15 minutes per key (email hash) by
+ * default. Provides brute-force protection at the application level.
+ *
+ * Env-tunable like the two limiters below it: the E2E suite logs in as the
+ * same handful of seeded QA accounts from many spec files against a real
+ * (non in-memory) Upstash instance, so a full run can exceed 15 logins per
+ * account well before brute-force protection is the relevant concern.
  */
-export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
+export const loginLimiter = createSlidingWindowLimiter(
+  serverEnv?.LOGIN_EMAIL_LIMIT_PER_15_MIN ?? 15,
+  "15 m",
+);
 
 /**
  * A broad burst ceiling that protects shared-office users without replacing

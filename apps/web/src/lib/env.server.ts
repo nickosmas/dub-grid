@@ -43,6 +43,7 @@ const serverSchema = z
     UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
     LOGIN_IP_LIMIT_PER_MINUTE: z.coerce.number().int().positive().optional(),
     LOGIN_GLOBAL_LIMIT_PER_10_SECONDS: z.coerce.number().int().positive().optional(),
+    LOGIN_EMAIL_LIMIT_PER_15_MIN: z.coerce.number().int().positive().optional(),
     SENTRY_DSN: z.string().url().optional(),
     VERCEL_API_TOKEN: z.string().optional(),
     VERCEL_PROJECT_ID: z.string().optional(),

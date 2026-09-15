@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loginAsQaSuperAdmin } from "./helpers/auth";
+import { isKnownBenignConsoleNoise, isKnownBenignResponsePath } from "./helpers/runtime-noise";
 
 interface RuntimeFailures {
   unexpected: string[];
@@ -15,22 +16,28 @@ function collectRuntimeFailures(page: Page): RuntimeFailures {
       !/Failed to load resource: the server responded with a status of (?:401|403)/.test(
         message.text(),
       ) &&
-      !/WebSocket connection to 'ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(message.text())
+      !/WebSocket connection to 'ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(message.text()) &&
+      !isKnownBenignConsoleNoise(message.text())
     ) {
       failures.unexpected.push(`console:${message.text()}`);
     }
   });
   page.on("response", (response) => {
     const path = new URL(response.url()).pathname;
-    if (path === "/v1/speed-insights/script.debug.js") {
-      // Vercel's development-only telemetry endpoint is not part of DubGrid's
-      // auth boundary and returns 403 outside a Vercel runtime.
+    if (isKnownBenignResponsePath(path)) {
+      // Vercel's telemetry endpoint is not part of DubGrid's auth boundary
+      // and only resolves inside a real Vercel runtime.
       return;
     }
-    if (response.status() === 401 && path === "/api/organization/bootstrap") {
+    if (
+      response.status() === 401 &&
+      (path === "/api/organization/bootstrap" || path === "/api/trial-welcome")
+    ) {
       // A request already accepted by the browser can reach the server after
       // the sibling tab revokes the shared session. The boundary still aborts
       // the client work and redirects before that response can render data.
+      // trial-welcome fires from the same dashboard mount as bootstrap, so it
+      // races the same way.
       failures.authBoundaryRejections.push(path);
     } else if (response.status() >= 400) {
       failures.unexpected.push(`response:${response.status()}:${path}`);
@@ -72,7 +79,7 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
   expect(secondTabFailures.unexpected).toEqual([]);
   expect(
     secondTabFailures.authBoundaryRejections.every(
-      (path) => path === "/api/organization/bootstrap",
+      (path) => path === "/api/organization/bootstrap" || path === "/api/trial-welcome",
     ),
   ).toBe(true);
 });

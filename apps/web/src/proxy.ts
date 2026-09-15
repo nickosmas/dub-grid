@@ -150,6 +150,14 @@ export async function proxy(req: NextRequest) {
     ? ""
     : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
   const analyticsSrc = "https://va.vercel-scripts.com";
+  // @vercel/analytics/next injects its own bootstrap inline script (not via
+  // next/script), so it never picks up the per-request nonce and its trust
+  // never chains from strict-dynamic — the browser blocks it outright on
+  // every authenticated page load. The script's content is fixed for a given
+  // package version, so a hash source (CSP's own suggested remedy) allowlists
+  // exactly that script without weakening strict-dynamic for anything else.
+  // Recompute this if `@vercel/analytics` is upgraded and starts failing again.
+  const analyticsInlineScriptHash = "'sha256-N+t4k5q6GzjvL1q+njUuAvlUpYZ9j7Yv2/Lax5Edtak='";
   const devScriptExtras = isDev ? "'unsafe-eval'" : "";
   // Gated on NEXT_PUBLIC_SUPABASE_URL being a loopback address, not on isDev —
   // a *production build* (`next start`) run against local Supabase (e.g. the
@@ -189,7 +197,9 @@ export async function proxy(req: NextRequest) {
   // force-dynamic, so Next can stamp the nonce); 'unsafe-inline' in dev.
   const dynamicCspHeaderValue = isDev
     ? contentSecurityPolicyHeaderValue
-    : buildCsp(`'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc}`);
+    : buildCsp(
+        `'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc} ${analyticsInlineScriptHash}`,
+      );
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);

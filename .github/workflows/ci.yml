@@ -107,6 +107,10 @@ jobs:
       # Seeding needs @prisma/engines binaries, which only arrive via the
       # allowlisted rebuild now that install scripts are off by default.
       - run: npm run deps:rebuild
+      # The integration suite imports workspace packages (e.g. @dubgrid/authz)
+      # by their built dist/ entry, and this job calls vitest directly instead
+      # of through turbo, so nothing else builds them first.
+      - run: npm run build:packages
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
