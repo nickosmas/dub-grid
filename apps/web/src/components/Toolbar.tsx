@@ -924,7 +924,17 @@ export default function Toolbar({
 
       {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
       {hasData && (
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            minWidth: 0,
+            maxWidth: "100%",
+          }}
+        >
           {presenceSlot}
 
           {/* Coverage button */}

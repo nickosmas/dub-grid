@@ -216,7 +216,7 @@
     - [x] 25b3. **Fix Alerts toolbar high-zoom overflow** - three toolbar
           controls carry fixed `minWidth` floors that don't shrink on wrap, so
           the row overflows horizontally at high browser zoom.
-    - [ ] 25b4. **Fix Schedule toolbar high-zoom overflow** - the toolbar's
+    - [x] 25b4. **Fix Schedule toolbar high-zoom overflow** - the toolbar's
           right zone (presence avatars, Coverage, Tools) lacks the
           `minWidth: 0` / wrap handling already applied to its nav and filter
           zones, so it overflows at high zoom the same way those zones used
