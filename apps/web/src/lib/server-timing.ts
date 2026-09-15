@@ -15,30 +15,30 @@ import { serverEnv } from "@/lib/env.server";
 
 export const PERF_TIMING_ENABLED = serverEnv?.PERF_TIMING === "1";
 
-type Span = { name: string; dur: number; desc?: string };
+type Span = { name: string; dur: number };
 
 export class Timer {
   private spans: Span[] = [];
 
   /** Record a pre-measured span (milliseconds). */
-  add(name: string, durationMs: number, description?: string): void {
-    this.spans.push({ name, dur: durationMs, desc: description });
+  add(name: string, durationMs: number): void {
+    this.spans.push({ name, dur: durationMs });
   }
 
   /** Time an async operation and record it as a span. */
-  async time<T>(name: string, fn: () => Promise<T>, description?: string): Promise<T> {
+  async time<T>(name: string, fn: () => Promise<T>): Promise<T> {
     const start = performance.now();
     try {
       return await fn();
     } finally {
-      this.add(name, performance.now() - start, description);
+      this.add(name, performance.now() - start);
     }
   }
 
   /** Start a manual span; call the returned fn to stop and record it. */
-  start(name: string, description?: string): () => void {
+  start(name: string): () => void {
     const begin = performance.now();
-    return () => this.add(name, performance.now() - begin, description);
+    return () => this.add(name, performance.now() - begin);
   }
 
   /**
@@ -51,8 +51,7 @@ export class Timer {
       .map((s) => {
         const name = s.name.replace(/[^a-zA-Z0-9_-]/g, "_");
         const dur = `dur=${s.dur.toFixed(1)}`;
-        const desc = s.desc ? `;desc=${JSON.stringify(s.desc)}` : "";
-        return `${name};${dur}${desc}`;
+        return `${name};${dur}`;
       })
       .join(", ");
   }

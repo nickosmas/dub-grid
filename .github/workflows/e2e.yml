@@ -97,6 +97,11 @@ jobs:
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
+          # The suite logs in as the same handful of seeded QA accounts from
+          # 10+ spec files against a real (non in-memory) Upstash instance;
+          # the production default of 15 per 15 minutes is well below a full
+          # run's real login volume, especially with retries.
+          LOGIN_EMAIL_LIMIT_PER_15_MIN: "200"
 
       - name: Wait for server
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { mobilePillOverflow, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 export type CountBadgeTone = "brand" | "warning" | "danger" | "success";
 
@@ -50,6 +50,7 @@ export function CountBadge({ label, tone = "brand" }: { label: string; tone?: Co
 
 const styles = StyleSheet.create({
   badge: {
+    ...mobilePillOverflow.displayContainer,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 8,
@@ -58,5 +59,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...mobileText.badge,
+    ...mobilePillOverflow.displayText,
   },
 });

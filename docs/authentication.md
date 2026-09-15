@@ -355,13 +355,17 @@ confirm and 6+ times concurrently by the post-login dashboard fan-out.
 Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
 
 1. **Verify locally.** `lib/auth/verify-token.ts` checks the token's signature against
-   Supabase's JWKS (ES256), plus `exp`, `iss`, and `aud`. The keyset is module-cached
-   and shared with `proxy.ts`. Tokens arrive either as an `Authorization: Bearer`
-   header (mobile) or the Supabase SSR cookie (web); the cookie path still goes through
-   `getSession()`, which is a local cookie read that only reaches the network to
-   refresh an expired token. There is **no** fallback to an unverified `decodeJwt` —
-   middleware has one because RLS is the real boundary for page navigation, but a route
-   handler acts on these claims.
+   Supabase's JWKS (ES256), plus `exp`, `iss`, `aud`, `sub`, the authenticated role,
+   `session_id`, and `iat`. Requiring the final two claims is load-bearing: without
+   them the app cannot enforce either a session-specific revocation or the user's
+   revoke-all watermark. The keyset is module-cached and shared with `proxy.ts`.
+   Tokens arrive either as an `Authorization: Bearer` header (mobile) or the Supabase
+   SSR cookie (web); an explicit Bearer header wins and an invalid one never falls
+   back to a cookie identity. The cookie path still goes through `getSession()`, which
+   is a local cookie read that only reaches the network to refresh an expired token.
+   There is **no** fallback to an unverified `decodeJwt` — middleware has one because
+   RLS is the real boundary for page navigation, but a route handler acts on these
+   claims.
 2. **Check revocation.** `lib/auth/revocation.ts` reads two Redis markers:
 
    | Key                                                       | Written on                 | Invalidates  |
@@ -381,10 +385,12 @@ the device fully working.
 
 **Two deliberate exceptions.**
 
-- `requireFreshAuth(req, userId)` re-checks against Supabase Auth over the network, for
-  irreversible or credential-level actions: `delete-account`, `gdpr-erase`,
-  `data-export`. A locally verified token can be up to an hour old, which is fine for
-  ordinary reads and writes and not fine for these.
+- `requireLiveAuthenticatedSession(req)` re-checks against Supabase Auth over the
+  network. `requireSensitiveActionAuth(req)` builds on that live check and enforces the
+  canonical five-minute password or verified-TOTP assurance policy before credential,
+  factor, session, export, or destructive account and organization actions. A locally
+  verified token can be up to an hour old, which is fine for ordinary reads and writes
+  and not fine for these.
 - `packages/mobile-api-core/src/auth.ts` still calls `getUser()`, solely to read enrolled
   MFA factors. `auth.mfa_factors` is not exposed through PostgREST and factors are not in
   the JWT, so there is no local answer to "does this user have a verified factor?", and
@@ -397,6 +403,85 @@ Org access is still resolved per request by `requireOrgPermissions` against
 `organization_memberships`, and the effective org by `resolveEffectiveOrgId` — never
 from a client-supplied org id and never from a JWT claim alone. That separation is what
 makes an hour-stale token safe.
+
+### Request authorization contract
+
+| Surface                         | Identity authority                                                                   | Live access authority                                                                                                 | What is never sufficient                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Request proxy / page navigation | Verified JWT when available; decode-only fallback may route a non-Gridmaster request | The page's user-scoped Supabase query and RLS                                                                         | Proxy headers, decoded claims, host, or cached bootstrap data       |
+| Authenticated Route Handler     | `authenticateRequest`: verified required claims plus known revocation markers        | `requireOrgPermissions` / `resolveEffectiveOrgId`, or another explicit live-membership permission check               | A request body org id, URL org id, cookie claim, or decode-only JWT |
+| User-scoped Supabase query      | Supabase verifies the JWT supplied by the request-bound client                       | `caller_org_id()` and tenant RLS evaluate current membership at query time                                            | The token's possibly stale `org_id` by itself                       |
+| Service-role query or mutation  | The handler's verified caller                                                        | An explicit current organization, membership, role, permission, and resource-ownership check before privileged access | RLS, because service-role access bypasses it                        |
+| Test Sandbox override           | The verified caller and matching JWT session ID                                      | A live, unarchived sandbox row owned by that user and exact auth session                                              | The cookie payload, user ID, or sandbox organization ID alone       |
+| Gridmaster impersonation        | A signature-verified, live Gridmaster and matching JWT session ID                    | A live impersonation row plus current target profile, membership, organization, role, and organization slug           | Client-held target IDs, role, slug, expiry, or display metadata     |
+
+`apps/web/src/__tests__/api-authorization-boundaries.test.ts` inventories every
+non-mobile Route Handler. A handler must call a canonical authorization helper,
+delegate to a helper whose live authorization is itself asserted, or appear in
+the exact public/system allowlist with its independent credential or public-purpose
+reason. Adding an unclassified handler fails the structural test. Mobile v1 routes
+have a separate complete authorization inventory.
+
+`apps/web/src/__tests__/sensitive-action-authorization-boundaries.test.ts` separately
+inventories every credential, factor, session-changing, export, and destructive
+account or organization entry point. It records whether the policy is direct,
+conditional, delegated to a mobile handler, or an authorized operational revocation
+of another user's sessions. A newly added matching endpoint must be classified and
+must satisfy the declared policy before the structural suite passes.
+
+`apps/web/src/__tests__/privileged-authorization-boundaries.test.ts` separately
+inventories every non-mobile source file that can create or receive the
+service-role client. Tenant routes must use `requireOrgPermissions` or the live
+`canManageEmployees` guard, platform routes must use `requireGridmasterSession`,
+and every subject-owned, delegated, public, webhook, or system-job exception is
+an exact documented path. A new privileged path fails until its independent
+authorization and ownership contract is explicit. Gridmaster routes also recheck
+the live profile role and account state rather than relying on an hour-stale token
+claim.
+
+Direct PostgREST requests cannot consult the Redis revocation markers used by Route
+Handlers. Their equivalent revocation boundary is the tracked `user_sessions` row:
+the access-token hook creates it when a session is minted, `caller_org_id()` and
+`is_gridmaster()` require it while a JWT carries `session_id`, and every single- or
+all-session revocation deletes it. Consequently, a copied access token loses direct
+tenant access as soon as its tracked session is removed. Tokens without a
+`session_id` cannot be individually revoked and are not accepted by the app request
+authenticator; the SQL helpers retain a claim-less compatibility path only for
+trusted internal/database execution, still constrained by live membership and
+organization state.
+
+Temporary tenant selection is session-bound too. A Test Sandbox row records
+`sandbox_owner_session_id`, and `is_own_sandbox_org()` requires it to match the
+current JWT before RLS recognizes the sandbox. New impersonation rows are stamped
+with `auth_session_id` by a database trigger, and every server consumer verifies that
+session before loading the target's current profile, membership, organization, and
+role. Switching into or out of either mode performs a hard page transition or clears
+the query cache before navigation so state from the prior tenant is not reused.
+
+`apps/web/src/__tests__/mobile-api-authorization-boundaries.test.ts` closes the
+same inventory over `/api/mobile/v1`. Every entry route must delegate to a
+classified server implementation, every protected implementation must use the
+shared mobile authorization context (directly or through its management guard),
+and every direct mobile service-role path is exact-listed. The shared context
+verifies revocation, requires the token's organization to match a live,
+unarchived membership, rejects archived organizations, and reads Gridmaster
+status from the live profile instead of the token claim. The locked-organization
+recovery route performs those same checks independently and never falls back to
+another membership when the claim is missing or stale. Resource IDs remain
+client inputs, but every read and write scopes them to `auth.currentOrg.id`
+before a service-role query or mutation.
+
+Authenticated pages use the protected app layout/proxy for navigation and obtain
+tenant data through classified Route Handlers or a request-scoped Supabase client.
+The latter remains safe only because PostgREST evaluates the live-membership RLS
+boundary for every query. `architecture-boundaries.test.ts` prevents browser UI
+layers from adding raw Supabase database calls or new database adapters; there are
+currently no Server Actions carrying user-scoped data.
+
+The proxy's unverified fallback is therefore a navigation-resilience mechanism,
+not an authorization mechanism. Known revocation markers reject a token before a
+handler runs. The revocation store's outage policy remains fail-open and bounded by
+token expiry; production fail-closed policy is reviewed separately under feature 19d4.
 
 ---
 

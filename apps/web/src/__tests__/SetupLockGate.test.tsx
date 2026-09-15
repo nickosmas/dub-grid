@@ -142,6 +142,7 @@ beforeEach(() => {
   mockPermissions.isSuperAdmin = false;
   mockPermissions.isImpersonating = false;
   mockPermissions.canManageOrg = true;
+  mockOrganizationData.org = { id: "org-1", name: "Acme" };
   mockOrganizationData.setupStatus = {
     isComplete: false,
     missing: {
@@ -266,6 +267,27 @@ describe("OnboardingGate setup lock", () => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
+  it("routes a super admin with setup capability to the setup wizard", async () => {
+    mockPermissions.role = "super_admin";
+    mockPermissions.isSuperAdmin = true;
+    mockPermissions.canManageOrg = true;
+
+    renderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
+  it("routes an admin with setup capability to the setup wizard", async () => {
+    mockPermissions.role = "admin";
+    mockPermissions.canManageOrg = true;
+
+    renderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
+  });
+
   it("renders the wizard inline on every route, including /settings, while setup is incomplete", async () => {
     mockPathname = "/settings";
 
@@ -318,6 +340,36 @@ describe("OnboardingGate setup lock", () => {
     expect(screen.queryByText("Loading your workspace")).not.toBeInTheDocument();
   });
 
+  it("waits for matching bootstrap data before applying another org's admission state", async () => {
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+
+    const { rerenderGate } = renderGate();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+
+    mockPermissions.orgId = "org-2";
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: false,
+      adminOnboardingCompleted: true,
+      billingLocked: true,
+    };
+    rerenderGate();
+
+    expect(screen.getByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    mockOrganizationData.org = { id: "org-2", name: "Baker" };
+    mockOrganizationData.entryGate = {
+      onboardingCompleted: false,
+      adminOnboardingCompleted: true,
+      billingLocked: null,
+    };
+    rerenderGate();
+
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+  });
+
   it("treats org setup as complete even when no employees exist (adding employees is post-wizard)", async () => {
     mockOrganizationData.setupStatus = {
       isComplete: true,
@@ -345,6 +397,7 @@ describe("OnboardingGate setup lock", () => {
   });
 
   it("redirects super admins to billing recovery when billing is locked", async () => {
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.setupStatus = {
       isComplete: true,
@@ -366,9 +419,31 @@ describe("OnboardingGate setup lock", () => {
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });
 
+  it("sends an admin with a stale billing-lock flag to the organization gate, never billing settings", async () => {
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    mockEmployeesData.employees = [{ id: "employee-1" }];
+    mockOrganizationData.entryGate.billingLocked = true;
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith("/billing-required");
+    });
+    expect(mockRouter.replace).not.toHaveBeenCalledWith("/settings?section=org-billing");
+  });
+
   it("allows super admins to stay on billing recovery when billing is locked", async () => {
     mockPathname = "/settings";
     mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.setupStatus = {
       isComplete: true,
@@ -391,6 +466,7 @@ describe("OnboardingGate setup lock", () => {
   it("renders billing recovery without waiting for setup data", async () => {
     mockPathname = "/settings";
     mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
     mockPermissions.isSuperAdmin = true;
     mockOrganizationData.loading = true;
     mockEmployeesData.loading = true;
@@ -399,6 +475,26 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps a completed super admin in the app after billing recovery", async () => {
+    mockPathname = "/settings";
+    mockSection = "org-billing";
+    mockPermissions.role = "super_admin";
+    mockPermissions.isSuperAdmin = true;
+    mockOrganizationData.entryGate.onboardingCompleted = true;
+    mockOrganizationData.entryGate.billingLocked = true;
+
+    const { rerenderGate } = renderGate();
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+
+    mockOrganizationData.entryGate.billingLocked = false;
+    rerenderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Setup pending")).not.toBeInTheDocument();
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 

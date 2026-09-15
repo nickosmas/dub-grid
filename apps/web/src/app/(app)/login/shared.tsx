@@ -6,8 +6,9 @@ import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
+import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 
-export const POST_LOGIN_DESTINATION = "/dashboard";
+export { POST_LOGIN_DESTINATION };
 
 /**
  * Resolves where to send the user after a successful sign-in: either the
@@ -21,14 +22,9 @@ export const POST_LOGIN_DESTINATION = "/dashboard";
  * there's no equivalent single request to fold this into for that path.
  */
 export async function resolvePostLoginDestination(): Promise<string> {
-  try {
-    const terms = await fetchTermsAcceptanceStatus();
-    if (!terms.acceptedCurrentTerms) {
-      return `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
-    }
-  } catch {
-    // Best-effort: a failure here means the user lands on the destination
-    // without a ToS check this turn. They'll be re-checked next sign-in.
+  const terms = await fetchTermsAcceptanceStatus();
+  if (!terms.acceptedCurrentTerms) {
+    return `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
   }
   return POST_LOGIN_DESTINATION;
 }

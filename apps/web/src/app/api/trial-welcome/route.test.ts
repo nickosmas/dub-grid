@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
+const requireOrgPermissions = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const sendResendEmail = vi.fn();
 const serviceFrom = vi.fn();
@@ -18,6 +19,10 @@ vi.mock("@/lib/csrf", () => ({
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: serviceFrom }),
+}));
+
+vi.mock("@/app/api/shared/permissions", () => ({
+  requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
 vi.mock("@/lib/resend", () => ({
@@ -75,6 +80,16 @@ function request(method = "GET") {
   return new NextRequest("http://localhost/api/trial-welcome", { method });
 }
 
+function allowLiveSuperAdmin() {
+  requireOrgPermissions.mockResolvedValue({
+    actor: { id: "user-1", email: "owner@example.com" },
+    permissions: { isSuperAdmin: true },
+    serviceClient: { from: serviceFrom },
+    userClient: {},
+    orgId: ORG_ID,
+  });
+}
+
 describe("GET /api/trial-welcome", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,6 +98,7 @@ describe("GET /api/trial-welcome", () => {
     maybeSingleCalls = 0;
     requireAuthenticatedUserWithClaims.mockResolvedValue(superAdminAuth());
     serviceFrom.mockImplementation(() => makeQuery());
+    allowLiveSuperAdmin();
   });
 
   it("shows the welcome for a trialing org the super_admin hasn't dismissed", async () => {
@@ -144,14 +160,12 @@ describe("GET /api/trial-welcome", () => {
     expect(sendResendEmail).not.toHaveBeenCalled();
   });
 
-  it("returns empty for non-super-admins without hitting the DB", async () => {
-    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(superAdminAuth({ org_role: "admin" }));
+  it("rejects a stale super-admin claim after live membership access is removed", async () => {
+    const denied = NextResponse.json({ error: "Not a member" }, { status: 403 });
+    requireOrgPermissions.mockResolvedValueOnce({ response: denied });
 
     const res = await GET(request());
-    await expect(res.json()).resolves.toEqual({
-      shouldShowWelcome: false,
-      trialEndsAt: null,
-    });
+    expect(res).toBe(denied);
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 
@@ -247,6 +261,7 @@ describe("POST /api/trial-welcome", () => {
     forbidIfSandboxCookie.mockReturnValue(null);
     requireAuthenticatedUserWithClaims.mockResolvedValue(superAdminAuth());
     serviceFrom.mockImplementation(() => makeQuery());
+    allowLiveSuperAdmin();
   });
 
   it("marks the welcome seen for a super_admin", async () => {
@@ -276,11 +291,12 @@ describe("POST /api/trial-welcome", () => {
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 
-  it("forbids non-super-admins", async () => {
-    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(superAdminAuth({ org_role: "admin" }));
+  it("forbids a stale claim when the live membership lacks super-admin permission", async () => {
+    const denied = NextResponse.json({ error: "Insufficient permission" }, { status: 403 });
+    requireOrgPermissions.mockResolvedValueOnce({ response: denied });
 
     const res = await POST(request("POST"));
-    expect(res.status).toBe(403);
+    expect(res).toBe(denied);
     expect(serviceFrom).not.toHaveBeenCalled();
   });
 });

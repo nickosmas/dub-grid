@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 
 interface OrganizationBootstrapRecoveryProps {
   onRetry: () => Promise<void>;
@@ -20,11 +21,11 @@ export default function OrganizationBootstrapRecovery({
   automaticallyRetry = true,
 }: OrganizationBootstrapRecoveryProps) {
   const [retrying, setRetrying] = useState(false);
-  const [automaticRetryCount, setAutomaticRetryCount] = useState(0);
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
-  const retryInFlight = useRef(false);
+  const onlineRef = useRef(online);
+  const retryInFlight = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -34,58 +35,45 @@ export default function OrganizationBootstrapRecovery({
     };
   }, []);
 
+  const retry = useCallback(async () => {
+    if (retryInFlight.current) return retryInFlight.current;
+    setRetrying(true);
+    const current = settleWithRequestTimeout(Promise.resolve().then(onRetry), RETRY_DEADLINE_MS)
+      .catch(() => undefined)
+      .finally(() => {
+        if (retryInFlight.current === current) retryInFlight.current = null;
+        if (mounted.current) setRetrying(false);
+      });
+    retryInFlight.current = current;
+    return current;
+  }, [onRetry]);
+
   useEffect(() => {
-    const markOnline = () => setOnline(true);
-    const markOffline = () => setOnline(false);
+    const markOnline = () => {
+      const reconnected = !onlineRef.current;
+      onlineRef.current = true;
+      setOnline(true);
+      if (reconnected && automaticallyRetry) void retry();
+    };
+    const markOffline = () => {
+      onlineRef.current = false;
+      setOnline(false);
+    };
     window.addEventListener("online", markOnline);
     window.addEventListener("offline", markOffline);
     return () => {
       window.removeEventListener("online", markOnline);
       window.removeEventListener("offline", markOffline);
     };
-  }, []);
-
-  const retry = useCallback(async () => {
-    if (retryInFlight.current) return;
-    retryInFlight.current = true;
-    setRetrying(true);
-    try {
-      // Query cancellation is not available for every caller. Bound the UI
-      // latch anyway: a stalled fetch must not make manual recovery
-      // permanently unavailable.
-      await Promise.race([
-        onRetry(),
-        new Promise<void>((resolve) => window.setTimeout(resolve, RETRY_DEADLINE_MS)),
-      ]);
-    } finally {
-      retryInFlight.current = false;
-      if (mounted.current) {
-        setRetrying(false);
-      }
-    }
-  }, [onRetry]);
-
-  useEffect(() => {
-    // The query itself already has a short, bounded retry budget. Once that
-    // is exhausted, keep reconnecting in the background without turning a
-    // provider outage into a permanent client-side dead end. The delay caps
-    // at 30 seconds so a prolonged outage does not create retry pressure.
-    if (!automaticallyRetry || !online) return;
-    const cappedDelay = Math.min(5_000 * 2 ** automaticRetryCount, 30_000);
-    // Full jitter prevents a large cohort recovering from the same outage from
-    // immediately recreating a synchronized bootstrap spike.
-    const delay = Math.round(cappedDelay * (0.5 + Math.random() * 0.5));
-    const timer = window.setTimeout(() => {
-      void retry().finally(() => {
-        if (mounted.current) {
-          setAutomaticRetryCount((count) => count + 1);
-        }
-      });
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [automaticRetryCount, retry]);
+  }, [automaticallyRetry, retry]);
 
   return (
-    <AuthTransitionScreen phase="workspace" offline={!online} onRetry={retry} retrying={retrying} />
+    <AuthTransitionScreen
+      phase="workspace"
+      offline={!online}
+      onRetry={retry}
+      retrying={retrying}
+      showActionsImmediately
+    />
   );
 }

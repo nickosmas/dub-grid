@@ -51,7 +51,6 @@ import {
   computeOpenShifts,
   computeShiftBreakdown,
   buildActivityFeed,
-  computeCoverageTrendData,
 } from "@/lib/dashboard-stats";
 import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
 import { formatDateKey } from "@/lib/utils";
@@ -68,10 +67,6 @@ import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
 import { useDashboardInvitations } from "./useDashboardInvitations";
-const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), {
-  ssr: false,
-  loading: LazyProgressFallback,
-});
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
   loading: LazyProgressFallback,
@@ -93,8 +88,7 @@ const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), {
   loading: LazyProgressFallback,
 });
 
-type ExpandedPanel =
-  "stats" | "coverage" | "openShifts" | "staffHours" | "breakdown" | "activity" | null;
+type ExpandedPanel = "coverage" | "openShifts" | "staffHours" | "breakdown" | "activity" | null;
 
 export type DashboardRoleVariant = "user" | "admin" | "super-admin";
 
@@ -895,38 +889,6 @@ export default function DashboardView({
     [isUserDashboardMode, activityPublishHistory, activityRequests, periodScopedInvitations],
   );
 
-  // Coverage trend — admin/super-admin only. Recomputes a full coverage
-  // snapshot for 5 historical periods, so skipping it in user mode avoids
-  // 5x the work of sectionCoverage above for a value UserDashboard never reads.
-  const trendData = useMemo(
-    () =>
-      isUserDashboardMode
-        ? []
-        : computeCoverageTrendData(
-            focusAreas,
-            assignments,
-            coverageRequirements,
-            activeEmployees,
-            allShifts,
-            periodStart,
-            periodDays,
-            shiftCategories,
-            org.coverageRuleConfig,
-          ),
-    [
-      isUserDashboardMode,
-      focusAreas,
-      assignments,
-      coverageRequirements,
-      activeEmployees,
-      allShifts,
-      periodStart,
-      periodDays,
-      shiftCategories,
-      org.coverageRuleConfig,
-    ],
-  );
-
   // ─── Draft counts ──────────────────────────────────────
   const { draftNewCount, draftModifiedCount, draftDeletedCount } = useMemo(() => {
     let newCount = 0;
@@ -1128,13 +1090,11 @@ export default function DashboardView({
     onNext: handleNext,
     onToday: handleToday,
     onViewModeChange: handleViewModeChange,
-    // Admin/super-admin only — UserDashboard never computes trendData.
-    onViewTrends: isUserDashboardMode ? undefined : () => handleExpandPanel("stats"),
   };
 
   if (shiftsLoading) {
     return (
-      <div style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <div className="no-print" style={stickyBarStyle}>
           <div style={toolbarContainerStyle}>
             <DashboardHeader {...headerProps} />
@@ -1178,7 +1138,6 @@ export default function DashboardView({
     prevHours,
     shiftBreakdown,
     activityItems,
-    trendData,
     publishedWindowState,
     overtimeThreshold,
     shiftRequests,
@@ -1206,7 +1165,7 @@ export default function DashboardView({
   return (
     <div
       style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         ...(userLockLayout
           ? {
               display: "flex",
@@ -1310,25 +1269,6 @@ export default function DashboardView({
         <DashboardContent {...contentProps} />
 
         {/* ─── Expanded Panels (shared across all roles) ───── */}
-        {expandedPanel === "stats" && (
-          <ExpandedStats
-            allShifts={allShifts}
-            currentWeekStart={periodStart}
-            periodDays={periodDays}
-            activeEmployees={activeEmployees}
-            focusAreas={focusAreas}
-            assignments={assignments}
-            assignmentById={assignmentById}
-            shiftCategories={shiftCategories}
-            coverageRequirements={coverageRequirements}
-            categoryById={categoryById}
-            showOT={showOT}
-            hasRequirements={coverageRequirements.length > 0}
-            overtimeThreshold={overtimeThreshold}
-            coverageRuleConfig={org.coverageRuleConfig}
-            onClose={closeExpanded}
-          />
-        )}
         {expandedPanel === "coverage" && (
           <ExpandedCoverage
             sections={sectionCoverage}

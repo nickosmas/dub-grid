@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 
 const nativeScrollTo = vi.fn();
 
@@ -209,7 +210,7 @@ describe("Screen", () => {
     expect(contentStyle.paddingBottom).toBe(86);
   });
 
-  it("renders a footer as a sibling of the scroll view, not inside it", () => {
+  it("renders a footer as a shallow sibling of the scroll view, not inside or wrapping it", () => {
     const { container } = render(
       <Screen footer={<span>Footer content</span>}>
         <div>Content</div>
@@ -220,11 +221,12 @@ describe("Screen", () => {
     const footerText = screen.getByText("Footer content");
 
     expect(scrollView.contains(footerText)).toBe(false);
-    // Supplying only `footer` (no stickyHeader/renderOverlay) still has to
-    // force the wrapped-root path — a footer can't render as a sibling of a
-    // scroll view that is itself the top-level element.
-    expect(container.firstElementChild).not.toBe(scrollView);
-    expect(container.firstElementChild?.contains(footerText)).toBe(true);
+    // Supplying only `footer` (no stickyHeader/renderOverlay) must keep the
+    // scroll view a top-level element rather than nesting it inside an extra
+    // wrapping View — iOS's native large-title collapse only tracks a scroll
+    // view that shallow, and an intervening wrapper silently breaks it.
+    expect(container.firstElementChild).toBe(scrollView);
+    expect(container.contains(footerText)).toBe(true);
   });
 
   it("gives scroll content a small gap instead of the full bottom-padding clearance once a footer takes over that job", () => {
@@ -245,7 +247,7 @@ describe("Screen", () => {
     expect(contentStyle.paddingBottom).toBe(16);
   });
 
-  it("gives the footer its own, smaller bottom-padding clearance than trailing scroll content would carry", () => {
+  it("gives a tab-hidden footer only safe-area and breathing-room clearance", () => {
     render(
       <Screen bottomPaddingMode="tabbed" footer={<span>Footer content</span>}>
         <div>Content</div>
@@ -256,14 +258,28 @@ describe("Screen", () => {
     const footerNode = footerText.parentElement;
     const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
 
-    // 30 (14 safe area + 16 breathing room), not the 86 `getScreenBottomPadding`
-    // produces for the same mode: a footer is permanently visible, not
-    // invisible space past the end of a scroll, and on iOS the safe-area
-    // inset already accounts for the tab bar itself (see
-    // `getFooterBottomPadding`'s doc comment) — stacking the scroll-content
-    // number on top would read as a wall of dead space under the footer.
+    // This test is outside the iOS tab-layout provider, so only the 14pt
+    // physical safe area and 16pt breathing room belong below the footer.
     expect(footerStyle).toEqual(
       expect.arrayContaining([expect.objectContaining({ paddingBottom: 30 })]),
+    );
+  });
+
+  it("clears the native iOS tab bar for nested routes regardless of padding mode", () => {
+    render(
+      <NativeTabBarPresenceProvider>
+        <Screen bottomPaddingMode="stack" footer={<span>Footer content</span>}>
+          <div>Content</div>
+        </Screen>
+      </NativeTabBarPresenceProvider>,
+    );
+
+    const footerNode = screen.getByText("Footer content").parentElement;
+    const footerStyle = JSON.parse(footerNode?.getAttribute("data-style") ?? "null");
+
+    // 14pt safe area + UIKit's 49pt tab-bar content + 16pt breathing room.
+    expect(footerStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ paddingBottom: 79 })]),
     );
   });
 

@@ -26,7 +26,17 @@ export type MobileEnvValidation =
     };
 
 function readEnvValue(key: MobileEnvKey): string {
-  return (process.env[key] ?? "").trim();
+  // Expo replaces direct EXPO_PUBLIC_* property reads while producing a native
+  // bundle. Dynamic bracket access is left for runtime, where release builds do
+  // not have Node's process environment and would therefore appear unconfigured.
+  switch (key) {
+    case "EXPO_PUBLIC_SUPABASE_URL":
+      return (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").trim();
+    case "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY":
+      return (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "").trim();
+    case "EXPO_PUBLIC_API_BASE_URL":
+      return (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim();
+  }
 }
 
 function parseUrlValue(key: MobileEnvKey, value: string): URL | null {

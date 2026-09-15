@@ -9,6 +9,7 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { acceptCurrentTerms } from "../../../shared/lib/api";
+import type { MobileBootstrapResponse } from "@dubgrid/contracts";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
@@ -55,7 +56,13 @@ export function TermsGate({ children }: PropsWithChildren) {
     setError(null);
     try {
       await acceptCurrentTerms(accessToken);
-      await queryClient.invalidateQueries({ queryKey: ["mobile", "bootstrap"] });
+      queryClient.setQueriesData<MobileBootstrapResponse>(
+        { queryKey: ["mobile", "bootstrap"] },
+        (current) => (current ? { ...current, acceptedCurrentTerms: true } : current),
+      );
+      void queryClient
+        .invalidateQueries({ queryKey: ["mobile", "bootstrap"] })
+        .catch(() => undefined);
     } catch (acceptError) {
       setError(
         getInlineErrorMessageOrToast(pushToast, {

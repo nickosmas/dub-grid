@@ -12,11 +12,13 @@ const mockRemoveChannel = vi.fn();
 const mockHistoryReplaceState = vi.fn();
 const mockToastInfo = vi.fn();
 const mockToastDismiss = vi.fn();
+const mockToastError = vi.fn();
 
 vi.mock("sonner", () => ({
   toast: {
     info: (...args: unknown[]) => mockToastInfo(...args),
     dismiss: (...args: unknown[]) => mockToastDismiss(...args),
+    error: (...args: unknown[]) => mockToastError(...args),
   },
 }));
 
@@ -128,6 +130,18 @@ describe("RunLogoutTeardown", () => {
     await waitFor(() => {
       expect(mockSignOutFromBrowser).toHaveBeenCalledWith("global");
     });
+  });
+
+  it("reports unconfirmed global sign-out and clears app state even after a rejection", async () => {
+    mockSignOutFromBrowser.mockRejectedValueOnce(new Error("Fresh proof needed"));
+    sessionStorage.setItem("dg_user_name", "Nic");
+    renderWithClient(<RunLogoutTeardown scope="global" />);
+    await screen.findByRole("link", { name: /sign back in/i });
+    expect(mockToastError).toHaveBeenCalledWith(
+      "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
+    );
+    expect(sessionStorage.getItem("dg_user_name")).toBeNull();
+    expect(mockSignOutFromBrowser).toHaveBeenCalledOnce();
   });
 
   it("short-circuits when scope is null (direct /goodbye visit)", async () => {

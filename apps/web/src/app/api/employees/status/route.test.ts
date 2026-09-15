@@ -6,7 +6,7 @@ const requireAuthenticatedUser = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
-const isCallerInactive = vi.fn();
+const canManageEmployees = vi.fn();
 const membershipMaybeSingle = vi.fn();
 const profileSingle = vi.fn();
 const employeeCurrentSingle = vi.fn();
@@ -40,7 +40,10 @@ vi.mock("@/lib/sentry", () => ({
 
 vi.mock("@/app/api/shared/permissions", () => ({
   resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
-  isCallerInactive: (...args: unknown[]) => isCallerInactive(...args),
+}));
+
+vi.mock("@/app/api/employees/shared", () => ({
+  canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
 }));
 
 const cacheDel = vi.fn();
@@ -90,7 +93,7 @@ vi.mock("@/lib/supabase-service", () => ({
             return {
               eq: vi.fn(() => ({
                 eq: vi.fn(() => ({
-                  maybeSingle: membershipMaybeSingle,
+                  is: vi.fn(() => ({ maybeSingle: membershipMaybeSingle })),
                 })),
               })),
             };
@@ -174,10 +177,11 @@ describe("POST /api/employees/status", () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+    canManageEmployees.mockResolvedValue(true);
   });
 
   it("denies an inactive admin from changing another employee's status even with canManageEmployees", async () => {
-    isCallerInactive.mockResolvedValue(true);
+    canManageEmployees.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
       error: null,
@@ -191,7 +195,6 @@ describe("POST /api/employees/status", () => {
   });
 
   it("does not deny an inactive super_admin (bypass, matches account/permissions/route.ts)", async () => {
-    isCallerInactive.mockResolvedValue(true);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
@@ -208,7 +211,6 @@ describe("POST /api/employees/status", () => {
   });
 
   it("does not deny an inactive gridmaster (bypass, matches account/permissions/route.ts)", async () => {
-    isCallerInactive.mockResolvedValue(true);
     membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
     profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
 
@@ -220,7 +222,6 @@ describe("POST /api/employees/status", () => {
   it("restores an archived organization membership when reactivating a removed employee", async () => {
     const EMPLOYEE_USER_ID = "44444444-4444-4444-8444-444444444444";
 
-    isCallerInactive.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
@@ -277,7 +278,6 @@ describe("POST /api/employees/status", () => {
   it("archives the organization membership when a super_admin removes a linked employee", async () => {
     const EMPLOYEE_USER_ID = "55555555-5555-4555-8555-555555555555";
 
-    isCallerInactive.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
@@ -342,7 +342,6 @@ describe("POST /api/employees/status", () => {
     // Every downstream write/cache-key/audit-log call must use the
     // resolved (sandbox) org, never the raw requested one.
     resolveEffectiveOrgId.mockResolvedValue(SANDBOX_ORG_ID);
-    isCallerInactive.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
@@ -402,7 +401,6 @@ describe("POST /api/employees/status", () => {
   it("refuses to remove the org's only super_admin", async () => {
     const EMPLOYEE_USER_ID = "77777777-7777-4777-8777-777777777777";
 
-    isCallerInactive.mockResolvedValue(false);
     // The actor is a gridmaster here specifically because a super_admin actor
     // removing another super_admin can never hit count <= 1 (removing them
     // still leaves the actor); a gridmaster has no org_role of their own, so
@@ -447,7 +445,6 @@ describe("POST /api/employees/status", () => {
   it("does not touch organization membership when a non-super-admin reactivates a linked employee", async () => {
     const EMPLOYEE_USER_ID = "66666666-6666-4666-8666-666666666666";
 
-    isCallerInactive.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
       error: null,

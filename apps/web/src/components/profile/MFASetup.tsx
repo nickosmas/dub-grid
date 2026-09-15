@@ -1,24 +1,29 @@
 "use client";
 
 import type { Factor } from "@supabase/supabase-js";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
+import { StepUpForm } from "@/components/auth/StepUpForm";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { isRequestTimeout } from "@/lib/fetch-with-timeout";
 import { ShieldCheck, ShieldOff, Copy, Check } from "lucide-react";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   BROWSER_TOTP_FRIENDLY_NAME,
   disableBrowserMfaFactor,
+  cleanupBrowserMfaFactor,
+  getBrowserAuthSession,
+  reauthenticateBrowserMfa,
   listBrowserMfaFactors,
   startBrowserTotpEnrollment,
   updateMfaStatus,
   verifyBrowserTotpEnrollment,
 } from "@/features/account/client";
 
-type MFAStep = "idle" | "enrolling" | "verifying" | "disabling";
+type MFAStep = "idle" | "enrolling" | "verifying" | "disabling" | "syncing";
 
 interface MFASetupProps {
   /** Whether the user currently has MFA enabled */
@@ -50,16 +55,18 @@ const labelStyle: React.CSSProperties = {
  * was never the problem. Match on the error code, and let anything unrecognised
  * say what it actually was.
  */
-function verificationErrorMessage(err: unknown): string {
+function verificationErrorMessage(err: unknown, enrollment = true): string {
   const code =
     typeof err === "object" && err !== null && "code" in err
       ? (err as { code?: unknown }).code
       : undefined;
 
   if (code === "mfa_verification_failed") {
+    if (!enrollment) return "That code didn't match. Enter a new code from your authenticator app.";
     return "That code didn't match. If you have scanned this before, delete the older DubGrid entry in your authenticator app and scan again, then enter the new code. If it still fails, check that your phone's clock is set automatically.";
   }
   if (code === "mfa_factor_not_found") {
+    if (!enrollment) return "Refresh two-factor status before trying again.";
     return "This setup is no longer active. Cancel and start again to get a fresh QR code.";
   }
   return extractErrorMessage(err, "Verification failed. Please try again.");
@@ -86,37 +93,57 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [needsReconciliation, setNeedsReconciliation] = useState(false);
+  const syncTokenRef = useRef<string | undefined>(undefined);
+  const verifyingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const pendingFactorIdRef = useRef<string | null>(null);
 
-  async function startEnrollment() {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const pendingFactorId = pendingFactorIdRef.current;
+      if (pendingFactorId && !verifyingRef.current) {
+        cleanupBrowserMfaFactor(pendingFactorId).catch(() => {});
+      }
+    };
+  }, []);
+
+  async function startEnrollment(password: string) {
     setLoading(true);
+    setVerifyError(null);
     try {
       const { data: factorsData, error: listError } = await listBrowserMfaFactors();
       if (listError) throw listError;
 
       const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
       if (existingVerifiedTotp) {
-        await updateMfaStatus(true);
-        toast.info("Two-factor authentication is already enabled.");
-        onStatusChange(true);
-        resetState();
+        await reconcileStatus();
         return;
       }
 
+      await reauthenticateBrowserMfa(password);
+
       const staleFactors = factorsData.all.filter(isStaleDubGridTotpFactor);
       for (const factor of staleFactors) {
-        const { error: unenrollError } = await disableBrowserMfaFactor(factor.id);
-        if (unenrollError) throw unenrollError;
+        await cleanupBrowserMfaFactor(factor.id);
       }
 
       const { data, error } = await startBrowserTotpEnrollment();
       if (error) throw error;
+      if (!mountedRef.current) {
+        await cleanupBrowserMfaFactor(data.id);
+        return;
+      }
 
       setQrCode(data.totp.qr_code);
       setSecret(data.totp.secret);
+      pendingFactorIdRef.current = data.id;
       setFactorId(data.id);
       setStep("verifying");
     } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "We couldn't start MFA enrollment. Try again."));
+      setVerifyError(extractErrorMessage(err, "We couldn't start MFA enrollment. Try again."));
     } finally {
       setLoading(false);
     }
@@ -126,28 +153,43 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
     if (!factorId || verifyCode.length !== 6) return;
     setLoading(true);
     setVerifyError(null);
+    verifyingRef.current = true;
 
     try {
-      const { error } = await verifyBrowserTotpEnrollment({
+      const { data: verifiedSession, error } = await verifyBrowserTotpEnrollment({
         factorId,
         code: verifyCode,
       });
       if (error) throw error;
 
-      await updateMfaStatus(true);
-
-      toast.success("Two-factor authentication enabled.");
-      onStatusChange(true);
-      resetState();
+      pendingFactorIdRef.current = null;
+      setNeedsReconciliation(true);
+      setStep("syncing");
+      if (!verifiedSession?.access_token)
+        throw new Error("Refresh two-factor status to finish setup.");
+      await reconcileStatus(verifiedSession.access_token);
     } catch (err: unknown) {
+      if (isRequestTimeout(err)) {
+        // Provider verification may settle after the UI deadline. Never clean
+        // up an outcome-unknown factor or automatically replay the mutation.
+        pendingFactorIdRef.current = null;
+        setNeedsReconciliation(true);
+        setStep("syncing");
+      }
       setVerifyError(verificationErrorMessage(err));
     } finally {
+      verifyingRef.current = false;
+      if (!mountedRef.current && pendingFactorIdRef.current) {
+        void cleanupBrowserMfaFactor(pendingFactorIdRef.current).catch(() => {});
+      }
       setLoading(false);
     }
   }
 
-  async function disableMFA() {
+  async function disableMFA(code: string) {
+    if (!/^\d{6}$/.test(code)) return;
     setLoading(true);
+    setVerifyError(null);
     try {
       const { data: factorsData, error: listError } = await listBrowserMfaFactors();
       if (listError) throw listError;
@@ -155,24 +197,62 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       const totpFactors = factorsData.totp.filter(
         (f: { status: string }) => f.status === "verified",
       );
+      if (!totpFactors.length) {
+        await reconcileStatus();
+        return;
+      }
+      const { data: verifiedSession, error: challengeError } = await verifyBrowserTotpEnrollment({
+        factorId: totpFactors[0].id,
+        code,
+      });
+      if (challengeError) throw challengeError;
+      if (!verifiedSession?.access_token)
+        throw new Error("We couldn't verify your session. Try again.");
+      syncTokenRef.current = verifiedSession.access_token;
+      setNeedsReconciliation(true);
+      // Once a mutation starts, retries reconcile first rather than replaying it.
+      setStep("syncing");
       for (const factor of totpFactors) {
-        const { error } = await disableBrowserMfaFactor(factor.id);
+        const { error } = await disableBrowserMfaFactor(factor.id, verifiedSession.access_token);
         if (error) throw error;
       }
 
-      await updateMfaStatus(false);
-
-      toast.success("Two-factor authentication disabled.");
-      onStatusChange(false);
-      resetState();
+      await reconcileStatus(verifiedSession.access_token);
     } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "We couldn't disable MFA. Try again."));
+      if (isRequestTimeout(err)) setStep("syncing");
+      setVerifyError(verificationErrorMessage(err, false));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function reconcileStatus(accessToken?: string) {
+    setNeedsReconciliation(true);
+    setStep("syncing");
+    syncTokenRef.current = accessToken ?? syncTokenRef.current;
+    const { profile } = await updateMfaStatus(syncTokenRef.current);
+    if (typeof profile?.mfa_enabled !== "boolean")
+      throw new Error("We couldn't refresh two-factor status. Try again.");
+    onStatusChange(profile.mfa_enabled);
+    setNeedsReconciliation(false);
+    resetState();
+  }
+
+  async function retryStatus() {
+    setLoading(true);
+    setVerifyError(null);
+    try {
+      const session = await getBrowserAuthSession();
+      await reconcileStatus(session?.access_token);
+    } catch (err) {
+      setVerifyError(extractErrorMessage(err, "We couldn't refresh two-factor status. Try again."));
     } finally {
       setLoading(false);
     }
   }
 
   function resetState() {
+    pendingFactorIdRef.current = null;
     setStep("idle");
     setQrCode(null);
     setSecret(null);
@@ -180,6 +260,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
     setVerifyCode("");
     setVerifyError(null);
     setCopied(false);
+    syncTokenRef.current = undefined;
   }
 
   async function copySecret() {
@@ -200,6 +281,16 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
 
   // ── Idle state: show status and enable/disable button ──
   if (step === "idle") {
+    if (needsReconciliation) {
+      return (
+        <div>
+          <p>Two-factor status needs to be refreshed.</p>
+          <Button className="dg-btn dg-btn-secondary" onClick={retryStatus}>
+            Refresh status
+          </Button>
+        </div>
+      );
+    }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -241,7 +332,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           </Button>
         ) : (
           <Button
-            onClick={startEnrollment}
+            onClick={() => setStep("enrolling")}
             disabled={loading}
             className="dg-btn dg-btn-primary"
             style={{ alignSelf: "flex-start" }}
@@ -259,29 +350,38 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
     );
   }
 
-  // ── Disabling confirmation ──
-  if (step === "disabling") {
+  if (step === "enrolling" || step === "disabling") {
+    const enrolling = step === "enrolling";
+    return (
+      <StepUpForm
+        key={step}
+        method={enrolling ? "password" : "totp"}
+        description={
+          enrolling
+            ? "Confirm your password to set up two-factor authentication."
+            : "Disabling two-factor authentication makes your account less secure. Enter a new code from your authenticator app to confirm."
+        }
+        error={verifyError}
+        disabled={loading}
+        onCancel={resetState}
+        onConfirm={enrolling ? startEnrollment : disableMFA}
+        confirmLabel={enrolling ? "Continue" : "Disable 2FA"}
+        variant={enrolling ? "primary" : "danger"}
+      />
+    );
+  }
+
+  if (step === "syncing") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <p
-          style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-danger-dark)",
-            margin: 0,
-            fontWeight: 500,
-          }}
-        >
-          Are you sure you want to disable two-factor authentication? This will make your account
-          less secure.
-        </p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <Button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
+        <p>Refresh the account's two-factor status before making another change.</p>
+        {verifyError && <p role="alert">{verifyError}</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+          <Button className="dg-btn dg-btn-secondary" disabled={loading} onClick={resetState}>
             Cancel
           </Button>
-          <Button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
-            <ButtonLoading loading={loading} spinnerSize={14}>
-              Confirm Disable
-            </ButtonLoading>
+          <Button className="dg-btn dg-btn-primary" disabled={loading} onClick={retryStatus}>
+            Refresh status
           </Button>
         </div>
       </div>
@@ -411,14 +511,21 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Button
-          onClick={() => {
+          onClick={async () => {
             // Cancel enrollment — unenroll the pending factor
-            if (factorId) {
-              disableBrowserMfaFactor(factorId).catch(() => {});
+            const pendingFactorId = pendingFactorIdRef.current;
+            setLoading(true);
+            try {
+              if (pendingFactorId) await cleanupBrowserMfaFactor(pendingFactorId);
+              resetState();
+            } catch {
+              setVerifyError("We couldn't cancel setup. Refresh its status before trying again.");
+              setStep("syncing");
+            } finally {
+              setLoading(false);
             }
-            resetState();
           }}
           disabled={loading}
           className="dg-btn dg-btn-secondary"

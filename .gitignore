@@ -19,6 +19,7 @@ node_modules/
 # next.js
 /.next/
 .next/
+apps/web/.next-auth-entry/
 /out/
 /.turbo/
 .turbo/

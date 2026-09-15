@@ -18,17 +18,21 @@ export interface OnboardingDecisionInput {
   orgLoading: boolean;
   entryGate: OnboardingEntryGate | null;
   onBillingRecoveryRoute: boolean;
+  /** Only the Super Admin can enter the organization's billing recovery page. */
+  canRecoverBilling: boolean;
   /** Org-wide configuration completeness: live, and shared by every member. */
   setupComplete: boolean;
   canCompleteSetup: boolean;
   /** Bootstrap has resolved the org this session is actually acting as. */
   orgDataReliable: boolean;
+  /** Inactive staff retain read-only app access but cannot complete onboarding. */
+  isInactive: boolean;
   frozenPhase: OnboardingPhase | null;
 }
 
 export type OnboardingDecision =
   | { kind: "bootstrap-recovery" }
-  | { kind: "billing-redirect" }
+  | { kind: "billing-redirect"; destination: "recovery" | "organization-gate" }
   | { kind: "app"; settled: boolean }
   | { kind: "setup-pending" }
   | { kind: "wizard"; isOrgSetup: boolean; freezePhase: OnboardingPhase | null };
@@ -42,11 +46,26 @@ export function resolveOnboardingDecision(input: OnboardingDecisionInput): Onboa
   if (input.bootstrapUnavailable) return { kind: "bootstrap-recovery" };
   if (input.completedThisSession) return { kind: "app", settled: true };
 
+  // Bootstrap data from the previous organization can survive briefly while
+  // the effective organization changes. It cannot decide onboarding, billing,
+  // or setup access for the new organization.
+  if (!input.orgDataReliable) return { kind: "app", settled: false };
+
   if (input.entryGate?.billingLocked) {
-    return input.onBillingRecoveryRoute
-      ? { kind: "app", settled: true }
-      : { kind: "billing-redirect" };
+    if (input.canRecoverBilling && input.onBillingRecoveryRoute) {
+      return { kind: "app", settled: true };
+    }
+    return {
+      kind: "billing-redirect",
+      destination: input.canRecoverBilling ? "recovery" : "organization-gate",
+    };
   }
+
+  // Deactivation deliberately reduces a staff member to the read-only app
+  // rather than removing their membership. They cannot advance organization
+  // setup or their own onboarding, so never strand them in a wizard they have
+  // no authority to complete. AppShell owns the inactivity banner.
+  if (input.isInactive) return { kind: "app", settled: true };
 
   // Once the app itself has been shown off settled data, this mount keeps
   // showing it. `setupComplete` is org-wide and live: an admin who adds a focus

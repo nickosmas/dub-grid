@@ -29,7 +29,7 @@ export function createCommonStackOptions(mobileColors: MobileColors): NativeStac
       backgroundColor: mobileColors.background,
     },
     // The header title is the one piece of chrome on every screen, so it has to
-    // be DM Sans like the page under it. Naming the bold *family* is the only
+    // be Inter like the page under it. Naming the bold *family* is the only
     // way to say that: a bare `fontWeight: "700"` leaves the bar in the system
     // font, and pairing the two makes Android bold an already-bold file twice.
     headerTitleStyle: {

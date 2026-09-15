@@ -6,7 +6,10 @@ import {
   mobileColors,
   mobileSoftGradientStops,
   mobileRadii,
+  mobilePillOverflow,
+  mobileInputText,
   mobileSpacing,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   mobileAvatarText,
@@ -23,6 +26,19 @@ describe("mobileAvatarText", () => {
     expect(style.fontSize).toBe(20);
     expect(style.maxWidth).toBe("100%");
     expect(style.lineHeight).toBeGreaterThan(style.fontSize!);
+  });
+});
+
+describe("mobilePillOverflow", () => {
+  it("lets display pills wrap while bounding both pill modes", () => {
+    expect(mobilePillOverflow.displayContainer).toMatchObject({ maxWidth: "100%", minWidth: 0 });
+    expect(mobilePillOverflow.displayText).toMatchObject({ flexShrink: 1, flexWrap: "wrap" });
+    expect(mobilePillOverflow.interactiveContainer).toMatchObject({
+      maxWidth: "100%",
+      minWidth: 0,
+      overflow: "hidden",
+    });
+    expect(mobilePillOverflow.interactiveText).toMatchObject({ flexShrink: 1 });
   });
 });
 
@@ -97,7 +113,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 20,
           "screenTitle": {
-            "fontFamily": "DMSans_700Bold",
+            "fontFamily": "Inter_700Bold",
             "fontSize": 22,
             "lineHeight": 28,
           },
@@ -108,7 +124,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 20,
           "screenTitle": {
-            "fontFamily": "DMSans_700Bold",
+            "fontFamily": "Inter_700Bold",
             "fontSize": 22,
             "lineHeight": 28,
           },
@@ -120,9 +136,9 @@ describe("shared design token derivation", () => {
   });
 });
 
-describe("DM Sans weights", () => {
+describe("Inter product weights", () => {
   // Regression guard for an Android-only, silent font fallback. expo-font
-  // registers each DM Sans file under its own family name at style NORMAL, so a
+  // registers each Inter file under its own family name at style NORMAL, so a
   // style naming both the family and a numeric weight of 500+ sends Android
   // hunting for a bold face that family doesn't have — and it lands on the
   // system font. Every heading in the app rendered in Roboto on Android once.
@@ -134,8 +150,8 @@ describe("DM Sans weights", () => {
       expect(style, `mobileText.${variant} must name its weight via fontFamily alone`).not.toEqual(
         expect.objectContaining({ fontWeight: expect.anything() }),
       );
-      expect(style.fontFamily, `mobileText.${variant} must name a DM Sans family`).toMatch(
-        /^DMSans_/,
+      expect(style.fontFamily, `mobileText.${variant} must name an Inter family`).toMatch(
+        /^Inter_/,
       );
     }
   });
@@ -143,21 +159,36 @@ describe("DM Sans weights", () => {
   it("moves the family, not the weight, when re-weighting a token", () => {
     const medium = mobileTextWeighted("body", "medium");
 
-    expect(medium.fontFamily).toBe("DMSans_500Medium");
+    expect(medium.fontFamily).toBe("Inter_500Medium");
     expect(medium.fontWeight).toBeUndefined();
     // Everything else about the token survives the swap.
     expect(medium.fontSize).toBe(mobileText.body.fontSize);
     expect(medium.lineHeight).toBe(mobileText.body.lineHeight);
   });
 
-  it("maps every family alias to a real DM Sans file", () => {
+  it("maps every product family alias to a real Inter file", () => {
     expect(mobileTypography.fontFamily).toEqual({
-      base: "DMSans_400Regular",
-      regular: "DMSans_400Regular",
-      medium: "DMSans_500Medium",
-      semibold: "DMSans_600SemiBold",
-      bold: "DMSans_700Bold",
+      base: "Inter_400Regular",
+      regular: "Inter_400Regular",
+      medium: "Inter_500Medium",
+      semibold: "Inter_600SemiBold",
+      bold: "Inter_700Bold",
     });
+  });
+
+  it("keeps editable fields on Inter only when the native face is loaded", () => {
+    expect(mobileInputText("regular", true)).toEqual({ fontFamily: "Inter_400Regular" });
+    expect(mobileInputText("semibold", false)).toEqual({ fontWeight: "600" });
+    expect(mobileInputText("regular", true)).not.toHaveProperty("fontWeight");
+    expect(mobileInputText("regular", false)).not.toHaveProperty("fontFamily");
+  });
+});
+
+describe("mobileTabularText", () => {
+  it("uses the native tabular-numeral feature without changing type scale", () => {
+    expect(mobileTabularText).toEqual({ fontVariant: ["tabular-nums"] });
+    expect(mobileTabularText).not.toHaveProperty("fontSize");
+    expect(mobileTabularText).not.toHaveProperty("lineHeight");
   });
 });
 

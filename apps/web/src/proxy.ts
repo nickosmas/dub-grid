@@ -7,7 +7,7 @@ import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
-import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
@@ -74,13 +74,19 @@ function redirectWithCookies(url: URL, source: NextResponse): NextResponse {
 async function readOrgAccess(
   orgId: string,
   load: () => Promise<MwOrgAccess>,
+  refresh = false,
 ): Promise<MwOrgAccess> {
   const now = Date.now();
-  const memoized = mwOrgAccessMemo.get(orgId);
-  if (memoized && memoized.expiresAt > now) return memoized.value;
+  if (!refresh) {
+    const memoized = mwOrgAccessMemo.get(orgId);
+    if (memoized && memoized.expiresAt > now) return memoized.value;
+  }
 
-  const value = await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
+  const value = refresh
+    ? await load()
+    : await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
   mwOrgAccessMemo.set(orgId, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
+  if (refresh) void cacheSet(CacheKey.mwOrgAccess(orgId), value, TTL.MIDDLEWARE);
   return value;
 }
 
@@ -100,6 +106,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
  * These are top-level claims injected by the custom_access_token_hook.
  */
 interface JWTClaims {
+  session_id?: string;
   platform_role?: string;
   org_role?: string;
   org_id?: string;
@@ -143,6 +150,14 @@ export async function proxy(req: NextRequest) {
     ? ""
     : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
   const analyticsSrc = "https://va.vercel-scripts.com";
+  // @vercel/analytics/next injects its own bootstrap inline script (not via
+  // next/script), so it never picks up the per-request nonce and its trust
+  // never chains from strict-dynamic — the browser blocks it outright on
+  // every authenticated page load. The script's content is fixed for a given
+  // package version, so a hash source (CSP's own suggested remedy) allowlists
+  // exactly that script without weakening strict-dynamic for anything else.
+  // Recompute this if `@vercel/analytics` is upgraded and starts failing again.
+  const analyticsInlineScriptHash = "'sha256-N+t4k5q6GzjvL1q+njUuAvlUpYZ9j7Yv2/Lax5Edtak='";
   const devScriptExtras = isDev ? "'unsafe-eval'" : "";
   // Gated on NEXT_PUBLIC_SUPABASE_URL being a loopback address, not on isDev —
   // a *production build* (`next start`) run against local Supabase (e.g. the
@@ -182,7 +197,9 @@ export async function proxy(req: NextRequest) {
   // force-dynamic, so Next can stamp the nonce); 'unsafe-inline' in dev.
   const dynamicCspHeaderValue = isDev
     ? contentSecurityPolicyHeaderValue
-    : buildCsp(`'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc}`);
+    : buildCsp(
+        `'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc} ${analyticsInlineScriptHash}`,
+      );
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -272,6 +289,7 @@ export async function proxy(req: NextRequest) {
   // enforced by Supabase RLS, not edge middleware. However, we never trust
   // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
+  let claimsVerified = false;
   try {
     const jwks = getSupabaseJwks();
     if (jwks) {
@@ -279,6 +297,7 @@ export async function proxy(req: NextRequest) {
         jwtVerify(session.access_token, jwks),
       );
       claims = payload as JWTClaims;
+      claimsVerified = true;
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
     }
@@ -298,6 +317,12 @@ export async function proxy(req: NextRequest) {
       Sentry.captureException(e, { extra: { context: "middleware-jwt-decode-fallback" } });
       return NextResponse.redirect(new URL("/login", req.url));
     }
+  }
+
+  if (claims.platform_role === "gridmaster" && !claimsVerified) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("error", "session_invalid");
+    return NextResponse.redirect(loginUrl);
   }
 
   // Fallback path: if custom JWT claims are missing, resolve role/org
@@ -427,7 +452,10 @@ export async function proxy(req: NextRequest) {
           const supabaseUrl3 = getSupabaseUrl();
           const serviceKey3 = getSupabaseSecretKey();
           const verified =
-            typeof impData.sessionId === "string" && supabaseUrl3 && serviceKey3
+            typeof impData.sessionId === "string" &&
+            typeof claims.session_id === "string" &&
+            supabaseUrl3 &&
+            serviceKey3
               ? await timer.time("mw_impersonation_verify", () =>
                   verifyImpersonationSession(
                     createClient(supabaseUrl3, serviceKey3, {
@@ -435,6 +463,7 @@ export async function proxy(req: NextRequest) {
                     }),
                     impData.sessionId,
                     session.user.id,
+                    claims.session_id as string,
                   ),
                 )
               : null;
@@ -448,10 +477,10 @@ export async function proxy(req: NextRequest) {
             claims = {
               ...claims,
               org_id: verified.targetOrgId,
-              org_slug: impData.targetOrgSlug,
-              org_role: impData.targetOrgRole,
+              org_slug: verified.targetOrgSlug,
+              org_role: verified.targetOrgRole,
             };
-            effectiveRole = impData.targetOrgRole ?? "user";
+            effectiveRole = verified.targetOrgRole;
           } else {
             // No matching active session — the cookie doesn't correspond to
             // a real, still-active impersonation. Clear it rather than
@@ -481,7 +510,10 @@ export async function proxy(req: NextRequest) {
   if (!isImpersonating && session?.user?.id) {
     const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
     if (sandboxCookie) {
-      if (sandboxCookie.userId !== session?.user?.id) {
+      if (
+        sandboxCookie.userId !== session?.user?.id ||
+        sandboxCookie.sessionId !== claims.session_id
+      ) {
         // Cookie was set for a different user — clear it.
         res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
       } else {
@@ -499,6 +531,7 @@ export async function proxy(req: NextRequest) {
                 .eq("id", sandboxCookie.sandboxOrgId)
                 .eq("workspace_kind", "sandbox")
                 .eq("sandbox_owner_user_id", session?.user?.id)
+                .eq("sandbox_owner_session_id", claims.session_id)
                 .is("archived_at", null)
                 .maybeSingle(),
             );
@@ -562,14 +595,18 @@ export async function proxy(req: NextRequest) {
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
       const orgAccess = await timer.time("mw_org_access", () =>
-        readOrgAccess(claims.org_id!, async () => {
-          const { data } = await supabase
-            .from("organizations")
-            .select("suspended_at, archived_at, subscription_status, trial_ends_at")
-            .eq("id", claims.org_id!)
-            .maybeSingle();
-          return (data as MwOrgAccess) ?? null;
-        }),
+        readOrgAccess(
+          claims.org_id!,
+          async () => {
+            const { data } = await supabase
+              .from("organizations")
+              .select("suspended_at, archived_at, subscription_status, trial_ends_at")
+              .eq("id", claims.org_id!)
+              .maybeSingle();
+            return (data as MwOrgAccess) ?? null;
+          },
+          pathname === "/billing-required",
+        ),
       );
 
       // A deleted (archived) org revokes access just like a suspended one. A

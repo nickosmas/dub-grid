@@ -370,7 +370,6 @@ export default function AddPersonScreen() {
             keyboardType="email-address"
             autoComplete="email"
             autoCorrect={false}
-            textContentType="emailAddress"
             label="Email (optional)"
             placeholder="name@example.com"
             value={email}

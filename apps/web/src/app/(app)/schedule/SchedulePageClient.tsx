@@ -43,6 +43,16 @@ import {
   isEmployeeEligibleForOpenShift,
   selectVisibleCoverageGaps,
 } from "./_lib/open-shifts";
+import {
+  buildOpenShiftStaffingCandidates,
+  buildStaffedOpenShiftInput,
+  isCalloffOpenShiftStaffedByDraft,
+  resolveOpenShiftClickAction,
+  type OpenShiftStaffingCandidate,
+  type OpenShiftStaffingOption,
+  type StaffingScheduleState,
+} from "./_lib/open-shift-staffing";
+import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingModal";
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
@@ -969,6 +979,7 @@ function SchedulerContent() {
   // Read-only info view for scheduler/admin viewers who can see every open
   // shift but aren't personally eligible to claim a given one for themselves.
   const [openShiftDetails, setOpenShiftDetails] = useState<GridOpenShift | null>(null);
+  const [staffingOpenShift, setStaffingOpenShift] = useState<GridOpenShift | null>(null);
   const [pendingCoverageGapVolunteer, setPendingCoverageGapVolunteer] = useState<{
     assignmentLabel: string;
     date: string;
@@ -3069,6 +3080,9 @@ function SchedulerContent() {
     return [...resolvedCalloffOpenShifts, ...gapShifts].reduce<GridOpenShift[]>(
       (visible, openShift) => {
         if (isOpenShiftStarted(openShift)) return visible;
+        if (canEditShifts && isCalloffOpenShiftStaffedByDraft({ openShift, employees, shifts })) {
+          return visible;
+        }
 
         const candidateAssignmentIds = openShift.eligibleAssignmentDefinitionIds?.length
           ? openShift.eligibleAssignmentDefinitionIds
@@ -3090,7 +3104,11 @@ function SchedulerContent() {
         // handleOpenShiftClick) handles the "can't claim this one for
         // myself" case instead of hiding it from them.
         if (canSeeAllOpenShifts) {
-          visible.push({ ...openShift, viewerEligible });
+          visible.push({
+            ...openShift,
+            viewerEligible,
+            viewerAction: canEditShifts ? "assign" : viewerEligible ? "volunteer" : "details",
+          });
           return visible;
         }
 
@@ -3114,13 +3132,14 @@ function SchedulerContent() {
           return visible;
         }
 
-        visible.push({ ...openShift, viewerEligible: true });
+        visible.push({ ...openShift, viewerEligible: true, viewerAction: "volunteer" });
         return visible;
       },
       [],
     );
   }, [
     assignmentById,
+    canEditShifts,
     canSeeAllOpenShifts,
     currentEmpId,
     currentEmployee,
@@ -3133,6 +3152,8 @@ function SchedulerContent() {
     resolvedCalloffOpenShifts,
     shiftCategories,
     shiftRequests.requests,
+    shifts,
+    employees,
     visibleCoverageGaps,
   ]);
 
@@ -5610,6 +5631,104 @@ function SchedulerContent() {
     orgRoles,
   ]);
 
+  const staffingCandidates = useMemo(() => {
+    if (!staffingOpenShift || !canEditShifts) return [];
+    const dateKey = staffingOpenShift.date;
+    const date = parseLocalDateKey(dateKey);
+    const scheduleByEmployeeId = new Map<string, StaffingScheduleState | null>();
+    const adjacentScheduleByEmployeeId = new Map<
+      string,
+      { previous: StaffingScheduleState | null; next: StaffingScheduleState | null }
+    >();
+    const staffingStateFor = (
+      employeeId: string,
+      targetDateKey: string,
+    ): StaffingScheduleState | null => {
+      const effective = shifts[`${employeeId}_${targetDateKey}`]?.effective ?? null;
+      return effective
+        ? {
+            kind: effective.kind,
+            segments: effective.segments,
+            assignmentIds: effective.assignmentIds,
+            absenceTypeId: effective.absenceTypeId ?? null,
+            customStartTime: effective.customStartTime ?? null,
+            customEndTime: effective.customEndTime ?? null,
+            seriesId: effective.seriesId ?? null,
+            fromRecurring: effective.fromRecurring ?? false,
+          }
+        : null;
+    };
+    const previousDateKey = formatDateKey(addDays(date, -1));
+    const nextDateKey = formatDateKey(addDays(date, 1));
+    for (const employee of employees) {
+      scheduleByEmployeeId.set(employee.id, staffingStateFor(employee.id, dateKey));
+      adjacentScheduleByEmployeeId.set(employee.id, {
+        previous: staffingStateFor(employee.id, previousDateKey),
+        next: staffingStateFor(employee.id, nextDateKey),
+      });
+    }
+    return buildOpenShiftStaffingCandidates({
+      openShift: staffingOpenShift,
+      employees,
+      scheduleByEmployeeId,
+      adjacentScheduleByEmployeeId,
+      assignments,
+      shiftCategories,
+      jobs,
+      orgRoles,
+      sortBy: scheduleSortBy,
+    });
+  }, [
+    assignments,
+    canEditShifts,
+    employees,
+    jobs,
+    orgRoles,
+    scheduleSortBy,
+    shiftCategories,
+    shifts,
+    staffingOpenShift,
+  ]);
+
+  const handleStaffOpenShift = useCallback(
+    (candidate: OpenShiftStaffingCandidate, option: OpenShiftStaffingOption) => {
+      if (!staffingOpenShift) return;
+      const currentCandidate = staffingCandidates.find(
+        (item) => item.employee.id === candidate.employee.id,
+      );
+      const currentOption = currentCandidate?.options.find(
+        (item) => item.assignmentIds.join(",") === option.assignmentIds.join(","),
+      );
+      if (!currentCandidate || !currentOption) {
+        toast.error("That person is no longer available for this shift.");
+        return;
+      }
+      const input = buildStaffedOpenShiftInput({
+        existingState: currentCandidate.existingState,
+        option: currentOption,
+        assignments,
+        shiftCategories,
+        jobs,
+        orgRoles,
+      });
+      if (!input) {
+        toast.error("That assignment is no longer available.");
+        return;
+      }
+      const added = setShift(
+        currentCandidate.employee.id,
+        parseLocalDateKey(staffingOpenShift.date),
+        input,
+      );
+      if (!added) return;
+      toast.success(
+        `${getEmployeeDisplayName(currentCandidate.employee)} was added to the draft schedule.`,
+      );
+      setStaffingOpenShift(null);
+    },
+    [assignments, jobs, orgRoles, setShift, shiftCategories, staffingCandidates, staffingOpenShift],
+  );
+
   const handleClaimOpenShift = useMemo<ScheduleGridHandlers["onClaimOpenShift"]>(
     () =>
       currentEmpId
@@ -5731,15 +5850,21 @@ function SchedulerContent() {
   // an ineligible shift in the first place, per the openShifts memo above).
   const handleOpenShiftClick = useCallback(
     (openShift: GridOpenShift) => {
-      if (openShift.viewerEligible === false) {
-        if (canSeeAllOpenShifts) {
-          setOpenShiftDetails(openShift);
-        }
-        return;
+      const action = resolveOpenShiftClickAction({
+        canEditShifts,
+        canSeeAllOpenShifts,
+        canVolunteer: handleClaimOpenShift != null,
+        viewerEligible: openShift.viewerEligible,
+      });
+      if (action === "staff") {
+        setStaffingOpenShift(openShift);
+      } else if (action === "details") {
+        setOpenShiftDetails(openShift);
+      } else if (action === "volunteer") {
+        handleClaimOpenShift?.(openShift);
       }
-      handleClaimOpenShift?.(openShift);
     },
-    [canSeeAllOpenShifts, handleClaimOpenShift],
+    [canEditShifts, canSeeAllOpenShifts, handleClaimOpenShift],
   );
 
   const scheduleGridModel = useMemo(
@@ -6250,7 +6375,7 @@ function SchedulerContent() {
     <div
       ref={pageRootRef}
       style={{
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         background: "var(--dg-color-bg)",
         minHeight: "100vh",
         color: "var(--dg-color-text-primary)",
@@ -6917,6 +7042,27 @@ function SchedulerContent() {
             )}
 
             {/* Confirm dialog for claiming / volunteering for an open shift */}
+            {staffingOpenShift && canEditShifts && (
+              <OpenShiftStaffingModal
+                assignmentLabel={
+                  staffingOpenShift.assignmentFullName ??
+                  spellOutAssignment(staffingOpenShift.assignmentIds[0]) ??
+                  staffingOpenShift.assignmentLabel
+                }
+                assignmentLabelById={assignmentNameMap}
+                absenceTypeLabelById={absenceTypeMap}
+                candidates={staffingCandidates}
+                dateLabel={parseLocalDateKey(staffingOpenShift.date).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+                needed={staffingOpenShift.needed ?? 1}
+                currentEmployeeId={currentEmpId}
+                onAssign={handleStaffOpenShift}
+                onClose={() => setStaffingOpenShift(null)}
+              />
+            )}
             {coverageGapSelection && currentEmpId && (
               <Modal
                 title="Choose Assignment"

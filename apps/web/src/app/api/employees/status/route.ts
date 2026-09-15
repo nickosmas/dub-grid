@@ -5,7 +5,8 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
-import { isCallerInactive, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { canManageEmployees } from "@/app/api/employees/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -93,29 +94,20 @@ export async function POST(req: NextRequest) {
 
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }, inactive] = await Promise.all([
+    const [hasPermission, { data: membership }, { data: profile }] = await Promise.all([
+      canManageEmployees(serviceClient, user.id, orgId),
       serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
         .eq("user_id", user.id)
         .eq("org_id", orgId)
+        .is("archived_at", null)
         .maybeSingle(),
       serviceClient.from("profiles").select("platform_role").eq("id", user.id).single(),
-      isCallerInactive(serviceClient, user.id, orgId),
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
     const isSuperAdmin = membership?.org_role === "super_admin";
-    const isAdmin = membership?.org_role === "admin";
-    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-
-    // Inactive employees keep their session but lose every manage capability —
-    // mirrors requireOrgPermissions / resolveMobileAuthContext. Gridmaster/super_admin
-    // bypass: those tiers aren't meant to be sidelined by a stale employees.status row.
-    const hasPermission =
-      isGridmaster ||
-      isSuperAdmin ||
-      (isAdmin && !inactive && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });

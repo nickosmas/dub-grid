@@ -9,9 +9,11 @@ function input(overrides: Partial<OnboardingDecisionInput> = {}): OnboardingDeci
     orgLoading: false,
     entryGate: { onboardingCompleted: false, adminOnboardingCompleted: true, billingLocked: null },
     onBillingRecoveryRoute: false,
+    canRecoverBilling: false,
     setupComplete: true,
     canCompleteSetup: false,
     orgDataReliable: true,
+    isInactive: false,
     frozenPhase: null,
     ...overrides,
   };
@@ -61,6 +63,21 @@ describe("resolveOnboardingDecision", () => {
     ).toEqual({ kind: "app", settled: true });
   });
 
+  it("keeps an inactive member in the read-only app instead of onboarding", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          isInactive: true,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: true,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+  });
+
   it("does not latch the app while the answer is still unsettled", () => {
     expect(resolveOnboardingDecision(input({ orgLoading: true }))).toEqual({
       kind: "app",
@@ -72,11 +89,12 @@ describe("resolveOnboardingDecision", () => {
     });
   });
 
-  it("still enforces the billing lock after the app has been shown", () => {
+  it("still sends a billing-locked super admin to recovery after the app has been shown", () => {
     expect(
       resolveOnboardingDecision(
         input({
           appAlreadyShown: true,
+          canRecoverBilling: true,
           entryGate: {
             onboardingCompleted: true,
             adminOnboardingCompleted: true,
@@ -84,7 +102,7 @@ describe("resolveOnboardingDecision", () => {
           },
         }),
       ),
-    ).toEqual({ kind: "billing-redirect" });
+    ).toEqual({ kind: "billing-redirect", destination: "recovery" });
   });
 
   it("lets a billing-locked super admin stay on the recovery route", () => {
@@ -92,6 +110,7 @@ describe("resolveOnboardingDecision", () => {
       resolveOnboardingDecision(
         input({
           onBillingRecoveryRoute: true,
+          canRecoverBilling: true,
           entryGate: {
             onboardingCompleted: false,
             adminOnboardingCompleted: true,
@@ -102,6 +121,20 @@ describe("resolveOnboardingDecision", () => {
     ).toEqual({ kind: "app", settled: true });
   });
 
+  it("sends a non-recovery role to the terminal organization gate", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: true,
+            billingLocked: true,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "billing-redirect", destination: "organization-gate" });
+  });
+
   it("prefers the frozen phase over live setup completeness", () => {
     expect(
       resolveOnboardingDecision(
@@ -110,14 +143,37 @@ describe("resolveOnboardingDecision", () => {
     ).toEqual({ kind: "wizard", isOrgSetup: false, freezePhase: null });
   });
 
-  it("only asks to freeze a phase for setup-capable users with reliable org data", () => {
+  it("keeps the app unsettled while bootstrap data belongs to another organization", () => {
     expect(
-      resolveOnboardingDecision(input({ canCompleteSetup: true, orgDataReliable: false })),
-    ).toEqual({ kind: "wizard", isOrgSetup: true, freezePhase: null });
-    expect(resolveOnboardingDecision(input({ canCompleteSetup: true }))).toEqual({
+      resolveOnboardingDecision(
+        input({
+          orgDataReliable: false,
+          entryGate: {
+            onboardingCompleted: false,
+            adminOnboardingCompleted: false,
+            billingLocked: true,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: false });
+  });
+
+  it("uses completed and incomplete admission states only after reliable bootstrap data", () => {
+    expect(
+      resolveOnboardingDecision(
+        input({
+          entryGate: {
+            onboardingCompleted: true,
+            adminOnboardingCompleted: true,
+            billingLocked: null,
+          },
+        }),
+      ),
+    ).toEqual({ kind: "app", settled: true });
+    expect(resolveOnboardingDecision(input())).toEqual({
       kind: "wizard",
       isOrgSetup: true,
-      freezePhase: "orientation",
+      freezePhase: null,
     });
   });
 

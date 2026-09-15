@@ -8,6 +8,27 @@ import { serverEnv } from "@/lib/env.server";
  */
 const logger = pino({
   level: serverEnv?.LOG_LEVEL || "info",
+  redact: {
+    paths: [
+      "password",
+      "token",
+      "token_hash",
+      "access_token",
+      "refresh_token",
+      "authorization",
+      "cookie",
+      "*.password",
+      "*.token",
+      "*.token_hash",
+      "*.access_token",
+      "*.refresh_token",
+      "*.authorization",
+      "*.cookie",
+      "req.headers.authorization",
+      "req.headers.cookie",
+    ],
+    censor: "[REDACTED]",
+  },
   ...(process.env.NODE_ENV !== "production" && {
     transport: {
       target: "pino/file",

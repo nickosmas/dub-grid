@@ -146,8 +146,18 @@ keeps receiving the previous user's notifications.
   should not evict the user from the app. `Linking` stays for `tel:`/`mailto:`
   and anything genuinely meant to hand off to another app.
 - Guard platform-specific code with `Platform.OS` or existing helpers.
-- Never set `fontFamily` on `<TextInput>` unless the font is guaranteed loaded —
-  an unknown family makes Android `EditText` non-interactive.
+- Editable fields must use `mobileInputText()`. It names the requested Inter
+  face only after Expo reports that face loaded and otherwise returns a bare
+  system `fontWeight`; an unknown family can make Android `EditText`
+  non-interactive. Keep `maxFontSizeMultiplier={MAX_FONT_SCALE}` on bounded
+  fields so accessibility scaling does not clip editable content or a suffix.
+- Prefer the cross-platform `autoComplete` hint on editable fields. Do not pair
+  it with `textContentType`: React Native gives the iOS-only prop precedence,
+  which makes the autofill contract differ by platform.
+- When a conditional auth field should receive focus as it mounts, use its
+  native `autoFocus` prop. Do not call `focus()` in the same tick as changing
+  the auth stage; iOS can preserve the prior text metrics and draw the
+  placeholder at the wrong size until the user types.
 - `<Screen>`'s keyboard insetting costs a visible jump on an iOS
   `headerLargeTitle` screen: RN writes `contentInset`/`contentOffset` when the
   keyboard opens, UIKit re-evaluates the large title, and it collapses under
@@ -292,6 +302,10 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   fragments count by the buttons actually shown. Do not switch pairs to a
   vertical layout on narrow screens or at larger text sizes; let labels wrap
   within each button.
+- **Public auth actions use `<AuthActions>` instead.** Their one primary action
+  is a centered full-width row first, with help/navigation links centered
+  underneath. This keeps `Continue` and `Sign In` visually dominant and stops
+  a long help label from being compressed beside them.
 - **Profile hero quick actions keep their established centered wrapping
   layout.** They are navigation and communication shortcuts, not a bottom form
   action group. Keep `ProfileQuickActions` out of `ActionButtons`; apply the
@@ -473,17 +487,18 @@ sweeps in phase. It is off entirely under reduce motion.
 - **Cards are borderless in light mode with `mobileElevation("card")`, and keep
   the hairline `borderSubtle` in dark mode** — a shadow is invisible against a
   near-black page, so the edge is what separates card from background.
-- **Never set `fontWeight` next to a DM Sans `fontFamily`, and never set one
-  without the other.** Weight on mobile is carried entirely by the family name.
-  DM Sans loads as four single-weight files, and `expo-font` registers each
+- **Never set `fontWeight` next to a registered Inter `fontFamily`, and outside
+  `mobileInputText()` never set `fontWeight` without a family.** Weight on
+  ordinary mobile text is carried entirely by the family name.
+  Inter loads as four single-weight files, and `expo-font` registers each
   under its own family at style NORMAL only, so the two mistakes fail in
   opposite directions and both land on the system font on Android:
   - `fontFamily` + `fontWeight: "600"` — Android asks that one-face family for a
-    bold face, finds none and no `DMSans_600SemiBold_bold` asset to load, and
+    bold face, finds none and no `Inter_600SemiBold_bold` asset to load, and
     falls back to **Roboto**. Only 400 escapes, since it maps to the NORMAL face
     that is really there. iOS resolves the family either way, so an iOS build
     and the jsdom suite both look fine while Android ships the wrong typeface.
-  - `fontWeight` alone, no family — nothing ever pointed at DM Sans, so it is
+  - `fontWeight` alone, no family — nothing ever pointed at Inter, so it is
     Roboto at that weight on both platforms.
 
   So: spread a `mobileText` token, or `mobileTextWeighted(variant, weight)` for
@@ -491,8 +506,12 @@ sweeps in phase. It is off entirely under reduce motion.
   when there is no size to inherit (a nested `<Text>`, a `headerTitleStyle`, a
   native tab `labelStyle`). `mobileText` tokens carry no
   `fontWeight` at all, and `tokens.test.ts` asserts they never regain one.
-  The one deliberate exception is `<TextInput>`, which keeps a bare `fontWeight`
-  and the system font on purpose — see the `fontFamily`/`EditText` note above.
+  The deliberate editable-field exception is `mobileInputText()`: it uses the
+  named Inter face after loading succeeds, then falls back to a bare
+  `fontWeight` and the system font before or after a load failure. DM Sans is
+  reserved for `DubGridWordmark` and its startup font load. Apply
+  `mobileTabularText` only to operational dates, times, hours, counts, and
+  schedule figures; ordinary prose keeps proportional numerals.
 
 - **Route every duration through `useMotionPreference().d()`.** It returns 0
   when the OS reduce-motion setting is on, which is what makes that setting

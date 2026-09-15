@@ -146,6 +146,13 @@ describe("BillingSettings", () => {
     expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "When" })).toBeInTheDocument();
+    const activityTable = screen.getByRole("table");
+    expect(activityTable.parentElement).toHaveAttribute(
+      "data-settings-table-layout",
+      "distributed",
+    );
+    expect(activityTable.parentElement).toHaveStyle({ width: "100%", maxWidth: "100%" });
+    expect(activityTable).toHaveStyle({ width: "100%", minWidth: "680px" });
     expect(
       trialEndsLabel.compareDocumentPosition(operationsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

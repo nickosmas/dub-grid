@@ -24,6 +24,7 @@ import {
   getInvitationEmailConfig,
   sendInvitationEmail,
 } from "@/features/mobile/server/invitation-email";
+import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 
 export const dynamic = "force-dynamic";
 
@@ -751,7 +752,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString();
 
     const { data: updatedInvitation, error } = await serviceClient
       .from("invitations")

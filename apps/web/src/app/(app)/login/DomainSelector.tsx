@@ -14,7 +14,8 @@ import { PageShell, Card } from "@/components/auth/AuthCard";
 import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
 import { withThemeParam } from "@/lib/theme-preference";
-import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { ORG_NOT_FOUND_MESSAGE, ORG_NOT_FOUND_PARAM } from "./constants";
 import { useClientHost } from "./shared";
 
@@ -27,6 +28,7 @@ export default function DomainSelector() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const submittingRef = useRef(false);
 
   const { theme } = useTheme();
   const { parsed } = useClientHost();
@@ -71,6 +73,7 @@ export default function DomainSelector() {
 
   async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
     const normalized = slug.trim().toLowerCase();
     if (!normalized) {
       setError("Please enter your subdomain.");
@@ -91,8 +94,10 @@ export default function DomainSelector() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError("");
+    let shouldNavigate = false;
 
     // Confirm the org actually exists before navigating — landing on a
     // broken "organization not found" page after a full page reload is a
@@ -108,20 +113,23 @@ export default function DomainSelector() {
         {},
         VALIDATE_DOMAIN_TIMEOUT_MS,
       );
+      if (!res.ok) throw { status: res.status };
       const { valid } = await res.json();
       if (!valid) {
         showToast(ORG_NOT_FOUND_MESSAGE);
-        setLoading(false);
         return;
       }
+      shouldNavigate = true;
     } catch (err) {
       showToast(
-        isRequestTimeout(err)
-          ? "That took too long. Check your connection and try again."
-          : "Unable to verify that subdomain. Please try again.",
+        getWebAuthRecoveryMessage(err, "Unable to verify that subdomain. Please try again."),
       );
-      setLoading(false);
       return;
+    } finally {
+      if (!shouldNavigate) {
+        submittingRef.current = false;
+        setLoading(false);
+      }
     }
 
     const { protocol, port } = window.location;

@@ -27,13 +27,13 @@ shared scroll architecture and needs its own spec, not a cleanup pass.
 **Suggested fix:** Align the mobile dashboard payload and screens with the web dashboard metrics and activity feed after the schedule lifecycle work establishes the required draft data.
 **Resolution:**
 
-### F-30 [P2] open - Most authenticated mobile queries use the rotating token as cache identity
+### F-30 [P2] fixed - Most authenticated mobile queries use the rotating token as cache identity
 
 **File:** apps/mobile/src/features/auth/hooks/useBootstrap.ts:15-50; apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx:689-709; apps/mobile/src/features/profile/screens/ProfileScreen.tsx:117-125; apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx:80-81
 **Found:** 2026-09-01 by /audit (scope: apps/mobile; lenses: quality, performance, tests)
 **Why it matters:** Bootstrap correctly keys cached data by stable user and organization claims because Supabase rotates the token automatically and a raw-token key creates a brand-new empty cache entry. Schedule, profile, notifications, people, dashboard, requests, and other authenticated queries still embed the raw token, so normal refreshes fragment the cache, refetch mounted data, and can repaint loading states across a running app. Only bootstrap currently has a token-rotation regression test.
 **Suggested fix:** Introduce a shared authenticated query identity built from stable `(sub, org_id)` claims, use it consistently in query and invalidation keys, keep the current token only inside the request function, and add token-rotation tests for representative schedule, profile, and infinite-query consumers.
-**Resolution:**
+**Resolution:** Fixed 2026-09-09 by feature 19c4 Steps 5-7. Authenticated mobile read keys now use stable user and organization identity while request tokens remain inside query functions; optimistic writes, unread patches, realtime invalidation, and organization switching address the stable keys and clear old-tenant data at identity boundaries. Rotation, isolation, mutation rollback and success, realtime, and switch-race tests pass. Requires `/audit` re-review before closing.
 
 ### F-31 [P2] open - Paginated mobile alerts accumulate in an unvirtualized ScrollView
 

@@ -348,7 +348,6 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
       respond,
       volunteer,
     },
-    trendData: [],
     viewMode: "week",
     absenceTypeById: new Map(),
   };

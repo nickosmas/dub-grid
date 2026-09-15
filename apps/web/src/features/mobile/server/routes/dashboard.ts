@@ -10,6 +10,7 @@ import {
   fetchMobileAcceptedInvitationRows,
   fetchMobilePublishHistoryRows,
   fetchProfileNameRowsByIds,
+  fetchMobileScheduleComparisonRows,
 } from "@dubgrid/data-access";
 import {
   fetchMobileCoverageSummary,
@@ -76,12 +77,14 @@ export async function GET(req: NextRequest) {
       {
         currentOrg: { id: auth.currentOrg.id, timezone: auth.currentOrg.timezone },
         effectiveRole: getEffectiveMobileRole(auth.permissions.role),
+        canEditSchedule: auth.permissions.canEditShifts,
         serviceClient: auth.serviceClient,
       },
       range,
       {
         fetchMobileCoverageSummary,
         fetchMobileShiftRequests,
+        fetchMobileDashboardDraftComparisons: fetchMobileScheduleComparisonRows,
         fetchMobileOpenShiftContext,
         fetchMobilePublishHistoryRows,
         fetchMobileAcceptedInvitationRows,

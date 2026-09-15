@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
 import type { NextRequest } from "next/server";
+import type { AuthenticationAssuranceClaims } from "@dubgrid/authz";
 import { getSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
@@ -16,30 +17,31 @@ import { getSupabaseUrl } from "@/lib/supabase-keys";
  * signs out. See lib/auth/revocation.ts for that half; callers must do both.
  */
 
-export type VerifiedClaims = JWTPayload & {
-  sub: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  aal?: string;
-  session_id?: string;
-  is_anonymous?: boolean;
-  app_metadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
-  platform_role?: unknown;
-  org_id?: unknown;
-  org_slug?: unknown;
-  org_role?: unknown;
-  in_sandbox?: unknown;
-};
+export type VerifiedClaims = JWTPayload &
+  AuthenticationAssuranceClaims & {
+    sub: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+    aal?: string;
+    session_id?: string;
+    is_anonymous?: boolean;
+    app_metadata?: Record<string, unknown>;
+    user_metadata?: Record<string, unknown>;
+    platform_role?: unknown;
+    org_id?: unknown;
+    org_slug?: unknown;
+    org_role?: unknown;
+    in_sandbox?: unknown;
+  };
 
 export interface VerifiedToken {
   userId: string;
   /** Supabase session id — the unit revocation is keyed on. */
-  sessionId: string | null;
+  sessionId: string;
   email: string | null;
   /** Token issue time in epoch ms, compared against the per-user revocation watermark. */
-  issuedAtMs: number | null;
+  issuedAtMs: number;
   claims: VerifiedClaims;
 }
 
@@ -120,13 +122,22 @@ export async function verifyAccessToken(token: string): Promise<VerifiedToken | 
     });
 
     const claims = payload as VerifiedClaims;
-    if (!claims.sub) return null;
+    if (
+      !claims.sub ||
+      claims.role !== "authenticated" ||
+      typeof claims.session_id !== "string" ||
+      claims.session_id.length === 0 ||
+      typeof claims.iat !== "number" ||
+      !Number.isFinite(claims.iat)
+    ) {
+      return null;
+    }
 
     return {
       userId: claims.sub,
-      sessionId: typeof claims.session_id === "string" ? claims.session_id : null,
+      sessionId: claims.session_id,
       email: typeof claims.email === "string" ? claims.email : null,
-      issuedAtMs: typeof claims.iat === "number" ? claims.iat * 1000 : null,
+      issuedAtMs: claims.iat * 1000,
       claims,
     };
   } catch {

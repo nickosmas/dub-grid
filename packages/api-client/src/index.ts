@@ -46,6 +46,7 @@ export class ApiResponseError extends Error {
     message: string,
     public readonly status: number,
     public readonly payload: unknown,
+    public readonly retryAfter: string | null = null,
   ) {
     super(message);
     this.name = "ApiResponseError";
@@ -61,6 +62,7 @@ export async function createJsonApiRequest<T>(input: {
   onAuthFailure?: () => Promise<void> | void;
   onTransportErrorMessage?: (baseUrl: string, error: unknown) => string;
   onNonJsonErrorMessage?: (baseUrl: string, path: string, response: Response) => string;
+  onResponse?: (response: Response) => void;
 }): Promise<T> {
   const {
     baseUrl,
@@ -71,6 +73,7 @@ export async function createJsonApiRequest<T>(input: {
     onAuthFailure,
     onTransportErrorMessage,
     onNonJsonErrorMessage,
+    onResponse,
   } = input;
 
   let response: Response;
@@ -85,6 +88,8 @@ export async function createJsonApiRequest<T>(input: {
         `Request failed for ${getRequestOrigin(baseUrl)}`,
     );
   }
+
+  onResponse?.(response);
 
   const contentType = response.headers?.get?.("content-type") ?? "";
   const payload = await response.json().catch(() => null);
@@ -110,7 +115,12 @@ export async function createJsonApiRequest<T>(input: {
       await onAuthFailure?.();
     }
 
-    throw new ApiResponseError(message, response.status, payload);
+    throw new ApiResponseError(
+      message,
+      response.status,
+      payload,
+      response.headers?.get?.("retry-after") ?? null,
+    );
   }
 
   return parse(payload);

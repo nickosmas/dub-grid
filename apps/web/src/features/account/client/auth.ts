@@ -1,6 +1,6 @@
 "use client";
 
-import type { EmailOtpType, RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { EmailOtpType, RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   clearSupabaseBrowserAuthState,
   getBrowserSession,
@@ -8,29 +8,68 @@ import {
   isRecoverableBrowserAuthError,
 } from "@/lib/browser-auth";
 import { supabase } from "@/lib/supabase";
+import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
+import { mfaEnrollmentResponseSchema, mfaReauthenticationResponseSchema } from "@dubgrid/contracts";
+import { broadcastBrowserSignOut } from "@/lib/auth-boundary-broadcast";
+import { requestMfaLifecycle, signOutAccountSessions } from "./api";
 
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
 export async function signOutFromBrowser(scope: "local" | "others" | "global"): Promise<void> {
+  if (scope !== "local") {
+    try {
+      const session = await settleWithRequestTimeout(getBrowserSession());
+      if (!session) throw new Error("Please sign in again before managing devices.");
+      await signOutAccountSessions(scope, session.access_token);
+    } finally {
+      // Legacy global callers still exit locally if fresh proof is unavailable,
+      // but the rejection remains visible: do not claim every device signed out.
+      if (scope === "global") await signOutFromBrowser("local");
+    }
+    return;
+  }
   // Tell the server first, while the session's tokens are still readable.
   // API routes verify tokens locally, so clearing them in the browser alone
   // would leave this access token usable until it expires — the server has to
   // record the revocation. Non-fatal: a failure here must never trap the user
   // in a signed-in state.
   try {
-    await fetch("/api/auth/sign-out", {
+    await fetchWithTimeout("/api/auth/sign-out", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope: scope === "local" ? "local" : "global" }),
+      body: JSON.stringify({ scope: "local" }),
       keepalive: true,
     });
   } catch {
     // Ignore — proceed with the local sign-out regardless.
   }
 
-  const { error } = await supabase.auth.signOut({ scope });
-  if (error) {
-    throw error;
+  try {
+    const { error } = await settleWithRequestTimeout<
+      Awaited<ReturnType<typeof supabase.auth.signOut>>
+    >(supabase.auth.signOut({ scope: "local" }));
+    if (error) throw error;
+  } finally {
+    clearSupabaseBrowserAuthState();
+    broadcastBrowserSignOut();
+  }
+}
+
+export async function completeBrowserPasswordRecovery(): Promise<void> {
+  try {
+    const response = await fetchWithTimeout("/api/auth/sign-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: "global", reason: "password_recovery" }),
+    });
+    if (!response.ok) throw new Error("Recovery session revocation failed");
+  } finally {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      clearSupabaseBrowserAuthState();
+      broadcastBrowserSignOut();
+    }
   }
 }
 
@@ -89,15 +128,29 @@ export async function setBrowserSession(input: {
   }
 }
 
-export async function refreshBrowserSession(): Promise<void> {
-  const { error } = await supabase.auth.refreshSession();
+export async function refreshBrowserSession(): Promise<Session | null> {
+  const { data, error } = await supabase.auth.refreshSession();
   if (error) {
     throw error;
   }
+  return data.session;
 }
 
 export async function resetBrowserPasswordForEmail(email: string, redirectTo: string) {
-  return supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  void redirectTo;
+  const response = await fetchWithTimeout("/api/auth/recovery-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (response.ok) return { error: null };
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+  return {
+    error: {
+      message: payload?.error ?? "Recovery request failed",
+      status: response.status,
+    },
+  };
 }
 
 export async function exchangeBrowserCodeForSession(code: string) {
@@ -156,28 +209,37 @@ export async function removeBrowserRealtimeChannel(channel: BrowserRealtimeChann
 export const BROWSER_TOTP_FRIENDLY_NAME = "DubGrid Authenticator";
 
 export async function startBrowserTotpEnrollment() {
-  return supabase.auth.mfa.enroll({
-    factorType: "totp",
-    friendlyName: BROWSER_TOTP_FRIENDLY_NAME,
-    // Without this, GoTrue names the factor after the site URL host, which
-    // makes an otpauth label of `host:email` -- and on a host carrying a port
-    // (`127.0.0.1:3000`) that is two colons deep, so an authenticator splitting
-    // on the first one files the entry under "127.0.0.1" with an account of
-    // "3000:email". The secret still scans, but every enrollment lands under
-    // the same opaque name, so a user who has tried before cannot tell the live
-    // entry from a dead one and reads their code off the wrong entry.
-    issuer: "DubGrid",
-  });
+  return {
+    data: mfaEnrollmentResponseSchema.parse(await requestMfaLifecycle({ action: "enroll" })),
+    error: null,
+  };
+}
+
+export async function reauthenticateBrowserMfa(password: string) {
+  const session = mfaReauthenticationResponseSchema.parse(
+    await requestMfaLifecycle({ action: "reauthenticate", password }),
+  );
+  await setBrowserSession(session);
+  return session;
 }
 
 export async function verifyBrowserTotpEnrollment(input: { factorId: string; code: string }) {
-  return supabase.auth.mfa.challengeAndVerify(input);
+  return settleWithRequestTimeout<Awaited<ReturnType<typeof supabase.auth.mfa.challengeAndVerify>>>(
+    supabase.auth.mfa.challengeAndVerify(input),
+  );
 }
 
 export async function listBrowserMfaFactors() {
-  return supabase.auth.mfa.listFactors();
+  return settleWithRequestTimeout<Awaited<ReturnType<typeof supabase.auth.mfa.listFactors>>>(
+    supabase.auth.mfa.listFactors(),
+  );
 }
 
-export async function disableBrowserMfaFactor(factorId: string) {
-  return supabase.auth.mfa.unenroll({ factorId });
+export async function disableBrowserMfaFactor(factorId: string, accessToken: string) {
+  await requestMfaLifecycle({ action: "remove", factorId }, accessToken);
+  return { error: null };
+}
+
+export async function cleanupBrowserMfaFactor(factorId: string) {
+  await requestMfaLifecycle({ action: "cleanup", factorId });
 }

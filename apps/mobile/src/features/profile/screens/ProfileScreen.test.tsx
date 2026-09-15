@@ -13,6 +13,9 @@ vi.mock("../../../shared/components/Screen", async () => createScreenModule(awai
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
 const queryClientClear = vi.fn();
+const queryClientCancel = vi.fn();
+const replaceAuthSession = vi.fn();
+const saveLastOrg = vi.fn();
 const useQuery = vi.fn();
 const useMutation = vi.fn();
 const useAccessToken = vi.fn();
@@ -74,13 +77,18 @@ vi.mock("../../../shared/lib/auth-reset", () => ({
   handleExpiredMobileSession,
 }));
 
+vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
+  replaceAuthSession,
+}));
+
 vi.mock("../../../shared/lib/session", () => ({
   loadStoredPushDevice,
-  saveLastOrg: vi.fn(),
+  saveLastOrg,
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
   queryClient: {
+    cancelQueries: queryClientCancel,
     clear: queryClientClear,
     invalidateQueries: vi.fn(),
   },
@@ -199,10 +207,27 @@ const bootstrapData = {
   unreadNotificationCount: 0,
 };
 
+async function chooseHiddenClinic() {
+  fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
+
+  // The picker has to leave before iOS can present the confirmation.
+  expect(screen.queryByRole("button", { name: "Hidden Clinic" })).not.toBeInTheDocument();
+  const confirmation = await screen.findByRole("alert");
+  return within(confirmation).getByRole("button", { name: "Switch" });
+}
+
 const singleOrgBootstrapData = {
   ...bootstrapData,
   memberships: [bootstrapData.memberships[0]],
 };
+
+function accessTokenForOrg(orgId: string, version: string) {
+  const payload = btoa(
+    JSON.stringify({ sub: "8af6f242-c060-4920-a7db-91b4cb66fd26", org_id: orgId }),
+  );
+  return `header.${payload}.${version}`;
+}
 
 let ProfileScreen: (typeof import("./ProfileScreen"))["default"];
 
@@ -226,6 +251,12 @@ describe("ProfileScreen", () => {
     routerPush.mockReset();
     routerReplace.mockReset();
     queryClientClear.mockReset();
+    queryClientCancel.mockReset();
+    queryClientCancel.mockResolvedValue(undefined);
+    replaceAuthSession.mockReset();
+    replaceAuthSession.mockReturnValue(true);
+    saveLastOrg.mockReset();
+    saveLastOrg.mockResolvedValue(undefined);
 
     useAccessToken.mockReturnValue("token-123");
     loadStoredPushDevice.mockResolvedValue(null);
@@ -615,17 +646,18 @@ describe("ProfileScreen", () => {
         resolveSwitch = resolve;
       }),
     );
+    const refreshedSession = {
+      access_token: accessTokenForOrg("95d4c7f2-6b2e-4818-b47b-7d8f99879174", "v2"),
+    };
     const refreshSession = vi.fn().mockResolvedValue({
-      data: { session: { access_token: "token-456" } },
+      data: { session: refreshedSession },
       error: null,
     });
     getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     expect(await screen.findByText("Switching to Hidden Clinic")).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("switch_org", {
@@ -637,10 +669,132 @@ describe("ProfileScreen", () => {
     await waitFor(() => {
       expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
     });
-    expect(queryClientClear).toHaveBeenCalled();
+    expect(replaceAuthSession).toHaveBeenCalledWith(refreshedSession);
+    expect(replaceAuthSession.mock.invocationCallOrder[0]).toBeLessThan(
+      routerReplace.mock.invocationCallOrder[0],
+    );
+    // Cache teardown belongs to AuthSessionProvider's identity boundary, not
+    // this screen, so an auth event racing the explicit commit cannot double it.
+    expect(queryClientClear).not.toHaveBeenCalled();
     // Not latched: the Home screen owns the loading state from here, and a
     // leftover overlay would still be up if the user came back to this tab.
     expect(screen.queryByText("Switching to Hidden Clinic")).not.toBeInTheDocument();
+  });
+
+  it("coalesces concurrent organization-switch confirmations", async () => {
+    let resolveSwitch: (result: { error: null }) => void = () => undefined;
+    const rpc = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveSwitch = resolve;
+      }),
+    );
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: accessTokenForOrg("95d4c7f2-6b2e-4818-b47b-7d8f99879174", "v2"),
+        },
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
+
+    render(<ProfileScreen />);
+    const confirm = await chooseHiddenClinic();
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await screen.findByText("Switching to Hidden Clinic");
+    expect(rpc).toHaveBeenCalledTimes(1);
+
+    resolveSwitch({ error: null });
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+  });
+
+  it("waits for a matching refreshed session before navigating", async () => {
+    let resolveRefresh: (result: {
+      data: { session: { access_token: string } };
+      error: null;
+    }) => void = () => undefined;
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const refreshSession = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }),
+    );
+    getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
+
+    render(<ProfileScreen />);
+    fireEvent.click(await chooseHiddenClinic());
+
+    await waitFor(() => expect(refreshSession).toHaveBeenCalledTimes(1));
+    expect(replaceAuthSession).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+
+    const refreshedSession = {
+      access_token: accessTokenForOrg("95d4c7f2-6b2e-4818-b47b-7d8f99879174", "v2"),
+    };
+    resolveRefresh({ data: { session: refreshedSession }, error: null });
+
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+    expect(replaceAuthSession).toHaveBeenCalledWith(refreshedSession);
+  });
+
+  it("fails closed when session refresh fails after the server switched organizations", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const refreshError = { message: "refresh failed" };
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: { session: null },
+      error: refreshError,
+    });
+    getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
+
+    render(<ProfileScreen />);
+    fireEvent.click(await chooseHiddenClinic());
+
+    await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
+    expect(queryClientCancel).toHaveBeenCalled();
+    expect(queryClientClear).toHaveBeenCalled();
+    expect(replaceAuthSession).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalledWith("/(tabs)/home");
+  });
+
+  it("fails closed when the refreshed session belongs to a different organization", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: {
+        session: { access_token: accessTokenForOrg("wrong-org", "v2") },
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
+
+    render(<ProfileScreen />);
+    fireEvent.click(await chooseHiddenClinic());
+
+    await waitFor(() => expect(handleExpiredMobileSession).toHaveBeenCalled());
+    expect(queryClientClear).toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalledWith("/(tabs)/home");
+  });
+
+  it("finishes a successful switch when remembering the organization fails", async () => {
+    saveLastOrg.mockRejectedValue(new Error("SecureStore unavailable"));
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: accessTokenForOrg("95d4c7f2-6b2e-4818-b47b-7d8f99879174", "v2"),
+        },
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ rpc, auth: { refreshSession } } as never);
+
+    render(<ProfileScreen />);
+    fireEvent.click(await chooseHiddenClinic());
+
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+    expect(saveLastOrg).toHaveBeenCalledWith({ slug: "hidden-clinic", name: "Hidden Clinic" });
+    expect(handleExpiredMobileSession).not.toHaveBeenCalled();
   });
 
   it("takes the switching overlay back down when the switch fails", async () => {
@@ -649,9 +803,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Switch organization/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Hidden Clinic" }));
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Switch" }));
+    fireEvent.click(await chooseHiddenClinic());
 
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalled();

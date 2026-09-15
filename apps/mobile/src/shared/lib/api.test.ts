@@ -48,6 +48,26 @@ describe("mobileApiRequest", () => {
     expect(headers.get("Content-Type")).toBeNull();
   });
 
+  it("preflights credential mutations with the exact promoted bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { requireMobileCredentialAssurance } = await import("./api");
+
+    await expect(requireMobileCredentialAssurance("promoted-token")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://app.dubgrid.com/api/mobile/v1/profile/credential-assurance",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(request.headers).get("Authorization")).toBe("Bearer promoted-token");
+  });
+
   it("adds schedule query params when a mobile date range is supplied", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -75,6 +95,29 @@ describe("mobileApiRequest", () => {
     );
   });
 
+  it("cancels a core read when its caller aborts", async () => {
+    let transportSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      transportSignal = init.signal ?? undefined;
+      return new Promise((_resolve, reject) => {
+        transportSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getDashboard } = await import("./api");
+    const controller = new AbortController();
+
+    const request = getDashboard("token-123", undefined, controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toBeDefined();
+    expect(transportSignal?.aborted).toBe(true);
+  });
+
   it("adds shift request query params when a mobile date range is supplied", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -96,6 +139,38 @@ describe("mobileApiRequest", () => {
       "https://app.dubgrid.com/api/mobile/v1/shift-requests?startDate=2026-04-19&endDate=2026-04-25",
       expect.any(Object),
     );
+  });
+
+  it("parses an authorized dashboard draft summary", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        range: { startDate: "2026-05-11", endDate: "2026-05-17" },
+        overtimeThresholdHours: 40,
+        heroSummary: {
+          statusLabel: "Healthy",
+          title: "Schedule health looks good",
+          description: "No open gaps or pending requests right now.",
+        },
+        metrics: {
+          coveragePct: 100,
+          openGapCount: 0,
+          pendingApprovalsCount: 0,
+          draftSummary: { newCount: 1, modifiedCount: 2, deletedCount: 0, total: 3 },
+        },
+        coverageBySection: [],
+        openShifts: [],
+        activity: [],
+        staffHours: [],
+        actionQueue: [],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getDashboard } = await import("./api");
+
+    await expect(getDashboard("token-123")).resolves.toMatchObject({
+      metrics: { draftSummary: { total: 3 } },
+    });
   });
 
   it("adds both cursor fields when loading another request-history page", async () => {
@@ -513,6 +588,10 @@ describe("mobileApiRequest", () => {
         body: JSON.stringify({ refreshTokenHash: "hash" }),
       }),
     );
+    const revokeHeaders = new Headers(
+      (fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.headers,
+    );
+    expect(revokeHeaders.get("Authorization")).toBe("Bearer token-123");
   });
 
   it("updates teammate status through the mobile people endpoint", async () => {

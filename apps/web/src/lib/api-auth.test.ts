@@ -4,7 +4,7 @@
 // `payload instanceof Uint8Array`, and under jsdom the encoder returns a
 // Uint8Array from a different realm, so every sign call fails the check.
 // Nothing here touches the DOM.
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT, generateKeyPair } from "jose";
 import type { CryptoKey } from "jose";
@@ -52,12 +52,13 @@ vi.mock("@/lib/cache", async (importOriginal) => {
 
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  getUser: vi.fn(),
   serviceFrom: vi.fn(),
 }));
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
-    auth: { getSession: authMocks.getSession },
+    auth: { getSession: authMocks.getSession, getUser: authMocks.getUser },
   }),
 }));
 
@@ -70,12 +71,15 @@ import {
   requireAuthenticatedUser,
   requireAuthenticatedUserWithClaims,
   requireGridmasterSession,
+  requireSensitiveActionAuth,
+  createTokenScopedClient,
 } from "./api-auth";
 import { resetRevocationMemo } from "./auth/revocation";
 import { resetSupabaseJwksCache } from "./auth/verify-token";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
+const SANDBOX_ORG_ID = "33333333-3333-4333-8333-333333333333";
 
 let privateKey: CryptoKey;
 let wrongPrivateKey: CryptoKey;
@@ -84,7 +88,7 @@ interface TokenOptions {
   issuer?: string;
   audience?: string;
   expiresIn?: number;
-  issuedAt?: number;
+  issuedAt?: number | null;
   sessionId?: string | null;
   claims?: Record<string, unknown>;
   signWithWrongKey?: boolean;
@@ -92,7 +96,7 @@ interface TokenOptions {
 
 async function signToken(options: TokenOptions = {}): Promise<string> {
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const issuedAt = options.issuedAt ?? nowSeconds;
+  const issuedAt = options.issuedAt === undefined ? nowSeconds : options.issuedAt;
   const payload: Record<string, unknown> = {
     sub: USER_ID,
     email: "user@example.com",
@@ -102,13 +106,13 @@ async function signToken(options: TokenOptions = {}): Promise<string> {
     ...options.claims,
   };
 
-  return new SignJWT(payload)
+  let token = new SignJWT(payload)
     .setProtectedHeader({ alg: "ES256" })
     .setIssuer(options.issuer ?? `${SUPABASE_URL}/auth/v1`)
-    .setAudience(options.audience ?? "authenticated")
-    .setIssuedAt(issuedAt)
-    .setExpirationTime(issuedAt + (options.expiresIn ?? 3600))
-    .sign(options.signWithWrongKey ? wrongPrivateKey : privateKey);
+    .setAudience(options.audience ?? "authenticated");
+  if (issuedAt !== null) token = token.setIssuedAt(issuedAt);
+  token = token.setExpirationTime((issuedAt ?? nowSeconds) + (options.expiresIn ?? 3600));
+  return token.sign(options.signWithWrongKey ? wrongPrivateKey : privateKey);
 }
 
 function cookieRequest() {
@@ -123,7 +127,7 @@ function bearerRequest(token: string) {
 
 function sandboxBearerRequest(token: string) {
   const sandboxCookie = encodeURIComponent(
-    JSON.stringify({ sandboxOrgId: "sandbox-org", userId: USER_ID }),
+    JSON.stringify({ sandboxOrgId: SANDBOX_ORG_ID, userId: USER_ID, sessionId: SESSION_ID }),
   );
   return new NextRequest("http://localhost/api/test", {
     headers: {
@@ -148,6 +152,40 @@ beforeAll(async () => {
   keyState.wrongPublicKey = wrongPair.publicKey;
 });
 
+it("forwards the user token to real SDK MFA mutations without a stored session", async () => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test-only");
+  const fetchMock = vi.fn().mockImplementation(
+    async (_input, init) =>
+      new Response(
+        JSON.stringify(
+          init.method === "DELETE"
+            ? { id: "factor-1" }
+            : {
+                id: "factor-1",
+                type: "totp",
+                totp: { qr_code: "<svg />", secret: "test-only", uri: "otpauth://test" },
+              },
+        ),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const client = createTokenScopedClient("user-session-token");
+    const enrolled = await client.auth.mfa.enroll({ factorType: "totp", issuer: "DubGrid" });
+    expect(enrolled.error).toBeNull();
+    const removed = await client.auth.mfa.unenroll({ factorId: "factor-1" });
+    expect(removed.error).toBeNull();
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init.headers).get("Authorization")).toBe("Bearer user-session-token");
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
+});
+
 describe("api auth helpers", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -157,6 +195,10 @@ describe("api auth helpers", () => {
     noRevocations();
     authMocks.getSession.mockResolvedValue({
       data: { session: { access_token: await signToken() } },
+    });
+    authMocks.getUser.mockResolvedValue({
+      data: { user: { id: USER_ID, factors: [] } },
+      error: null,
     });
     authMocks.serviceFrom.mockImplementation((table: string) => {
       if (table !== "profiles" && table !== "organizations") {
@@ -173,35 +215,40 @@ describe("api auth helpers", () => {
   });
 
   describe("token verification", () => {
-    it("rejects a malformed token", async () => {
-      const result = await requireAuthenticatedSession(bearerRequest("not-a-jwt"));
-      expect("response" in result && result.response.status).toBe(401);
-    });
+    it.each([
+      ["a malformed token", async () => "not-a-jwt"],
+      ["a token signed by the wrong key", () => signToken({ signWithWrongKey: true })],
+      [
+        "an expired token",
+        () =>
+          signToken({
+            issuedAt: Math.floor(Date.now() / 1000) - 7200,
+            expiresIn: 3600,
+          }),
+      ],
+      [
+        "a token from the wrong issuer",
+        () => signToken({ issuer: "https://evil.example.com/auth/v1" }),
+      ],
+      ["a token with the wrong audience", () => signToken({ audience: "anon" })],
+      ["a signed token without its subject", () => signToken({ claims: { sub: undefined } })],
+      [
+        "a signed token without its authenticated role",
+        () => signToken({ claims: { role: "anon" } }),
+      ],
+      ["a signed token without its session ID", () => signToken({ sessionId: null })],
+      ["a signed token with an empty session ID", () => signToken({ sessionId: "" })],
+      ["a signed token without its issued-at timestamp", () => signToken({ issuedAt: null })],
+    ] satisfies ReadonlyArray<readonly [string, () => Promise<string>]>)(
+      "rejects %s before consulting revocation state",
+      async (_case, createToken) => {
+        const token = await createToken();
+        const result = await requireAuthenticatedSession(bearerRequest(token));
 
-    it("rejects a token signed by the wrong key, with no unverified fallback", async () => {
-      const token = await signToken({ signWithWrongKey: true });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects an expired token", async () => {
-      const twoHoursAgo = Math.floor(Date.now() / 1000) - 7200;
-      const token = await signToken({ issuedAt: twoHoursAgo, expiresIn: 3600 });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects a token from the wrong issuer", async () => {
-      const token = await signToken({ issuer: "https://evil.example.com/auth/v1" });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
-
-    it("rejects a token with the wrong audience", async () => {
-      const token = await signToken({ audience: "anon" });
-      const result = await requireAuthenticatedSession(bearerRequest(token));
-      expect("response" in result && result.response.status).toBe(401);
-    });
+        expect("response" in result && result.response.status).toBe(401);
+        expect(cacheMocks.cacheGetMany).not.toHaveBeenCalled();
+      },
+    );
 
     it("accepts a valid token and resolves the user from its claims", async () => {
       const token = await signToken();
@@ -241,6 +288,41 @@ describe("api auth helpers", () => {
     it("rejects a request carrying no token at all", async () => {
       authMocks.getSession.mockResolvedValue({ data: { session: null } });
       const result = await requireAuthenticatedUser(cookieRequest());
+      expect("response" in result && result.response.status).toBe(401);
+    });
+
+    it("uses an explicit Bearer token instead of a conflicting cookie session", async () => {
+      const cookieUserId = "33333333-3333-4333-8333-333333333333";
+      authMocks.getSession.mockResolvedValue({
+        data: { session: { access_token: await signToken({ claims: { sub: cookieUserId } }) } },
+      });
+      const bearerToken = await signToken();
+
+      const result = await requireAuthenticatedUser(
+        new NextRequest("http://localhost/api/test", {
+          headers: {
+            Authorization: `Bearer ${bearerToken}`,
+            Cookie: "sb-test-auth-token=conflicting-cookie",
+          },
+        }),
+      );
+
+      expect(authMocks.getSession).not.toHaveBeenCalled();
+      expect("response" in result).toBe(false);
+      if (!("response" in result)) expect(result.user.id).toBe(USER_ID);
+    });
+
+    it("does not fall back to a cookie when an explicit Bearer token is invalid", async () => {
+      const result = await requireAuthenticatedUser(
+        new NextRequest("http://localhost/api/test", {
+          headers: {
+            Authorization: "Bearer forged-token",
+            Cookie: "sb-test-auth-token=valid-cookie-session",
+          },
+        }),
+      );
+
+      expect(authMocks.getSession).not.toHaveBeenCalled();
       expect("response" in result && result.response.status).toBe(401);
     });
   });
@@ -337,7 +419,34 @@ describe("api auth helpers", () => {
       }
     });
 
+    it("rejects a Test Sandbox cookie stolen from another auth session", async () => {
+      const token = await signToken({
+        sessionId: "44444444-4444-4444-8444-444444444444",
+        claims: { org_id: "real-org" },
+      });
+
+      const result = await requireAuthenticatedUserWithClaims(sandboxBearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(403);
+      expect(authMocks.serviceFrom).not.toHaveBeenCalled();
+    });
+
     it("allows a gridmaster whose JWT platform_role is gridmaster", async () => {
+      authMocks.serviceFrom.mockReturnValueOnce({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () =>
+              Promise.resolve({
+                data: {
+                  platform_role: "gridmaster",
+                  deactivated_at: null,
+                  scheduled_deletion_at: null,
+                },
+                error: null,
+              }),
+          }),
+        }),
+      });
       const token = await signToken({ claims: { platform_role: "gridmaster" } });
       const result = await requireGridmasterSession(bearerRequest(token));
 
@@ -347,10 +456,189 @@ describe("api auth helpers", () => {
       }
     });
 
+    it("rejects a stale gridmaster claim when the live profile no longer has that role", async () => {
+      const token = await signToken({ claims: { platform_role: "gridmaster" } });
+      const result = await requireGridmasterSession(bearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(403);
+    });
+
     it("rejects a non-gridmaster from a gridmaster-only route", async () => {
       const token = await signToken();
       const result = await requireGridmasterSession(bearerRequest(token));
       expect("response" in result && result.response.status).toBe(403);
+    });
+  });
+
+  describe("sensitive-action assurance", () => {
+    it.each(["cookie", "bearer"] as const)(
+      "returns the same safe step-up contract for %s authentication",
+      async (transport) => {
+        const token = await signToken({
+          claims: {
+            aal: "aal1",
+            amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) - 301 }],
+          },
+        });
+        if (transport === "cookie") {
+          authMocks.getSession.mockResolvedValue({ data: { session: { access_token: token } } });
+        }
+
+        const result = await requireSensitiveActionAuth(
+          transport === "cookie" ? cookieRequest() : bearerRequest(token),
+        );
+
+        expect("response" in result).toBe(true);
+        if (!("response" in result)) return;
+        expect(result.response.status).toBe(403);
+        await expect(result.response.json()).resolves.toEqual({
+          code: "STEP_UP_REQUIRED",
+          method: "password",
+          error: "Confirm your identity, then try again.",
+        });
+      },
+    );
+
+    it.each([
+      {
+        label: "password",
+        factors: [],
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      },
+      {
+        label: "password with Supabase's omitted empty factors",
+        factors: undefined,
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      },
+      {
+        label: "TOTP",
+        factors: [{ factor_type: "totp", status: "verified" }],
+        claims: {
+          aal: "aal2",
+          amr: [{ method: "totp", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      },
+    ])(
+      "accepts recent $label proof selected from live factor state",
+      async ({ factors, claims }) => {
+        authMocks.getUser.mockResolvedValue({
+          data: { user: { id: USER_ID, factors } },
+          error: null,
+        });
+        const token = await signToken({ claims });
+
+        const result = await requireSensitiveActionAuth(bearerRequest(token));
+
+        expect("response" in result).toBe(false);
+        if ("response" in result) return;
+        expect(result.user.id).toBe(USER_ID);
+      },
+    );
+
+    it("ignores an untrusted requested method and requires TOTP from live factors", async () => {
+      authMocks.getUser.mockResolvedValue({
+        data: {
+          user: {
+            id: USER_ID,
+            factors: [{ factor_type: "totp", status: "verified" }],
+          },
+        },
+        error: null,
+      });
+      const token = await signToken({
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      });
+      const req = new NextRequest("http://localhost/api/test", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ method: "password" }),
+      });
+
+      const result = await requireSensitiveActionAuth(req);
+
+      expect("response" in result).toBe(true);
+      if (!("response" in result)) return;
+      await expect(result.response.json()).resolves.toEqual({
+        code: "STEP_UP_REQUIRED",
+        method: "totp",
+        error: "Confirm your identity, then try again.",
+      });
+    });
+
+    it.each([
+      {
+        label: "live identity lookup fails",
+        liveUser: null,
+        liveError: { message: "temporarily unavailable" },
+        expectedStatus: 503,
+      },
+      {
+        label: "live identity does not match the signed token",
+        liveUser: { id: "another-user", factors: [] },
+        liveError: null,
+        expectedStatus: 401,
+      },
+      {
+        label: "live factor state is malformed",
+        liveUser: { id: USER_ID, factors: null },
+        liveError: null,
+        expectedStatus: 503,
+      },
+    ])("fails closed when $label", async ({ liveUser, liveError, expectedStatus }) => {
+      authMocks.getUser.mockResolvedValue({
+        data: { user: liveUser },
+        error: liveError,
+      });
+      const token = await signToken({
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      });
+
+      const result = await requireSensitiveActionAuth(bearerRequest(token));
+
+      expect("response" in result && result.response.status).toBe(expectedStatus);
+    });
+
+    it("does not let a route execute its protected operation before assurance passes", async () => {
+      const protectedOperation = vi.fn();
+      const route = async (req: NextRequest) => {
+        const auth = await requireSensitiveActionAuth(req);
+        if ("response" in auth) return auth.response;
+        protectedOperation(auth.user.id);
+        return NextResponse.json({ ok: true });
+      };
+      const staleToken = await signToken({
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) - 301 }],
+        },
+      });
+
+      expect((await route(bearerRequest(staleToken))).status).toBe(403);
+      expect(protectedOperation).not.toHaveBeenCalled();
+
+      const freshToken = await signToken({
+        claims: {
+          aal: "aal1",
+          amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+        },
+      });
+      expect((await route(bearerRequest(freshToken))).status).toBe(200);
+      expect(protectedOperation).toHaveBeenCalledOnce();
     });
   });
 });

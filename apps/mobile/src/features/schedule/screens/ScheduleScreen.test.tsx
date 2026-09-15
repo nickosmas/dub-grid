@@ -622,7 +622,7 @@ describe("ScheduleScreen", () => {
     });
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["mobile", "requests", "token-123"],
+      queryKey: ["mobile", "requests"],
     });
     expect(pushToast).toHaveBeenCalledWith({
       tone: "success",
@@ -2270,7 +2270,14 @@ describe("ScheduleScreen", () => {
     );
     expect(useQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ["mobile", "schedule", "team", "token-123", "2026-06-21", "2026-06-27"],
+        queryKey: [
+          "mobile",
+          "schedule",
+          "team",
+          ["unreadable", null, null],
+          "2026-06-21",
+          "2026-06-27",
+        ],
       }),
     );
     springSpy.mockRestore();

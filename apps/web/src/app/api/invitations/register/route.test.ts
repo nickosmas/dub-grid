@@ -108,10 +108,11 @@ describe("POST /api/invitations/register", () => {
     );
   });
 
-  it("rejects an email that isn't the one the invitation was sent to", async () => {
+  it("returns the generic dead-invitation contract for the wrong email", async () => {
     const res = await POST(request(validBody({ email: "someone.else@example.com" })));
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toMatchObject({ code: "INVITATION_INVALID" });
     expect(createUser).not.toHaveBeenCalled();
   });
 
@@ -130,6 +131,7 @@ describe("POST /api/invitations/register", () => {
     const res = await POST(request(validBody()));
 
     expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toMatchObject({ code: "INVITATION_INVALID" });
     expect(createUser).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
 import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -8,36 +8,45 @@ import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
-import { extractErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
 import { resetBrowserPasswordForEmail } from "@/features/account/client";
 import { ApexLandingLink } from "@/components/auth/ApexLandingLink";
+import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
+import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
+import { AUTH_ACTION_DESTINATIONS } from "@/lib/auth/integrity-contract";
 
 function ForgotPasswordContent() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const submittingRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
 
     try {
-      const redirectTo = `${window.location.origin}/reset-password`;
-      const { error } = await resetBrowserPasswordForEmail(email, redirectTo);
+      const redirectTo = new URL(
+        AUTH_ACTION_DESTINATIONS.recovery,
+        window.location.origin,
+      ).toString();
+      const { error } = await settleWithRequestTimeout(
+        resetBrowserPasswordForEmail(email, redirectTo),
+      );
       if (error) throw error;
       setSent(true);
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("rate") || msg.includes("limit")) {
-        toast.error("Too many requests. Wait a few minutes and try again.");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("We couldn't reach DubGrid. Check your connection and try again.");
+      if (isRetryableAuthRecoveryError(err)) {
+        toast.error(getWebAuthRecoveryMessage(err, "We couldn't send the reset link. Try again."));
       } else {
         // Always show success to prevent email enumeration
         setSent(true);
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }

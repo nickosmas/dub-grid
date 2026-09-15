@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
 const serviceFrom = vi.fn();
-const cacheThrough = vi.fn();
+const cacheSet = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
@@ -13,15 +13,13 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: serviceFrom }),
 }));
 
-// CacheKey and TTL stay real: reading through the same key the proxy writes is
-// the property this route depends on, so a test that stubbed them would prove
-// nothing.
+// CacheKey and TTL stay real: refreshing the exact entry the proxy reads is the
+// property this recovery route depends on.
 vi.mock("@/lib/cache", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/cache")>();
   return {
     ...actual,
-    cacheThrough: (key: string, ttl: number, fetcher: () => Promise<unknown>) =>
-      cacheThrough(key, ttl, fetcher),
+    cacheSet: (key: string, value: unknown, ttl: number) => cacheSet(key, value, ttl),
   };
 });
 
@@ -31,6 +29,18 @@ import { CacheKey, TTL } from "@/lib/cache";
 import { GET } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
+let currentOrgRow: OrgRow | null = null;
+let currentOrgError: unknown = null;
+let currentMembership: { org_role: string } | null = { org_role: "user" };
+let currentProfile: {
+  platform_role: string;
+  deactivated_at: string | null;
+  scheduled_deletion_at: string | null;
+} | null = {
+  platform_role: "none",
+  deactivated_at: null,
+  scheduled_deletion_at: null,
+};
 
 type OrgRow = {
   suspended_at: string | null;
@@ -39,11 +49,16 @@ type OrgRow = {
   trial_ends_at: string | null;
 };
 
-function auth(orgRole = "user") {
+function auth(orgRole = "user", platformRole = "user") {
   return {
     user: { id: "user-1" },
     session: { access_token: "token" },
-    claims: { sub: "user-1", org_id: ORG_ID, org_role: orgRole },
+    claims: {
+      sub: "user-1",
+      org_id: ORG_ID,
+      org_role: orgRole,
+      platform_role: platformRole,
+    },
   };
 }
 
@@ -58,13 +73,7 @@ function orgRow(overrides: Partial<OrgRow> = {}): OrgRow {
 }
 
 function respondWith(row: OrgRow | null) {
-  const query = {
-    select: vi.fn(() => query),
-    eq: vi.fn(() => query),
-    maybeSingle: vi.fn(() => Promise.resolve({ data: row, error: null })),
-  };
-  serviceFrom.mockReturnValue(query);
-  return query;
+  currentOrgRow = row;
 }
 
 function request() {
@@ -75,7 +84,34 @@ describe("GET /api/organization/access-status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth());
-    cacheThrough.mockImplementation((_key, _ttl, fetcher: () => Promise<unknown>) => fetcher());
+    cacheSet.mockResolvedValue(undefined);
+    currentOrgRow = null;
+    currentOrgError = null;
+    currentMembership = { org_role: "user" };
+    currentProfile = {
+      platform_role: "none",
+      deactivated_at: null,
+      scheduled_deletion_at: null,
+    };
+    serviceFrom.mockImplementation((table: string) => {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        is: vi.fn(() => query),
+        maybeSingle: vi.fn(() =>
+          Promise.resolve({
+            data:
+              table === "organization_memberships"
+                ? currentMembership
+                : table === "profiles"
+                  ? currentProfile
+                  : currentOrgRow,
+            error: table === "organizations" ? currentOrgError : null,
+          }),
+        ),
+      };
+      return query;
+    });
   });
 
   it("returns the caller's auth failure untouched", async () => {
@@ -85,16 +121,14 @@ describe("GET /api/organization/access-status", () => {
     expect(await GET(request())).toBe(unauthorized);
   });
 
-  it("reads through the same cache entry the proxy's gate reads", async () => {
-    respondWith(orgRow({ subscription_status: "active" }));
+  it("reads current organization state and refreshes the proxy's cache entry", async () => {
+    const row = orgRow({ subscription_status: "active" });
+    respondWith(row);
 
     await GET(request());
 
-    expect(cacheThrough).toHaveBeenCalledWith(
-      CacheKey.mwOrgAccess(ORG_ID),
-      TTL.MIDDLEWARE,
-      expect.any(Function),
-    );
+    expect(serviceFrom).toHaveBeenCalledWith("organizations");
+    expect(cacheSet).toHaveBeenCalledWith(CacheKey.mwOrgAccess(ORG_ID), row, TTL.MIDDLEWARE);
   });
 
   it("holds a regular user while the trial clock has not started", async () => {
@@ -102,12 +136,23 @@ describe("GET /api/organization/access-status", () => {
 
     expect(await (await GET(request())).json()).toEqual({
       available: false,
-      state: "trial_pending",
+      state: "unavailable",
+    });
+  });
+
+  it("also holds an admin while the trial clock has not started", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("admin"));
+    respondWith(orgRow());
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
     });
   });
 
   it("lets a super admin through the same unstarted trial", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = { org_role: "super_admin" };
     respondWith(orgRow());
 
     expect(await (await GET(request())).json()).toEqual({
@@ -122,22 +167,95 @@ describe("GET /api/organization/access-status", () => {
     expect(await (await GET(request())).json()).toEqual({ available: true, state: "active" });
   });
 
-  it("reports a lapsed subscription as locked", async () => {
-    respondWith(orgRow({ subscription_status: "canceled" }));
+  it("keeps payment-attention and trial-grace organizations open without exposing why", async () => {
+    respondWith(orgRow({ subscription_status: "past_due" }));
 
-    expect(await (await GET(request())).json()).toEqual({ available: false, state: "locked" });
+    expect(await (await GET(request())).json()).toEqual({
+      available: true,
+      state: "active",
+    });
+
+    respondWith(
+      orgRow({
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() - 86_400_000).toISOString(),
+      }),
+    );
+
+    expect(await (await GET(request())).json()).toEqual({ available: true, state: "active" });
   });
 
-  it("reports an archived organization without evaluating billing", async () => {
+  it("redacts a lapsed subscription for a regular user", async () => {
+    respondWith(orgRow({ subscription_status: "canceled" }));
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+  });
+
+  it("holds suspended organizations without identifying suspension to a regular user", async () => {
+    respondWith(
+      orgRow({
+        suspended_at: "2026-01-01T00:00:00.000Z",
+        subscription_status: "active",
+      }),
+    );
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+  });
+
+  it("redacts archival from a regular user", async () => {
     respondWith(orgRow({ archived_at: "2026-01-01T00:00:00.000Z", subscription_status: "active" }));
 
-    expect(await (await GET(request())).json()).toEqual({ available: false, state: "archived" });
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+  });
+
+  it("preserves recovery detail for Super Admins and Gridmasters", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = { org_role: "super_admin" };
+    respondWith(orgRow({ subscription_status: "canceled" }));
+    expect(await (await GET(request())).json()).toEqual({ available: false, state: "locked" });
+
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("user", "gridmaster"));
+    currentMembership = null;
+    currentProfile = {
+      platform_role: "gridmaster",
+      deactivated_at: null,
+      scheduled_deletion_at: null,
+    };
+    respondWith(orgRow({ archived_at: "2026-01-01T00:00:00.000Z" }));
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "archived",
+    });
   });
 
   it("never claims the organization is open when the lookup fails", async () => {
-    cacheThrough.mockRejectedValue(new Error("redis down"));
+    currentOrgError = new Error("database unavailable");
 
-    expect(await (await GET(request())).json()).toEqual({ available: false, state: "unknown" });
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+  });
+
+  it("returns no organization state after the caller's membership is removed", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(auth("super_admin"));
+    currentMembership = null;
+    respondWith(orgRow({ subscription_status: "active" }));
+
+    expect(await (await GET(request())).json()).toEqual({
+      available: false,
+      state: "unavailable",
+    });
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 
   it("skips the gate for a caller with no organization claim", async () => {
@@ -148,6 +266,6 @@ describe("GET /api/organization/access-status", () => {
     });
 
     expect(await (await GET(request())).json()).toEqual({ available: true, state: "active" });
-    expect(cacheThrough).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 });

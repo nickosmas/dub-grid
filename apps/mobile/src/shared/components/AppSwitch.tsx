@@ -30,9 +30,14 @@ export function AppSwitch({
     <Switch
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}
-      // iOS draws its own fill behind the track before the switch is on; left
-      // to the default it is a light grey that reads as "on" in dark mode.
-      ios_backgroundColor={mobileColors.border}
+      // UIKit keeps a sliver of this colour visible around the whole track in
+      // every state, not just before the switch is turned on — left to the
+      // default it's a light grey that both reads as "on" in dark mode and
+      // outlines the ON track as a visible ring. `border` (the app's hairline
+      // colour, tuned to stand out) made that ring obvious against the brand
+      // fill; `surface` blends into the surrounding card in both themes while
+      // still being dark enough in dark mode not to misread as "on".
+      ios_backgroundColor={mobileColors.surface}
       thumbColor={mobileColors.onBrandSurface}
       trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
       value={value}

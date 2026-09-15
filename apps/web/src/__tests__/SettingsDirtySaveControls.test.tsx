@@ -260,9 +260,24 @@ describe("settings dirty save controls", () => {
     const codeSampleStaffHeader = document.querySelector(
       '[data-display-mode-sample-staff-header="true"]',
     );
+    const optionsGrid = document.querySelector<HTMLElement>("[data-display-mode-options]");
+    const codeOption = screen.getByRole("button", { name: /short codes/i });
+    const fullNameOption = screen.getByRole("button", { name: /full names/i });
     expect(saveButton).toBeDisabled();
     expect(codeSample).not.toBeNull();
     expect(codeSampleStaffHeader).not.toBeNull();
+    expect(optionsGrid).toHaveStyle({
+      gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+    });
+    for (const option of [codeOption, fullNameOption]) {
+      expect(option).toHaveStyle({
+        width: "100%",
+        minWidth: "0",
+        maxWidth: "100%",
+        whiteSpace: "normal",
+        overflow: "hidden",
+      });
+    }
     expect(codeSampleStaffHeader).toHaveStyle({
       position: "relative",
       zIndex: "2",
@@ -270,12 +285,9 @@ describe("settings dirty save controls", () => {
     expect(codeSample?.querySelector('.dg-grid-slot[data-leading-divider="split"]')).not.toBeNull();
     expect(codeSample?.querySelector('.dg-grid-cell[data-top-divider="dark"]')).not.toBeNull();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /short codes/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(codeOption).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: /full names/i }));
+    await user.click(fullNameOption);
 
     const cancelButton = screen.getByRole("button", { name: /^cancel$/i });
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
@@ -1217,7 +1229,7 @@ describe("settings dirty save controls", () => {
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
-  it("allows dense string list tables to use a wider section card", () => {
+  it("keeps a sparse two-column string list card at the standard table width", () => {
     const items: NamedItem[] = [
       {
         id: 1,
@@ -1237,12 +1249,12 @@ describe("settings dirty save controls", () => {
         placeholder="Role"
         sectionTitle="Roles"
         maxWidth={1120}
-        wideTable
       />,
     );
 
     expect(container.querySelector(".dg-page-enter")).toHaveStyle({
       maxWidth: "1120px",
+      margin: "0",
     });
   });
 

@@ -19,6 +19,10 @@ const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const pushToast = vi.fn();
+const { getShiftRequestHistory, getShiftRequests } = vi.hoisted(() => ({
+  getShiftRequestHistory: vi.fn(),
+  getShiftRequests: vi.fn(),
+}));
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -56,6 +60,11 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
     pushToast,
   }),
 }));
+
+vi.mock("../../../shared/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/lib/api")>();
+  return { ...actual, getShiftRequestHistory, getShiftRequests };
+});
 
 let RequestsScreen: (typeof import("./RequestsScreen"))["default"];
 
@@ -98,6 +107,8 @@ describe("RequestsScreen", () => {
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
+    getShiftRequestHistory.mockReset();
+    getShiftRequests.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({});
@@ -168,6 +179,38 @@ describe("RequestsScreen", () => {
     // the pills along the moment the screen finished loading.
     expect(screen.queryByRole("tab", { name: "Available" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Mine" })).not.toBeInTheDocument();
+  });
+
+  it("keeps request tokens in cancellable request closures, not query keys", () => {
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [], range: null, entries: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    render(<RequestsScreen />);
+    const signal = new AbortController().signal;
+    const requestOptions = useQuery.mock.calls
+      .map(([options]) => options)
+      .find((options) => options.queryKey?.[1] === "requests" && options.queryKey?.length === 5);
+    const historyOptions = useInfiniteQuery.mock.calls[0]?.[0];
+
+    requestOptions.queryFn({ signal });
+    historyOptions.queryFn({ pageParam: null, signal });
+
+    expect(JSON.stringify(requestOptions.queryKey)).not.toContain("token-123");
+    expect(JSON.stringify(historyOptions.queryKey)).not.toContain("token-123");
+    expect(getShiftRequests).toHaveBeenCalledWith(
+      "token-123",
+      { startDate: "2026-04-16", endDate: "2026-04-29" },
+      signal,
+    );
+    expect(getShiftRequestHistory).toHaveBeenCalledWith(
+      "token-123",
+      { limit: 25, cursorCreatedAt: undefined, cursorId: undefined },
+      signal,
+    );
   });
 
   it("shows a retryable query error state", () => {

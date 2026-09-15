@@ -11,6 +11,7 @@ const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignOut = vi.fn();
+const mockFetch = vi.fn();
 
 vi.mock("@/features/account/client", () => ({
   clearBrowserAuthState: vi.fn(),
@@ -30,10 +31,11 @@ import AuthProvider, { useAuth } from "@/components/AuthProvider";
 // ─── Test consumers ──────────────────────────────────────────────────────────
 
 function TestConsumer() {
-  const { user, isLoading, signOut } = useAuth();
+  const { user, session, isLoading, signOut } = useAuth();
   return (
     <div>
       <span data-testid="user">{user?.id ?? "null"}</span>
+      <span data-testid="token">{session?.access_token ?? "null"}</span>
       <span data-testid="isLoading">{String(isLoading)}</span>
       <button data-testid="signOut" onClick={signOut} />
     </div>
@@ -45,10 +47,26 @@ function TestConsumer() {
 const fakeUser = { id: "user-123", email: "test@example.com" };
 const fakeSession = { user: fakeUser, access_token: "token-abc" };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function accessToken(sessionId: string): string {
+  return `header.${btoa(JSON.stringify({ session_id: sessionId }))}.signature`;
+}
+
 // ─── Setup / teardown ────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("fetch", mockFetch);
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
   // Default: no session
   mockGetSession.mockResolvedValue(null);
   mockGetUser.mockResolvedValue(null);
@@ -61,6 +79,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -184,6 +203,145 @@ describe("AuthProvider — auth state changes", () => {
     });
 
     expect(screen.getByTestId("user")).toHaveTextContent("null");
+  });
+
+  it("does not let a late initial restore revive a signed-out session", async () => {
+    const restored = deferred<typeof fakeSession | null>();
+    let authCallback: (event: string, session: unknown) => void = () => {};
+    mockGetSession.mockReturnValue(restored.promise);
+    mockGetUser.mockResolvedValue(fakeUser);
+    mockOnAuthStateChange.mockImplementation(
+      (callback: (event: string, session: unknown) => void) => {
+        authCallback = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      },
+    );
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      authCallback("SIGNED_OUT", null);
+    });
+    expect(screen.getByTestId("user")).toHaveTextContent("null");
+
+    await act(async () => {
+      restored.resolve(fakeSession);
+      await restored.promise;
+    });
+
+    expect(screen.getByTestId("user")).toHaveTextContent("null");
+    expect(screen.getByTestId("isLoading")).toHaveTextContent("false");
+  });
+
+  it("does not let late verification overwrite a newer signed-in user", async () => {
+    const oldUser = { id: "user-old", email: "old@example.com" };
+    const newUser = { id: "user-new", email: "new@example.com" };
+    const oldSession = { user: oldUser, access_token: "token-old" };
+    const newSession = { user: newUser, access_token: "token-new" };
+    const verification = deferred<typeof oldUser | null>();
+    let authCallback: (event: string, session: unknown) => void = () => {};
+    mockGetUser.mockReturnValue(verification.promise);
+    mockOnAuthStateChange.mockImplementation(
+      (callback: (event: string, session: unknown) => void) => {
+        authCallback = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      },
+    );
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("isLoading")).toHaveTextContent("false");
+    });
+
+    await act(async () => {
+      authCallback("INITIAL_SESSION", oldSession);
+      authCallback("SIGNED_IN", newSession);
+    });
+    expect(screen.getByTestId("user")).toHaveTextContent("user-new");
+
+    await act(async () => {
+      verification.resolve(oldUser);
+      await verification.promise;
+    });
+
+    expect(screen.getByTestId("user")).toHaveTextContent("user-new");
+    expect(screen.getByTestId("token")).toHaveTextContent("token-new");
+  });
+
+  it("keeps the newest token across repeated refresh events", async () => {
+    let authCallback: (event: string, session: unknown) => void = () => {};
+    mockOnAuthStateChange.mockImplementation(
+      (callback: (event: string, session: unknown) => void) => {
+        authCallback = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      },
+    );
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("isLoading")).toHaveTextContent("false");
+    });
+
+    await act(async () => {
+      authCallback("TOKEN_REFRESHED", { ...fakeSession, access_token: "token-rotated-1" });
+      authCallback("TOKEN_REFRESHED", { ...fakeSession, access_token: "token-rotated-2" });
+    });
+
+    expect(screen.getByTestId("user")).toHaveTextContent("user-123");
+    expect(screen.getByTestId("token")).toHaveTextContent("token-rotated-2");
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
+  it("registers one restored session when overlapping auth events carry the same session id", async () => {
+    const trackedSession = {
+      ...fakeSession,
+      access_token: accessToken("restored-session"),
+      refresh_token: "refresh-token",
+    };
+    let authCallback: (event: string, session: unknown) => void = () => {};
+    mockGetSession.mockResolvedValue(trackedSession);
+    mockGetUser.mockResolvedValue(fakeUser);
+    mockOnAuthStateChange.mockImplementation(
+      (callback: (event: string, session: unknown) => void) => {
+        authCallback = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      },
+    );
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user")).toHaveTextContent("user-123");
+    });
+
+    await act(async () => {
+      authCallback("SIGNED_IN", trackedSession);
+      authCallback("TOKEN_REFRESHED", trackedSession);
+    });
+
+    await waitFor(() => {
+      expect(
+        mockFetch.mock.calls.filter(([url]) => url === "/api/auth/track-session"),
+      ).toHaveLength(1);
+    });
   });
 });
 

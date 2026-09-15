@@ -149,13 +149,14 @@ export function FilterChip({
     <Button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
+      title={typeof children === "string" ? children : undefined}
+      className={`dg-pill-action inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
         active
           ? "border-[var(--dg-color-brand-border)] bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]"
           : "border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-border-light)]"
       }`}
     >
-      {children}
+      <span className="dg-pill-action-label">{children}</span>
     </Button>
   );
 }

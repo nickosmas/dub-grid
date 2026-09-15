@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getUserIdFromAccessToken } from "./access-token";
+import {
+  getMobileAuthIdentity,
+  getMobileAuthIdentityKey,
+  getUserIdFromAccessToken,
+  isSameMobileAuthIdentity,
+} from "./access-token";
 
 function encodeSegment(value: object): string {
   return btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -51,5 +56,63 @@ describe("getUserIdFromAccessToken", () => {
     ["a jwt with a non-string sub", tokenWithClaims({ sub: 42 })],
   ])("returns null for %s", (_label, token) => {
     expect(getUserIdFromAccessToken(token)).toBeNull();
+  });
+});
+
+describe("mobile auth identity", () => {
+  it("classifies a missing token as anonymous", () => {
+    expect(getMobileAuthIdentity(null)).toEqual({
+      kind: "anonymous",
+      userId: null,
+      orgId: null,
+    });
+    expect(getMobileAuthIdentityKey(null)).toEqual(["anonymous", null, null]);
+  });
+
+  it.each([
+    "just-a-string",
+    "header.!!!!.signature",
+    tokenWithClaims({ org_id: "org-1" }),
+    tokenWithClaims({ sub: 42, org_id: "org-1" }),
+  ])("classifies an unreadable authenticated token separately from sign-out", (token) => {
+    expect(getMobileAuthIdentity(token)).toEqual({
+      kind: "unreadable",
+      userId: null,
+      orgId: null,
+    });
+    expect(getMobileAuthIdentityKey(token)).toEqual(["unreadable", null, null]);
+  });
+
+  it("keeps the same identity and key when only the token rotates", () => {
+    const firstToken = tokenWithClaims({ sub: "user-1", org_id: "org-1", iat: 1 });
+    const secondToken = tokenWithClaims({ sub: "user-1", org_id: "org-1", iat: 2 });
+    const first = getMobileAuthIdentity(firstToken);
+    const second = getMobileAuthIdentity(secondToken);
+
+    expect(firstToken).not.toBe(secondToken);
+    expect(isSameMobileAuthIdentity(first, second)).toBe(true);
+    expect(getMobileAuthIdentityKey(firstToken)).toEqual(getMobileAuthIdentityKey(secondToken));
+  });
+
+  it("separates different users in the same organization", () => {
+    const first = getMobileAuthIdentity(tokenWithClaims({ sub: "user-1", org_id: "org-1" }));
+    const second = getMobileAuthIdentity(tokenWithClaims({ sub: "user-2", org_id: "org-1" }));
+
+    expect(isSameMobileAuthIdentity(first, second)).toBe(false);
+  });
+
+  it("separates the same user in different organizations", () => {
+    const first = getMobileAuthIdentity(tokenWithClaims({ sub: "user-1", org_id: "org-1" }));
+    const second = getMobileAuthIdentity(tokenWithClaims({ sub: "user-1", org_id: "org-2" }));
+
+    expect(isSameMobileAuthIdentity(first, second)).toBe(false);
+  });
+
+  it("keeps an authenticated identity when the token has no organization claim", () => {
+    expect(getMobileAuthIdentity(tokenWithClaims({ sub: "gridmaster-1" }))).toEqual({
+      kind: "authenticated",
+      userId: "gridmaster-1",
+      orgId: null,
+    });
   });
 });

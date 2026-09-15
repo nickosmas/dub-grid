@@ -29,6 +29,8 @@ import {
   mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
+  mobileInputText,
+  mobilePillOverflow,
   mobileRadii,
   mobileText,
   mobileTextWeighted,
@@ -135,11 +137,13 @@ export function ProfileHero({
 
   const badgeTextStyle = [
     styles.heroBadgeText,
+    onBadgePress ? mobilePillOverflow.interactiveText : mobilePillOverflow.displayText,
     badgeTone === "contrast" && styles.heroBadgeTextContrast,
     badgeTone === "warning" && styles.heroBadgeTextWarning,
   ];
   const badgeStyle = [
     styles.heroBadge,
+    onBadgePress ? mobilePillOverflow.interactiveContainer : mobilePillOverflow.displayContainer,
     // `heroBadge` pins itself with `alignSelf: "flex-start"`, which beats a
     // centered parent's `alignItems` and would hang the pill off the left
     // edge of an otherwise centered block.
@@ -164,7 +168,9 @@ export function ProfileHero({
         onPress={onBadgePress}
         style={({ pressed }) => [...badgeStyle, pressed && styles.heroBadgePressed]}
       >
-        <Text style={badgeTextStyle}>{badge}</Text>
+        <Text ellipsizeMode="tail" numberOfLines={1} style={badgeTextStyle}>
+          {badge}
+        </Text>
         <Ionicons color={badgeChevronColor} name="chevron-down" size={13} />
       </Pressable>
     ) : (
@@ -417,6 +423,7 @@ export function ProfileTextInput({
             accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
             {...resolvedInputProps}
             inputAccessoryViewID={inputAccessoryViewID}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
             placeholderTextColor={mobileColors.textSubtle}
             style={[
               styles.input,
@@ -433,6 +440,7 @@ export function ProfileTextInput({
           accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
           {...resolvedInputProps}
           inputAccessoryViewID={inputAccessoryViewID}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           placeholderTextColor={mobileColors.textSubtle}
           style={[
             styles.input,
@@ -880,13 +888,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSubtle,
     },
     input: {
-      // Explicit regular weight — don't spread a `mobileText.*` token that
-      // carries a bold `fontFamily`, since the named family overrides
-      // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
-      // EditText non-interactive bug when DM Sans hasn't loaded.
+      ...mobileInputText("regular"),
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "400",
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.control,

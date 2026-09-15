@@ -53,7 +53,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+          fontFamily: "var(--font-sans)",
           padding: 32,
           gap: 24,
         }}

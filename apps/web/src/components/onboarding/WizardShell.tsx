@@ -42,7 +42,7 @@ export default function WizardShell({
         display: "flex",
         flexDirection: "column",
         background: "var(--dg-color-onboarding-shell-bg)",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         overflow: "auto",
       }}
     >

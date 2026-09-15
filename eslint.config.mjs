@@ -122,6 +122,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "apps/web/.next/**",
+    "apps/web/.next-auth-entry/**",
     "out/**",
     "build/**",
     "dist/**",

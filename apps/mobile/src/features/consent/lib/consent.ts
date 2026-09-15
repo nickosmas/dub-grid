@@ -92,8 +92,8 @@ export async function setStoredConsent(analytics: boolean): Promise<ConsentPrefe
 /**
  * Best-effort POST to the shared web audit endpoint. The route is CSRF-origin
  * protected and reads its session from cookies, so a native request records an
- * anonymous row (user_id null) tagged with the mobile user-agent. We send an
- * Origin header on the same root domain so the CSRF check passes in production.
+ * anonymous row (user_id null) tagged with the mobile user-agent. We declare
+ * the exact API origin so the no-cookie request passes the same-origin check.
  * Never throws — consent UX must not depend on the network.
  */
 export async function syncConsentToServer(prefs: ConsentPreferences): Promise<void> {

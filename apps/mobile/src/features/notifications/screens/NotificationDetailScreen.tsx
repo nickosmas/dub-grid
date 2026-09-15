@@ -21,6 +21,7 @@ import {
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
 import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { NotificationDetailSkeleton } from "../components/NotificationDetailSkeleton";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -28,6 +29,7 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileElevation,
   mobileRadii,
+  mobilePillOverflow,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -105,21 +107,25 @@ export default function NotificationDetailScreen() {
     if (!id) return null;
     const matches = queryClient
       .getQueriesData<{ pages?: { notifications: MobileNotification[] }[] }>({
-        queryKey: ["mobile", "notifications-infinite"],
+        queryKey: mobileQueryKeys.notificationsPrefix(accessToken),
       })
       .flatMap(([, data]) => data?.pages?.flatMap((p) => p.notifications) ?? []);
     return matches.find((n) => n.id === id) ?? null;
-  }, [id, queryClient]);
+  }, [accessToken, id, queryClient]);
 
   // Fallback: hit the API once if we don't already have it cached.
   const detailQuery = useQuery({
-    queryKey: ["mobile", "notification-detail", accessToken, id],
+    queryKey: mobileQueryKeys.notificationDetail(accessToken, id),
     enabled: Boolean(accessToken && id && !cachedNotification),
-    queryFn: async () => {
-      const page = await getNotifications(accessToken!, {
-        limit: 100,
-        archived: "any",
-      });
+    queryFn: async ({ signal }) => {
+      const page = await getNotifications(
+        accessToken!,
+        {
+          limit: 100,
+          archived: "any",
+        },
+        signal,
+      );
       return page.notifications.find((n) => n.id === id) ?? null;
     },
   });
@@ -367,6 +373,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
     },
     priorityChip: {
+      ...mobilePillOverflow.displayContainer,
+      ...mobilePillOverflow.displayText,
       ...mobileTextWeighted("caption", "bold"),
       letterSpacing: 0.5,
       paddingHorizontal: 8,

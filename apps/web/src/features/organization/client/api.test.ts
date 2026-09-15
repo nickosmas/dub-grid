@@ -8,7 +8,12 @@ vi.mock("@/lib/fetch-with-timeout", async (importOriginal) => {
   return { ...actual, fetchWithTimeout: (...args: unknown[]) => fetchWithTimeout(...args) };
 });
 
-import { fetchOrganizationBootstrap, isRetryableOrganizationBootstrapError } from "./api";
+import {
+  getOrganizationBootstrapQueryPolicy,
+  fetchOrganizationBootstrap,
+  isRetryableOrganizationBootstrapError,
+  OrganizationRequestError,
+} from "./api";
 
 describe("organization bootstrap client", () => {
   beforeEach(() => {
@@ -34,5 +39,16 @@ describe("organization bootstrap client", () => {
 
   it("retries a typed request timeout", () => {
     expect(isRetryableOrganizationBootstrapError(new RequestTimeoutError(5_000))).toBe(true);
+  });
+
+  it("gives every bootstrap observer the same bounded query policy", () => {
+    const policy = getOrganizationBootstrapQueryPolicy();
+    const retryableError = new OrganizationRequestError("Temporary failure", 503, null);
+
+    expect(policy.staleTime).toBe(5 * 60_000);
+    expect(policy.retry(2, retryableError)).toBe(true);
+    expect(policy.retry(3, retryableError)).toBe(false);
+    expect(policy.retry(0, new OrganizationRequestError("Rejected", 400, null))).toBe(false);
+    expect(policy.retryOnMount).toBe(false);
   });
 });

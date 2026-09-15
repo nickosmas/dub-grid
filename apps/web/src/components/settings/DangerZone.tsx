@@ -9,6 +9,8 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import * as Sentry from "@/lib/sentry";
 import { useIsInSandbox, useLogout } from "@/hooks";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { requireCredentialAssurance } from "@/features/account/client";
 
 interface DangerZoneProps {
   organization: Organization;
@@ -17,6 +19,7 @@ interface DangerZoneProps {
 export default function DangerZone({ organization }: DangerZoneProps) {
   const isInSandbox = useIsInSandbox();
   const { signOut } = useLogout();
+  const stepUp = useStepUpAction();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -32,15 +35,25 @@ export default function DangerZone({ organization }: DangerZoneProps) {
   async function handleDelete() {
     setIsDeleting(true);
     try {
-      const res = await fetch("/api/organizations/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId: organization.id, confirmation: typed }),
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        const res = await fetch("/api/organizations/delete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ orgId: organization.id, confirmation: typed }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw Object.assign(
+            new Error(data?.error || "We couldn't delete that organization. Try again."),
+            { status: res.status, code: data?.code, method: data?.method },
+          );
+        }
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "We couldn't delete that organization. Try again.");
-      }
+      if (!completed) return;
       toast.success("Organization deleted.");
       // The org is gone for this user. Sign out globally so every device's
       // session is invalidated; /goodbye handles the teardown.
@@ -56,6 +69,10 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         formatClientErrorMessage(err, "We couldn't delete that organization. Try again."),
       );
       setIsDeleting(false);
+    } finally {
+      // Successful deletion navigates away. Every other outcome must restore
+      // the original typed confirmation so the user can retry or cancel.
+      if (confirmOpen) setIsDeleting(false);
     }
   }
 
@@ -106,7 +123,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         </div>
       </div>
 
-      {confirmOpen && (
+      {confirmOpen && !stepUp.dialog && (
         <ConfirmDialog
           title="Delete organization"
           variant="danger"
@@ -138,6 +155,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           }
         />
       )}
+      {stepUp.dialog}
     </SectionCard>
   );
 }

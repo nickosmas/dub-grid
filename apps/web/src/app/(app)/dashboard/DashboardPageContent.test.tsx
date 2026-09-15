@@ -28,6 +28,10 @@ vi.mock("@/components/dashboard/DashboardView", () => ({
   default: () => <div data-testid="dashboard-view" />,
 }));
 
+vi.mock("@/components/onboarding/OrganizationBootstrapRecovery", () => ({
+  default: () => <div data-testid="bootstrap-recovery" />,
+}));
+
 vi.mock("@/components/gridmaster/GridmasterPortal", () => ({
   default: () => <div data-testid="gridmaster-portal" />,
 }));
@@ -127,5 +131,31 @@ describe("DashboardPageContent", () => {
 
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
+  });
+
+  it("keeps tenant-safe cached content visible during a warm bootstrap failure", () => {
+    vi.mocked(useOrganizationData).mockReturnValue({
+      ...organizationData,
+      loadError: "Check your internet connection and try again.",
+    } as unknown as ReturnType<typeof useOrganizationData>);
+
+    renderDashboard();
+
+    expect(screen.getByTestId("dashboard-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("bootstrap-recovery")).not.toBeInTheDocument();
+  });
+
+  it("shows explicit recovery when a cold bootstrap has no safe organization data", () => {
+    vi.mocked(useOrganizationData).mockReturnValue({
+      ...organizationData,
+      org: null,
+      loadError: "Check your internet connection and try again.",
+      bootstrapRetryable: true,
+    } as unknown as ReturnType<typeof useOrganizationData>);
+
+    renderDashboard();
+
+    expect(screen.getByTestId("bootstrap-recovery")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-view")).not.toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@ export type AuthActionEmailProps = {
    * generated templates; the dev preview passes a real URL so the logo loads.
    */
   logoUrl?: string;
+  actionHref?: string;
   /**
    * Optional one-time code shown below the button, for flows a native app can
    * complete without following the link. Rendered as the Supabase
@@ -36,12 +37,13 @@ export function AuthActionEmail({
   footer,
   code,
   logoUrl = SUPABASE.siteUrl,
+  actionHref = SUPABASE.confirmationUrl,
 }: AuthActionEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={{ ...styles.heading, textAlign: "center" }}>{heading}</Text>
       <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>{intro}</Text>
-      <EmailButton href={SUPABASE.confirmationUrl}>{ctaLabel}</EmailButton>
+      <EmailButton href={actionHref}>{ctaLabel}</EmailButton>
       {code ? (
         <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
           <Text style={{ ...styles.fine, textAlign: "center", margin: "0 0 12px" }}>

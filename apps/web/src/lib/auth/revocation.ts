@@ -1,4 +1,5 @@
 import { CacheKey, TTL, cacheGetMany, cacheSet, cacheDel } from "@/lib/cache";
+import { getServiceClient } from "@/lib/supabase-service";
 import { withTimeout } from "@/lib/with-timeout";
 
 /**
@@ -140,6 +141,12 @@ function forgetMemoizedUser(userId: string): void {
 export async function revokeSession(sessionId: string): Promise<void> {
   memo.delete(sessionId);
   await cacheSet(CacheKey.revokedSession(sessionId), Date.now(), TTL.ACCESS_TOKEN);
+
+  const { error } = await getServiceClient()
+    .from("user_sessions")
+    .delete()
+    .eq("supabase_session_id", sessionId);
+  if (error) throw error;
 }
 
 /**
@@ -152,6 +159,38 @@ export async function revokeSession(sessionId: string): Promise<void> {
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   forgetMemoizedUser(userId);
   await cacheSet(CacheKey.revokedAfter(userId), Date.now(), TTL.ACCESS_TOKEN);
+
+  const { error } = await getServiceClient().from("user_sessions").delete().eq("user_id", userId);
+  if (error) throw error;
+}
+
+/** Revoke tracked peers without applying the watermark that would revoke this device too. */
+export async function revokeOtherUserSessions(
+  userId: string,
+  currentSessionId: string,
+): Promise<void> {
+  const sessionIds = new Set<string>();
+  const service = getServiceClient();
+  const pageSize = 1000;
+  // Collect before deleting so offset pagination cannot skip rows. Include
+  // partially registered sessions, which the device-list UI intentionally omits.
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await service
+      .from("user_sessions")
+      .select("supabase_session_id")
+      .eq("user_id", userId)
+      .neq("supabase_session_id", currentSessionId)
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (row.supabase_session_id && row.supabase_session_id !== currentSessionId) {
+        sessionIds.add(row.supabase_session_id);
+      }
+    }
+    if (!data || data.length < pageSize) break;
+  }
+  for (const sessionId of sessionIds) await revokeSession(sessionId);
 }
 
 /**

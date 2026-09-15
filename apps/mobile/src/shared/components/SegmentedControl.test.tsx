@@ -57,6 +57,21 @@ describe("SegmentedControl", () => {
     expect(screen.getByText("2 Weeks")).toBeInTheDocument();
   });
 
+  it("keeps a long option on one truncated line with its full accessible name", () => {
+    const label = "Management scheduling permissions";
+    render(
+      <SegmentedControl
+        onChange={vi.fn()}
+        options={[{ value: "management", label }]}
+        value="management"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    expect(screen.getByText(label)).toHaveAttribute("data-number-of-lines", "1");
+    expect(screen.getByText(label)).toHaveAttribute("data-ellipsize-mode", "tail");
+  });
+
   // Counts render as a badge beside the label, the way `ScrollableTabStrip`
   // draws them — People's roster tabs once spelled theirs into the label as
   // "Schedule (12)", which is the same number in a different vocabulary.

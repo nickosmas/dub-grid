@@ -13,6 +13,8 @@ const getSupabaseClient = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
+const requireMobileCredentialAssurance = vi.fn();
+const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -37,6 +39,8 @@ vi.mock("../../auth/hooks/useAccessToken", () => ({
 
 vi.mock("../../../shared/lib/api", () => ({
   getProfile: vi.fn(),
+  requireMobileCredentialAssurance: (...args: unknown[]) =>
+    requireMobileCredentialAssurance(...args),
 }));
 
 vi.mock("../../../shared/lib/env", () => ({
@@ -60,6 +64,10 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
+vi.mock("../hooks/useMobileStepUpAction", () => ({
+  useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
+}));
+
 let ProfilePasswordScreen: (typeof import("./ProfilePasswordScreen"))["default"];
 
 beforeAll(async () => {
@@ -67,9 +75,6 @@ beforeAll(async () => {
 });
 
 function fillValidPassword() {
-  fireEvent.change(screen.getByLabelText("Current password"), {
-    target: { value: "old-password" },
-  });
   fireEvent.change(screen.getByLabelText("New password"), {
     target: { value: "New-password-123" },
   });
@@ -88,6 +93,11 @@ describe("ProfilePasswordScreen", () => {
     disablePushForCurrentDevice.mockReset();
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
+    requireMobileCredentialAssurance.mockReset().mockResolvedValue({ success: true });
+    stepUpRun.mockReset().mockImplementation(async (action) => {
+      await action("fresh-token");
+      return true;
+    });
 
     useAccessToken.mockReturnValue("token-123");
     useQuery.mockReturnValue({
@@ -102,18 +112,17 @@ describe("ProfilePasswordScreen", () => {
   });
 
   it("changes the password and signs out every session", async () => {
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
     const updateUser = vi.fn().mockResolvedValue({ error: null });
     const signOut = vi.fn().mockResolvedValue({ error: null });
     getSupabaseClient.mockReturnValue({
-      auth: { signInWithPassword, updateUser, signOut },
+      auth: { updateUser, signOut },
     } as never);
     handleExpiredMobileSession.mockResolvedValue(undefined);
 
     render(<ProfilePasswordScreen />);
 
     // The form is the screen — no "Change password" button to open it first.
-    expect(screen.getByLabelText("Current password")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
     expect(screen.getByLabelText("New password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
 
@@ -132,10 +141,8 @@ describe("ProfilePasswordScreen", () => {
     });
 
     await waitFor(() => {
-      expect(signInWithPassword).toHaveBeenCalledWith({
-        email: "mina@dubgrid.com",
-        password: "old-password",
-      });
+      expect(stepUpRun).toHaveBeenCalledTimes(1);
+      expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("fresh-token");
       expect(updateUser).toHaveBeenCalledWith({ password: "New-password-123" });
       // Pushes off before the token dies, not after.
       expect(disablePushForCurrentDevice).toHaveBeenCalled();
@@ -149,18 +156,15 @@ describe("ProfilePasswordScreen", () => {
 
     render(<ProfilePasswordScreen />);
 
-    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
 
-    fireEvent.click(screen.getByRole("button", { name: "Show current password" }));
     fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
     fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
 
-    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "text");
     expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
     expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: "Hide current password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
 
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
@@ -174,13 +178,11 @@ describe("ProfilePasswordScreen", () => {
     expect(screen.getByText("Strong")).toBeInTheDocument();
   });
 
-  it("surfaces a wrong current password inline rather than proceeding", async () => {
-    const signInWithPassword = vi.fn().mockResolvedValue({
-      error: { message: "Invalid login credentials" },
-    });
+  it("does not reach Supabase when the assurance preflight fails", async () => {
     const updateUser = vi.fn();
+    requireMobileCredentialAssurance.mockRejectedValue(new Error("Identity confirmation failed"));
     getSupabaseClient.mockReturnValue({
-      auth: { signInWithPassword, updateUser, signOut: vi.fn() },
+      auth: { updateUser, signOut: vi.fn() },
     } as never);
 
     render(<ProfilePasswordScreen />);
@@ -213,8 +215,8 @@ describe("ProfilePasswordScreen", () => {
   it("asks before a back press throws away a part-entered password", async () => {
     render(<ProfilePasswordScreen />);
 
-    fireEvent.change(screen.getByLabelText("Current password"), {
-      target: { value: "old-password" },
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "part-entered" },
     });
 
     act(() => {
@@ -234,8 +236,8 @@ describe("ProfilePasswordScreen", () => {
   it("keeps what was typed when the back press is called off", () => {
     render(<ProfilePasswordScreen />);
 
-    fireEvent.change(screen.getByLabelText("Current password"), {
-      target: { value: "old-password" },
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "part-entered" },
     });
     act(() => {
       pressBack();
@@ -245,6 +247,23 @@ describe("ProfilePasswordScreen", () => {
     );
 
     expect(navigatedActions).toHaveLength(0);
-    expect(screen.getByLabelText("Current password")).toHaveValue("old-password");
+    expect(screen.getByLabelText("New password")).toHaveValue("part-entered");
+  });
+
+  it("keeps the confirmation and typed password when identity confirmation is cancelled", async () => {
+    stepUpRun.mockResolvedValue(false);
+    getSupabaseClient.mockReturnValue({ auth: { updateUser: vi.fn(), signOut: vi.fn() } } as never);
+
+    render(<ProfilePasswordScreen />);
+    fillValidPassword();
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", { name: "Update and sign out" }),
+      );
+    });
+
+    expect(screen.getByText("Update password?")).toBeInTheDocument();
+    expect(screen.getByLabelText("New password")).toHaveValue("New-password-123");
   });
 });

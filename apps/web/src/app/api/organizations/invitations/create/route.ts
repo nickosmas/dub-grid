@@ -15,6 +15,7 @@ import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/st
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
+import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -57,7 +58,7 @@ async function refreshPendingInvitation(
   employeeId: string | null,
 ): Promise<RefreshedInvitation | null> {
   const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString();
 
   const baseQuery = serviceClient
     .from("invitations")

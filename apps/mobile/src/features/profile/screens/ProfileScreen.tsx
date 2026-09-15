@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
@@ -34,8 +34,11 @@ import {
 } from "../../../shared/lib/auth-reset";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
+import { getMobileAuthIdentity } from "../../../shared/lib/access-token";
 import { saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
+import { replaceAuthSession } from "../../../shared/providers/AuthSessionProvider";
 import {
   mobileMotion,
   mobileRadii,
@@ -116,14 +119,15 @@ export default function ProfileScreen() {
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
   const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
   const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
+  const switchInFlightRef = useRef(false);
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const changeRequestsQuery = useQuery({
-    queryKey: ["mobile", "profile", "change-requests", accessToken],
-    queryFn: () => getProfileChangeRequests(accessToken!),
+    queryKey: mobileQueryKeys.profileChangeRequests(accessToken),
+    queryFn: ({ signal }) => getProfileChangeRequests(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const bootstrapQuery = useBootstrap(accessToken);
@@ -221,14 +225,31 @@ export default function ProfileScreen() {
   }
 
   async function handleSwitchOrganization(input: OrganizationMembershipOption) {
-    if (input.isCurrent || switchingOrg) {
+    if (input.isCurrent || switchInFlightRef.current) {
       return;
     }
 
+    switchInFlightRef.current = true;
     // The whole membership, not just its id: the overlay below names the org
     // being switched to, and `memberships` is about to be thrown away with the
     // rest of the previous org's cached data.
     setSwitchingOrg(input);
+
+    let serverOrganizationChanged = false;
+
+    const failClosedAfterServerSwitch = async (error: unknown) => {
+      // The RPC already changed the server-side active organization, so the
+      // previous token and cache can no longer be offered as an interactive
+      // recovery state. Tear them down immediately and return to sign-in.
+      await queryClient.cancelQueries().catch(() => undefined);
+      queryClient.clear();
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        fallbackMessage: "Sign in again to finish switching organizations.",
+        title: "Could not finish organization switch",
+      });
+      await handleExpiredMobileSession();
+    };
 
     try {
       const supabase = getSupabaseClient();
@@ -245,14 +266,21 @@ export default function ProfileScreen() {
         });
         return;
       }
+      serverOrganizationChanged = true;
 
       const refreshResult = await supabase.auth.refreshSession();
       if (refreshResult.error || !refreshResult.data.session) {
-        pushClientFriendlyErrorToast(pushToast, {
-          error: refreshResult.error,
-          fallbackMessage: "We couldn't refresh your session after switching organizations.",
-          title: "Could not switch organization",
-        });
+        await failClosedAfterServerSwitch(
+          refreshResult.error ?? new Error("The refreshed session was unavailable."),
+        );
+        return;
+      }
+
+      const refreshedIdentity = getMobileAuthIdentity(refreshResult.data.session.access_token);
+      if (refreshedIdentity.kind !== "authenticated" || refreshedIdentity.orgId !== input.id) {
+        await failClosedAfterServerSwitch(
+          new Error("The refreshed session did not match the selected organization."),
+        );
         return;
       }
 
@@ -272,10 +300,16 @@ export default function ProfileScreen() {
       // detail route pushed under the old org survives in its own tab's
       // history. That is deliberate rather than overlooked: every mobile read
       // is scoped server-side to the token's org (`auth.currentOrg.id`), and
-      // every query key carries the access token, so such a route refetches
-      // under the new session and 404s. It fails closed and shows a "not
-      // found" state; it cannot render the previous org's row.
-      queryClient.clear();
+      // every authenticated query key carries the stable user-and-org identity,
+      // so such a route refetches under the new session and 404s. It fails
+      // closed and cannot render the previous organization's row.
+      // Commit the exact refreshed session ourselves instead of waiting for a
+      // later auth-state event. The provider clears/cancels the old identity's
+      // queries synchronously at this boundary, and only then can Home mount.
+      if (!replaceAuthSession(refreshResult.data.session)) {
+        await failClosedAfterServerSwitch(new Error("The authenticated session is unavailable."));
+        return;
+      }
       router.replace("/(tabs)/home");
 
       // Last, and deliberately not awaited into the critical path: remembering
@@ -286,15 +320,20 @@ export default function ProfileScreen() {
       // on. Worst case the next launch offers the previous org's slug.
       saveLastOrg({ slug: input.slug, name: input.name }).catch(() => {});
     } catch (error) {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        fallbackMessage: "We couldn't switch organizations right now.",
-        title: "Could not switch organization",
-      });
+      if (serverOrganizationChanged) {
+        await failClosedAfterServerSwitch(error);
+      } else {
+        pushClientFriendlyErrorToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't switch organizations right now.",
+          title: "Could not switch organization",
+        });
+      }
     } finally {
       // Cleared on success too, in the same commit as the navigation away: a
       // latched overlay would still be up if the user came back to this tab.
       setSwitchingOrg(null);
+      switchInFlightRef.current = false;
     }
   }
 
@@ -304,16 +343,10 @@ export default function ProfileScreen() {
     if (!action) return;
 
     if (action.kind === "switch-org") {
-      // Two modals, one at a time. The confirmation leaves first (above), then
-      // the picker under it — dismissing both in one commit is the case iOS
-      // drops, and it left the picker on screen over the switched org.
-      //
-      // The switch still runs only once the picker is closed, which is what the
-      // same-tick version was protecting: the refreshSession() cascade (new
-      // accessToken → query refetches → realtime channel rebuild) must not land
-      // while a sheet is still mounted over it.
+      // The picker already left before this confirmation was presented. Let
+      // the confirmation finish leaving before the refreshSession() cascade
+      // starts so no previous-organization surface remains mounted over it.
       handoff(() => {
-        setIsSwitchModalVisible(false);
         void handleSwitchOrganization(action.membership);
       });
       return;
@@ -606,7 +639,13 @@ export default function ProfileScreen() {
                     !membership.isCurrent &&
                     !memberships[index + 1]?.isCurrent
                   }
-                  onPress={() => setPendingConfirmation({ kind: "switch-org", membership })}
+                  onPress={() => {
+                    // UIKit will not present the confirmation over an existing
+                    // native sheet. Close the picker first, then present the
+                    // confirmation after its dismissal animation finishes.
+                    setIsSwitchModalVisible(false);
+                    handoff(() => setPendingConfirmation({ kind: "switch-org", membership }));
+                  }}
                 />
               ))}
             </ProfileList>

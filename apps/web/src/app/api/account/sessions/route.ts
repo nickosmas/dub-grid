@@ -4,7 +4,7 @@ import {
   fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
-import { requireAuthenticatedUser, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { requireSensitiveActionAuth, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -42,7 +42,7 @@ export async function DELETE(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireSensitiveActionAuth(req);
     if ("response" in auth) {
       return auth.response;
     }

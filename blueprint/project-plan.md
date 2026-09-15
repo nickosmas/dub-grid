@@ -85,6 +85,37 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Explicit schedule-indicator removal: active shift note/indicator controls in
   the slideover must offer a clear, accessible removal affordance instead of
   requiring users to discover that clicking the active indicator removes it.
+- Production display-mode layout resilience: keep Settings display-mode previews
+  fully visible and selectable at supported desktop widths and browser zoom levels;
+  render role names as plain table text and keep the compact Roles table's columns
+  content-aware rather than unnecessarily wide.
+- Scheduler open-shift staffing: when a scheduler clicks an open shift in the
+  web schedule, show active staff who meet its focus-area, role, and
+  certification requirements and have no absence or overlapping shift that
+  day. Let the scheduler assign a selected person through the normal
+  draft/publish workflow, while regular staff keep the existing volunteer flow.
+- App-wide pill overflow resilience: keep every pill, chip, tag, badge, and
+  segmented-choice label inside its visual bounds on web and mobile. Display
+  values may wrap and grow; interactive controls remain one line and truncate
+  safely while preserving the full accessible value.
+- Inter product typography: use Inter for all product UI and ordinary copy on
+  web and mobile. Use Inter Variable with optical sizing on web and native
+  Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark and every
+  landing or marketing title and heading, preserve the existing semantic type
+  scale, and use tabular numerals for scheduling data.
+- Web UI consistency and interaction resilience: review every project-owned web
+  route, component, primitive, and rendered state; consolidate equivalent
+  controls and presentation; repair confirmed clipping, overlap, reflow,
+  first-paint, loading, error, empty-state, keyboard, focus, and responsive
+  defects; and qualify the complete role, theme, viewport, zoom, permission,
+  loading, empty, error, and overlay matrix with reproducible browser evidence.
+  The review may use `better-ui` for surfaces, radii, optical alignment, icon
+  state, explicit transitions, and theme-switch behavior, and
+  `emil-design-eng` for motion purpose, interruptibility, easing, gesture
+  physics, perceived performance, and reduced-motion review. These are review
+  references only: preserve DubGrid's tokens, density, platform-specific
+  motion, and existing accessibility contracts, and do not add a dependency
+  solely to satisfy either checklist.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -95,11 +126,14 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 The roadmap starts with management-only assignment visibility in item 17, then
 the mobile release catch-up in item 18, authentication and onboarding release
 hardening in item 19, explicit schedule-indicator removal in item 20, and
-production migration safety in item 21. Item 18 is deliberately split into role
-eligibility, the shared dashboard model, and native dashboard presentation so
-each can be reviewed independently. Item 19 is split into state correctness,
-full journey coverage, performance and resilience, security, and release
-qualification. Item 21 must remain last.
+production display-mode layout resilience in item 21. Scheduler open-shift
+staffing is item 22, app-wide pill overflow resilience is item 23, and Inter
+product typography is item 24. Web UI consistency and interaction resilience is
+item 25, and production migration safety remains last as item 26. Item 18 is
+deliberately split into role eligibility, the shared dashboard model, and native
+dashboard presentation so each can be reviewed independently. Item 19 is split
+into state correctness, full journey coverage, performance and resilience,
+security, and release qualification. Item 26 must remain last.
 
 ## 4. Data - What are we storing?
 
@@ -176,6 +210,12 @@ before conversion is required.
 - Mobile has its own primitive component set (`AppText`, `Button`,
   `PressableRow`, motion primitives) - never override `fontWeight` on a
   text token
+- DM Sans is the brand-heading typeface for the wordmark and every landing or
+  marketing title and heading. Inter is the product typeface for all product UI
+  and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
+  native Inter 400/500/600/700 faces. Preserve the existing semantic size
+  hierarchy and use tabular numerals for schedules, dates, times, durations,
+  and totals.
 - Neutral grays carry a deliberate tint: light-mode grays are slate
   (blue-tinted), dark-mode grays are zinc; any new gray must match
 - Terminology is customizable per organization (e.g. "Wings" can be

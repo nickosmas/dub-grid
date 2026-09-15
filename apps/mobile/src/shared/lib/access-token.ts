@@ -31,6 +31,17 @@ function readStringClaim(accessToken: string | null, claim: string): string | nu
   }
 }
 
+export type MobileAuthIdentity =
+  | { kind: "anonymous"; userId: null; orgId: null }
+  | { kind: "unreadable"; userId: null; orgId: null }
+  | { kind: "authenticated"; userId: string; orgId: string | null };
+
+export type MobileAuthIdentityKey = readonly [
+  kind: MobileAuthIdentity["kind"],
+  userId: string | null,
+  orgId: string | null,
+];
+
 /**
  * The `sub` claim of a Supabase access token, i.e. the signed-in user's id.
  *
@@ -58,4 +69,41 @@ export function getUserIdFromAccessToken(accessToken: string | null): string | n
  */
 export function getOrgIdFromAccessToken(accessToken: string | null): string | null {
   return readStringClaim(accessToken, "org_id");
+}
+
+/**
+ * Stable client identity for session transitions and authenticated cache keys.
+ *
+ * The token string is deliberately absent: Supabase rotates it during a live
+ * session, while `sub` and `org_id` stay fixed until the account or active
+ * organization actually changes. Decoded claims never grant access; the
+ * server still verifies every token and enforces its organization boundary.
+ */
+export function getMobileAuthIdentity(accessToken: string | null): MobileAuthIdentity {
+  if (!accessToken) {
+    return { kind: "anonymous", userId: null, orgId: null };
+  }
+
+  const userId = getUserIdFromAccessToken(accessToken);
+  if (!userId) {
+    return { kind: "unreadable", userId: null, orgId: null };
+  }
+
+  return {
+    kind: "authenticated",
+    userId,
+    orgId: getOrgIdFromAccessToken(accessToken),
+  };
+}
+
+export function getMobileAuthIdentityKey(accessToken: string | null): MobileAuthIdentityKey {
+  const identity = getMobileAuthIdentity(accessToken);
+  return [identity.kind, identity.userId, identity.orgId];
+}
+
+export function isSameMobileAuthIdentity(
+  left: MobileAuthIdentity,
+  right: MobileAuthIdentity,
+): boolean {
+  return left.kind === right.kind && left.userId === right.userId && left.orgId === right.orgId;
 }

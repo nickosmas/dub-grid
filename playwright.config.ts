@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const baseURL = `http://calmhaven.${baseDomain}:${port}`;
+const isAuthEntryMeasurement = process.env.AUTH_ENTRY_MEASUREMENT === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -26,9 +27,17 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: "npm run dev:web",
+        command: isAuthEntryMeasurement
+          ? `npm --workspace @dubgrid/web run dev -- --port ${port}`
+          : "npm run dev:web",
         url: `http://localhost:${port}`,
-        reuseExistingServer: true,
+        reuseExistingServer: !isAuthEntryMeasurement,
         timeout: 120_000,
+        env: isAuthEntryMeasurement
+          ? {
+              ...process.env,
+              NEXT_DIST_DIR: ".next-auth-entry",
+            }
+          : process.env,
       },
 });

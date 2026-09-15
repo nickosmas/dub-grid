@@ -84,6 +84,24 @@ const ALLOWLIST = [
       "neither ships in the web bundle or the server runtime. Revisit when ajv's dependents " +
       "publish on a fixed fast-uri, or when npm applies root overrides inside workspaces.",
   },
+  {
+    ids: ["GHSA-2883-xcg3-v3hh"],
+    package: "js-yaml",
+    reviewBy: "2026-12-01",
+    reason:
+      "CPU exhaustion parsing a YAML document with many empty merge keys, fixed in 3.15.2 and " +
+      "4.3.2. The root override pulls every reachable copy up to those versions. Two stay behind, " +
+      "both inside the apps/mobile workspace subtree: react-native > babel-jest > " +
+      "babel-plugin-istanbul > @istanbuljs/load-nyc-config > js-yaml@3.15.1, and expo > @expo/cli " +
+      "> @expo/xcpretty > js-yaml@4.3.1. Same limitation as fast-uri above: a root `overrides` " +
+      "block does not reach into a workspace subtree under `install-strategy=nested`, and neither " +
+      "an exact pin nor a full lockfile re-resolution moved them. Neither copy parses untrusted " +
+      "input: the first loads this repo's own coverage config during `npm test`, the second " +
+      "reformats `xcodebuild`'s own output during a mobile test run, so both run on a developer " +
+      "machine or in CI over output we generated, and neither ships in the mobile app bundle. " +
+      "Revisit when react-native or expo publish on fixed js-yaml, or when npm applies root " +
+      "overrides inside workspaces.",
+  },
 ];
 
 /** Every GHSA id in `via`, following the chains npm nests inside each other. */

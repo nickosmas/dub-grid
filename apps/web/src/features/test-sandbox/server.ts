@@ -159,25 +159,31 @@ async function cloneOrgIntoSandbox(
 }
 
 /**
- * Returns the active sandbox org owned by this user, if any. We only ever
- * keep one sandbox alive per user — entering twice just re-attaches to the
- * existing one.
+ * Returns the active sandbox org owned by this user and auth session, if any.
+ * A different browser session never inherits the existing temporary tenant.
  */
 export async function findActiveSandboxForUser(
   serviceClient: SupabaseClient,
   userId: string,
-): Promise<{ id: string; slug: string | null } | null> {
+  sessionId: string,
+): Promise<{ id: string; slug: string | null; sourceOrgId: string | null } | null> {
   const { data, error } = await serviceClient
     .from("organizations")
-    .select("id, slug")
+    .select("id, slug, sandbox_source_org_id")
     .eq("workspace_kind", "sandbox")
     .eq("sandbox_owner_user_id", userId)
+    .eq("sandbox_owner_session_id", sessionId)
     .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return (data as { id: string; slug: string | null } | null) ?? null;
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    slug: (data.slug as string | null) ?? null,
+    sourceOrgId: (data.sandbox_source_org_id as string | null) ?? null,
+  };
 }
 
 /**
@@ -189,9 +195,10 @@ export async function findActiveSandboxForUser(
 export async function createSandboxForUser(input: {
   serviceClient: SupabaseClient;
   actor: User;
+  sessionId: string;
   sourceOrgId: string;
 }): Promise<{ id: string; slug: string }> {
-  const { serviceClient, actor, sourceOrgId } = input;
+  const { serviceClient, actor, sessionId, sourceOrgId } = input;
 
   // Copy as much of the source org row as we can so the sandbox feels
   // identical to the real organization. Anything Stripe-, suspension-, or
@@ -217,6 +224,7 @@ export async function createSandboxForUser(input: {
         slug,
         workspace_kind: "sandbox",
         sandbox_owner_user_id: actor.id,
+        sandbox_owner_session_id: sessionId,
         sandbox_source_org_id: sourceOrgId,
         // Display + label clones
         focus_area_label: sourceOrg?.focus_area_label ?? null,
@@ -270,7 +278,7 @@ export async function createSandboxForUser(input: {
       // for this same user won the race). Retrying can't resolve the latter
       // — reuse whatever the winner created instead.
       if (insertErr.message?.includes("organizations_one_active_sandbox_per_user")) {
-        const winner = await findActiveSandboxForUser(serviceClient, actor.id);
+        const winner = await findActiveSandboxForUser(serviceClient, actor.id, sessionId);
         if (winner) {
           return { id: winner.id, slug: winner.slug ?? "" };
         }

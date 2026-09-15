@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { resolveVerifiedTotpFactorPresence } from "@dubgrid/authz";
 import {
   mobileProfilePhoneUpdateBodySchema,
   mobileProfilePhoneUpdateResponseSchema,
@@ -231,10 +232,7 @@ export async function PATCHPhone(req: NextRequest) {
   );
 }
 
-// Mirrors /api/account/mfa-status: the actual TOTP enroll/verify/unenroll
-// calls go straight from the mobile app to Supabase's auth.mfa.* endpoints
-// (no backend route needed for those). This route only persists the
-// denormalized profiles.mfa_enabled flag the profile screen displays.
+// This reconciles a display flag, not a factor mutation or a step-up proof.
 export async function PATCHMfaStatus(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
@@ -254,7 +252,12 @@ export async function PATCHMfaStatus(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
-  await updateSelfMfaStatus(auth.user.id, parsed.data.enabled);
+  // requireMobileAuth resolves this user through live Supabase Auth.
+  const enabled = resolveVerifiedTotpFactorPresence(auth.user.factors);
+  if (enabled === null) {
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+  }
+  await updateSelfMfaStatus(auth.user.id, enabled);
 
   const payload = await buildMobileProfilePayload(auth);
   if ("response" in payload) {
@@ -262,7 +265,9 @@ export async function PATCHMfaStatus(req: NextRequest) {
   }
 
   return NextResponse.json(
-    mobileProfileMfaStatusUpdateResponseSchema.parse({ user: payload.user }),
+    mobileProfileMfaStatusUpdateResponseSchema.parse({
+      user: { ...payload.user, mfaEnabled: enabled },
+    }),
   );
 }
 

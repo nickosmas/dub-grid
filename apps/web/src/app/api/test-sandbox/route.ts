@@ -94,29 +94,19 @@ export async function POST(req: NextRequest) {
       .eq("id", auth.user.id)
       .maybeSingle();
 
-    // Which org gets cloned. The claim comes first, because it is the only
-    // value scoped to THIS session: profiles.org_id is a per-user global that
-    // switch_org rewrites on every device, so sourcing from it cloned whichever
-    // org the user last switched to ANYWHERE. A user sitting on org A's
-    // subdomain could press Enter and get a full copy of org B's employees,
-    // schedules and PII, served under org A's slug.
-    //
-    // profiles.org_id stays as the fallback for exactly one case: `reset`,
-    // where a sandbox cookie already exists and the auth layer has rewritten
-    // claims.org_id to the sandbox itself, so the claim can no longer name the
-    // source. On `enter` there is no cookie yet and the claim is correct.
-    const hasSandboxCookie = Boolean(req.cookies.get(SANDBOX_COOKIE_NAME)?.value);
-    const sourceOrgId = hasSandboxCookie
-      ? ((profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims))
-      : (getClaimOrgId(auth.claims) ?? (profile?.org_id as string | undefined) ?? null);
+    const isReset = parsed.data.action === "reset";
+    const existing = await findActiveSandboxForUser(serviceClient, auth.user.id, auth.sessionId);
+
+    // Enter starts from this verified session's organization claim. Reset
+    // starts from the source recorded on the current session's authoritative
+    // sandbox row, never from the globally mutable profiles.org_id fallback.
+    const sourceOrgId = isReset ? (existing?.sourceOrgId ?? null) : getClaimOrgId(auth.claims);
     if (!sourceOrgId) {
       return NextResponse.json(
         { error: "Pick an organization before entering sandbox mode." },
         { status: 400 },
       );
     }
-
-    const isReset = parsed.data.action === "reset";
 
     // Sandbox mode is admin+ only (mirrors Header.tsx's client-side
     // canOpenSandbox gate) — enforce it server-side too. auth.claims.org_role
@@ -149,31 +139,33 @@ export async function POST(req: NextRequest) {
     // For "enter": reuse the existing sandbox if there is one (typical case is
     // the user re-clicking enter from another tab and expecting their
     // in-progress work back). For "reset": ignore it — we recreate below.
-    const existing = isReset ? null : await findActiveSandboxForUser(serviceClient, auth.user.id);
-
-    // For "reset": wipe any existing sandbox first so the recreate step gives
-    // the user a truly fresh clone.
-    if (isReset) {
+    // One sandbox is retained per user. A sandbox from another browser session
+    // is invalid for this request and is removed before this session creates
+    // its own, so stale state cannot silently migrate between sessions.
+    if (isReset || !existing) {
       await deleteSandboxForUser({ serviceClient, actor: auth.user });
     }
 
+    const reusable = isReset ? null : existing;
     const sandbox =
-      existing ??
+      reusable ??
       (await createSandboxForUser({
         serviceClient,
         actor: auth.user,
+        sessionId: auth.sessionId,
         sourceOrgId,
       }));
 
     const response = NextResponse.json({
       success: true,
-      sandbox: { id: sandbox.id, slug: sandbox.slug, reused: Boolean(existing) },
+      sandbox: { id: sandbox.id, slug: sandbox.slug, reused: Boolean(reusable) },
     });
     response.cookies.set(
       SANDBOX_COOKIE_NAME,
       encodeSandboxCookieValue({
         sandboxOrgId: sandbox.id,
         userId: auth.user.id,
+        sessionId: auth.sessionId,
       }),
       {
         path: "/",

@@ -34,4 +34,16 @@ describe("StatusPill", () => {
     expect(pill.getAttribute("style")).toContain("border: 1px solid var(--dg-color-border)");
     expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
   });
+
+  it("keeps a long display label inside a wrapping bounded pill", () => {
+    render(
+      <StatusPill tone="neutral" variant="category">
+        Journal Listed Christian Science Nurse
+      </StatusPill>,
+    );
+
+    expect(screen.getByText("Journal Listed Christian Science Nurse")).toHaveClass(
+      "dg-pill-display",
+    );
+  });
 });

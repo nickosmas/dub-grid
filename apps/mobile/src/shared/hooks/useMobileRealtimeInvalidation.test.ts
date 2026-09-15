@@ -1,24 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { getMobileRealtimeInvalidationKeys } from "../lib/mobile-realtime-invalidation";
+import { mobileQueryKeys } from "../lib/mobile-query-keys";
+
+const TOKEN = "token-1";
 
 describe("getMobileRealtimeInvalidationKeys", () => {
   it("refreshes bootstrap, profile, schedule, requests, and the dashboard for org settings changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "organizations")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "organizations")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
       ["mobile", "schedule"],
       ["mobile", "requests"],
-      ["mobile", "person", "token-1"],
+      mobileQueryKeys.personPrefix(TOKEN),
       ["mobile", "dashboard"],
     ]);
   });
 
   it("refreshes people-facing caches and the dashboard for employee changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "employees")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "employees")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
-      ["mobile", "people", "token-1"],
-      ["mobile", "person", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
+      mobileQueryKeys.people(TOKEN),
+      mobileQueryKeys.personPrefix(TOKEN),
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
@@ -27,34 +30,34 @@ describe("getMobileRealtimeInvalidationKeys", () => {
   });
 
   it("refreshes people-facing caches for people directory relationship changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "organization_memberships")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "organization_memberships")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
-      ["mobile", "people", "token-1"],
-      ["mobile", "person", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
+      mobileQueryKeys.people(TOKEN),
+      mobileQueryKeys.personPrefix(TOKEN),
     ]);
     // invitations also feeds the dashboard's activity feed (accepted
     // invitations show up as "user_signup" activity items).
-    expect(getMobileRealtimeInvalidationKeys("token-1", "invitations")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "invitations")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
-      ["mobile", "people", "token-1"],
-      ["mobile", "person", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
+      mobileQueryKeys.people(TOKEN),
+      mobileQueryKeys.personPrefix(TOKEN),
       ["mobile", "dashboard"],
     ]);
   });
 
   it("refreshes bootstrap-owned data when subscription access changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "subscriptions")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "subscriptions")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
-      ["mobile", "people", "token-1"],
-      ["mobile", "person", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
+      mobileQueryKeys.people(TOKEN),
+      mobileQueryKeys.personPrefix(TOKEN),
     ]);
   });
 
   it("refreshes schedule, derived request availability, and the dashboard for schedule cell changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "schedule_cells")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "schedule_cells")).toEqual([
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
@@ -63,22 +66,22 @@ describe("getMobileRealtimeInvalidationKeys", () => {
   });
 
   it("refreshes the profile-change-requests queue when a request row changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "profile_change_requests")).toEqual([
-      ["mobile", "profile-change-requests"],
-      ["mobile", "profile", "change-requests", "token-1"],
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "profile_change_requests")).toEqual([
+      mobileQueryKeys.adminProfileChangeRequests(TOKEN),
+      mobileQueryKeys.profileChangeRequests(TOKEN),
     ]);
   });
 
   it("refreshes the notifications inbox, bootstrap, and facets when a notification row changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "notifications")).toEqual([
-      ["mobile", "notifications-infinite"],
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "notifications")).toEqual([
+      mobileQueryKeys.notificationsPrefix(TOKEN),
       ["mobile", "bootstrap"],
-      ["mobile", "notification-facets", "token-1"],
+      mobileQueryKeys.notificationFacets(TOKEN),
     ]);
   });
 
   it("refreshes schedule + requests + the dashboard when recurring shifts change", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "recurring_shifts")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "recurring_shifts")).toEqual([
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
@@ -87,20 +90,20 @@ describe("getMobileRealtimeInvalidationKeys", () => {
   });
 
   it("refreshes schedule and the dashboard on publish history changes", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "publish_history")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "publish_history")).toEqual([
       ["mobile", "schedule"],
       ["mobile", "dashboard"],
     ]);
   });
 
   it("refreshes bootstrap + profile for audit-log and impersonation events", () => {
-    expect(getMobileRealtimeInvalidationKeys("token-1", "audit_log")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "audit_log")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
     ]);
-    expect(getMobileRealtimeInvalidationKeys("token-1", "impersonation_sessions")).toEqual([
+    expect(getMobileRealtimeInvalidationKeys(TOKEN, "impersonation_sessions")).toEqual([
       ["mobile", "bootstrap"],
-      ["mobile", "profile", "token-1"],
+      mobileQueryKeys.profile(TOKEN),
     ]);
   });
 });

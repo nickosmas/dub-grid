@@ -5,11 +5,17 @@ import {
   optimisticPatch,
   type OptimisticMutationOptions,
 } from "./useOptimisticMutation";
+import { mobileQueryKeys } from "../lib/mobile-query-keys";
 
 type Counter = { value: number };
 type Variables = { by: number };
 
 const COUNTER_KEY = ["test", "counter"] as const;
+
+function tokenFor(version: string) {
+  const payload = btoa(JSON.stringify({ sub: "user-1", org_id: "org-1" }));
+  return `header.${payload}.${version}`;
+}
 
 describe("createOptimisticMutationLifecycle", () => {
   let queryClient: QueryClient;
@@ -83,6 +89,41 @@ describe("createOptimisticMutationLifecycle", () => {
     expect(pushToast).toHaveBeenCalledWith(
       expect.objectContaining({ tone: "error", title: "Could not save" }),
     );
+  });
+
+  it("rolls an optimistic write back through a same-identity token rotation", async () => {
+    const firstKey = mobileQueryKeys.notificationPreferences(tokenFor("v1"));
+    const rotatedKey = mobileQueryKeys.notificationPreferences(tokenFor("v2"));
+    queryClient.setQueryData(firstKey, { value: 10 });
+    const lifecycle = build({
+      patches: [
+        optimisticPatch<Counter, Variables>(firstKey, (previous, variables) =>
+          previous ? { value: previous.value + variables.by } : previous,
+        ),
+      ],
+    });
+
+    const context = await lifecycle.onMutate({ by: 5 });
+    expect(queryClient.getQueryData(rotatedKey)).toEqual({ value: 15 });
+
+    lifecycle.onError(new Error("boom"), { by: 5 }, context);
+    expect(queryClient.getQueryData(rotatedKey)).toEqual({ value: 10 });
+  });
+
+  it("reconciles a successful write through the rotated token's stable key", async () => {
+    const firstKey = mobileQueryKeys.people(tokenFor("v1"));
+    const rotatedKey = mobileQueryKeys.people(tokenFor("v2"));
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    const lifecycle = build({
+      patches: [optimisticPatch<Counter, Variables>(firstKey, () => ({ value: 2 }))],
+    });
+
+    const context = await lifecycle.onMutate({ by: 1 });
+    await lifecycle.onSuccess("ok", { by: 1 });
+    lifecycle.onSettled("ok", null, { by: 1 });
+
+    expect(context.snapshots[0]?.queryKey).toEqual(rotatedKey);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: rotatedKey });
   });
 
   it("rolls back to undefined when there was no cached value to begin with", async () => {

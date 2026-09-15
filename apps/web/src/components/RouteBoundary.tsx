@@ -15,7 +15,7 @@ const shellStyle = {
   gap: 16,
   padding: 24,
   textAlign: "center" as const,
-  fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+  fontFamily: "var(--font-sans)",
 };
 
 const titleStyle = {

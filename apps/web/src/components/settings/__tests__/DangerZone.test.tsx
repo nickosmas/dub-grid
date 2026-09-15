@@ -9,12 +9,20 @@ const mockIsInSandbox = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 const captureException = vi.fn();
+const stepUpRun = vi.fn();
+const requireCredentialAssurance = vi.fn();
 
 vi.mock("@/hooks", () => ({
   useLogout: () => ({ signOut: mockSignOut }),
   useIsInSandbox: () => mockIsInSandbox(),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
+}));
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+vi.mock("@/features/account/client", () => ({
+  requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -46,6 +54,11 @@ function openDialog() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsInSandbox.mockReturnValue(false);
+  stepUpRun.mockReset().mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+    await action("fresh-token");
+    return true;
+  });
+  requireCredentialAssurance.mockReset().mockResolvedValue({ success: true });
   // Default: 200 OK
   vi.stubGlobal(
     "fetch",
@@ -94,6 +107,10 @@ describe("DangerZone", () => {
       "/api/organizations/delete",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer fresh-token",
+        },
         body: JSON.stringify({
           orgId: organization.id,
           confirmation: CONFIRM_PHRASE,
@@ -103,6 +120,20 @@ describe("DangerZone", () => {
     expect(mockSignOut).toHaveBeenCalledWith({ scope: "global" });
     expect(toastSuccess).toHaveBeenCalledWith("Organization deleted.");
     expect(toastError).not.toHaveBeenCalled();
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+  });
+
+  it("keeps the typed confirmation and does not delete when step-up is cancelled", async () => {
+    stepUpRun.mockResolvedValueOnce(false);
+    render(<DangerZone organization={organization} />);
+    openDialog();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: CONFIRM_PHRASE } });
+    const confirmButtons = screen.getAllByRole("button", { name: /delete organization/i });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    await screen.findByDisplayValue(CONFIRM_PHRASE);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Delete organization" })).toBeInTheDocument();
   });
 
   it("toasts a generic message on a failed delete and does not sign out", async () => {

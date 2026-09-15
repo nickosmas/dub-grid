@@ -5,6 +5,7 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpace,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   mobileTypography,
@@ -95,7 +96,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailShiftChangeBadgeText: {
       ...mobileText.badge,
       color: mobileColors.brand,
-      fontWeight: "700",
       textTransform: "none",
     },
     detailHeroTitle: {
@@ -217,6 +217,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailTimeValue: {
       ...mobileText.rowTitle,
+      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     previousShiftSheetDetails: {
@@ -265,6 +266,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailDateDay: {
       ...mobileText.heroMetric,
+      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     detailShiftTitle: {
@@ -409,6 +411,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     shiftmateSegmentTime: {
       flexShrink: 0,
       ...mobileTextWeighted("meta", "semibold"),
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     shiftmateRow: {
@@ -540,6 +543,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     swapSummaryDate: {
       ...mobileTextWeighted("meta", "medium"),
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     swapSummaryNote: {
@@ -746,7 +750,8 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       textTransform: "uppercase",
     },
     swapDateChipDay: {
-      // 800 was never reachable - DM Sans stops at 700.
+      ...mobileTabularText,
+      // The bundled product scale stops at 700.
       fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 20,
       lineHeight: 24,
@@ -771,6 +776,7 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     swapDateChipCountText: {
       ...mobileText.micro,
+      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     swapDateChipCountTextActive: {

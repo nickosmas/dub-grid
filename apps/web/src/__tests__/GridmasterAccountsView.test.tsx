@@ -1,17 +1,26 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import type { GridmasterAccount, Organization } from "@/types";
 
 const mockFetchGridmasterAccounts = vi.fn();
+const mockForceLogoutGridmasterUser = vi.fn();
+const stepUpRun = vi.fn();
+const requireCredentialAssurance = vi.fn();
 
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterAccounts: () => mockFetchGridmasterAccounts(),
   promoteGridmasterAccount: vi.fn(),
   demoteGridmasterAccount: vi.fn(),
   updateGridmasterAccountActivation: vi.fn(),
-  forceLogoutGridmasterUser: vi.fn(),
+  forceLogoutGridmasterUser: (...args: unknown[]) => mockForceLogoutGridmasterUser(...args),
+}));
+vi.mock("@/hooks/useStepUpAction", () => ({
+  useStepUpAction: () => ({ run: stepUpRun, dialog: null }),
+}));
+vi.mock("@/features/account/client", () => ({
+  requireCredentialAssurance: (...args: unknown[]) => requireCredentialAssurance(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -67,6 +76,16 @@ function renderView() {
 }
 
 describe("GridmasterAccountsView", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stepUpRun.mockImplementation(async (action: (token: string) => Promise<unknown>) => {
+      await action("fresh-token");
+      return true;
+    });
+    requireCredentialAssurance.mockResolvedValue({ success: true });
+    mockForceLogoutGridmasterUser.mockResolvedValue({ success: true });
+  });
+
   it("renders gridmaster-only management without impersonation controls", async () => {
     mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
 
@@ -81,5 +100,22 @@ describe("GridmasterAccountsView", () => {
       expect(screen.getAllByRole("button", { name: "Demote" })[0]).toBeDisabled();
       expect(screen.getAllByRole("button", { name: "Deactivate" })[0]).toBeDisabled();
     });
+  });
+
+  it("requires fresh assurance before force logout", async () => {
+    mockFetchGridmasterAccounts.mockResolvedValueOnce({ accounts });
+    renderView();
+
+    const buttons = await screen.findAllByRole("button", { name: "Force Logout" });
+    fireEvent.click(buttons[1]);
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Force logout" })).getByRole("button", {
+        name: "Force logout",
+      }),
+    );
+
+    await waitFor(() => expect(mockForceLogoutGridmasterUser).toHaveBeenCalledOnce());
+    expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
+    expect(mockForceLogoutGridmasterUser).toHaveBeenCalledWith(accounts[1].id, "fresh-token");
   });
 });

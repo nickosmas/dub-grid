@@ -5,6 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { deadInvitationResponse, isDeadInvitationError } from "@/lib/auth/invitation-capability";
 
 const postSchema = z.object({
   token: z.string().trim().min(1),
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase.rpc("accept_invitation", {
       p_token: parsed.data.token,
     });
-    if (error) throw error;
+    if (error) {
+      if (isDeadInvitationError(error)) return deadInvitationResponse();
+      throw error;
+    }
 
     const orgId = data.org_id as string;
     if (orgId) {
@@ -55,6 +59,7 @@ export async function POST(req: NextRequest) {
       orgSlug: (data.org_slug as string | null) ?? null,
     });
   } catch (error) {
+    if (isDeadInvitationError(error)) return deadInvitationResponse();
     return apiErrorResponse(error, "We couldn't accept invitation. Try again.");
   }
 }

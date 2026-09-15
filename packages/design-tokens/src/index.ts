@@ -318,11 +318,11 @@ export const typographyTokens = {
 
 export const mobileTypographyTokens = {
   fontFamily: {
-    base: "DMSans_400Regular",
-    regular: "DMSans_400Regular",
-    medium: "DMSans_500Medium",
-    semibold: "DMSans_600SemiBold",
-    bold: "DMSans_700Bold",
+    base: "Inter_400Regular",
+    regular: "Inter_400Regular",
+    medium: "Inter_500Medium",
+    semibold: "Inter_600SemiBold",
+    bold: "Inter_700Bold",
   },
   fontWeight: {
     regular: "400",
@@ -334,12 +334,12 @@ export const mobileTypographyTokens = {
    * Weight lives in `fontFamily` alone - these tokens deliberately carry no
    * `fontWeight`, and adding one back silently breaks Android.
    *
-   * DM Sans ships as four separate single-weight files, and `expo-font`
+   * Inter ships as four separate single-weight files, and `expo-font`
    * registers each one under its own family name at style NORMAL only. Naming a
-   * numeric weight next to the family reads as harmless (`DMSans_700Bold` is
+   * numeric weight next to the family reads as harmless (`Inter_700Bold` is
    * already 700) but sends Android down a different path: it asks that
    * one-face family for a BOLD face, finds none registered and no
-   * `DMSans_700Bold_bold` asset to load, and falls back to the *system* font.
+   * `Inter_700Bold_bold` asset to load, and falls back to the *system* font.
    * The text renders in Roboto, at roughly the right weight, which is why this
    * hid for so long - only anything at 500 and up was affected, since 400
    * resolves to the NORMAL face that is actually there. iOS resolves the family
@@ -350,65 +350,71 @@ export const mobileTypographyTokens = {
    */
   text: {
     screenTitle: {
-      fontFamily: "DMSans_700Bold",
+      fontFamily: "Inter_700Bold",
       fontSize: 22,
       lineHeight: 28,
     },
     heroMetric: {
-      fontFamily: "DMSans_700Bold",
+      fontFamily: "Inter_700Bold",
       fontSize: 24,
       lineHeight: 30,
     },
     sectionTitle: {
-      fontFamily: "DMSans_700Bold",
+      fontFamily: "Inter_700Bold",
       fontSize: 16,
       lineHeight: 22,
     },
     cardTitle: {
-      fontFamily: "DMSans_600SemiBold",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 16,
       lineHeight: 22,
     },
     rowTitle: {
-      fontFamily: "DMSans_600SemiBold",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 15,
       lineHeight: 21,
     },
     body: {
-      fontFamily: "DMSans_400Regular",
+      fontFamily: "Inter_400Regular",
       fontSize: 14,
       lineHeight: 21,
     },
     bodyStrong: {
-      fontFamily: "DMSans_600SemiBold",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 14,
       lineHeight: 21,
     },
     meta: {
-      fontFamily: "DMSans_400Regular",
+      fontFamily: "Inter_400Regular",
       fontSize: 13,
       lineHeight: 18,
     },
     label: {
-      fontFamily: "DMSans_600SemiBold",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 12,
       lineHeight: 16,
     },
     caption: {
-      fontFamily: "DMSans_400Regular",
+      fontFamily: "Inter_400Regular",
       fontSize: 12,
       lineHeight: 16,
     },
     badge: {
-      fontFamily: "DMSans_700Bold",
+      fontFamily: "Inter_700Bold",
       fontSize: 11,
       lineHeight: 14,
     },
     micro: {
-      fontFamily: "DMSans_600SemiBold",
+      fontFamily: "Inter_600SemiBold",
       fontSize: 10,
       lineHeight: 12,
     },
+  },
+} as const;
+
+export const mobileBrandTypographyTokens = {
+  wordmark: {
+    fontFamily: "DMSans_700Bold",
   },
 } as const;
 
@@ -615,20 +621,20 @@ export function borderColorFromText(textHex: string, opacity = 0.35): string {
 
 const mobileNavigationFonts = {
   regular: {
-    fontFamily: "DMSans_400Regular",
-    fontWeight: "400",
+    fontFamily: "Inter_400Regular",
+    fontWeight: "normal",
   },
   medium: {
-    fontFamily: "DMSans_500Medium",
-    fontWeight: "500",
+    fontFamily: "Inter_500Medium",
+    fontWeight: "normal",
   },
   bold: {
-    fontFamily: "DMSans_600SemiBold",
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    fontWeight: "normal",
   },
   heavy: {
-    fontFamily: "DMSans_700Bold",
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
+    fontWeight: "normal",
   },
 } as const;
 

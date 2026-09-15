@@ -5,6 +5,11 @@ const requireAuthenticatedUserWithClaims = vi.fn();
 const getImpersonationFromCookie = vi.fn();
 const verifyImpersonationSession = vi.fn();
 const serviceFrom = vi.fn();
+const fetchSelfProfileSnapshot = vi.fn();
+
+vi.mock("@/features/account/server/profile", () => ({
+  fetchSelfProfileSnapshot: (...args: unknown[]) => fetchSelfProfileSnapshot(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
@@ -70,6 +75,7 @@ function makeAuth(opts?: {
   return {
     user: { id: USER_ID, email: "user@example.com", factors: opts?.factors },
     session: { access_token: "test-token" },
+    sessionId: "auth-session-1",
     claims: {
       sub: USER_ID,
       platform_role: opts?.platformRole ?? "none",
@@ -82,6 +88,7 @@ function makeAuth(opts?: {
 describe("GET /api/account/permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: false });
     tableResults.clear();
     requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth());
     getImpersonationFromCookie.mockReturnValue(null);
@@ -356,6 +363,15 @@ describe("GET /api/account/permissions", () => {
   });
 
   describe("mfaNagRequired", () => {
+    it("does not claim MFA is disabled when the reconciled profile is unavailable", async () => {
+      fetchSelfProfileSnapshot.mockResolvedValue(null);
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+      );
+      const response = await request();
+      expect((await response.json()).mfaNagRequired).toBe(false);
+    });
+
     it("nags a super_admin with no verified TOTP factor", async () => {
       requireAuthenticatedUserWithClaims.mockResolvedValue(
         makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
@@ -367,12 +383,12 @@ describe("GET /api/account/permissions", () => {
       expect(body.mfaNagRequired).toBe(true);
     });
 
-    it("does not nag a super_admin who has a verified TOTP factor", async () => {
+    it("does not nag an enrolled super_admin even when the JWT user has no factors", async () => {
+      fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: true });
       requireAuthenticatedUserWithClaims.mockResolvedValue(
         makeAuth({
           orgId: ORG_ID,
           orgRole: "super_admin",
-          factors: [{ factor_type: "totp", status: "verified" }],
         }),
       );
 
@@ -380,9 +396,10 @@ describe("GET /api/account/permissions", () => {
 
       const body = await response.json();
       expect(body.mfaNagRequired).toBe(false);
+      expect(fetchSelfProfileSnapshot).toHaveBeenCalledExactlyOnceWith(USER_ID);
     });
 
-    it("does not nag a super_admin whose only TOTP factor is unverified", async () => {
+    it("still nags when enrollment has not been reconciled as enabled", async () => {
       requireAuthenticatedUserWithClaims.mockResolvedValue(
         makeAuth({
           orgId: ORG_ID,
@@ -421,6 +438,7 @@ describe("GET /api/account/permissions", () => {
     });
 
     it("reflects the impersonating gridmaster's own MFA status, not the target's", async () => {
+      fetchSelfProfileSnapshot.mockResolvedValue({ mfaEnabled: true });
       getImpersonationFromCookie.mockReturnValue({
         sessionId: "session-1",
         targetOrgId: ORG_ID,
@@ -430,6 +448,8 @@ describe("GET /api/account/permissions", () => {
       verifyImpersonationSession.mockResolvedValue({
         targetOrgId: ORG_ID,
         targetUserId: "target-user",
+        targetOrgRole: "user",
+        targetOrgSlug: "calm-haven",
       });
       requireAuthenticatedUserWithClaims.mockResolvedValue(
         makeAuth({
@@ -448,6 +468,7 @@ describe("GET /api/account/permissions", () => {
         expect.anything(),
         "session-1",
         USER_ID,
+        "auth-session-1",
       );
     });
 

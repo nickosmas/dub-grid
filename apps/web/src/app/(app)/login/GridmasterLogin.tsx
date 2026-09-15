@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
-import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { DubGridLogo } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -22,7 +21,8 @@ import {
   useClientHost,
   useSessionInvalidToast,
 } from "./shared";
-import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
+import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
+import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 
 export default function GridmasterLogin() {
   const router = useRouter();
@@ -31,6 +31,7 @@ export default function GridmasterLogin() {
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
+  const submittingRef = useRef(false);
 
   useSessionInvalidToast();
 
@@ -39,6 +40,8 @@ export default function GridmasterLogin() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
 
     try {
@@ -56,20 +59,15 @@ export default function GridmasterLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(
-            extractErrorMessage(
-              result.error,
-              "Too many sign-in attempts. Wait a few minutes and try again.",
-            ),
-          );
+          toast.error("Too many sign-in attempts. Wait a few minutes and try again.");
           setLoading(false);
           return;
         }
-        if (res.status === 403 && result.code === ACCOUNT_DISABLED_CODE) {
+        if (res.status === 403 && result?.code === ACCOUNT_DISABLED_CODE) {
           setAccountDisabled(true);
           setPassword("");
           setLoading(false);
@@ -80,16 +78,21 @@ export default function GridmasterLogin() {
           setLoading(false);
           return;
         }
-        toast.error(extractErrorMessage(result.error, "We couldn't sign you in. Try again."));
+        toast.error(
+          getWebAuthRecoveryMessage({ status: res.status }, "We couldn't sign you in. Try again."),
+        );
         setLoading(false);
         return;
       }
+      if (!result) throw Object.assign(new Error("Unexpected login response"), { status: 502 });
 
       // Set the session in the client using the tokens from the server
-      await setBrowserSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      });
+      await settleWithRequestTimeout(
+        setBrowserSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        }),
+      );
 
       // Check if MFA is required before proceeding
       if (result.mfa_required) {
@@ -104,15 +107,10 @@ export default function GridmasterLogin() {
       markAuthTransition();
       router.replace(result.destination);
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err, "").toLowerCase();
-      if (isRequestTimeout(err)) {
-        toast.error("That took too long. Check your connection and try again.");
-      } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Check your connection and try again.");
-      } else {
-        toast.error("We couldn't sign you in. Try again.");
-      }
+      toast.error(getWebAuthRecoveryMessage(err, "We couldn't sign you in. Try again."));
       setLoading(false);
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -120,16 +118,9 @@ export default function GridmasterLogin() {
     // After MFA verification, refresh session and navigate. Must handle a
     // refresh failure (network/token hiccup) — otherwise the MFA screen hangs
     // forever with an unhandled rejection. Mirrors the org-login path. (H-3)
-    try {
-      await refreshBrowserSession();
-      markAuthTransition();
-      router.replace(await resolvePostLoginDestination());
-    } catch {
-      toast.error("We couldn't verify your session. Sign in again.");
-      void signOutFromBrowser("local");
-      setMfaRequired(false);
-      setLoading(false);
-    }
+    await settleWithRequestTimeout(refreshBrowserSession());
+    markAuthTransition();
+    router.replace(await settleWithRequestTimeout(resolvePostLoginDestination()));
   }
 
   function handleMFACancel() {

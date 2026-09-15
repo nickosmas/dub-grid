@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
+import { parseInternalDestination } from "@/lib/auth/integrity-contract";
 
 /**
  * Server-side PKCE code exchange callback.
@@ -16,8 +17,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const rawNext = searchParams.get("next") ?? "/";
-  // Sanitize: must be a relative path, no protocol-relative URLs
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const next = parseInternalDestination(rawNext, "/");
 
   if (code) {
     const cookieStore = await cookies();
@@ -35,10 +35,7 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const redirectTo = request.nextUrl.clone();
-      redirectTo.pathname = next;
-      redirectTo.searchParams.delete("code");
-      redirectTo.searchParams.delete("next");
+      const redirectTo = new URL(next, request.nextUrl.origin);
       return NextResponse.redirect(redirectTo);
     }
   }

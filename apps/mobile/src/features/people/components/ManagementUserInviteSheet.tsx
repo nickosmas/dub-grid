@@ -213,7 +213,6 @@ export function ManagementUserInviteSheet({
               keyboardType="email-address"
               autoComplete="email"
               autoCorrect={false}
-              textContentType="emailAddress"
               label="Email"
               onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
               value={draft.email}
@@ -223,7 +222,6 @@ export function ManagementUserInviteSheet({
               error={showErrors ? phoneError : null}
               keyboardType="phone-pad"
               autoComplete="tel"
-              textContentType="telephoneNumber"
               label="Phone (optional)"
               onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
               value={draft.phone}

@@ -3,8 +3,10 @@ import {
   mobileAuthLoginResponseSchema,
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestBodySchema,
+  mobileDashboardMetricsSchema,
   mobileNotificationPreferencesResponseSchema,
   mobileNotificationSchema,
+  mobileOrgStatusResponseSchema,
   mobilePersonSchema,
   mobilePersonResponseSchema,
   mobilePersonUpdateBodySchema,
@@ -30,6 +32,50 @@ import { scheduleCellStateSchema } from "./schedule";
 import { getOptionalUsPhoneError, normalizeOptionalUsPhone, staffNameSchema } from "./staff";
 
 describe("mobile contracts", () => {
+  it("accepts a privacy-redacted organization status", () => {
+    expect(
+      mobileOrgStatusResponseSchema.parse({
+        state: "unavailable",
+        isLocked: true,
+        trialGraceEndsAt: null,
+        orgRole: "admin",
+      }),
+    ).toEqual({
+      state: "unavailable",
+      isLocked: true,
+      trialGraceEndsAt: null,
+      orgRole: "admin",
+    });
+  });
+
+  it("distinguishes redacted dashboard drafts from an authorized zero", () => {
+    const baseMetrics = {
+      coveragePct: 100,
+      openGapCount: 0,
+      pendingApprovalsCount: 0,
+    };
+
+    expect(
+      mobileDashboardMetricsSchema.parse({ ...baseMetrics, draftSummary: null }),
+    ).toMatchObject({
+      draftSummary: null,
+    });
+    expect(
+      mobileDashboardMetricsSchema.parse({
+        ...baseMetrics,
+        draftSummary: { newCount: 0, modifiedCount: 0, deletedCount: 0, total: 0 },
+      }),
+    ).toMatchObject({
+      draftSummary: { total: 0 },
+    });
+    expect(
+      mobileDashboardMetricsSchema.safeParse({
+        ...baseMetrics,
+        draftSummary: { newCount: 1, modifiedCount: 0, deletedCount: 0, total: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects invalid schedule state combinations before API handlers reach SQL", () => {
     expect(
       scheduleCellStateSchema.safeParse({

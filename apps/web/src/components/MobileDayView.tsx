@@ -687,6 +687,7 @@ export default function MobileDayView({
                         side="top"
                       >
                         <span
+                          className="dg-tabular-nums"
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,

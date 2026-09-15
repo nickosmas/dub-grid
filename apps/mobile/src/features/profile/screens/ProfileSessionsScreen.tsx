@@ -12,6 +12,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { getProfileSessions, revokeProfileSession } from "../../../shared/lib/api";
 import {
   disablePushForCurrentDevice,
@@ -35,6 +36,7 @@ import { ProfileSection } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { SessionDetailSheet } from "../components/SessionDetailSheet";
 import { SignOutScopeSheet, type SignOutScope } from "../components/SignOutScopeSheet";
+import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 import {
   formatSessionDeviceLabel,
   formatSessionClient,
@@ -63,6 +65,7 @@ export default function ProfileSessionsScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const handoff = useModalHandoff();
+  const stepUp = useMobileStepUpAction();
   const [openSession, setOpenSession] = useState<MobileProfileSession | null>(null);
   const [isScopeSheetVisible, setScopeSheetVisible] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<SessionConfirmation | null>(null);
@@ -70,12 +73,18 @@ export default function ProfileSessionsScreen() {
   const [isStaleOpen, setStaleOpen] = useState(false);
 
   const sessionsQuery = useQuery({
-    queryKey: ["mobile", "profile", "sessions", accessToken],
-    queryFn: () => getProfileSessions(accessToken!),
+    queryKey: mobileQueryKeys.profileSessions(accessToken),
+    queryFn: ({ signal }) => getProfileSessions(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const revokeMutation = useMutation({
-    mutationFn: (refreshTokenHash: string) => revokeProfileSession(accessToken!, refreshTokenHash),
+    mutationFn: ({
+      actionAccessToken,
+      refreshTokenHash,
+    }: {
+      actionAccessToken: string;
+      refreshTokenHash: string;
+    }) => revokeProfileSession(actionAccessToken, refreshTokenHash),
     onSuccess: async () => {
       await sessionsQuery.refetch();
       pushToast({
@@ -142,12 +151,12 @@ export default function ProfileSessionsScreen() {
     }
   }
 
-  function confirmSessionAction(): Promise<void> | undefined {
+  async function confirmSessionAction(): Promise<void> {
     const action = pendingConfirmation;
-    setPendingConfirmation(null);
     if (!action) return;
 
     if (action.kind === "scope") {
+      setPendingConfirmation(null);
       // One modal at a time: the confirmation has already gone, the sheet
       // follows once it has finished leaving. Tearing both down in one commit
       // is the case iOS drops, which left the scope sheet up over a signed-out
@@ -161,11 +170,20 @@ export default function ProfileSessionsScreen() {
       return;
     }
 
-    handoff(() => setOpenSession(null));
-    return revokeMutation.mutateAsync(action.session.refreshTokenHash).then(
-      () => undefined,
-      () => undefined,
-    );
+    try {
+      const completed = await stepUp.run((actionAccessToken) =>
+        revokeMutation.mutateAsync({
+          actionAccessToken,
+          refreshTokenHash: action.session.refreshTokenHash,
+        }),
+      );
+      if (!completed) return;
+      setPendingConfirmation(null);
+      handoff(() => setOpenSession(null));
+    } catch {
+      // The mutation owns its user-facing error. Keeping both surfaces open
+      // leaves the same device selected for an explicit retry or cancel.
+    }
   }
 
   const isScopeConfirmation = pendingConfirmation?.kind === "scope";
@@ -293,8 +311,9 @@ export default function ProfileSessionsScreen() {
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmSessionAction}
         title={confirmationTitle}
-        visible={pendingConfirmation != null}
+        visible={pendingConfirmation != null && !stepUp.active}
       />
+      {stepUp.sheet}
     </Screen>
   );
 }

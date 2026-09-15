@@ -3,6 +3,7 @@ import type { ErrorBoundaryProps } from "expo-router";
 import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
+import { NativeTabBarPresenceProvider } from "../../src/shared/navigation/NativeTabBarPresence";
 import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
 import { mobileTypography } from "../../src/shared/theme/tokens";
 
@@ -106,34 +107,36 @@ export default function TabsLayout() {
   ];
 
   return (
-    <NativeTabs
-      backgroundColor={mobileColors.surface}
-      badgeBackgroundColor={mobileColors.danger}
-      blurEffect={
-        resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"
-      }
-      disableTransparentOnScrollEdge
-      iconColor={{
-        default: mobileColors.textSubtle,
-        selected: mobileColors.brand,
-      }}
-      labelStyle={{
-        default: {
-          color: mobileColors.textSubtle,
-          fontFamily: mobileTypography.fontFamily.semibold,
-          fontSize: 11,
-        },
-        selected: {
-          color: mobileColors.brand,
-          fontFamily: mobileTypography.fontFamily.bold,
-          fontSize: 11,
-        },
-      }}
-      minimizeBehavior="never"
-      shadowColor={mobileColors.shadow}
-      tintColor={mobileColors.brand}
-    >
-      {tabTriggers}
-    </NativeTabs>
+    <NativeTabBarPresenceProvider>
+      <NativeTabs
+        backgroundColor={mobileColors.surface}
+        badgeBackgroundColor={mobileColors.danger}
+        blurEffect={
+          resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"
+        }
+        disableTransparentOnScrollEdge
+        iconColor={{
+          default: mobileColors.textSubtle,
+          selected: mobileColors.brand,
+        }}
+        labelStyle={{
+          default: {
+            color: mobileColors.textSubtle,
+            fontFamily: mobileTypography.fontFamily.semibold,
+            fontSize: 11,
+          },
+          selected: {
+            color: mobileColors.brand,
+            fontFamily: mobileTypography.fontFamily.bold,
+            fontSize: 11,
+          },
+        }}
+        minimizeBehavior="never"
+        shadowColor={mobileColors.shadow}
+        tintColor={mobileColors.brand}
+      >
+        {tabTriggers}
+      </NativeTabs>
+    </NativeTabBarPresenceProvider>
   );
 }

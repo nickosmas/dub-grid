@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canManageProfileChangeRequests } from "@/features/account/server";
-import {
-  forbidIfSandboxCookie,
-  requireAuthenticatedUserWithClaims,
-  requireFreshAuth,
-} from "@/lib/api-auth";
-import { extractJwtClaims } from "@/features/permissions/shared";
+import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -31,14 +26,10 @@ export async function DELETE(req: NextRequest) {
 
   try {
     // Auth check
-    const auth = await requireAuthenticatedUserWithClaims(req);
+    const auth = await requireSensitiveActionAuth(req);
     if ("response" in auth) return auth.response;
     const { user } = auth;
-    // Irreversible: don't act on a locally verified token that could be up to
-    // an hour old. Confirm with Supabase Auth that this caller is still live.
-    const stale = await requireFreshAuth(req, user.id);
-    if (stale) return stale;
-    const { orgId } = extractJwtClaims(auth.session.access_token);
+    const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
 
     // Rate-limit: this is a destructive, irreversible endpoint.
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);

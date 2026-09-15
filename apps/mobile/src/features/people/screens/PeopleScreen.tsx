@@ -44,6 +44,7 @@ import {
 } from "../../../shared/lib/api";
 import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import { getDepartmentNames } from "../../../shared/lib/departments";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import {
   getClientFriendlyErrorMessage,
   pushClientFriendlyErrorToast,
@@ -197,20 +198,20 @@ export default function PeopleScreen() {
     bootstrapQuery.data?.permissions.canManageManagementAccess,
   );
   const peopleQuery = useQuery({
-    queryKey: ["mobile", "people", accessToken],
-    queryFn: () => getPeople(accessToken!),
+    queryKey: mobileQueryKeys.people(accessToken),
+    queryFn: ({ signal }) => getPeople(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   // The roster is a different union from the staff directory: it includes
   // people with no `employees` row at all, who the people endpoint can't see.
   const managementUsersQuery = useQuery({
-    queryKey: ["mobile", "management-users", accessToken],
-    queryFn: () => getManagementUsers(accessToken!),
+    queryKey: mobileQueryKeys.managementUsers(accessToken),
+    queryFn: ({ signal }) => getManagementUsers(accessToken!, signal),
     enabled: Boolean(accessToken) && (canManageManagementAccess || canManageEmployees),
   });
   const profileRequestsQuery = useQuery({
-    queryKey: ["mobile", "profile-change-requests", "admin", accessToken],
-    queryFn: () => getAdminProfileChangeRequests(accessToken!),
+    queryKey: mobileQueryKeys.adminProfileChangeRequests(accessToken),
+    queryFn: ({ signal }) => getAdminProfileChangeRequests(accessToken!, signal),
     enabled: Boolean(accessToken) && canManageEmployees,
   });
   const resolveRequestMutation = useMutation({

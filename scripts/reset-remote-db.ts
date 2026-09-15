@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "fs";
 import { createInterface } from "node:readline/promises";
 import { connectSqlClient } from "./lib/db-client";
+import { protectedProductionRefs } from "./lib/migration-readiness";
 
 /**
  * Project refs this script will not drop, whatever the operator types.
@@ -13,12 +14,7 @@ import { connectSqlClient } from "./lib/db-client";
  * exact ref, so no blanket truthy value opens it, and `CONFIRM_RESET=yes` does
  * not bypass it: automation can skip the prompt but never the denylist.
  */
-const PRODUCTION_PROJECT_REFS = new Set(
-  (process.env.PRODUCTION_PROJECT_REFS ?? "xpoylacxkbphnudsupuu")
-    .split(",")
-    .map((ref) => ref.trim())
-    .filter(Boolean),
-);
+const PRODUCTION_PROJECT_REFS = protectedProductionRefs(process.env.PRODUCTION_PROJECT_REFS);
 
 function refuseProductionReset(ref: string): void {
   if (!PRODUCTION_PROJECT_REFS.has(ref)) return;

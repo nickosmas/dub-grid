@@ -1,5 +1,9 @@
 import type { MobileAuthLoginBody, MobileAuthLoginResponse } from "@dubgrid/contracts";
-import { buildPermissionContext, type PermissionContext } from "@dubgrid/authz";
+import {
+  buildPermissionContext,
+  type AuthenticationAssuranceClaims,
+  type PermissionContext,
+} from "@dubgrid/authz";
 import type {
   BillingAccessResult,
   AdminPermissions,
@@ -31,7 +35,7 @@ type SignedInSession = {
   token_type: string;
 };
 
-export type MobileAuthClaims = {
+export type MobileAuthClaims = AuthenticationAssuranceClaims & {
   aal?: string;
   org_id?: string;
   org_role?: string;
@@ -101,23 +105,22 @@ function getMobileUserName(user: User): {
 }
 
 function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
-  if (billingAccess.reason === "suspended") {
-    return "Organization unavailable. Contact your organization administrator.";
-  }
-
   if (orgRole === "super_admin") {
+    if (billingAccess.reason === "suspended") {
+      return "Organization unavailable. Contact DubGrid support for help.";
+    }
     return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
+  return "Organization unavailable. Please try again later.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
-  if (orgRole === "super_admin" || orgRole === "admin") {
+  if (orgRole === "super_admin") {
     return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
+  return "Organization unavailable. Please try again later.";
 }
 
 async function requireMobileOrganization(
@@ -317,7 +320,7 @@ export async function resolveMobileAuthContext<
   TOrganizationRow,
   TOrganization extends Pick<
     Organization,
-    "id" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
+    "id" | "archivedAt" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
   > = Organization,
 >(input: {
   accessToken: string;
@@ -358,6 +361,8 @@ export async function resolveMobileAuthContext<
     sessionId: string | null;
     issuedAtMs: number | null;
   }) => Promise<boolean>;
+  /** Lets the sensitive-action adapter turn AAL1 into its structured step-up response. */
+  allowAal1ForStepUp?: boolean;
 }): Promise<ResolvedMobileAuthContext<TOrganization>> {
   const verified = await input.verifyToken(input.accessToken);
   if (!verified) {
@@ -397,11 +402,12 @@ export async function resolveMobileAuthContext<
   const hasVerifiedTotpFactor = (user.factors ?? []).some(
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );
-  if (hasVerifiedTotpFactor && claims.aal !== "aal2") {
+  if (hasVerifiedTotpFactor && claims.aal !== "aal2" && !input.allowAal1ForStepUp) {
     throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 
-  if (claims.platform_role === "gridmaster") {
+  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
+  if (platformRole === "gridmaster") {
     throw new MobileApiRequestError(403, "Gridmaster mobile access is not supported");
   }
 
@@ -439,10 +445,12 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(404, "Organization not found");
   }
 
-  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
   const adminPermissions = currentMembership.admin_permissions ?? null;
   const orgRole = currentMembership.org_role ?? "user";
   const currentOrg = input.mapOrganization(currentOrgRow);
+  if (currentOrg.archivedAt) {
+    throw new MobileApiRequestError(403, "Organization unavailable. Please try again later.");
+  }
   const billingAccess = evaluateOrganizationBillingAccess({
     suspendedAt: currentOrg.suspendedAt,
     subscriptionStatus: currentOrg.subscriptionStatus,

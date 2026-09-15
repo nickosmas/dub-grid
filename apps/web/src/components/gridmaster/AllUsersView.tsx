@@ -23,6 +23,8 @@ import {
   updateGridmasterUserActivation,
 } from "@/features/gridmaster/client";
 import { queryKeys } from "@/lib/query-keys";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { requireCredentialAssurance } from "@/features/account/client";
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -98,6 +100,7 @@ export default function AllUsersView({
   onImpersonate: (userId: string, orgId?: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const stepUp = useStepUpAction();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [orgFilter, setOrgFilter] = useState<string>("all");
@@ -203,7 +206,11 @@ export default function AllUsersView({
   async function handleForceLogout(user: PlatformUser) {
     setActionLoading(user.id);
     try {
-      await forceLogoutGridmasterUser(user.id);
+      const completed = await stepUp.run(async (accessToken) => {
+        await requireCredentialAssurance(accessToken);
+        await forceLogoutGridmasterUser(user.id, accessToken);
+      });
+      if (!completed) return;
       toast.success("User sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
@@ -597,7 +604,7 @@ export default function AllUsersView({
       )}
 
       {/* Force logout confirm */}
-      {forceLogoutConfirm && (
+      {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Force logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
@@ -608,6 +615,7 @@ export default function AllUsersView({
           onCancel={() => setForceLogoutConfirm(null)}
         />
       )}
+      {stepUp.dialog}
 
       {/* Password reset confirm */}
       {resetConfirm && (

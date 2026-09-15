@@ -2896,7 +2896,17 @@ async function main() {
   const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "calmhaven")?.id;
   const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "ardenwood")?.id;
 
-  const TEST_USERS = [
+  const TEST_USERS: Array<{
+    email: string;
+    platform_role: "gridmaster" | "none";
+    org_role: "super_admin" | "admin" | "user";
+    label: string;
+    first_name: string;
+    last_name: string;
+    preferred_org: "sunrise-senior" | "calmhaven" | "ardenwood";
+    management_access: boolean;
+    employee_status: "active" | "inactive";
+  }> = [
     {
       email: "nicokosmas.dev@gmail.com",
       platform_role: "gridmaster",
@@ -2905,6 +2915,8 @@ async function main() {
       first_name: "Nicodamus",
       last_name: "Kosmas",
       preferred_org: "sunrise-senior",
+      management_access: false,
+      employee_status: "active",
     },
     {
       email: "nicokosmas@outlook.com",
@@ -2914,6 +2926,8 @@ async function main() {
       first_name: "Nic",
       last_name: "Kosmas",
       preferred_org: "ardenwood",
+      management_access: true,
+      employee_status: "active",
     },
     {
       email: "nicodamusalois@gmail.com",
@@ -2923,6 +2937,8 @@ async function main() {
       first_name: "Nick",
       last_name: "Kosmas",
       preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
     },
     {
       // Dedicated to automated integration tests (see LOCAL_SUPABASE_SUPER_ADMIN_EMAIL
@@ -2935,6 +2951,74 @@ async function main() {
       first_name: "QA",
       last_name: "SuperAdmin",
       preferred_org: "ardenwood",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      email: "qa-regular@dubgrid.test",
+      platform_role: "none",
+      org_role: "user",
+      label: "qa_regular (release qualification)",
+      first_name: "QA",
+      last_name: "Regular",
+      preferred_org: "calmhaven",
+      management_access: false,
+      employee_status: "active",
+    },
+    {
+      email: "qa-management@dubgrid.test",
+      platform_role: "none",
+      org_role: "user",
+      label: "qa_management (release qualification)",
+      first_name: "QA",
+      last_name: "Management",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      email: "qa-inactive@dubgrid.test",
+      platform_role: "none",
+      org_role: "user",
+      label: "qa_inactive (release qualification)",
+      first_name: "QA",
+      last_name: "Inactive",
+      preferred_org: "calmhaven",
+      management_access: false,
+      employee_status: "inactive",
+    },
+    {
+      email: "qa-mfa-chromium@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "qa_mfa_chromium (release qualification)",
+      first_name: "QA",
+      last_name: "MfaChromium",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      email: "qa-mfa-firefox@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "qa_mfa_firefox (release qualification)",
+      first_name: "QA",
+      last_name: "MfaFirefox",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      email: "qa-mfa-webkit@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "qa_mfa_webkit (release qualification)",
+      first_name: "QA",
+      last_name: "MfaWebkit",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
     },
   ];
 
@@ -3094,6 +3178,7 @@ async function main() {
     org_id: string;
     org_role: string;
     admin_permissions: Record<string, boolean> | null;
+    management_access: boolean;
   }> = [];
   for (const user of memberUsers) {
     const adminPermissions =
@@ -3108,6 +3193,7 @@ async function main() {
         org_id: org.id,
         org_role: user.org_role,
         admin_permissions: adminPermissions,
+        management_access: user.management_access,
       });
     }
   }
@@ -3116,15 +3202,17 @@ async function main() {
     await db.query(
       `INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions, department_ids)
        SELECT p.id, m.org_id, m.org_role::org_role, m.admin_permissions,
-              COALESCE(
-                ARRAY(
-                  SELECT d.id FROM public.departments d
-                  WHERE d.org_id = m.org_id AND d.name = 'Tech' AND d.type = 'management'
-                ),
-                '{}'::bigint[]
-              )
+              CASE WHEN m.management_access THEN
+                COALESCE(
+                  ARRAY(
+                    SELECT d.id FROM public.departments d
+                    WHERE d.org_id = m.org_id AND d.name = 'Tech' AND d.type = 'management'
+                  ),
+                  '{}'::bigint[]
+                )
+              ELSE '{}'::bigint[] END
        FROM jsonb_to_recordset($1::jsonb) AS m(
-         email text, org_id uuid, org_role text, admin_permissions jsonb
+         email text, org_id uuid, org_role text, admin_permissions jsonb, management_access boolean
        )
        JOIN auth.users a ON a.email = m.email
        JOIN public.profiles p ON p.id = a.id
@@ -3173,6 +3261,20 @@ async function main() {
   `);
   console.log(`    ✓ Backfilled employees rows for management members`);
 
+  const inactiveQaEmails = TEST_USERS.filter((user) => user.employee_status === "inactive").map(
+    (user) => user.email,
+  );
+  if (inactiveQaEmails.length > 0) {
+    await db.query(
+      `UPDATE public.employees e
+       SET status = 'inactive', focus_area_ids = '{}'
+       FROM auth.users a
+       WHERE e.user_id = a.id
+         AND a.email = ANY($1::text[])`,
+      [inactiveQaEmails],
+    );
+  }
+
   // ── Put the login accounts on the schedule ─────────────────────────────
   // The per-org loop above generates schedule cells only for the anonymous
   // roster it just inserted; the employees rows for real login accounts do
@@ -3198,6 +3300,7 @@ async function main() {
       FROM public.employees e
       WHERE e.user_id IS NOT NULL
         AND e.archived_at IS NULL
+        AND e.status = 'active'
     ),
     donors AS (
       SELECT e.id, e.org_id, e.focus_area_ids,

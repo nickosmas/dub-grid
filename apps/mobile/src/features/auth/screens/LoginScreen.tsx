@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiResponseError } from "@dubgrid/api-client";
+import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { Button } from "../../../shared/components/Button";
 import { AuthField } from "../components/AuthField";
 import { InlineError } from "../../../shared/components/InlineError";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { AuthShell } from "../components/AuthShell";
+import { AuthActions, AuthShell } from "../components/AuthShell";
+import { NetworkConnectionRecoveryScreen } from "./NetworkConnectionRecoveryScreen";
 import {
   useIsConsentDecisionPending,
   useRecheckConsentDecision,
@@ -20,10 +21,11 @@ import {
   getBootstrap,
   loginToOrganization,
   lookupOrganization,
-  registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
 import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
+import { authEntryRecorder } from "../lib/auth-entry-measurement";
+import { settleMobileAuthAction } from "../lib/request-deadline";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
@@ -34,6 +36,7 @@ import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -49,7 +52,6 @@ type PendingMfaLogin = MobileAuthLoginResponse & {
   mfa: NonNullable<MobileAuthLoginResponse["mfa"]>;
 };
 
-const SESSION_HANDOFF_TIMEOUT_MS = 15_000;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(value: string): boolean {
@@ -69,36 +71,12 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
   return ".dubgrid.com";
 }
 
-function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(
-        new Error(
-          "Sign-in is taking longer than expected. Check your internet connection and try again.",
-        ),
-      );
-    }, SESSION_HANDOFF_TIMEOUT_MS);
-
-    promise.then(
-      (value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      },
-    );
-  });
-}
-
 export default function LoginScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const { accessToken, isLoading } = useSessionState();
+  const { accessToken, isLoading, restoreError, retryRestore } = useSessionState();
   const isConsentDecisionPending = useIsConsentDecisionPending();
   const recheckConsentDecision = useRecheckConsentDecision();
-  const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const mfaInputRef = useRef<TextInput>(null);
   // One bar serves every stage's field: the keyboard covers the stage's submit
@@ -123,6 +101,7 @@ export default function LoginScreen() {
   const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [slowSubmission, setSlowSubmission] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(false);
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
@@ -142,7 +121,7 @@ export default function LoginScreen() {
     // consent sheet slid up over it. Wait for the decision instead of racing
     // it: this effect re-runs once consent resolves, and the focus below then
     // lands on a screen the user can actually act on.
-    if (isConsentDecisionPending) {
+    if (isConsentDecisionPending || accessToken) {
       return;
     }
 
@@ -154,24 +133,29 @@ export default function LoginScreen() {
         return;
       }
 
-      // Take the user straight to the credentials step: the saved slug is
-      // enough to attempt sign-in. The cached name renders the subtitle right
-      // away, so a returning user sees their organization named in full even
-      // before (or without) the network lookup below, which only refreshes a
-      // name that may have changed server-side.
+      // A remembered organization is convenience, not proof that the
+      // organization remains available. Keep its slug in the field so retrying
+      // is effortless, but do not expose credentials until the public lookup
+      // confirms an active organization target.
       setOrgSlug(storedOrg.slug);
       setOrgName(storedOrg.name);
-      setStage("credentials");
       setIsResolvingOrgName(!storedOrg.name);
-      setTimeout(() => emailInputRef.current?.focus(), 0);
       try {
         const result = await lookupOrganization(storedOrg.slug);
         if (!active) return;
         setOrgName(result.organization.name);
         setOrgSlug(result.organization.slug);
         await saveLastOrg(result.organization);
-      } catch {
-        // Ignore: the cached name (or the subdomain) still names the target.
+        if (!active) return;
+        setStage("credentials");
+      } catch (organizationError) {
+        if (!active) return;
+        const nextError = getInlineErrorMessageOrToast(pushToast, {
+          error: organizationError,
+          fallbackMessage: "We couldn't find that organization. Check the subdomain and try again.",
+          preferInlineNetworkError: true,
+        });
+        setError(nextError);
       } finally {
         if (active) setIsResolvingOrgName(false);
       }
@@ -180,13 +164,30 @@ export default function LoginScreen() {
     return () => {
       active = false;
     };
-  }, [isConsentDecisionPending]);
+  }, [accessToken, isConsentDecisionPending]);
 
   // No splash here: the only time the session is still restoring is launch, and
   // `StartupSplashGate` is already covering the screen with the app's one
   // splash instance. Rendering another would restart the brand animation.
   if (isLoading) {
     return null;
+  }
+
+  if (restoreError) {
+    return (
+      <NetworkConnectionRecoveryScreen
+        isRetrying={restoringSession}
+        onRetry={async () => {
+          if (restoringSession) return;
+          setRestoringSession(true);
+          try {
+            await retryRestore();
+          } finally {
+            setRestoringSession(false);
+          }
+        }}
+      />
+    );
   }
 
   if (accessToken) {
@@ -196,14 +197,16 @@ export default function LoginScreen() {
   async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
     await saveLastOrg(response.organization);
 
-    const { error: sessionError } = await withSessionHandoffTimeout(
+    const stopSessionHandoff = authEntryRecorder.startPhase("session_handoff");
+    const { error: sessionError } = await settleMobileAuthAction(
       getSupabaseClient().auth.setSession({
         access_token: session.accessToken,
         refresh_token: session.refreshToken,
       }),
-    );
+    ).finally(stopSessionHandoff);
 
     if (sessionError) {
+      authEntryRecorder.cancel("cold_sign_in");
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: sessionError,
         fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
@@ -211,8 +214,6 @@ export default function LoginScreen() {
       setError(nextError);
       return;
     }
-
-    registerMobileSessionPresence(session.accessToken).catch(() => {});
 
     // Warm bootstrap before handing off. The tab tree can't draw its tab bar or
     // pick the Home screen without it, and the launch splash is long spent by
@@ -223,9 +224,13 @@ export default function LoginScreen() {
     await queryClient.prefetchQuery({
       queryKey: buildBootstrapQueryKey(session.accessToken),
       queryFn: () => getBootstrap(session.accessToken),
+      retry: false,
     });
 
     router.replace("/(tabs)/home");
+    requestAnimationFrame(() => {
+      authEntryRecorder.markAuthenticatedNavigationReady("cold_sign_in");
+    });
   }
 
   async function handleOrganizationContinue() {
@@ -246,7 +251,6 @@ export default function LoginScreen() {
       setOrgSlug(result.organization.slug);
       setOrgName(result.organization.name);
       setStage("credentials");
-      setTimeout(() => emailInputRef.current?.focus(), 0);
     } catch (organizationError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: organizationError,
@@ -264,6 +268,7 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     setError(null);
+    authEntryRecorder.start("cold_sign_in");
     try {
       const response = await loginToOrganization({
         orgSlug: orgSlug.trim().toLowerCase(),
@@ -272,6 +277,7 @@ export default function LoginScreen() {
       });
 
       if (response.mfaRequired && response.mfa) {
+        authEntryRecorder.cancel("cold_sign_in");
         setPendingMfaLogin(response as PendingMfaLogin);
         setMfaCode("");
         setPassword("");
@@ -282,6 +288,7 @@ export default function LoginScreen() {
 
       await finishLogin(response);
     } catch (loginError) {
+      authEntryRecorder.cancel("cold_sign_in");
       // The JWT hook refuses terminated employees with a sentinel message
       // (ACCOUNT_DISABLED_CODE) — surface a friendly disabled-account message
       // instead of the generic invalid-credentials fallback.
@@ -317,11 +324,13 @@ export default function LoginScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const verifiedSession = await verifyMobileTotpFactor({
-        session: pendingMfaLogin.session,
-        factorId: pendingMfaLogin.mfa.factorId,
-        code: mfaCode,
-      });
+      const verifiedSession = await settleMobileAuthAction(
+        verifyMobileTotpFactor({
+          session: pendingMfaLogin.session,
+          factorId: pendingMfaLogin.mfa.factorId,
+          code: mfaCode,
+        }),
+      );
 
       await finishLogin(pendingMfaLogin, verifiedSession);
     } catch (mfaError) {
@@ -330,8 +339,10 @@ export default function LoginScreen() {
         fallbackMessage: "We couldn't verify that code right now. Try again in a moment.",
       });
       setError(nextError);
-      setMfaCode("");
-      setTimeout(() => mfaInputRef.current?.focus(), 0);
+      if (!isRetryableAuthRecoveryError(mfaError)) {
+        setMfaCode("");
+        setTimeout(() => mfaInputRef.current?.focus(), 0);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -353,12 +364,16 @@ export default function LoginScreen() {
   // finding out. `styles.subtitle` reserves its height so nothing shifts.
   const orgSubtitle = orgName ? (
     <>
-      Continue to <Text style={styles.subtitleStrong}>{orgName}</Text>.
+      Continue to{" "}
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitleStrong}>
+        {orgName}
+      </Text>
+      .
     </>
   ) : isResolvingOrgName ? null : (
     <>
       Signing in at{" "}
-      <Text style={styles.subtitleStrong}>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitleStrong}>
         {orgSlug}
         {orgSuffix}
       </Text>
@@ -395,8 +410,12 @@ export default function LoginScreen() {
       {stage === "organization" ? (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Sign in</Text>
-            <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Sign in
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              Enter the subdomain for your team.
+            </Text>
           </View>
 
           <View style={styles.fields}>
@@ -421,7 +440,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={orgLoading || !orgSlug.trim()}
@@ -437,9 +456,13 @@ export default function LoginScreen() {
                 onPress={() => setShowOrgHelp((current) => !current)}
                 tone="link"
               />
-            </ActionButtons>
+            </AuthActions>
             {orgLoading ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 {slowSubmission
                   ? "This is taking longer than usual. We’re still checking your Organization."
                   : "Checking your workspace…"}
@@ -447,10 +470,16 @@ export default function LoginScreen() {
             ) : null}
 
             {showOrgHelp ? (
-              <Text style={styles.helperText}>
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperText}>
                 Your subdomain is the first part of your organization URL - for example, the{" "}
-                <Text style={styles.helperStrong}>yourorg</Text> in{" "}
-                <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg
+                </Text>{" "}
+                in{" "}
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg{orgSuffix}
+                </Text>
+                .
               </Text>
             ) : null}
           </View>
@@ -458,24 +487,27 @@ export default function LoginScreen() {
       ) : stage === "credentials" ? (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome back!</Text>
-            <Text style={styles.subtitle}>{orgSubtitle}</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Welcome back!
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              {orgSubtitle}
+            </Text>
           </View>
 
           <View style={styles.fields}>
             <AuthField
               accessibilityLabel="Email"
-              autoCapitalize="none"
               autoComplete="email"
+              autoFocus
+              autoCapitalize="none"
               autoCorrect={false}
               blurOnSubmit={false}
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
               keyboardType="email-address"
               placeholder="Email"
-              ref={emailInputRef}
               returnKeyType="next"
-              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               onSubmitEditing={() => passwordInputRef.current?.focus()}
@@ -484,7 +516,7 @@ export default function LoginScreen() {
             <AuthField
               accessibilityLabel="Password"
               autoCapitalize="none"
-              autoComplete="password"
+              autoComplete="current-password"
               autoCorrect={false}
               hasError={Boolean(error)}
               inputAccessoryViewID={inputAccessoryViewID}
@@ -492,7 +524,6 @@ export default function LoginScreen() {
               ref={passwordInputRef}
               returnKeyType="done"
               secureTextEntry={!showPassword}
-              textContentType="password"
               trailingAccessory={
                 <View style={styles.eyeButton}>
                   <Button
@@ -513,7 +544,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={submitting || !isValidEmail(email) || !password}
@@ -536,9 +567,13 @@ export default function LoginScreen() {
                   });
                 }}
               />
-            </ActionButtons>
+            </AuthActions>
             {submitting && slowSubmission ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 Signing in is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}
@@ -547,8 +582,12 @@ export default function LoginScreen() {
       ) : (
         <View style={styles.stage}>
           <View style={styles.header}>
-            <Text style={styles.title}>Two-factor authentication</Text>
-            <Text style={styles.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
+              Two-factor authentication
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.subtitle}>
+              Enter the 6-digit code from your authenticator app.
+            </Text>
           </View>
 
           <View style={styles.fields}>
@@ -563,7 +602,6 @@ export default function LoginScreen() {
               placeholder="000000"
               ref={mfaInputRef}
               returnKeyType="done"
-              textContentType="oneTimeCode"
               value={mfaCode}
               variant="code"
               onChangeText={(value) => {
@@ -577,7 +615,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.actions}>
-            <ActionButtons
+            <AuthActions
               primaryAction={
                 <Button
                   disabled={submitting || mfaCode.length !== 6}
@@ -597,9 +635,13 @@ export default function LoginScreen() {
                   setError(null);
                 }}
               />
-            </ActionButtons>
+            </AuthActions>
             {submitting && slowSubmission ? (
-              <Text accessibilityLiveRegion="polite" style={styles.progressText}>
+              <Text
+                accessibilityLiveRegion="polite"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.progressText}
+              >
                 Verification is taking longer than usual. We’re still working in the background.
               </Text>
             ) : null}

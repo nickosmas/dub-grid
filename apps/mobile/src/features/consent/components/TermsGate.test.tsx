@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
@@ -13,6 +13,7 @@ const useBootstrap = vi.fn();
 const acceptCurrentTerms = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const invalidateQueries = vi.fn();
+const setQueriesData = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
@@ -26,6 +27,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     ...actual,
     useQueryClient: () => ({
       invalidateQueries: (...args: unknown[]) => invalidateQueries(...args),
+      setQueriesData: (...args: unknown[]) => setQueriesData(...args),
     }),
   };
 });
@@ -74,6 +76,7 @@ describe("TermsGate", () => {
 
     invalidateQueries.mockReset();
     invalidateQueries.mockResolvedValue(undefined);
+    setQueriesData.mockReset();
 
     useSessionState.mockReturnValue({ accessToken: "token-123", isLoading: false });
     acceptCurrentTerms.mockResolvedValue({ acceptedCurrentTerms: true });
@@ -128,6 +131,39 @@ describe("TermsGate", () => {
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["mobile", "bootstrap"],
+    });
+    expect(setQueriesData).toHaveBeenCalledWith(
+      { queryKey: ["mobile", "bootstrap"] },
+      expect.any(Function),
+    );
+  });
+
+  it("does not duplicate acceptance while the first request is active", async () => {
+    let resolveAcceptance: ((value: { acceptedCurrentTerms: true }) => void) | undefined;
+    acceptCurrentTerms.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAcceptance = resolve;
+      }),
+    );
+    useBootstrap.mockReturnValue({ data: { acceptedCurrentTerms: false } });
+
+    renderGate();
+    fireEvent.click(screen.getByText("Accept and continue"));
+    fireEvent.click(screen.getByText("Accept and continue"));
+
+    expect(acceptCurrentTerms).toHaveBeenCalledTimes(1);
+    await act(async () => resolveAcceptance?.({ acceptedCurrentTerms: true }));
+  });
+
+  it("unlatches after acceptance even when the background refresh stalls", async () => {
+    useBootstrap.mockReturnValue({ data: { acceptedCurrentTerms: false } });
+    invalidateQueries.mockReturnValue(new Promise(() => undefined));
+
+    renderGate();
+    fireEvent.click(screen.getByText("Accept and continue"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Accept and continue" })).toBeEnabled();
     });
   });
 

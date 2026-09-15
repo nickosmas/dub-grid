@@ -112,6 +112,15 @@ describe("LoginScreen", () => {
     vi.unstubAllEnvs();
   });
 
+  it("places the organization help link below the primary action", () => {
+    render(<LoginScreen />);
+
+    const primaryAction = screen.getByRole("button", { name: "Continue" });
+    const helpLink = screen.getByRole("button", { name: "Need help with your subdomain?" });
+
+    expect(primaryAction.compareDocumentPosition(helpLink)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("auto-skips to the credentials stage when the remembered organization resolves", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     lookupOrganization.mockResolvedValue({
@@ -130,6 +139,15 @@ describe("LoginScreen", () => {
     expect(screen.getByText(/Continue to/)).toBeInTheDocument();
     expect(screen.getByText("DubGrid Health")).toBeInTheDocument();
     expect(screen.queryByText("dubgrid-health")).not.toBeInTheDocument();
+    const primaryAction = screen.getByRole("button", { name: "Sign In" });
+    const switchOrganization = screen.getByRole("button", { name: "Switch organization" });
+    const forgotPassword = screen.getByRole("button", { name: "Forgot password?" });
+    expect(primaryAction.compareDocumentPosition(switchOrganization)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(primaryAction.compareDocumentPosition(forgotPassword)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(lookupOrganization).toHaveBeenCalledWith("dubgrid-health");
     // Cache the refreshed name so the next launch has it before the network.
     await waitFor(() => {
@@ -139,15 +157,19 @@ describe("LoginScreen", () => {
     });
   });
 
-  // The name is cached alongside the slug precisely so a returning user is
-  // greeted by it at once, including when the lookup never answers.
-  it("names the remembered organization from cache, before the lookup", async () => {
+  it("keeps the remembered organization ready for an actionable retry when lookup fails", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: "DubGrid Health" });
     lookupOrganization.mockRejectedValue(new Error("Network request failed"));
 
     render(<LoginScreen />);
 
-    expect(await screen.findByText(/Continue to/)).toHaveTextContent("Continue to DubGrid Health.");
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't connect right now. Check your internet connection and try again.",
+      ),
+    ).toBeInTheDocument();
   });
 
   // The subdomain is a last resort for when no name is coming. Showing it while
@@ -163,9 +185,8 @@ describe("LoginScreen", () => {
 
     render(<LoginScreen />);
 
-    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
-    expect(screen.queryByText(/Signing in at/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Continue to/)).not.toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
 
     await act(async () => {
       resolveLookup({
@@ -177,22 +198,37 @@ describe("LoginScreen", () => {
       });
     });
 
+    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
     expect(screen.getByText(/Continue to/)).toHaveTextContent("Continue to DubGrid Health.");
   });
 
-  // Without the lookup there is no full organization name to show, and a raw
-  // slug must not stand in for one — name the destination by subdomain instead.
-  it("still goes to the credentials stage even when the remembered lookup fails", async () => {
+  it("does not let a stale remembered organization bypass lookup", async () => {
     loadLastOrg.mockResolvedValue({ slug: "dubgrid-health", name: null });
     lookupOrganization.mockRejectedValue(new Error("Network request failed"));
 
     render(<LoginScreen />);
 
-    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
-    expect(screen.getByText(/Signing in at/)).toHaveTextContent(
-      "Signing in at dubgrid-health.dubgrid.com.",
-    );
-    expect(screen.queryByText(/Continue to/)).not.toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("yourorg")).toHaveValue("dubgrid-health");
+    expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't connect right now. Check your internet connection and try again.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render entry UI over an already authenticated session", () => {
+    useSessionState.mockReturnValue({
+      session: { user: { id: "user-1" } },
+      accessToken: "active-token",
+      isLoading: false,
+    });
+
+    render(<LoginScreen />);
+
+    expect(screen.getByText("redirect:/(tabs)/home")).toBeInTheDocument();
+    expect(loadLastOrg).not.toHaveBeenCalled();
+    expect(lookupOrganization).not.toHaveBeenCalled();
   });
 
   it("verifies the organization before showing the credential form", async () => {
@@ -214,6 +250,19 @@ describe("LoginScreen", () => {
     expect(lookupOrganization).toHaveBeenCalledWith("dubgrid-health");
     expect(await screen.findByText("DubGrid Health")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Email")).toBeInTheDocument();
+  });
+
+  it("does not duplicate an active organization lookup", () => {
+    lookupOrganization.mockReturnValue(new Promise(() => undefined));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    fireEvent.click(screen.getByText("Continue"));
+
+    expect(lookupOrganization).toHaveBeenCalledTimes(1);
   });
 
   // Auto-advancing focuses the email field, which raises the keyboard. Doing
@@ -390,7 +439,9 @@ describe("LoginScreen", () => {
       access_token: "token-123",
       refresh_token: "refresh-123",
     });
-    expect(registerMobileSessionPresence).toHaveBeenCalledWith("token-123");
+    // AuthSessionProvider owns registration for every newly observed token.
+    // LoginScreen must not send a second request during the same handoff.
+    expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
     // Warmed before the handoff, not after it. The tab tree can't draw its tab
     // bar or pick the Home screen without bootstrap, and the launch splash is
@@ -524,8 +575,69 @@ describe("LoginScreen", () => {
       access_token: "verified-token",
       refresh_token: "verified-refresh",
     });
-    expect(registerMobileSessionPresence).toHaveBeenCalledWith("verified-token");
+    expect(registerMobileSessionPresence).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+  });
+
+  it("keeps the pending session out of storage when MFA verification fails", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToOrganization.mockResolvedValue({
+      session: {
+        accessToken: "pending-token",
+        refreshToken: "pending-refresh",
+        expiresIn: 3600,
+        tokenType: "bearer",
+      },
+      organization: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+      user: {
+        id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        email: "staff@dubgrid.com",
+        firstName: "Mina",
+        lastName: "Diaz",
+      },
+      mfaRequired: true,
+      mfa: {
+        factorId: "factor-123",
+        friendlyName: "DubGrid Authenticator",
+      },
+    });
+    verifyMobileTotpFactor.mockRejectedValue(new Error("That code didn't match"));
+    const setSession = vi.fn();
+    getSupabaseClient.mockReturnValue({ auth: { setSession } } as never);
+
+    render(<LoginScreen />);
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    await screen.findByText("Two-factor authentication");
+
+    fireEvent.change(screen.getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+
+    expect(await screen.findByText("That code didn't match")).toBeInTheDocument();
+    expect(setSession).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
   it("shows a returned auth error without navigating", async () => {
@@ -557,6 +669,66 @@ describe("LoginScreen", () => {
     expect(
       await screen.findByText("Check your email and password and try again."),
     ).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("does not duplicate an active credential submission", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockReturnValue(new Promise(() => undefined));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(loginToOrganization).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the MFA code after a recoverable connection failure", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockResolvedValue({
+      session: { accessToken: "pending-token", refreshToken: "pending-refresh" },
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+      mfaRequired: true,
+      mfa: { factorId: "factor-123", friendlyName: "Authenticator" },
+    });
+    verifyMobileTotpFactor.mockRejectedValue(new TypeError("Network request failed"));
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    await screen.findByText("Two-factor authentication");
+    fireEvent.change(screen.getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+
+    await waitFor(() => expect(verifyMobileTotpFactor).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("Verification code")).toHaveValue("123456");
     expect(routerReplace).not.toHaveBeenCalled();
   });
 

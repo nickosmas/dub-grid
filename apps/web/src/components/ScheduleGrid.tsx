@@ -24,6 +24,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatDateKey } from "@/lib/utils";
 import {
@@ -600,6 +601,7 @@ function ShiftDetailHoverCard({
                   ) : null}
                   {entry.timeLabel ? (
                     <div
+                      className="dg-tabular-nums"
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         color: "var(--dg-color-text-muted)",
@@ -1412,6 +1414,7 @@ const SectionBlock = memo(function SectionBlock({
                     >
                       <div className="dg-grid-slot__chrome" aria-hidden="true" />
                       <div
+                        className="dg-tabular-nums"
                         style={{
                           fontSize: "var(--dg-fs-caption)",
                           fontWeight: 600,
@@ -1606,14 +1609,18 @@ const SectionBlock = memo(function SectionBlock({
                         const isMentoredOpenShift =
                           os.segments?.some((segment) => segment.isMentored === true) ?? false;
                         const needed = os.needed ?? 1;
-                        // Viewers who see every open shift (schedulers/admins) but
-                        // aren't personally eligible for this one get routed to a
-                        // read-only details view on click, not the claim flow.
+                        const viewerAction =
+                          os.viewerAction ??
+                          (os.viewerEligible === false ? "details" : "volunteer");
+                        const actionHint =
+                          viewerAction === "assign"
+                            ? "click to assign"
+                            : viewerAction === "details"
+                              ? "click for details"
+                              : "click to volunteer";
                         const openShiftHint = os.calledOffBy
-                          ? `Called off by ${os.calledOffBy}`
-                          : os.viewerEligible === false
-                            ? `${needed} needed, click for details`
-                            : `${needed} needed, click to volunteer`;
+                          ? `Called off by ${os.calledOffBy}, ${actionHint}`
+                          : `${needed} needed, ${actionHint}`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -1683,24 +1690,17 @@ const SectionBlock = memo(function SectionBlock({
                                   </span>
                                 ) : null}
                               </span>
-                              <span
+                              <NumericBadge
+                                aria-label={`${needed} needed`}
+                                value={needed}
                                 style={{
-                                  width: 16,
-                                  height: 16,
-                                  borderRadius: "50%",
                                   background: scPill?.text ?? "var(--dg-color-warning)",
                                   color: scPill?.color ?? "var(--dg-color-text-inverse)",
                                   fontSize: "var(--dg-type-badge-size)",
                                   fontWeight: 600,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
                                   lineHeight: 1,
-                                  flexShrink: 0,
                                 }}
-                              >
-                                {needed}
-                              </span>
+                              />
                             </Button>
                           </MaybeHint>
                         );
@@ -3706,7 +3706,7 @@ const SectionBlock = memo(function SectionBlock({
                       return (
                         <div
                           key={`${row.label}-${date.toISOString()}`}
-                          className="dg-grid-slot dg-grid-slot--tally"
+                          className="dg-grid-slot dg-grid-slot--tally dg-tabular-nums"
                           data-tally-count={`${row.categoryId}-${index}`}
                           data-tally-status={
                             hasRequirement ? (isMet ? "covered" : "short") : "none"

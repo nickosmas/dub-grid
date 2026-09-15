@@ -153,7 +153,7 @@ export default function RequestDemoPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         padding: "24px 16px",
       }}
     >
@@ -179,6 +179,7 @@ export default function RequestDemoPage() {
             }}
           />
           <h1
+            className="dg-font-brand-heading"
             style={{
               fontSize: "22px",
               fontWeight: 700,
@@ -262,6 +263,7 @@ export default function RequestDemoPage() {
           </div>
 
           <h1
+            className="dg-font-brand-heading"
             style={{
               fontSize: "22px",
               fontWeight: 700,

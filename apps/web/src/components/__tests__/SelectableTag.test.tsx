@@ -46,4 +46,17 @@ describe("SelectableTag", () => {
       color: "var(--dg-color-text-inverse)",
     });
   });
+
+  it("truncates a long interactive label without changing its accessible name", () => {
+    render(<SelectableTag selected={false}>Journal Listed Christian Science Nurse</SelectableTag>);
+
+    const button = screen.getByRole("button", {
+      name: "Journal Listed Christian Science Nurse",
+    });
+    expect(button).toHaveClass("dg-pill-action");
+    expect(button).not.toHaveAttribute("title");
+    expect(screen.getByText("Journal Listed Christian Science Nurse")).toHaveClass(
+      "dg-pill-action-label",
+    );
+  });
 });

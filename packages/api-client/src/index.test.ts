@@ -77,6 +77,35 @@ describe("createJsonApiRequest", () => {
     expect(result).toBe(42);
   });
 
+  it("exposes the response to an optional observer without changing parsing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ value: 42 }), {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+              "server-timing": "total;dur=12.3",
+            },
+          }),
+      ),
+    );
+    const onResponse = vi.fn();
+
+    const result = await createJsonApiRequest({
+      baseUrl: "https://api.example.com",
+      path: "/thing",
+      init: {},
+      parse: (value) => (value as { value: number }).value,
+      onResponse,
+    });
+
+    expect(result).toBe(42);
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    expect(onResponse.mock.calls[0]?.[0].headers.get("server-timing")).toBe("total;dur=12.3");
+  });
+
   it("throws ApiResponseError with the parsed message on a non-ok JSON response", async () => {
     vi.stubGlobal(
       "fetch",
@@ -97,6 +126,36 @@ describe("createJsonApiRequest", () => {
         parse: (value) => value,
       }),
     ).rejects.toMatchObject(new ApiResponseError("Not allowed", 403, { error: "Not allowed" }));
+  });
+
+  it("preserves Retry-After metadata without exposing other response headers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: "Too many requests" }), {
+            status: 429,
+            headers: {
+              "content-type": "application/json",
+              "retry-after": "12",
+              "x-request-id": "private-request-id",
+            },
+          }),
+      ),
+    );
+
+    await expect(
+      createJsonApiRequest({
+        baseUrl: "https://api.example.com",
+        path: "/thing",
+        init: {},
+        parse: (value) => value,
+      }),
+    ).rejects.toMatchObject({
+      name: "ApiResponseError",
+      status: 429,
+      retryAfter: "12",
+    });
   });
 
   it("invokes onAuthFailure on a 401 when handleAuthFailure is set", async () => {

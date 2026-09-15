@@ -20,6 +20,10 @@ function describe(error: unknown): { code: string; message: string; status?: num
 }
 
 export function getRecoveryErrorMessage(error: unknown): string {
+  if (isAuthRecoveryTimeout(error)) {
+    return "This is taking longer than expected. Check your connection and try again.";
+  }
+
   const { code, message, status } = describe(error);
   const haystack = `${code} ${message}`.toLowerCase();
 
@@ -65,6 +69,8 @@ export function getRecoveryErrorMessage(error: unknown): string {
  * failures that are about *us* rather than about the address get shown.
  */
 export function shouldSurfaceResetRequestError(error: unknown): boolean {
+  if (isAuthRecoveryTimeout(error)) return true;
+
   const { message, status, code } = describe(error);
   const haystack = `${code} ${message}`.toLowerCase();
 
@@ -76,3 +82,4 @@ export function shouldSurfaceResetRequestError(error: unknown): boolean {
     haystack.includes("fetch")
   );
 }
+import { isAuthRecoveryTimeout } from "@dubgrid/client-errors";

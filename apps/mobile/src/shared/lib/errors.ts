@@ -15,6 +15,7 @@ import {
   isAuthorizationError,
   isNetworkConnectionError,
   getOrgUnavailableMessage,
+  isAuthRecoveryTimeout,
 } from "@dubgrid/client-errors";
 import type { ToastInput } from "../providers/ToastProvider";
 import { isLoopbackHost, isPrivateIpv4Host } from "./env";
@@ -84,7 +85,7 @@ export function pushClientFriendlyErrorToast(
   pushToast: (toast: ToastInput) => void,
   input: ClientFriendlyToastInput,
 ) {
-  if (isNetworkConnectionError(input.error)) {
+  if (isNetworkConnectionError(input.error) || isAuthRecoveryTimeout(input.error)) {
     pushToast(createNetworkErrorToast());
     return;
   }
@@ -105,7 +106,7 @@ export function getInlineErrorMessageOrToast(
     preferInlineNetworkError?: boolean;
   },
 ): string | null {
-  if (isNetworkConnectionError(input.error)) {
+  if (isNetworkConnectionError(input.error) || isAuthRecoveryTimeout(input.error)) {
     if (input.preferInlineNetworkError) {
       return buildInlineNetworkErrorMessage();
     }

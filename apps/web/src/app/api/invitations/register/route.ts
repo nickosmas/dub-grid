@@ -8,6 +8,7 @@ import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import { apiLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
 
 /**
  * Creates the auth account for an invited user, already email-confirmed.
@@ -30,8 +31,6 @@ const bodySchema = z.object({
   password: z.string().min(1).max(200),
 });
 
-const INVITE_INVALID = "This invitation is no longer valid. Ask your administrator for a new one.";
-const EMAIL_MISMATCH = "This invitation was sent to a different email address.";
 const WEAK_PASSWORD = "Choose a stronger password.";
 
 /** GoTrue's duplicate-address signal, across the shapes it has used. */
@@ -99,25 +98,26 @@ export async function POST(req: NextRequest) {
     // ── The token is the credential: it must be a live invitation ──────
     const { data: invitation, error: lookupError } = await service
       .from("invitations")
-      .select("email, first_name, last_name")
+      .select("email, first_name, last_name, organizations!inner(id, archived_at)")
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())
       .is("accepted_at", null)
       .is("revoked_at", null)
+      .is("organizations.archived_at", null)
       .maybeSingle();
     if (lookupError) throw lookupError;
 
     // Unknown / expired / accepted / revoked all read the same, so a caller
     // can't tell a dead token from one that never existed.
     if (!invitation) {
-      return NextResponse.json({ error: INVITE_INVALID }, { status: 404 });
+      return deadInvitationResponse();
     }
 
     const invitedEmail = String(invitation.email ?? "")
       .trim()
       .toLowerCase();
     if (invitedEmail !== email) {
-      return NextResponse.json({ error: EMAIL_MISMATCH }, { status: 400 });
+      return deadInvitationResponse();
     }
 
     // Names ride along so `handle_new_user` can seed the profile; the invite

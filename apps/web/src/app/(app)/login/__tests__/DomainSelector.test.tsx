@@ -4,9 +4,10 @@
  * landing on a broken "organization not found" page after a full page
  * reload is worse than a one-tick delay here up front.
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import DomainSelector from "@/app/(app)/login/DomainSelector";
+import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -25,9 +26,11 @@ vi.mock("next-themes", () => ({
 }));
 
 function submitSlug(slug: string) {
-  const input = screen.getByLabelText("Organization subdomain");
-  fireEvent.change(input, { target: { value: slug } });
-  fireEvent.submit(input.closest("form")!);
+  act(() => {
+    const input = screen.getByLabelText("Organization subdomain");
+    fireEvent.change(input, { target: { value: slug } });
+    fireEvent.submit(input.closest("form")!);
+  });
 }
 
 describe("DomainSelector", () => {
@@ -154,5 +157,44 @@ describe("DomainSelector", () => {
       );
     });
     expect(hrefSetter).not.toHaveBeenCalled();
+  });
+
+  it("uses safe recovery copy for timeout and temporary server failures", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new RequestTimeoutError(8_000))
+      .mockResolvedValueOnce(new Response("Unavailable", { status: 503 }));
+
+    render(<DomainSelector />);
+    submitSlug("calmhaven");
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "That took too long. Check your connection and try again.",
+        { id: "login-error" },
+      );
+    });
+
+    submitSlug("calmhaven");
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        "DubGrid is temporarily unavailable. Please try again.",
+        { id: "login-error" },
+      );
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(hrefSetter).not.toHaveBeenCalled();
+  });
+
+  it("does not start a duplicate lookup while one is pending", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
+
+    render(<DomainSelector />);
+    const input = screen.getByLabelText("Organization subdomain");
+    fireEvent.change(input, { target: { value: "calmhaven" } });
+    const form = input.closest("form")!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

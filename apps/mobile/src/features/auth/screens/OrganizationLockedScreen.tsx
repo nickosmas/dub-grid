@@ -8,6 +8,7 @@ import { getScreenBottomPadding } from "../../../shared/components/screen-layout
 import { getOrgStatus } from "../../../shared/lib/api";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -42,12 +43,24 @@ function getDetailLine(
     return "Billing needs attention before this organization can be used again.";
   }
 
-  if (!["trial_grace", "trial_ending_soon", "payment_attention_required"].includes(status.state)) {
-    // The org looks fine now — a billing fix may have just landed.
-    return "This organization may be available again. Try reloading.";
+  if (status.state === "trial_pending") {
+    return "Your organization opens once a Super Admin starts the trial on the web.";
   }
 
-  return null;
+  if (status.state === "trial_grace") {
+    return "The trial has ended, but the organization is still in its grace period. Try again to refresh access.";
+  }
+
+  if (status.state === "trial_ending_soon") {
+    return "The trial is ending soon. Try again to refresh access.";
+  }
+
+  if (status.state === "payment_attention_required") {
+    return "Billing needs attention, but the organization may still be available. Try again to refresh access.";
+  }
+
+  // The org looks fine now, so a billing fix may have just landed.
+  return "This organization may be available again. Try again to refresh access.";
 }
 
 export function OrganizationLockedScreen({
@@ -66,19 +79,23 @@ export function OrganizationLockedScreen({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
-  const body = formatLockedMessage(message);
 
   const statusQuery = useQuery({
-    queryKey: ["mobile", "org-status", accessToken],
-    queryFn: () => getOrgStatus(accessToken!),
+    queryKey: mobileQueryKeys.orgStatus(accessToken),
+    queryFn: ({ signal }) => getOrgStatus(accessToken!, signal),
     enabled: Boolean(accessToken),
     retry: false,
   });
   const status = statusQuery.data ?? null;
-  const detailLine = getDetailLine(status);
-  const graceDate =
-    status?.state === "trial_grace" ? formatGraceDate(status.trialGraceEndsAt) : null;
   const isSuperAdmin = status?.orgRole === "super_admin";
+  const body = isSuperAdmin
+    ? formatLockedMessage(message)
+    : "This organization is currently unavailable. Please try again later.";
+  const detailLine = isSuperAdmin ? getDetailLine(status) : null;
+  const graceDate =
+    isSuperAdmin && status?.state === "trial_grace"
+      ? formatGraceDate(status.trialGraceEndsAt)
+      : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>

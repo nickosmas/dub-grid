@@ -1,11 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchOrganizationAccessStatus = vi.fn();
 const signOut = vi.fn();
-const reload = vi.fn();
+const replace = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+}));
 
 vi.mock("@/features/organization/client/api", () => ({
   fetchOrganizationAccessStatus: () => fetchOrganizationAccessStatus(),
@@ -15,15 +19,10 @@ vi.mock("@/hooks", () => ({
   useLogout: () => ({ signOut }),
 }));
 
-Object.defineProperty(window, "location", {
-  value: { reload, origin: "https://acme.dubgrid.com" },
-  writable: true,
-});
-
 import { isAuthTransitionPending, markAuthTransition } from "@/lib/auth-transition";
 import {
-  claimAutomaticReload,
   getGateMessage,
+  ORGANIZATION_GATE_RECHECK_INTERVAL_MS,
   OrganizationGateScreen,
 } from "./OrganizationGateScreen";
 
@@ -40,6 +39,7 @@ describe("OrganizationGateScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     fetchOrganizationAccessStatus.mockResolvedValue({ available: false, state: "trial_pending" });
   });
 
@@ -53,19 +53,23 @@ describe("OrganizationGateScreen", () => {
     await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalled());
   });
 
-  it("reloads on its own once the organization opens", async () => {
+  it("checks for restored access within five seconds while the gate is visible", () => {
+    expect(ORGANIZATION_GATE_RECHECK_INTERVAL_MS).toBe(5_000);
+  });
+
+  it("admits the same user without a hard refresh once the organization opens", async () => {
     fetchOrganizationAccessStatus.mockResolvedValue({ available: true, state: "active" });
 
     renderScreen();
 
-    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/schedule"));
   });
 
   it("stays put while the organization is still closed", async () => {
     renderScreen();
 
     await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalled());
-    expect(reload).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("re-checks on demand", async () => {
@@ -75,6 +79,42 @@ describe("OrganizationGateScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: /check again/i }));
 
     await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(2));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("navigates exactly once when a manual check finds the organization open", async () => {
+    fetchOrganizationAccessStatus
+      .mockResolvedValueOnce({ available: false, state: "locked" })
+      .mockResolvedValueOnce({ available: true, state: "active" });
+
+    renderScreen();
+    await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: /check again/i }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    expect(replace).toHaveBeenCalledWith("/schedule");
+  });
+
+  it("coalesces reconnect and manual checks into one active request", async () => {
+    let resolveCheck: ((value: { available: false; state: "unavailable" }) => void) | undefined;
+    fetchOrganizationAccessStatus
+      .mockResolvedValueOnce({ available: false, state: "unavailable" })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveCheck = resolve;
+          }),
+      );
+
+    renderScreen();
+    await waitFor(() => expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(1));
+    act(() => window.dispatchEvent(new Event("offline")));
+    act(() => window.dispatchEvent(new Event("online")));
+    await userEvent.click(screen.getByRole("button", { name: /check again/i }));
+
+    expect(fetchOrganizationAccessStatus).toHaveBeenCalledTimes(2);
+    await act(async () => resolveCheck?.({ available: false, state: "unavailable" }));
   });
 
   it("signs out without leaving the user to find their own way", async () => {
@@ -95,12 +135,13 @@ describe("OrganizationGateScreen", () => {
     await waitFor(() => expect(isAuthTransitionPending()).toBe(false));
   });
 
-  it("says what is actually wrong when billing has lapsed", async () => {
-    fetchOrganizationAccessStatus.mockResolvedValue({ available: false, state: "locked" });
+  it("does not identify the cause to a held-out User or Admin", async () => {
+    fetchOrganizationAccessStatus.mockResolvedValue({ available: false, state: "unavailable" });
 
     renderScreen();
 
-    expect(await screen.findByText(/billing/i)).toBeInTheDocument();
+    expect(await screen.findByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/billing|trial|suspend|archive/i)).not.toBeInTheDocument();
   });
 });
 
@@ -112,24 +153,15 @@ describe("getGateMessage", () => {
     expect(getGateMessage(undefined)).toBe(setupCopy);
   });
 
-  it("names the real cause for a locked, suspended, or deleted organization", () => {
+  it("uses neutral wording for a redacted unavailable state", () => {
+    const message = getGateMessage("unavailable");
+    expect(message).toMatch(/currently unavailable/i);
+    expect(message).not.toMatch(/billing|trial|suspend|archive/i);
+  });
+
+  it("keeps cause-specific recovery wording for authorized states", () => {
     expect(getGateMessage("locked")).toMatch(/billing/i);
     expect(getGateMessage("suspended")).toMatch(/suspended/i);
     expect(getGateMessage("archived")).toMatch(/no longer available/i);
-  });
-});
-
-describe("claimAutomaticReload", () => {
-  beforeEach(() => {
-    window.sessionStorage.clear();
-  });
-
-  it("spends one automatic reload, then holds off until the proxy's gate can catch up", () => {
-    const start = 1_000_000;
-    expect(claimAutomaticReload(start)).toBe(true);
-    // A gate still serving its cached answer bounces the user straight back
-    // here; without the cooldown that is an endless reload loop.
-    expect(claimAutomaticReload(start + 20_000)).toBe(false);
-    expect(claimAutomaticReload(start + 46_000)).toBe(true);
   });
 });

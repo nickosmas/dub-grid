@@ -31,6 +31,9 @@ supabase/
 
 - Add `NNN_name.sql` at the next number. Make it idempotent, so a retried
   apply converges instead of failing halfway.
+- Add the reviewed file hash to `migrations/checksums.sha256` in the same
+  change. `npm run db:migrations:check` fails if any locked migration changes,
+  disappears, or lacks a checksum.
 - **Do not edit `001`-`004`.** They are a frozen historical baseline. Once a
   migration is in a database's ledger it never runs again, so editing one is a
   no-op for every environment that already has it, and the edit reaches only

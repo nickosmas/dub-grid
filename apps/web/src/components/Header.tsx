@@ -24,6 +24,7 @@ import {
   useMediaQuery,
   MOBILE,
   TABLET,
+  HEADER_NARROW,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
@@ -41,7 +42,7 @@ import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { exitSandbox } from "@/features/account/client";
 import {
-  fetchOrganizationBootstrap,
+  getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 
@@ -261,6 +262,11 @@ export default function Header({ orgName }: HeaderProps) {
   const isManagementOnlyUser = role === "user" && isManagementUser && !isOnSchedule;
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  // Wider than the tablet compaction (which the trial badge already survives
+  // via its own `compact` prop) but still not enough room for the full row —
+  // most visibly at 125%+ browser zoom on an ordinary desktop width. The
+  // badge is the one element here that's least costly to drop entirely.
+  const isHeaderNarrow = useMediaQuery(HEADER_NARROW);
   const featureFlags = useClientFeatureFlags();
 
   // Match each top-nav route explicitly. Routes like /profile and
@@ -304,8 +310,7 @@ export default function Header({ orgName }: HeaderProps) {
 
   const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
-    queryFn: () => fetchOrganizationBootstrap(),
-    staleTime: 60_000,
+    ...getOrganizationBootstrapQueryPolicy(),
     enabled: Boolean(authUser),
   });
   const isInSandbox = sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
@@ -657,13 +662,13 @@ export default function Header({ orgName }: HeaderProps) {
         {/* Alerts */}
         {!isGridmaster && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {canShowBillingNotice && orgId && (
+            {canShowBillingNotice && orgId && !isHeaderNarrow && (
               <HeaderBillingNotice orgId={orgId} compact={isTablet} />
             )}
             <NotificationBell />
           </div>
         )}
-        {isGridmaster && canShowBillingNotice && orgId && (
+        {isGridmaster && canShowBillingNotice && orgId && !isHeaderNarrow && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <HeaderBillingNotice orgId={orgId} compact={isTablet} />
           </div>
@@ -721,14 +726,13 @@ export default function Header({ orgName }: HeaderProps) {
             </div>
             {!isTablet && (
               <>
-                <div style={{ textAlign: "left" }}>
+                <div style={{ textAlign: "left", maxWidth: 120 }}>
                   <div
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 600,
                       color: "var(--dg-color-text-primary)",
                       lineHeight: 1.2,
-                      maxWidth: 120,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -741,6 +745,9 @@ export default function Header({ orgName }: HeaderProps) {
                       fontSize: "var(--dg-fs-footnote)",
                       color: "var(--dg-color-text-muted)",
                       lineHeight: 1.2,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {roleLabel}

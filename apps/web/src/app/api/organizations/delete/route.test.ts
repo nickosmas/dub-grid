@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireOrgPermissions = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const checkRateLimit = vi.fn();
 const cancelSubscription = vi.fn();
 const loggerError = vi.fn();
@@ -18,6 +19,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/api-auth", () => ({
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
@@ -101,6 +103,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   validateCsrfOrigin.mockReturnValue(null);
   forbidIfSandboxCookie.mockReturnValue(null);
+  requireSensitiveActionAuth.mockResolvedValue({
+    user: { id: "actor-1", email: "admin@test.com" },
+    session: { access_token: "fresh-token" },
+    claims: { org_id: ORG_ID },
+  });
   checkRateLimit.mockResolvedValue({ limited: false, reset: 0, misconfigured: false });
   cancelSubscription.mockResolvedValue({});
 });
@@ -121,6 +128,26 @@ describe("POST /api/organizations/delete", () => {
     const { POST } = await importRoute();
     const res = await POST(makeRequest({ orgId: ORG_ID, confirmation: "DELETE Acme" }));
     expect(res.status).toBe(403);
+    expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
+  it("returns STEP_UP_REQUIRED before reading or mutating organization data", async () => {
+    const { client, orgUpdate } = buildServiceClient({
+      org: { id: ORG_ID, name: "Acme", archived_at: null },
+    });
+    authorize(client);
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: new Response(JSON.stringify({ code: "STEP_UP_REQUIRED", method: "password" }), {
+        status: 403,
+      }),
+    });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, confirmation: "DELETE Acme" }));
+
+    expect(res.status).toBe(403);
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(orgUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects a confirmation that does not match the org name", async () => {

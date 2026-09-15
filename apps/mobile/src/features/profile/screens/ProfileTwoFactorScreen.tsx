@@ -1,15 +1,26 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Factor } from "@supabase/supabase-js";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatClientErrorMessage } from "@dubgrid/client-errors";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { getProfile, updateProfileMfaStatus } from "../../../shared/lib/api";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getProfile,
+  requireMobileCredentialAssurance,
+  updateProfileMfaStatus,
+} from "../../../shared/lib/api";
+import {
+  enrollMobileMfa,
+  removeMobileMfa,
+  withMfaDeadline,
+  MfaRequestTimeoutError,
+} from "../../../shared/lib/mfa-lifecycle";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -30,6 +41,7 @@ import {
   ProfileTextInput,
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 
 const MOBILE_TOTP_FRIENDLY_NAME = "Mobile App Authenticator";
 
@@ -58,17 +70,28 @@ export default function ProfileTwoFactorScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
+  const stepUp = useMobileStepUpAction();
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaSecret, setMfaSecret] = useState<string | null>(null);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaVerifyCode, setMfaVerifyCode] = useState("");
   const [isConfirmingDisable, setIsConfirmingDisable] = useState(false);
+  const [phase, setPhase] = useState<"sync" | null>(null);
+  const [needsReconciliation, setNeedsReconciliation] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const tokenRef = useRef(accessToken);
+  useEffect(() => {
+    tokenRef.current = accessToken;
+  }, [accessToken]);
+  const mountedRef = useRef(true);
+  const verifyingRef = useRef(false);
 
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const contentState = useMobileContentState({
@@ -83,14 +106,13 @@ export default function ProfileTwoFactorScreen() {
   // now the way out of this screen. A ref rather than state so the cleanup
   // reads the latest id without re-running on every step.
   const pendingFactorIdRef = useRef<string | null>(null);
-  pendingFactorIdRef.current = mfaFactorId;
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       const factorId = pendingFactorIdRef.current;
-      if (!factorId) return;
-      getSupabaseClient()
-        .auth.mfa.unenroll({ factorId })
-        .catch(() => {});
+      if (!factorId || !tokenRef.current || verifyingRef.current) return;
+      void removeMobileMfa(tokenRef.current, factorId, true).catch(() => {});
     };
   }, []);
 
@@ -108,56 +130,91 @@ export default function ProfileTwoFactorScreen() {
   useNavigationDiscardGuard(guard);
 
   function resetMfaEnrollment() {
+    pendingFactorIdRef.current = null;
     setIsEnrolling(false);
     setMfaSecret(null);
     setMfaFactorId(null);
     setMfaVerifyCode("");
+    setPhase(null);
+    setActionError(null);
+  }
+
+  async function reconcileStatus(token = tokenRef.current) {
+    setNeedsReconciliation(true);
+    setPhase("sync");
+    if (!token) throw new Error("Sign in again to refresh two-factor status.");
+    tokenRef.current = token;
+    const result = await updateProfileMfaStatus(token);
+    // Update both the current render and the promoted-session query key.
+    for (const keyToken of new Set([accessToken, token])) {
+      queryClient.setQueryData(mobileQueryKeys.profile(keyToken), {
+        ...profileQuery.data,
+        user: result.user,
+      });
+    }
+    resetMfaEnrollment();
+    setNeedsReconciliation(false);
+  }
+
+  async function retryStatus() {
+    setMfaLoading(true);
+    setActionError(null);
+    try {
+      const { data, error } = await withMfaDeadline(getSupabaseClient().auth.getSession());
+      if (error) throw error;
+      await reconcileStatus(data.session?.access_token ?? tokenRef.current);
+    } catch (error) {
+      setActionError(
+        formatClientErrorMessage(error, "We couldn't refresh two-factor status. Try again."),
+      );
+    } finally {
+      setMfaLoading(false);
+    }
   }
 
   async function startMfaEnrollment() {
-    if (mfaLoading) return;
+    if (mfaLoading || !accessToken) return;
     setMfaLoading(true);
+    setActionError(null);
     try {
-      const { data: factorsData, error: listError } =
-        await getSupabaseClient().auth.mfa.listFactors();
-      if (listError) throw listError;
+      await stepUp.run(async (actionAccessToken) => {
+        // No cleanup or provider mutation begins until the same canonical
+        // five-minute assurance preflight used by credential changes passes.
+        await requireMobileCredentialAssurance(actionAccessToken);
+        tokenRef.current = actionAccessToken;
 
-      const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
-      if (existingVerifiedTotp) {
-        if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: true });
-        await profileQuery.refetch();
-        pushToast({
-          tone: "success",
-          title: "Two-factor authentication",
-          message: "Already enabled on this account.",
-        });
-        resetMfaEnrollment();
-        return;
-      }
+        const { data: factorsData, error: listError } = await withMfaDeadline(
+          getSupabaseClient().auth.mfa.listFactors(),
+        );
+        if (listError) throw listError;
 
-      const staleFactors = factorsData.all.filter(isStaleMobileTotpFactor);
-      for (const factor of staleFactors) {
-        const { error: unenrollError } = await getSupabaseClient().auth.mfa.unenroll({
-          factorId: factor.id,
-        });
-        if (unenrollError) throw unenrollError;
-      }
+        const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
+        if (existingVerifiedTotp) {
+          await reconcileStatus(actionAccessToken);
+          return;
+        }
 
-      const { data, error } = await getSupabaseClient().auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: MOBILE_TOTP_FRIENDLY_NAME,
+        const staleFactors = factorsData.all.filter(isStaleMobileTotpFactor);
+        for (const factor of staleFactors) {
+          await removeMobileMfa(actionAccessToken, factor.id, true);
+        }
+
+        const data = await enrollMobileMfa(actionAccessToken);
+        if (!mountedRef.current) {
+          await removeMobileMfa(actionAccessToken, data.id, true);
+          return;
+        }
+
+        setMfaSecret(data.totp.secret);
+        pendingFactorIdRef.current = data.id;
+        setMfaFactorId(data.id);
+        setIsEnrolling(true);
+        setPhase(null);
       });
-      if (error) throw error;
-
-      setMfaSecret(data.totp.secret);
-      setMfaFactorId(data.id);
-      setIsEnrolling(true);
     } catch (error) {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not start setup",
-        fallbackMessage: "We couldn't start two-factor setup right now.",
-      });
+      setActionError(
+        formatClientErrorMessage(error, "We couldn't start two-factor setup right now."),
+      );
     } finally {
       setMfaLoading(false);
     }
@@ -166,13 +223,19 @@ export default function ProfileTwoFactorScreen() {
   async function verifyMfaEnrollment() {
     if (!mfaFactorId || mfaVerifyCode.length !== 6 || mfaLoading) return;
     setMfaLoading(true);
+    setActionError(null);
+    verifyingRef.current = true;
     try {
-      const { data: verifiedSession, error } =
-        await getSupabaseClient().auth.mfa.challengeAndVerify({
+      const { data: verifiedSession, error } = await withMfaDeadline(
+        getSupabaseClient().auth.mfa.challengeAndVerify({
           factorId: mfaFactorId,
           code: mfaVerifyCode,
-        });
+        }),
+      );
       if (error) throw error;
+      pendingFactorIdRef.current = null;
+      setNeedsReconciliation(true);
+      setPhase("sync");
       if (!verifiedSession?.access_token) {
         throw new Error("We couldn't finish two-factor setup. Try again.");
       }
@@ -183,61 +246,87 @@ export default function ProfileTwoFactorScreen() {
       // Use the promoted token returned by verification; AuthSessionProvider
       // receives the same session update and refetches this profile under its
       // new token key.
-      await updateProfileMfaStatus(verifiedSession.access_token, { enabled: true });
+      await reconcileStatus(verifiedSession.access_token);
       pushToast({
         tone: "success",
-        title: "Two-factor authentication enabled",
-        message: "Your account is now protected.",
+        title: "Two-factor status refreshed",
+        message: "Your account shows its current protection status.",
       });
       resetMfaEnrollment();
     } catch (error) {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not verify code",
-        fallbackMessage: "Invalid verification code. Please try again.",
-      });
+      if (error instanceof MfaRequestTimeoutError) {
+        pendingFactorIdRef.current = null;
+        setNeedsReconciliation(true);
+        setPhase("sync");
+      }
+      setActionError(formatClientErrorMessage(error, "We couldn't verify this code. Try again."));
+    } finally {
+      verifyingRef.current = false;
+      if (!mountedRef.current && pendingFactorIdRef.current && tokenRef.current) {
+        void removeMobileMfa(tokenRef.current, pendingFactorIdRef.current, true).catch(() => {});
+      }
+      setMfaLoading(false);
+    }
+  }
+
+  async function cancelMfaEnrollment() {
+    const pendingFactorId = pendingFactorIdRef.current;
+    setMfaLoading(true);
+    try {
+      if (pendingFactorId && tokenRef.current)
+        await removeMobileMfa(tokenRef.current, pendingFactorId, true);
+      resetMfaEnrollment();
+    } catch {
+      setPhase("sync");
+      setActionError("We couldn't cancel setup. Refresh its status before trying again.");
     } finally {
       setMfaLoading(false);
     }
   }
 
-  function cancelMfaEnrollment() {
-    if (mfaFactorId) {
-      getSupabaseClient()
-        .auth.mfa.unenroll({ factorId: mfaFactorId })
-        .catch(() => {});
-    }
-    resetMfaEnrollment();
-  }
-
   async function disableMfa() {
     if (mfaLoading) return;
     setMfaLoading(true);
+    setActionError(null);
     try {
-      const { data: factorsData, error: listError } =
-        await getSupabaseClient().auth.mfa.listFactors();
-      if (listError) throw listError;
+      await stepUp.run(async (actionAccessToken) => {
+        // The challenge installs the promoted session before this callback is
+        // retried. Once removal begins, any failure reconciles instead of
+        // replaying an outcome-unknown provider mutation.
+        await requireMobileCredentialAssurance(actionAccessToken);
+        tokenRef.current = actionAccessToken;
+        const { data: factorsData, error: listError } = await withMfaDeadline(
+          getSupabaseClient().auth.mfa.listFactors(),
+        );
+        if (listError) throw listError;
 
-      const verifiedTotp = factorsData.totp.filter((factor) => factor.status === "verified");
-      for (const factor of verifiedTotp) {
-        const { error } = await getSupabaseClient().auth.mfa.unenroll({ factorId: factor.id });
-        if (error) throw error;
-      }
+        const verifiedTotp = factorsData.totp.filter((factor) => factor.status === "verified");
+        if (!verifiedTotp.length) {
+          await reconcileStatus(actionAccessToken);
+          return;
+        }
+        setNeedsReconciliation(true);
+        setPhase("sync");
+        for (const factor of verifiedTotp) {
+          await removeMobileMfa(actionAccessToken, factor.id);
+        }
 
-      if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: false });
-      await profileQuery.refetch();
-      pushToast({
-        tone: "success",
-        title: "Two-factor authentication disabled",
-        message: "You can re-enable it any time.",
+        await reconcileStatus(actionAccessToken);
+        pushToast({
+          tone: "success",
+          title: "Two-factor status refreshed",
+          message: "Your account shows its current protection status.",
+        });
+        resetMfaEnrollment();
       });
-      resetMfaEnrollment();
     } catch (error) {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not disable",
-        fallbackMessage: "We couldn't disable two-factor authentication right now.",
-      });
+      // Provider removal may have completed even if its response was lost.
+      // Reconcile before allowing another attempt; never replay automatically.
+      setNeedsReconciliation(true);
+      setPhase("sync");
+      setActionError(
+        formatClientErrorMessage(error, "We couldn't disable two-factor authentication right now."),
+      );
     } finally {
       setMfaLoading(false);
     }
@@ -258,6 +347,29 @@ export default function ProfileTwoFactorScreen() {
           variant="centered"
           onAction={() => profileQuery.refetch()}
         />
+      ) : phase === "sync" ? (
+        <ProfileSection
+          title="Refresh status"
+          description="Refresh two-factor status before making another change."
+        >
+          <ActionButtons
+            primaryAction={
+              <Button
+                label="Refresh status"
+                loading={mfaLoading}
+                disabled={mfaLoading}
+                onPress={retryStatus}
+              />
+            }
+          >
+            <Button
+              label="Cancel"
+              tone="neutral"
+              disabled={mfaLoading}
+              onPress={resetMfaEnrollment}
+            />
+          </ActionButtons>
+        </ProfileSection>
       ) : isEnrolling ? (
         <ProfileSection
           title="Set up"
@@ -276,7 +388,6 @@ export default function ProfileTwoFactorScreen() {
               autoComplete="one-time-code"
               inputMode="numeric"
               keyboardType="number-pad"
-              textContentType="oneTimeCode"
               label="Verification code"
               maxLength={6}
               placeholder="000000"
@@ -310,10 +421,12 @@ export default function ProfileTwoFactorScreen() {
               iconName="shield-outline"
               isLast
               label="Status"
-              value={mfaEnabled ? "Enabled" : "Not enabled"}
+              value={needsReconciliation ? "Needs refresh" : mfaEnabled ? "Enabled" : "Not enabled"}
             />
           </ProfileList>
-          {mfaEnabled ? (
+          {needsReconciliation ? (
+            <Button label="Refresh status" onPress={retryStatus} tone="neutral" />
+          ) : mfaEnabled ? (
             <Button
               disabled={mfaLoading}
               label="Disable 2FA"
@@ -321,9 +434,14 @@ export default function ProfileTwoFactorScreen() {
               tone="danger"
             />
           ) : (
-            <Button label="Enable 2FA" loading={mfaLoading} onPress={() => startMfaEnrollment()} />
+            <Button label="Enable 2FA" loading={mfaLoading} onPress={startMfaEnrollment} />
           )}
         </ProfileSection>
+      )}
+      {actionError && (
+        <Text accessibilityRole="alert" style={styles.errorText}>
+          {actionError}
+        </Text>
       )}
       <ConfirmationModal
         body="This will make your account less secure."
@@ -331,13 +449,14 @@ export default function ProfileTwoFactorScreen() {
         confirmTone="danger"
         loading={mfaLoading}
         onCancel={() => setIsConfirmingDisable(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           setIsConfirmingDisable(false);
-          return disableMfa();
+          await disableMfa();
         }}
         title="Disable two-factor authentication?"
         visible={isConfirmingDisable}
       />
+      {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
@@ -345,6 +464,7 @@ export default function ProfileTwoFactorScreen() {
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    errorText: { ...mobileText.body, color: mobileColors.dangerText },
     actionsStack: {
       gap: mobileSpace.sm,
     },

@@ -21,9 +21,10 @@ const fullSettingsPermissions: NavPermissions = {
 };
 
 describe("settings nav config", () => {
-  it("uses the standard card width and gives roles room for extra columns", () => {
+  it("uses the standard card width and gives dense tables room for extra columns", () => {
     expect(getMaxWidth("staff-roles")).toBe(1280);
-    expect(getMaxWidth("staff-certifications")).toBe(1120);
+    expect(getMaxWidth("org-activity")).toBe(1280);
+    expect(getMaxWidth("staff-certifications")).toBe(1280);
     expect(getMaxWidth("org-general")).toBe(1120);
   });
 

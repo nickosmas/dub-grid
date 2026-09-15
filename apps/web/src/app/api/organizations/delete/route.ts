@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { forbidIfSandboxCookie } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireSensitiveActionAuth } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { cancelSubscription } from "@/lib/stripe";
 import { cacheDel, CacheKey } from "@/lib/cache";
@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
   );
   if ("response" in authorized) return authorized.response;
   const { actor, serviceClient, orgId: effectiveOrgId } = authorized;
+
+  const assurance = await requireSensitiveActionAuth(req);
+  if ("response" in assurance) return assurance.response;
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, actor.id);
   if (misconfigured) {

@@ -83,6 +83,7 @@ async function resolveOrganizationId(
       getServiceClient(),
       impersonation.sessionId,
       userId,
+      typeof claims.session_id === "string" ? claims.session_id : "",
     );
     if (verified) {
       return { orgId: verified.targetOrgId, isGridmaster: false };

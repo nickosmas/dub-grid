@@ -1,5 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import {
+  createSensitiveActionStepUpRequired,
+  evaluateSensitiveActionAssurance,
+  resolveVerifiedTotpFactorPresence,
+} from "@dubgrid/authz";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -16,12 +22,16 @@ type Claims = JwtPayload & {
   in_sandbox?: unknown;
 };
 
-type AuthResult = { session: Session; user: User } | { response: NextResponse };
+type AuthResult = { session: Session; user: User; sessionId: string } | { response: NextResponse };
 
-type UserAuthResult = { user: User } | { response: NextResponse };
+type UserAuthResult = { user: User; sessionId: string } | { response: NextResponse };
 
 type ClaimsAuthResult =
-  { session: Session; user: User; claims: Claims } | { response: NextResponse };
+  { session: Session; user: User; sessionId: string; claims: Claims } | { response: NextResponse };
+
+type SensitiveActionAuthResult =
+  | { session: Session; user: User; sessionId: string; claims: VerifiedClaims }
+  | { response: NextResponse };
 
 /**
  * A user-scoped Supabase client for this request, honouring whichever
@@ -175,46 +185,70 @@ async function authenticateRequest(
 export async function requireAuthenticatedSession(req: NextRequest): Promise<AuthResult> {
   const auth = await authenticateRequest(req);
   if ("response" in auth) return auth;
-  return { session: auth.session, user: auth.user };
+  return { session: auth.session, user: auth.user, sessionId: auth.verified.sessionId };
 }
 
 export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAuthResult> {
   const auth = await authenticateRequest(req);
   if ("response" in auth) return auth;
-  return { user: auth.user };
+  return { user: auth.user, sessionId: auth.verified.sessionId };
 }
 
-/**
- * Confirms the caller is still live according to Supabase Auth, rather than
- * only according to a token we verified locally.
- *
- * Local verification accepts a token for its full lifetime, so a caller can be
- * up to an hour stale. That is the right trade for ordinary reads and writes,
- * where the revocation markers cover the cases that matter. It is NOT the
- * right trade for irreversible or credential-level actions — account deletion,
- * GDPR erasure, data export, credential and MFA changes, ownership transfer.
- * Those pay the round trip deliberately, by calling this after their normal
- * auth check:
- *
- *   const stale = await requireFreshAuth(req, auth.user.id);
- *   if (stale) return stale;
- *
- * Returns null when the caller is still valid, or the 401 to return when not.
- */
-export async function requireFreshAuth(
+export async function requireLiveAuthenticatedSession(
   req: NextRequest,
-  expectedUserId: string,
-): Promise<NextResponse | null> {
+): Promise<SensitiveActionAuthResult> {
+  const auth = await authenticateRequest(req);
+  if ("response" in auth) return auth;
+
   const supabase = createRequestSupabaseClient(req);
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
-  if (!user || user.id !== expectedUserId) {
-    return expiredSessionResponse();
+  if (error) {
+    return {
+      response: NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 }),
+    };
   }
 
-  return null;
+  if (!user || user.id !== auth.user.id) {
+    return { response: expiredSessionResponse() };
+  }
+
+  return {
+    session: auth.session,
+    user,
+    sessionId: auth.verified.sessionId,
+    claims: auth.verified.claims,
+  };
+}
+
+export async function requireSensitiveActionAuth(
+  req: NextRequest,
+): Promise<SensitiveActionAuthResult> {
+  const auth = await requireLiveAuthenticatedSession(req);
+  if ("response" in auth) return auth;
+  const hasVerifiedTotpFactor = resolveVerifiedTotpFactorPresence(auth.user.factors);
+  if (hasVerifiedTotpFactor === null) {
+    return {
+      response: NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 }),
+    };
+  }
+
+  const decision = evaluateSensitiveActionAssurance({
+    claims: auth.claims,
+    hasVerifiedTotpFactor,
+  });
+  if (!decision.allowed) {
+    return {
+      response: NextResponse.json(createSensitiveActionStepUpRequired(decision.requiredMethod), {
+        status: 403,
+      }),
+    };
+  }
+
+  return auth;
 }
 
 /**
@@ -254,7 +288,11 @@ export async function requireAuthenticatedUserWithClaims(
 
   // The verified JWT payload IS the claims — `getClaims()` used to re-derive
   // them over a second round trip, which local verification makes redundant.
-  const auth = { session: result.session, user: result.user };
+  const auth = {
+    session: result.session,
+    user: result.user,
+    sessionId: result.verified.sessionId,
+  };
   const claims = result.verified.claims as VerifiedClaims & Claims;
 
   // ── Sandbox claim override ─────────────────────────────────────────────
@@ -271,48 +309,41 @@ export async function requireAuthenticatedUserWithClaims(
   const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
-    if (sb && sb.userId === auth.user.id) {
-      try {
-        const serviceClient = getServiceClient();
-        const { data: ownedSandbox } = await serviceClient
-          .from("organizations")
-          .select("id")
-          .eq("id", sb.sandboxOrgId)
-          .eq("workspace_kind", "sandbox")
-          .eq("sandbox_owner_user_id", auth.user.id)
-          .is("archived_at", null)
-          .maybeSingle();
-        if (ownedSandbox) {
-          return {
-            ...auth,
-            claims: {
-              ...claims,
-              org_id: ownedSandbox.id,
-              // User is super_admin of their own sandbox; widen the role
-              // so admin-gated features work inside the sandbox even if
-              // the user is a non-admin on their real org. (Menu-level
-              // gating already prevents user-tier accounts from entering
-              // a sandbox in the first place.)
-              org_role: "super_admin",
-              // org_slug is display metadata only. Host routing is not used
-              // to select organization or sandbox context.
-              in_sandbox: true,
-            },
-          };
-        }
-      } catch {
-        // A sandbox verification outage must never send a request to the
-        // caller's real Organization. Some endpoints legitimately use these
-        // claims as their effective org context, so falling through here
-        // would turn a transient dependency failure into a cross-context
-        // write or read. Fail closed and let the client retry instead.
-        return {
-          response: NextResponse.json(
-            { error: "We couldn't verify your Test Sandbox. Please retry." },
-            { status: 503 },
-          ),
-        };
+    if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
+      return { response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }) };
+    }
+    try {
+      const serviceClient = getServiceClient();
+      const { data: ownedSandbox } = await serviceClient
+        .from("organizations")
+        .select("id")
+        .eq("id", sb.sandboxOrgId)
+        .eq("workspace_kind", "sandbox")
+        .eq("sandbox_owner_user_id", auth.user.id)
+        .eq("sandbox_owner_session_id", auth.sessionId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (!ownedSandbox) {
+        return { response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }) };
       }
+      return {
+        ...auth,
+        claims: {
+          ...claims,
+          org_id: ownedSandbox.id,
+          org_role: "super_admin",
+          in_sandbox: true,
+        },
+      };
+    } catch {
+      // Never fall through to the real organization while temporary tenant
+      // state is present but cannot be verified.
+      return {
+        response: NextResponse.json(
+          { error: "We couldn't verify your Test Sandbox. Please retry." },
+          { status: 503 },
+        ),
+      };
     }
   }
 
@@ -334,5 +365,25 @@ export async function requireGridmasterSession(req: NextRequest): Promise<AuthRe
     };
   }
 
-  return { session: auth.session, user: auth.user };
+  const { data: profile, error } = await getServiceClient()
+    .from("profiles")
+    .select("platform_role, deactivated_at, scheduled_deletion_at")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  if (
+    error ||
+    profile?.platform_role !== "gridmaster" ||
+    profile.deactivated_at != null ||
+    profile.scheduled_deletion_at != null
+  ) {
+    return {
+      response: NextResponse.json(
+        { error: "You don't have permission to use that area." },
+        { status: 403 },
+      ),
+    };
+  }
+
+  return { session: auth.session, user: auth.user, sessionId: auth.sessionId };
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
+import { MaybeHint } from "@/components/ui/hint";
+import { cn } from "@/lib/utils";
 
 type SelectableTagProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   children: ReactNode;
@@ -40,9 +42,12 @@ export function SelectableTag({
   disabledTextColor,
   disabledOpacity = 0.65,
   labelStyle,
+  className,
+  title,
   style,
   ...buttonProps
 }: SelectableTagProps) {
+  const fullLabel = title ?? (typeof children === "string" ? children : undefined);
   const borderColor =
     disabled && disabledBorderColor
       ? disabledBorderColor
@@ -63,32 +68,37 @@ export function SelectableTag({
         : "var(--dg-color-text-secondary)";
 
   return (
-    <button
-      {...buttonProps}
-      type={type}
-      aria-pressed={selected}
-      disabled={disabled}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap,
-        padding,
-        borderRadius,
-        border: `1.5px solid ${borderColor}`,
-        background,
-        color: textColor,
-        fontSize,
-        fontWeight: selected ? selectedFontWeight : fontWeight,
-        cursor: disabled ? "default" : "pointer",
-        transition: "border-color 150ms ease, background 150ms ease, color 150ms ease",
-        fontFamily: "inherit",
-        lineHeight: 1.2,
-        textAlign: "left",
-        opacity: disabled ? disabledOpacity : 1,
-        ...style,
-      }}
-    >
-      <span style={labelStyle}>{children}</span>
-    </button>
+    <MaybeHint content={fullLabel}>
+      <button
+        {...buttonProps}
+        type={type}
+        aria-pressed={selected}
+        className={cn("dg-pill-action", className)}
+        disabled={disabled}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap,
+          padding,
+          borderRadius,
+          border: `1.5px solid ${borderColor}`,
+          background,
+          color: textColor,
+          fontSize,
+          fontWeight: selected ? selectedFontWeight : fontWeight,
+          cursor: disabled ? "default" : "pointer",
+          transition: "border-color 150ms ease, background 150ms ease, color 150ms ease",
+          fontFamily: "inherit",
+          lineHeight: 1.2,
+          textAlign: "left",
+          opacity: disabled ? disabledOpacity : 1,
+          ...style,
+        }}
+      >
+        <span className="dg-pill-action-label" style={labelStyle}>
+          {children}
+        </span>
+      </button>
+    </MaybeHint>
   );
 }

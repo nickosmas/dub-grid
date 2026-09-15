@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 import {
+  mobilePillOverflow,
   mobileElevation,
   mobileRadii,
   mobileRadius,
@@ -143,6 +144,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       includeFontPadding: false,
     },
     statusChip: {
+      ...mobilePillOverflow.displayContainer,
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       borderColor: mobileColors.border,
@@ -153,6 +155,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     statusChipText: {
       ...mobileTextWeighted("caption", "semibold"),
+      ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
       includeFontPadding: false,
     },
@@ -168,6 +171,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textSecondary,
     },
     jobPill: {
+      ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
@@ -180,12 +184,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 5,
     },
     jobPillTextStack: {
+      minWidth: 0,
       gap: 2,
     },
     jobPillInlineTextRow: {
       flexDirection: "row",
       alignItems: "center",
+      flexWrap: "wrap",
       gap: 4,
+      minWidth: 0,
     },
     jobPillEyebrowText: {
       ...mobileText.micro,
@@ -196,6 +203,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillText: {
       ...mobileText.badge,
+      ...mobilePillOverflow.displayText,
       textTransform: "uppercase",
       includeFontPadding: false,
     },
@@ -220,12 +228,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
+      ...mobilePillOverflow.displayText,
       includeFontPadding: false,
     },
     jobPillValueTextCompact: {
       fontSize: 12,
     },
     mentoredPill: {
+      ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
@@ -238,6 +248,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     mentoredPillText: {
       ...mobileText.badge,
+      ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
       includeFontPadding: false,
     },

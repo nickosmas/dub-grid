@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchOrganizationBootstrap,
+  getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -21,8 +21,7 @@ import { queryKeys } from "@/lib/query-keys";
 export function useIsInSandbox(): boolean {
   const { data } = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
-    queryFn: () => fetchOrganizationBootstrap(),
-    staleTime: 60_000,
+    ...getOrganizationBootstrapQueryPolicy(),
   });
   return data?.org?.workspaceKind === "sandbox";
 }
@@ -36,8 +35,7 @@ export function useIsInSandbox(): boolean {
 export function useSandboxSourceOrgId(): string | null {
   const { data } = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
-    queryFn: () => fetchOrganizationBootstrap(),
-    staleTime: 60_000,
+    ...getOrganizationBootstrapQueryPolicy(),
   });
   const org = data?.org;
   if (!org || org.workspaceKind !== "sandbox") return null;

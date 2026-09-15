@@ -14,6 +14,7 @@ import {
   revokeAccountSession,
 } from "@/features/account/client";
 import { useLogout } from "@/hooks/useLogout";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { queryKeys } from "@/lib/query-keys";
 
 interface UserSession {
@@ -237,6 +238,7 @@ export function SessionList({
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const { signOut } = useLogout();
+  const stepUp = useStepUpAction();
   const [confirmCurrentSessionSignOut, setConfirmCurrentSessionSignOut] = useState(false);
 
   const sessionsQuery = useQuery({
@@ -289,9 +291,14 @@ export function SessionList({
   }, [active, onOtherSessionCountChange, sessionsQuery.data]);
 
   const revokeMutation = useMutation({
-    mutationFn: (session: UserSession) =>
-      revokeAccountSession(session.refreshTokenHash).then(() => session),
-    onSuccess: (session) => {
+    mutationFn: async (session: UserSession) => ({
+      session,
+      completed: await stepUp.run((accessToken) =>
+        revokeAccountSession(session.refreshTokenHash, accessToken),
+      ),
+    }),
+    onSuccess: ({ session, completed }) => {
+      if (!completed) return;
       if (user) {
         queryClient.setQueryData<SessionOverview>(queryKeys.account.sessions(user.id), (prev) =>
           prev ? { ...prev, active: prev.active.filter((s) => s.id !== session.id) } : prev,
@@ -301,6 +308,11 @@ export function SessionList({
     },
     onError: () => {
       toast.error("We couldn't sign out that device. Try again.");
+    },
+    onSettled: () => {
+      // Password confirmation may replace this session even if the action was cancelled or failed.
+      if (user)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.account.sessions(user.id) });
     },
   });
   const revokingId = revokeMutation.isPending ? (revokeMutation.variables?.id ?? null) : null;
@@ -323,17 +335,14 @@ export function SessionList({
     background: "var(--dg-color-surface)",
   };
 
-  if (loading) {
-    return <div style={emptyStateBoxStyle}>Loading sessions...</div>;
-  }
-
-  if (active.length === 0 && stale.length === 0) {
-    return <div style={emptyStateBoxStyle}>No active sessions</div>;
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {active.length > 0 && (
+      {stepUp.dialog}
+      {loading && <div style={emptyStateBoxStyle}>Loading sessions...</div>}
+      {!loading && active.length === 0 && stale.length === 0 && (
+        <div style={emptyStateBoxStyle}>No active sessions</div>
+      )}
+      {!loading && active.length > 0 && (
         <div
           style={{
             overflow: "hidden",
@@ -356,7 +365,7 @@ export function SessionList({
           ))}
         </div>
       )}
-      {stale.length > 0 && (
+      {!loading && stale.length > 0 && (
         <div
           style={{
             overflow: "hidden",

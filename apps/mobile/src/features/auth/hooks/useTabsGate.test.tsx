@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -37,7 +37,37 @@ vi.mock("../../notifications/hooks/usePushResponseHandler", () => ({
 }));
 
 vi.mock("../screens/NetworkConnectionRecoveryScreen", () => ({
-  NetworkConnectionRecoveryScreen: () => <div>network-connection-recovery</div>,
+  NetworkConnectionRecoveryScreen: ({
+    isRetrying,
+    onRetry,
+  }: {
+    isRetrying: boolean;
+    onRetry: () => void;
+  }) => (
+    <div>
+      <span>network-connection-recovery</span>
+      <span>{isRetrying ? "network-retrying" : "network-ready"}</span>
+      <button onClick={onRetry}>retry network</button>
+    </div>
+  ),
+}));
+
+vi.mock("../screens/OrganizationLockedScreen", () => ({
+  OrganizationLockedScreen: ({
+    isRetrying,
+    message,
+    onRetry,
+  }: {
+    isRetrying: boolean;
+    message: string;
+    onRetry: () => void;
+  }) => (
+    <div>
+      <span>{message}</span>
+      <span>{isRetrying ? "retrying" : "held"}</span>
+      <button onClick={onRetry}>retry organization</button>
+    </div>
+  ),
 }));
 
 let useTabsGate: (typeof import("./useTabsGate"))["useTabsGate"];
@@ -103,12 +133,145 @@ describe("useTabsGate canViewRequestsTab", () => {
       isError: true,
       isFetching: false,
       isLoading: false,
+      failureCount: 0,
       refetch: vi.fn().mockResolvedValue({}),
     });
 
     render(<TestHost />);
 
     expect(screen.getByText("network-connection-recovery")).toBeTruthy();
+  });
+
+  it("shows recovery immediately when a cold bootstrap is paused offline", () => {
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      failureCount: 0,
+      fetchStatus: "paused",
+      isError: false,
+      isFetching: false,
+      isLoading: true,
+      refetch: vi.fn().mockResolvedValue({}),
+    });
+
+    render(<TestHost />);
+
+    expect(screen.getByText("network-connection-recovery")).toBeInTheDocument();
+  });
+
+  it("shows recovery between bounded cold-bootstrap attempts", () => {
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      failureCount: 1,
+      fetchStatus: "idle",
+      isError: false,
+      isFetching: false,
+      isLoading: true,
+      refetch: vi.fn().mockResolvedValue({}),
+    });
+
+    render(<TestHost />);
+
+    expect(screen.getByText("network-connection-recovery")).toBeInTheDocument();
+  });
+
+  it("releases cold recovery in place as soon as bootstrap succeeds", () => {
+    const bootstrapState: {
+      data:
+        | undefined
+        | {
+            currentOrg: { id: string; featureFlags: Record<string, never> };
+            effectiveRole: string;
+            linkedEmployee: { focusAreaIds: number[]; departmentIds: number[] };
+            permissions: { canViewSchedule: boolean; canApproveShiftRequests: boolean };
+          };
+      error: Error | null;
+      failureCount: number;
+      fetchStatus: string;
+      isError: boolean;
+      isFetching: boolean;
+      isLoading: boolean;
+      refetch: ReturnType<typeof vi.fn>;
+    } = {
+      data: undefined,
+      error: new Error("network"),
+      failureCount: 3,
+      fetchStatus: "idle",
+      isError: true,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({}),
+    };
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockImplementation(() => bootstrapState);
+
+    const result = render(<TestHost />);
+    expect(screen.getByText("network-connection-recovery")).toBeInTheDocument();
+
+    bootstrapState.data = {
+      currentOrg: { id: "org-1", featureFlags: {} },
+      effectiveRole: "user",
+      linkedEmployee: { focusAreaIds: [1], departmentIds: [] },
+      permissions: { canViewSchedule: true, canApproveShiftRequests: false },
+    };
+    bootstrapState.error = null;
+    bootstrapState.failureCount = 0;
+    bootstrapState.isError = false;
+    result.rerender(<TestHost />);
+
+    expect(screen.queryByText("network-connection-recovery")).not.toBeInTheDocument();
+    expect(screen.getByTestId("team")).toHaveTextContent("true");
+  });
+
+  it("keeps a billing-held member locked until bootstrap itself succeeds", () => {
+    const refetch = vi.fn().mockResolvedValue({});
+    const bootstrapState: {
+      data:
+        | undefined
+        | {
+            currentOrg: { id: string; featureFlags: Record<string, never> };
+            effectiveRole: string;
+            linkedEmployee: { focusAreaIds: number[]; departmentIds: number[] };
+            permissions: { canViewSchedule: boolean; canApproveShiftRequests: boolean };
+          };
+      error: Error | null;
+      isError: boolean;
+      isFetching: boolean;
+      isLoading: boolean;
+      refetch: typeof refetch;
+    } = {
+      data: undefined,
+      error: new Error("Organization unavailable. Contact your organization administrator."),
+      isError: true,
+      isFetching: false,
+      isLoading: false,
+      refetch,
+    };
+    useSessionState.mockReturnValue({ accessToken: "token-1", isLoading: false });
+    useBootstrap.mockImplementation(() => bootstrapState);
+
+    const result = render(<TestHost />);
+
+    expect(screen.getByText("held")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("retry organization"));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("held")).toBeInTheDocument();
+
+    bootstrapState.error = null;
+    bootstrapState.isError = false;
+    bootstrapState.data = {
+      currentOrg: { id: "org-1", featureFlags: {} },
+      effectiveRole: "user",
+      linkedEmployee: { focusAreaIds: [1], departmentIds: [] },
+      permissions: { canViewSchedule: true, canApproveShiftRequests: false },
+    };
+    result.rerender(<TestHost />);
+
+    expect(screen.queryByText("held")).not.toBeInTheDocument();
+    expect(screen.getByTestId("home")).toHaveTextContent("true");
   });
 
   it("keeps the tab tree mounted when a refetch fails but data is still cached", () => {

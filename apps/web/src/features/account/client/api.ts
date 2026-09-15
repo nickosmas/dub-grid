@@ -1,7 +1,9 @@
 "use client";
 
 import type { Employee } from "@dubgrid/domain";
+import type { MfaLifecycleRequest } from "@dubgrid/contracts";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import type { RecurringShift, ShiftMap } from "@/types";
 import type { NotificationPreferenceMap } from "@/features/account/shared/preferences";
 import type { Permissions } from "@/features/permissions/shared";
@@ -131,28 +133,41 @@ export interface InvitationRegistration {
   status: "created" | "existing";
 }
 
-async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+async function requestJson<T>(
+  input: string,
+  init?: RequestInit,
+  options: { deadline?: boolean } = {},
+): Promise<T> {
+  const response = options.deadline
+    ? await fetchWithTimeout(input, init)
+    : await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
     ? ((await response.json()) as Record<string, unknown>)
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Account request failed."));
+    throw Object.assign(
+      new Error(formatClientErrorMessage(body?.error, "Account request failed.")),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
   }
 
   return body as T;
 }
 
 export function fetchTermsAcceptanceStatus(): Promise<TermsAcceptanceStatus> {
-  return requestJson<TermsAcceptanceStatus>("/api/account/terms");
+  return requestJson<TermsAcceptanceStatus>("/api/account/terms", undefined, { deadline: true });
 }
 
 export function recordCurrentTermsAcceptance(): Promise<{ success: true }> {
-  return requestJson<{ success: true }>("/api/account/terms", {
-    method: "POST",
-  });
+  return requestJson<{ success: true }>(
+    "/api/account/terms",
+    {
+      method: "POST",
+    },
+    { deadline: true },
+  );
 }
 
 export function clearLogoutCleanup(): Promise<{ success: true }> {
@@ -304,11 +319,15 @@ export function resolvePeopleProfileChangeRequest(input: {
   requestId: string;
   action: "approve" | "reject";
   resolverNote?: string;
+  accessToken?: string;
 }): Promise<{ success: true; request: ProfileChangeRequest }> {
   const params = new URLSearchParams({ orgId: input.orgId });
   return requestJson(`/api/people/change-requests/${input.requestId}?${params}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
+    },
     body: JSON.stringify({
       action: input.action,
       resolverNote: input.resolverNote,
@@ -332,14 +351,47 @@ export function saveNotificationPreferences(
   });
 }
 
-export function updateMfaStatus(enabled: boolean): Promise<{
+export function requestMfaLifecycle(body: MfaLifecycleRequest, accessToken?: string) {
+  return requestJson<unknown>(
+    "/api/account/mfa-lifecycle",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+    { deadline: true },
+  );
+}
+
+export function updateMfaStatus(accessToken?: string): Promise<{
   profile: SelfProfileRecord | null;
 }> {
-  return requestJson("/api/account/mfa-status", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled }),
-  });
+  return requestJson(
+    "/api/account/mfa-status",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({}),
+    },
+    { deadline: true },
+  );
+}
+
+export function requireCredentialAssurance(accessToken: string): Promise<{ success: true }> {
+  return requestJson(
+    "/api/account/credential-assurance",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+    { deadline: true },
+  );
 }
 
 export function fetchAccountSessions(): Promise<{
@@ -349,12 +401,37 @@ export function fetchAccountSessions(): Promise<{
   return requestJson("/api/account/sessions");
 }
 
-export function revokeAccountSession(refreshTokenHash: string): Promise<{ success: true }> {
-  return requestJson("/api/account/sessions", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshTokenHash }),
-  });
+export function signOutAccountSessions(
+  scope: "others" | "global",
+  accessToken: string,
+): Promise<{ success: true }> {
+  return requestJson(
+    "/api/auth/sign-out",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ scope }),
+    },
+    { deadline: true },
+  );
+}
+
+export function revokeAccountSession(
+  refreshTokenHash: string,
+  accessToken?: string,
+): Promise<{ success: true }> {
+  return requestJson(
+    "/api/account/sessions",
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ refreshTokenHash }),
+    },
+    { deadline: true },
+  );
 }
 
 export function fetchAccessibleOrganizations(): Promise<{

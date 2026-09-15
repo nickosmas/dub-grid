@@ -4,6 +4,7 @@ import type { MobilePerson } from "@dubgrid/contracts";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { getMobilePerson } from "../../../shared/lib/api";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 
@@ -20,8 +21,8 @@ export function usePersonEditor(personId: string | undefined) {
   const queryClient = useQueryClient();
   const bootstrapQuery = useBootstrap(accessToken);
   const personQuery = useQuery({
-    queryKey: ["mobile", "person", accessToken, personId],
-    queryFn: () => getMobilePerson(accessToken!, personId!),
+    queryKey: mobileQueryKeys.person(accessToken, personId),
+    queryFn: ({ signal }) => getMobilePerson(accessToken!, personId!, signal),
     enabled: Boolean(accessToken && personId && bootstrapQuery.data),
   });
 
@@ -40,11 +41,11 @@ export function usePersonEditor(personId: string | undefined) {
 
   const updateCachedPerson = useCallback(
     (nextPerson: MobilePerson) => {
-      queryClient.setQueryData(["mobile", "person", accessToken, nextPerson.id], {
+      queryClient.setQueryData(mobileQueryKeys.person(accessToken, nextPerson.id), {
         person: nextPerson,
       });
       queryClient.setQueryData(
-        ["mobile", "people", accessToken],
+        mobileQueryKeys.people(accessToken),
         (current: { people: MobilePerson[] } | undefined) =>
           current
             ? {

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AuthActionEmail } from "./AuthActionEmail";
-import { PREVIEW_LOGO_URL } from "./placeholders";
+import { PREVIEW_LOGO_URL, RECOVERY_VERIFICATION_URL } from "./placeholders";
 
 /** Supabase: recovery.html — password reset. */
 export function RecoveryEmail({ logoUrl }: { logoUrl?: string } = {}) {
@@ -9,6 +9,7 @@ export function RecoveryEmail({ logoUrl }: { logoUrl?: string } = {}) {
       heading="Reset your password"
       intro="Click the button below to choose a new password for your account."
       ctaLabel="Reset password"
+      actionHref={RECOVERY_VERIFICATION_URL}
       // The mobile app resets in-app rather than opening this link, so the same
       // email has to carry a code it can accept.
       code={{ label: "Or enter this code in the DubGrid app." }}

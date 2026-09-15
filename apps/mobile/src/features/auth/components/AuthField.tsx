@@ -2,7 +2,13 @@ import { forwardRef, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileInputText,
+  mobileRadii,
+  mobileSpace,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 /**
  * The app's auth text field: a bordered row that owns its own focus state, with
@@ -50,6 +56,8 @@ export const AuthField = forwardRef<
     >
       <TextInput
         ref={ref}
+        {...inputProps}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         onBlur={(event) => {
           setFocused(false);
           onBlur?.(event);
@@ -60,7 +68,6 @@ export const AuthField = forwardRef<
         }}
         placeholderTextColor={mobileColors.placeholderText}
         style={[styles.input, variant === "code" ? styles.inputCode : styles.inputFlex, style]}
-        {...inputProps}
       />
       {suffix ? (
         <View style={styles.suffix}>
@@ -103,12 +110,9 @@ const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.inputBorderError,
     },
     input: {
-      // No fontFamily: an explicit DM Sans family on TextInput breaks
-      // Android EditText interactivity when the font hasn't loaded yet.
-      // System font keeps the input safe; surrounding Text stays DM Sans.
+      ...mobileInputText("regular"),
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "400",
       color: mobileColors.textPrimary,
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: 14,
@@ -117,12 +121,12 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
     },
     inputCode: {
+      ...mobileInputText("semibold"),
       flex: 1,
       textAlign: "center",
       fontSize: 26,
       lineHeight: 32,
       letterSpacing: 10,
-      fontWeight: "600",
     },
     suffix: {
       alignSelf: "stretch",

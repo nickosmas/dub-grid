@@ -23,10 +23,12 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
   cancelOwnProfileChangeRequest,
   createOwnProfileChangeRequest,
   fetchOwnProfileChangeRequests,
+  requireCredentialAssurance,
   updateBrowserUserEmail,
   updateSelfProfileDetails,
   updateSelfProfilePhone,
@@ -141,6 +143,7 @@ export function ProfilePanel({
   setEmployee,
   refetchProfile,
 }: ProfilePanelProps) {
+  const stepUp = useStepUpAction();
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
   const displayName =
@@ -423,46 +426,63 @@ export function ProfilePanel({
       const nextLast = normalizeStaffName(editLastName);
       const nextPhone = employee ? normalizeOptionalUsPhone(editPhone) : "";
 
-      if (canEditProfileDirectly && employee && orgId) {
-        if (workHasChanges) {
-          const workSaved = await workEditorRef.current?.save();
-          if (!workSaved) return;
-        } else if (hasNameChanges || hasPhoneChanges) {
-          await saveWorkDetails(employee);
+      const persistDraft = async (): Promise<boolean> => {
+        if (canEditProfileDirectly && employee && orgId) {
+          if (workHasChanges) {
+            const workSaved = await workEditorRef.current?.save();
+            if (!workSaved) return false;
+          } else if (hasNameChanges || hasPhoneChanges) {
+            await saveWorkDetails(employee);
+          }
+          profileSaved = hasNameChanges || hasPhoneChanges || workHasChanges;
+        } else if (hasNameChanges) {
+          const updated = await updateSelfProfileDetails({
+            firstName: nextFirst,
+            lastName: nextLast,
+            orgId,
+          });
+          setProfile(updated.profile);
+          if (updated.employee) setEmployee(updated.employee);
+          profileSaved = true;
         }
-        profileSaved = hasNameChanges || hasPhoneChanges || workHasChanges;
-      } else if (hasNameChanges) {
-        const updated = await updateSelfProfileDetails({
-          firstName: nextFirst,
-          lastName: nextLast,
-          orgId,
-        });
-        setProfile(updated.profile);
-        if (updated.employee) setEmployee(updated.employee);
-        profileSaved = true;
-      }
-      if (!canEditProfileDirectly && hasPhoneChanges && orgId && employee) {
-        const updated = await updateSelfProfilePhone({
-          orgId,
-          phone: nextPhone,
-          expectedVersion: employee.version,
-        });
-        setEmployee(updated.employee);
-        profileSaved = true;
-      }
+        if (!canEditProfileDirectly && hasPhoneChanges && orgId && employee) {
+          const updated = await updateSelfProfilePhone({
+            orgId,
+            phone: nextPhone,
+            expectedVersion: employee.version,
+          });
+          setEmployee(updated.employee);
+          profileSaved = true;
+        }
+        if (hasEmailChanges) {
+          try {
+            await updateBrowserUserEmail(nextEmail);
+            setRequestedEmail(nextEmail);
+          } catch (err) {
+            toast.error(
+              profileSaved
+                ? "Your profile was saved, but we couldn't start the email change. Try the email again."
+                : extractErrorMessage(err, "We couldn't update your email. Try again."),
+            );
+            return false;
+          }
+        }
+        return true;
+      };
+
+      let draftPersisted = false;
       if (hasEmailChanges) {
-        try {
-          await updateBrowserUserEmail(nextEmail);
-          setRequestedEmail(nextEmail);
-        } catch (err) {
-          toast.error(
-            profileSaved
-              ? "Your profile was saved, but we couldn't start the email change. Try the email again."
-              : extractErrorMessage(err, "We couldn't update your email. Try again."),
-          );
-          return;
-        }
+        const completed = await stepUp.run(async (accessToken) => {
+          // Do not persist names, phone, or work details until the server has
+          // selected and accepted the account's current assurance method.
+          await requireCredentialAssurance(accessToken);
+          draftPersisted = await persistDraft();
+        });
+        if (!completed) return;
+      } else {
+        draftPersisted = await persistDraft();
       }
+      if (!draftPersisted) return;
       accountDraftTouchedRef.current = false;
       setEditFirstName(nextFirst);
       setEditLastName(nextLast);
@@ -475,6 +495,7 @@ export function ProfilePanel({
             : "Confirmation sent to your new email address."
           : "Profile updated.",
       );
+      setPendingConfirm(null);
     } catch (err) {
       if (err instanceof EmployeeProfileConflictError) {
         setEmployee(err.latestEmployee);
@@ -579,8 +600,11 @@ export function ProfilePanel({
   function confirmPending() {
     const action = pendingConfirm;
     if (!action) return;
+    if (action === "account-details") {
+      void saveAccount();
+      return;
+    }
     setPendingConfirm(null);
-    if (action === "account-details") void saveAccount();
     if (action === "name-change-request") void sendNameChangeRequest();
     if (action === "account-deletion") void sendDeletionRequest();
   }
@@ -1049,7 +1073,7 @@ export function ProfilePanel({
         </SectionCard>
       )}
 
-      {confirmation && (
+      {confirmation && !stepUp.dialog && (
         <ConfirmDialog
           title={confirmation.title}
           message={confirmation.message}
@@ -1062,6 +1086,7 @@ export function ProfilePanel({
           }}
         />
       )}
+      {stepUp.dialog}
     </div>
   );
 }

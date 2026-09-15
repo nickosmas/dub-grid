@@ -2,51 +2,55 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { clientEnv } from "@/lib/env";
 
-/**
- * Extract the root domain from a hostname (e.g., "acme.dubgrid.com" → "dubgrid.com").
- * Handles localhost and IP addresses by returning them as-is.
- */
-function getRootDomain(hostname: string): string {
-  // localhost or IP address — return as-is
-  if (hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
-    return hostname;
-  }
-  // Handle *.localhost subdomains (e.g., "acme.localhost" → "localhost")
-  if (hostname.endsWith(".localhost")) {
-    return "localhost";
-  }
-  const parts = hostname.split(".");
-  // e.g., "dubgrid.com" → 2 parts, "acme.dubgrid.com" → 3 parts
-  return parts.length > 2 ? parts.slice(-2).join(".") : hostname;
+function forbidden(): NextResponse {
+  return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
 }
 
-/**
- * Validates the Origin header against the configured site URL.
- * Returns a 403 response if the origin is invalid, or null if valid.
- * Allows any subdomain of the same root domain (multi-tenant support).
- * Fails closed in production (blocks if Origin or siteUrl is missing).
- */
-export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
-  const origin = req.headers.get("origin");
-  const siteUrl =
-    clientEnv?.NEXT_PUBLIC_SITE_URL ||
-    (clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv.NEXT_PUBLIC_VERCEL_URL}` : null);
+function parseOrigin(value: string): string | null {
+  if (value.trim() !== value || value === "null" || value.includes(",")) return null;
 
-  if (!origin || !siteUrl) {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
+  try {
+    const parsed = new URL(value);
+    if (
+      (parsed.protocol !== "https:" && parsed.protocol !== "http:") ||
+      parsed.username ||
+      parsed.password ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
     }
+    return parsed.origin;
+  } catch {
     return null;
   }
+}
 
-  const allowedRoot = getRootDomain(
-    new URL(siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`).hostname,
-  );
-  const originRoot = getRootDomain(new URL(origin).hostname);
+function configuredOrigin(): string | null {
+  const siteUrl = clientEnv?.NEXT_PUBLIC_SITE_URL;
+  return siteUrl ? parseOrigin(siteUrl) : null;
+}
 
-  if (originRoot !== allowedRoot) {
-    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
+function requestOrigin(req: NextRequest): string | null {
+  const trustForwarded = Boolean(clientEnv?.NEXT_PUBLIC_VERCEL_URL);
+  const forwardedHost = trustForwarded ? req.headers.get("x-forwarded-host") : null;
+  const forwardedProtocol = trustForwarded ? req.headers.get("x-forwarded-proto") : null;
+  const host = forwardedHost ?? req.headers.get("host") ?? req.nextUrl.host;
+  const protocol = forwardedProtocol ?? req.nextUrl.protocol.replace(":", "");
+
+  if (!host || host.includes(",") || !/^(?:https?|HTTPS?)$/.test(protocol)) return null;
+  return parseOrigin(`${protocol.toLowerCase()}://${host}`);
+}
+
+/** Validates a browser mutation against the exact origin of its API endpoint. */
+export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
+  const declaredOrigin = req.headers.get("origin");
+  if (!declaredOrigin) {
+    return process.env.NODE_ENV === "production" ? forbidden() : null;
   }
 
-  return null;
+  const actual = requestOrigin(req) ?? configuredOrigin();
+  const declared = parseOrigin(declaredOrigin);
+  return actual && declared === actual ? null : forbidden();
 }

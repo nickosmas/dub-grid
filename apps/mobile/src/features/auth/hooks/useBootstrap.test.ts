@@ -15,8 +15,12 @@ import { useBootstrap } from "./useBootstrap";
 
 type QueryOptions = {
   queryKey: unknown[];
-  queryFn: () => unknown;
+  queryFn: (context?: { signal?: AbortSignal }) => unknown;
   enabled: boolean;
+  retry: (failureCount: number, error: unknown) => boolean;
+  retryDelay: (failureCount: number, error: unknown) => number;
+  refetchOnReconnect: boolean;
+  refetchOnWindowFocus: boolean;
 };
 
 function optionsFor(token: string | null): QueryOptions {
@@ -118,6 +122,34 @@ describe("useBootstrap", () => {
     options.queryFn();
 
     expect(getBootstrap).toHaveBeenCalledWith("token-123");
+  });
+
+  it("passes React Query cancellation through to the bootstrap request", () => {
+    const controller = new AbortController();
+    const options = optionsFor("token-123");
+
+    options.queryFn({ signal: controller.signal });
+
+    expect(getBootstrap).toHaveBeenCalledWith("token-123", controller.signal);
+  });
+
+  it("uses the bounded shared recovery policy and honors Retry-After", () => {
+    const options = optionsFor("token-123");
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    expect(options.retry(2, { status: 503 })).toBe(true);
+    expect(options.retry(3, { status: 503 })).toBe(false);
+    expect(options.retry(0, { status: 400 })).toBe(false);
+    expect(options.retryDelay(0, { status: 429, retryAfter: "4" })).toBe(4_000);
+
+    vi.restoreAllMocks();
+  });
+
+  it("lets React Query own one reconnect and foreground refetch lifecycle", () => {
+    const options = optionsFor("token-123");
+
+    expect(options.refetchOnReconnect).toBe(true);
+    expect(options.refetchOnWindowFocus).toBe(true);
   });
 
   it("shares the 'mobile' key prefix so a sign-out cache clear reaches it", () => {

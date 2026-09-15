@@ -185,42 +185,45 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 
 ## Available Scripts
 
-| Script                           | Description                                               |
-| -------------------------------- | --------------------------------------------------------- |
-| `npm run dev`                    | Start the web app through TurboRepo                       |
-| `npm run dev:web`                | Start the Next.js web app through TurboRepo               |
-| `npm run dev:web:lan`            | Start the Next.js web app on `0.0.0.0` for phone access   |
-| `npm run dev:webpack`            | Start the web app with the Webpack dev server             |
-| `npm run dev:mobile`             | Start the Expo mobile app in LAN mode                     |
-| `npm run dev:mobile:phone`       | Start the Expo mobile app in tunnel mode for Expo Go      |
-| `npm run dev:mobile:lan`         | Start the Expo mobile app in LAN mode                     |
-| `npm run build`                  | Dependency-aware production build for the web app         |
-| `npm run build:packages`         | Build all `packages/*` workspaces (tsc → `dist/`)         |
-| `npm run start`                  | Start the web production server                           |
-| `npm run lint`                   | Run ESLint                                                |
-| `npm run format:check`           | Check Prettier formatting without writing files           |
-| `npm run type-check`             | Run workspace type-checks through TurboRepo               |
-| `npm test`                       | Run workspace tests through TurboRepo                     |
-| `npm run test:web`               | Run web workspace tests                                   |
-| `npm run test:mobile`            | Run mobile + contracts workspace tests                    |
-| `npm run test:e2e`               | Run Playwright end-to-end tests                           |
-| `npm run test:e2e:ui`            | Run Playwright tests with interactive UI                  |
-| `npm run test:load`              | Run the k6 schedule load test                             |
-| `npm run test:load:auth`         | Run the k6 auth-flow load test                            |
-| `npm run test:load:stress`       | Run the k6 schedule load test in stress mode              |
-| `npm run analyze`                | Build the web app with bundle analysis                    |
-| `npm run gen:types`              | Generate Supabase TypeScript types from the local DB      |
-| `npm run seed`                   | Seed the local database (runs `seed.ts` → SQL seed files) |
-| `npm run db:reset`               | Reset local Supabase DB (runs migrations + seed)          |
-| `npm run db:reset:mobile`        | Reset the local DB and Android mobile storage             |
-| `npm run db:reset:remote`        | Reset remote Supabase DB (for staging environments)       |
-| `node scripts/doctor-mobile.mjs` | Diagnose the mobile app's local environment setup         |
-| `npm run use:local`              | Switch .env.local to local Supabase credentials           |
-| `npm run use:mobile:local`       | Generate `apps/mobile/.env.local` for local phone testing |
-| `npm run use:mobile:remote`      | Copy remote mobile envs into `apps/mobile/.env.local`     |
-| `npm run use:remote`             | Switch .env.local to remote Supabase credentials          |
-| `npm run deps:audit`             | Run the dependency advisory check                         |
-| `npm run deps:scan`              | Run the supply-chain scan                                 |
+| Script                                | Description                                               |
+| ------------------------------------- | --------------------------------------------------------- |
+| `npm run dev`                         | Start the web app through TurboRepo                       |
+| `npm run dev:web`                     | Start the Next.js web app through TurboRepo               |
+| `npm run dev:web:lan`                 | Start the Next.js web app on `0.0.0.0` for phone access   |
+| `npm run dev:webpack`                 | Start the web app with the Webpack dev server             |
+| `npm run dev:mobile`                  | Start the Expo mobile app in LAN mode                     |
+| `npm run dev:mobile:phone`            | Start the Expo mobile app in tunnel mode for Expo Go      |
+| `npm run dev:mobile:lan`              | Start the Expo mobile app in LAN mode                     |
+| `npm run build`                       | Dependency-aware production build for the web app         |
+| `npm run build:packages`              | Build all `packages/*` workspaces (tsc → `dist/`)         |
+| `npm run start`                       | Start the web production server                           |
+| `npm run lint`                        | Run ESLint                                                |
+| `npm run format:check`                | Check Prettier formatting without writing files           |
+| `npm run type-check`                  | Run workspace type-checks through TurboRepo               |
+| `npm test`                            | Run workspace tests through TurboRepo                     |
+| `npm run test:web`                    | Run web workspace tests                                   |
+| `npm run test:mobile`                 | Run mobile + contracts workspace tests                    |
+| `npm run test:e2e`                    | Run Playwright end-to-end tests                           |
+| `npm run test:e2e:ui`                 | Run Playwright tests with interactive UI                  |
+| `npm run test:load`                   | Run the k6 schedule load test                             |
+| `npm run test:load:auth`              | Run the k6 auth-flow load test                            |
+| `npm run test:load:stress`            | Run the k6 schedule load test in stress mode              |
+| `npm run analyze`                     | Build the web app with bundle analysis                    |
+| `npm run gen:types`                   | Generate Supabase TypeScript types from the local DB      |
+| `npm run seed`                        | Seed the local database (runs `seed.ts` → SQL seed files) |
+| `npm run db:reset`                    | Reset local Supabase DB (runs migrations + seed)          |
+| `npm run db:reset:mobile`             | Reset the local DB and Android mobile storage             |
+| `npm run db:reset:remote`             | Destructively reset an explicitly non-production remote   |
+| `npm run db:migrations:check`         | Validate the local ordered migration inventory            |
+| `npm run db:migrations:inspect`       | Read-only linked-production ledger/schema qualification   |
+| `npm run db:migrations:inspect:local` | Read-only local ledger/schema qualification               |
+| `node scripts/doctor-mobile.mjs`      | Diagnose the mobile app's local environment setup         |
+| `npm run use:local`                   | Switch .env.local to local Supabase credentials           |
+| `npm run use:mobile:local`            | Generate `apps/mobile/.env.local` for local phone testing |
+| `npm run use:mobile:remote`           | Copy remote mobile envs into `apps/mobile/.env.local`     |
+| `npm run use:remote`                  | Switch .env.local to remote Supabase credentials          |
+| `npm run deps:audit`                  | Run the dependency advisory check                         |
+| `npm run deps:scan`                   | Run the supply-chain scan                                 |
 
 `npm test` runs the workspace suites in parallel through Turbo. If a resource-constrained machine hits unrelated Vitest timeouts, rerun serially before treating it as a product regression:
 
@@ -293,12 +296,14 @@ remote-cache reuse.
 
 ## Database
 
-All schema lives in exactly **4 migration files** — never create additional files:
+Database history is an immutable ordered migration stream:
 
-- `001_schema.sql` — Enums, tables, foreign keys, indexes, realtime subscriptions
-- `002_functions_triggers.sql` — Functions, triggers, auth hooks, RPCs
-- `003_rls_policies.sql` — Row-Level Security policies for all tables
-- `004_grants.sql` — Grants for anon, authenticated, service_role, and supabase_auth_admin
+- `001_schema.sql` through `004_grants.sql` are the frozen historical baseline.
+- Every later schema change is a new, retry-safe `NNN_snake_case.sql` file.
+- `supabase/migrations/checksums.sha256` locks every reviewed migration.
+- Never edit an applied migration or replay `supabase/patches/` as a migration
+  stream. See [Supabase migration instructions](supabase/AGENTS.md) and the
+  [production migration runbook](docs/operations/production-migration-safety.md).
 
 ## Deployment
 

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchWithTimeout, RequestTimeoutError } from "./fetch-with-timeout";
+import {
+  fetchWithTimeout,
+  RequestTimeoutError,
+  settleWithRequestTimeout,
+} from "./fetch-with-timeout";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -46,5 +51,20 @@ describe("fetchWithTimeout", () => {
     controller.abort();
 
     await expect(request).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("settleWithRequestTimeout", () => {
+  it("returns a provider result that settles before its deadline", async () => {
+    await expect(settleWithRequestTimeout(Promise.resolve("ready"), 20)).resolves.toBe("ready");
+  });
+
+  it("rejects stalled provider work at its owned deadline", async () => {
+    vi.useFakeTimers();
+    const request = settleWithRequestTimeout(new Promise(() => {}), 20);
+    const assertion = expect(request).rejects.toBeInstanceOf(RequestTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(20);
+    await assertion;
   });
 });

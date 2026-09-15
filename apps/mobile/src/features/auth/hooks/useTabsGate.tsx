@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
@@ -9,6 +9,7 @@ import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { isManagementOnly, isOnSchedule } from "./employmentStatus";
+import { authEntryRecorder } from "../lib/auth-entry-measurement";
 
 export type TabsGateResult =
   | { kind: "blocked"; element: ReactNode }
@@ -29,6 +30,12 @@ export function useTabsGate(): TabsGateResult {
   const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
   usePushRegistration(accessToken, lockedMessage ? null : bootstrapQuery.data?.currentOrg.id);
   usePushResponseHandler(Boolean(accessToken));
+
+  useEffect(() => {
+    if (accessToken && !bootstrapQuery.isLoading) {
+      authEntryRecorder.markAuthenticatedNavigationReady("warm_restore");
+    }
+  }, [accessToken, bootstrapQuery.isLoading]);
 
   // No explicit AppState listener here: `NetworkStateProvider` drives
   // react-query's `focusManager`, which already refetches bootstrap on
@@ -80,7 +87,13 @@ export function useTabsGate(): TabsGateResult {
   // flaky connection hit that every time. With cached data the screens keep
   // rendering it and each surfaces its own error, the same reasoning the
   // comment below applies to the first load.
-  if (bootstrapQuery.isError && !bootstrapQuery.data) {
+  const isColdBootstrapRecovering =
+    !bootstrapQuery.data &&
+    (bootstrapQuery.isError ||
+      bootstrapQuery.fetchStatus === "paused" ||
+      bootstrapQuery.failureCount > 0);
+
+  if (isColdBootstrapRecovering) {
     return {
       kind: "blocked",
       element: (

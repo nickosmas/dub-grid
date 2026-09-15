@@ -15,6 +15,12 @@
  * or bundled during development — preventing the ENOENT manifest scans.
  */
 
+import {
+  redactSecurityError,
+  redactSecurityText,
+  redactSecurityValue,
+} from "@/lib/auth/security-redaction";
+
 // ── Type stubs so TypeScript is happy when the real SDK isn't loaded ──────────
 
 type SeverityLevel = "fatal" | "error" | "warning" | "log" | "info" | "debug";
@@ -158,13 +164,19 @@ function sentryKillSwitchEnabled(): boolean {
 // captureException
 export const captureException: (error: unknown, context?: CaptureContext) => void = (...args) => {
   if (!sentryKillSwitchEnabled()) return;
-  dispatch(() => _sdk!.captureException(...args));
+  const [error, context] = args;
+  dispatch(() =>
+    _sdk!.captureException(
+      redactSecurityError(error),
+      context ? (redactSecurityValue(context) as CaptureContext) : undefined,
+    ),
+  );
 };
 
 // captureMessage
 export const captureMessage: (message: string, level?: SeverityLevel) => void = (...args) => {
   if (!sentryKillSwitchEnabled()) return;
-  dispatch(() => _sdk!.captureMessage(...args));
+  dispatch(() => _sdk!.captureMessage(redactSecurityText(args[0]), args[1]));
 };
 
 // setUser

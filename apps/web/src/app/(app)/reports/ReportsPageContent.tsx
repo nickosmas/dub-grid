@@ -1235,7 +1235,7 @@ function ReportsContent() {
                           }}
                           type="checkbox"
                         />
-                        {formatDateLabel(date)}
+                        <span className="dg-tabular-nums">{formatDateLabel(date)}</span>
                       </label>
                     ))
                   )}
@@ -1264,7 +1264,9 @@ function ReportsContent() {
             {metrics.map((metric) => (
               <div key={metric.label} data-stat-card style={metricStyle}>
                 <div style={metricLabelStyle}>{metric.label}</div>
-                <div style={metricValueStyle}>{metric.value}</div>
+                <div className="dg-tabular-nums" style={metricValueStyle}>
+                  {metric.value}
+                </div>
               </div>
             ))}
           </section>

@@ -47,53 +47,157 @@
       management-only controls. Re-show only the controls authorized by their
       current saved capability state, with transition-safe cache updates and
       regression coverage for both directions.
-- [ ] 18. **Mobile release catch-up** - close the remaining release-delta
+- [x] 18. **Mobile release catch-up** - close the remaining release-delta
       gaps while preserving the intentional web-only schedule authoring and
       organization-settings boundaries.
   - [x] 18a. **Mobile role certification eligibility** - expose role
         certification requirements to mobile and prevent incompatible new role
         selections before save.
-  - [ ] 18b. **Canonical mobile dashboard model** - make web and mobile consume
+  - [x] 18b. **Canonical mobile dashboard model** - make web and mobile consume
         one dashboard calculation model and extend the authenticated mobile
-        payload with canonical metrics, coverage, drafts, and trends.
-  - [ ] 18c. **Canonical mobile dashboard experience** - present the canonical
+        payload with canonical metrics, coverage, and drafts.
+    - [x] 18b1. **Canonical mobile dashboard metrics** - extend the authenticated
+          mobile payload with permission-safe, draft-aware canonical dashboard
+          metrics that use the same coverage and draft semantics as web.
+  - [x] 18c. **Canonical mobile dashboard experience** - present the canonical
         dashboard data in native mobile cards and read-only detail screens,
         without adding schedule editing or publishing.
-- [ ] 19. **Authentication and onboarding release hardening** - leave no known
+- [x] 19. **Authentication and onboarding release hardening** - leave no known
       correctness, performance, resilience, or security defects across the
       complete web and mobile entry lifecycle before production readiness.
-  - [ ] 19a. **Admission and onboarding state correctness** - make durable
+  - [x] 19a. **Admission and onboarding state correctness** - make durable
         per-member, per-organization completion authoritative; completed users
         must never see onboarding again after app admission, refresh, token
         rotation, realtime organization changes, role changes, or a new session,
         while incomplete users cannot bypass required setup, billing, or MFA
         gates.
-  - [ ] 19b. **Complete authentication journey coverage** - audit and repair
+  - [x] 19b. **Complete authentication journey coverage** - audit and repair
         invitation acceptance, subdomain and organization entry, sign-in,
         session restoration, password reset and recovery, MFA enrollment and
         challenge, logout and revocation, expired sessions, onboarding variants,
         and trial/setup gates across every role on web and mobile.
-  - [ ] 19c. **Authentication speed and resilience** - measure cold and warm
+    - [x] 19b1. **Invitation and organization entry** - verify invitation
+          acceptance, subdomain and organization selection, and signed-out and
+          signed-in entry states on web and mobile.
+    - [x] 19b2. **Sign-in, restoration, expiry, and revocation** - verify
+          web/mobile login, session restoration, expired-session recovery,
+          logout, and forced or session-specific revocation.
+    - [x] 19b3. **Password recovery and reset** - verify web recovery links
+          and the mobile OTP reset flow, including error and replay states.
+    - [x] 19b4. **MFA enrollment and challenge** - verify TOTP enrollment,
+          verification, unenrollment, required-MFA challenges, and role
+          differences across web and mobile.
+    - [x] 19b5. **Role-based setup, onboarding, and trial gates** - verify
+          every role's setup, onboarding, and trial path without duplicating
+          19a's stale-bootstrap admission repair.
+      - [x] 19b5a. **Role-based setup and onboarding gates** - verify the
+            Super Admin, Admin, and User paths through incomplete organization
+            setup and member onboarding across web and mobile.
+      - [x] 19b5b. **Trial and billing recovery gates** - verify pending,
+            active, grace, and locked trial paths, including Super Admin billing
+            recovery and non-admin restrictions across web and mobile.
+  - [x] 19c. **Authentication speed and resilience** - measure cold and warm
         entry paths, remove avoidable serial work and duplicate requests, keep
         useful content or explicit recovery visible instead of blank screens,
         and verify slow, offline, retry, cross-tab, and token-refresh behavior.
-  - [ ] 19d. **Authentication security hardening** - verify tenant and session
-        isolation, current membership enforcement, stale-claim handling, MFA
-        assurance, invite/recovery expiry and replay protection, redirect safety,
-        CSRF protection, enumeration resistance, rate limiting, token secrecy,
-        auditability, and RLS-backed authorization.
-  - [ ] 19e. **Authentication release qualification** - add a durable automated
+    - [x] 19c1. **Web authentication entry performance** - measure cold and
+          warm web login, proxy, session-verification, and organization-bootstrap
+          paths; remove confirmed avoidable serial work and duplicate requests
+          without weakening authentication or tenant checks.
+    - [x] 19c2. **Mobile authentication entry performance** - measure cold and
+          warm mobile session restoration and organization bootstrap; remove
+          confirmed unnecessary waits and duplicate requests without turning
+          slow restoration into premature logout.
+    - [x] 19c3. **Degraded-network authentication recovery** - keep useful
+          content or an explicit recovery path visible across web and mobile
+          during slow, offline, timeout, and retry states, with bounded retries
+          and no blank or permanently latched loading screens.
+    - [x] 19c4. **Authentication session continuity under change** - verify and
+          repair cross-tab sign-in/sign-out, token rotation and refresh,
+          foreground/resume, and organization-switch races without stale
+          identity, permissions, or tenant data.
+  - [x] 19d. **Authentication security hardening** - complete the following
+        bounded security passes without weakening authentication performance or
+        tenant isolation:
+    - [x] 19d1. **Live tenant, membership, and session authorization** - verify
+          stale claims, archived memberships, session revocation, tenant
+          isolation, service-role boundaries, sandbox and impersonation
+          boundaries, and RLS enforcement across web and mobile APIs.
+    - [x] 19d2. **MFA assurance and sensitive-action reauthentication** - require
+          the appropriate AAL2 or fresh-auth proof for MFA changes, credentials,
+          sessions, exports, account deletion, and other irreversible actions.
+    - [x] 19d3. **Invite, recovery, redirect, and CSRF integrity** - verify token
+          expiry, single use, and replay protection; safe redirects; origin
+          validation; generic failure responses; and public state-changing
+          endpoints.
+    - [x] 19d4. **Abuse resistance, token secrecy, and security auditability** -
+          verify enumeration resistance, distributed and per-target rate limits,
+          production fail-closed behavior, token secrecy across URLs, logs, and
+          telemetry, and complete security-event audit coverage.
+  - [x] 19e. **Authentication release qualification** - add a durable automated
         role/state/browser matrix and complete authenticated browser plus native
         device checks; close every confirmed in-scope defect and report any
-        unavailable evidence explicitly before marking the epic complete.
-- [ ] 20. **Explicit schedule-indicator removal** - make removing an active
+        unavailable evidence explicitly before marking the epic complete. The
+        native matrix must include a TOTP-enabled account and physical-device
+        coverage; feature 19d2 verified the no-TOTP Android-emulator path only.
+- [x] 20. **Explicit schedule-indicator removal** - make removing an active
       shift note/indicator discoverable in the shift slideover, without relying
       on clicking the active indicator itself. Preserve authorization,
       confirmation, audit, and save behavior; provide an accessible explicit
       removal affordance and regression coverage.
-- [ ] 21. **Production migration safety** - final release gate only after all
+- [x] 21. **Production display-mode layout resilience** - repair the production
+      Settings display-mode preview layout so both choices remain fully visible,
+      readable, selectable, and responsive at supported desktop widths and
+      browser zoom levels. Also make role names plain table text rather than
+      pills, and make Settings data tables size themselves from the columns and
+      content they actually show: compact for sparse read-only tables, wider only
+      when more columns or edit controls need it, and full-width for genuinely
+      dense tables. Prevent horizontal clipping or overflow without changing
+      settings behavior, and add regression coverage for read, edit, narrow,
+      empty, and long-content states.
+- [x] 22. **Scheduler open-shift staffing** - when a scheduler clicks an open
+      shift in the web schedule, show active staff who are qualified for its
+      focus area, role, and certification requirements and have no absence or
+      overlapping shift that day. Let the scheduler assign a selected person
+      through the normal draft/publish workflow, while regular staff retain the
+      existing volunteer flow.
+- [x] 23. **App-wide pill overflow resilience** - make every pill, chip, tag,
+      badge, and segmented-choice label keep its text inside its visual bounds
+      across web and mobile. Long labels must remain readable through a
+      consistent combination of wrapping, intrinsic sizing, truncation, or a
+      full-value affordance appropriate to the component, without colliding
+      with adjacent content or breaking narrow layouts.
+- [x] 24. **Inter product typography** - use Inter for all product UI and
+      ordinary copy across web and mobile, with Inter Variable optical sizing
+      on web and native Inter 400/500/600/700 faces on mobile. Keep DM Sans for
+      the wordmark and every landing or marketing title and heading, preserve
+      the existing semantic type scale, use tabular numerals for scheduling
+      data, and verify fallbacks, layout, browser zoom, and native text scaling.
+- [ ] 25. **Web UI consistency and interaction resilience** - audit and repair
+      every project-owned web route, component, primitive, and rendered state so
+      equivalent elements share one visual and interaction contract and no known
+      clipping, overlap, reflow, first-paint, loading, error, empty-state,
+      keyboard, focus, or responsive defect remains. Consolidate numeric counts,
+      semantic statuses, switches, auth actions, empty states, and action copy;
+      repair the tablet dashboard, high-zoom Alerts and Schedule overflow,
+      breakpoint-dependent first paint, and app-shell-aware route boundaries;
+      then restore the Inter-aware browser audit and qualify the full route,
+      role, theme, viewport, zoom, permission, loading, empty, error, and overlay
+      matrix with reproducible evidence. Split this epic into bounded
+      sub-features during `/feature` rather than attempting one large build pass.
+      Use the `better-ui` reference for surface depth, concentric radii, optical
+      icon alignment, explicit transition properties, theme-switch snapping, and
+      hit-area polish. Use `emil-design-eng` for motion purpose and frequency,
+      interruptible open/close states, origin-aware popovers, gesture velocity,
+      perceived loading speed, and slow-motion or device review. Preserve
+      DubGrid's shared tokens, platform-specific mobile motion, reduced-motion
+      behavior, and established density; these references guide review and do
+      not authorize a new dependency or a wholesale visual rewrite.
+- [ ] 26. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,
       tenant isolation, and the migration ledger. This item must remain last and
-      does not itself authorize production changes.
+      does not itself authorize production changes. Local safety tooling and
+      qualification are preserved in checkpoint `ee4207e0`; resume with the
+      hosted production-data branch rehearsal when product work is complete.

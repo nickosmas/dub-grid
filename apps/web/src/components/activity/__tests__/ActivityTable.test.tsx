@@ -50,6 +50,10 @@ describe("ActivityTable", () => {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
     expect(within(table).queryByRole("columnheader", { name: "Organization" })).toBeNull();
+    expect(table.closest("[data-settings-table-layout]")).toHaveAttribute(
+      "data-settings-table-layout",
+      "available",
+    );
   });
 
   it("drops the target column for a person's own page", () => {

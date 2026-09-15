@@ -7,6 +7,7 @@ import {
 } from "@dubgrid/domain";
 import {
   mobileRadii,
+  mobilePillOverflow,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -57,6 +58,7 @@ export function getMobileOrgRoleBadge(
       label: ORG_ROLE_LABELS[highlightedRole],
       tone: "warning" as const,
       containerStyle: {
+        ...mobilePillOverflow.displayContainer,
         alignItems: "center" as const,
         backgroundColor: mobileColors.warningSoft,
         borderColor: mobileColors.warningBorder,
@@ -69,6 +71,7 @@ export function getMobileOrgRoleBadge(
       },
       textStyle: {
         ...mobileTextWeighted("caption", "bold"),
+        ...mobilePillOverflow.displayText,
         color: mobileColors.warningText,
       },
     };
@@ -79,6 +82,7 @@ export function getMobileOrgRoleBadge(
     label: ORG_ROLE_LABELS[highlightedRole],
     tone: "brand" as const,
     containerStyle: {
+      ...mobilePillOverflow.displayContainer,
       alignItems: "center" as const,
       backgroundColor: mobileColors.brandSoft,
       borderColor: mobileColors.brandBorder,
@@ -91,6 +95,7 @@ export function getMobileOrgRoleBadge(
     },
     textStyle: {
       ...mobileTextWeighted("caption", "bold"),
+      ...mobilePillOverflow.displayText,
       color: mobileColors.brand,
     },
   };

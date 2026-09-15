@@ -3,6 +3,11 @@ import { getMobileRealtimeInvalidationKeys } from "./mobile-realtime-invalidatio
 
 const DASHBOARD_KEY = ["mobile", "dashboard"];
 
+function tokenFor(userId: string, orgId: string, version: string) {
+  const payload = btoa(JSON.stringify({ sub: userId, org_id: orgId }));
+  return `header.${payload}.${version}`;
+}
+
 const TABLES_THAT_SHOULD_REFRESH_THE_DASHBOARD = [
   "organizations",
   "focus_areas",
@@ -28,6 +33,18 @@ const TABLES_THAT_SHOULD_NOT_REFRESH_THE_DASHBOARD = [
 ] as const;
 
 describe("getMobileRealtimeInvalidationKeys", () => {
+  it("keeps identity-scoped realtime targets stable across rotation and disjoint across organizations", () => {
+    const first = tokenFor("user-1", "org-1", "v1");
+    const rotated = tokenFor("user-1", "org-1", "v2");
+    const otherOrg = tokenFor("user-1", "org-2", "v1");
+    const firstKeys = getMobileRealtimeInvalidationKeys(first, "employees");
+
+    expect(firstKeys).toEqual(getMobileRealtimeInvalidationKeys(rotated, "employees"));
+    expect(firstKeys).not.toEqual(getMobileRealtimeInvalidationKeys(otherOrg, "employees"));
+    expect(JSON.stringify(firstKeys)).not.toContain(first);
+    expect(JSON.stringify(firstKeys)).not.toContain(rotated);
+  });
+
   it.each(TABLES_THAT_SHOULD_REFRESH_THE_DASHBOARD)(
     "includes the dashboard key prefix for %s changes",
     (table) => {

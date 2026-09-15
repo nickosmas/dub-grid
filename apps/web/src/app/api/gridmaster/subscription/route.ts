@@ -16,6 +16,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { countBillableAppUsers } from "@/features/billing/server";
+import { cacheDel, CacheKey } from "@/lib/cache";
 
 const orgIdSchema = z.string().uuid();
 const billingStatusSchema = z.enum([
@@ -55,6 +56,10 @@ const bodySchema = z.discriminatedUnion("action", [
 
 function defaultTrialEndFrom(date: Date): string {
   return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
+}
+
+async function invalidateOrganizationAccess(orgId: string): Promise<void> {
+  await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
 }
 
 export async function POST(req: NextRequest) {
@@ -142,6 +147,7 @@ export async function POST(req: NextRequest) {
           })
           .eq("id", orgId);
       }
+      await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -160,6 +166,7 @@ export async function POST(req: NextRequest) {
         await cancelSubscription(sub.stripe_subscription_id);
       }
       await admin.from("organizations").update({ subscription_status: "canceled" }).eq("id", orgId);
+      await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -206,6 +213,7 @@ export async function POST(req: NextRequest) {
         .from("organizations")
         .update({ subscription_status: scheduledSubscription.status })
         .eq("id", orgId);
+      await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -252,6 +260,7 @@ export async function POST(req: NextRequest) {
           ...(status === "trialing" ? { trial_ends_at: defaultTrialEndFrom(new Date()) } : {}),
         })
         .eq("id", orgId);
+      await invalidateOrganizationAccess(orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,

@@ -1304,4 +1304,6 @@ export interface GridOpenShift {
    * open-shifts list is built; absent means "not yet computed."
    */
   viewerEligible?: boolean;
+  /** The action this viewer will enter when they activate the opening. */
+  viewerAction?: "assign" | "volunteer" | "details";
 }

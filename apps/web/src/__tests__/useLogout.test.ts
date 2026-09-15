@@ -63,6 +63,25 @@ describe("useLogout.signOut", () => {
 
     expect(mockReplace).toHaveBeenCalledWith("/login?scope=global");
   });
+
+  it("preserves an allowed fragment while adding the logout scope", () => {
+    const { result } = renderHook(() => useLogout());
+
+    result.current.signOut({ redirectTo: "/goodbye?source=menu#signed-out" });
+
+    expect(mockReplace).toHaveBeenCalledWith("/goodbye?source=menu&scope=local#signed-out");
+  });
+
+  it.each(["https://evil.example/logout", "//evil.example/logout", "/%2f%2fevil.example"])(
+    "falls back to /goodbye for unsafe override %s",
+    (redirectTo) => {
+      const { result } = renderHook(() => useLogout());
+
+      result.current.signOut({ redirectTo });
+
+      expect(mockReplace).toHaveBeenCalledWith("/goodbye?scope=local");
+    },
+  );
 });
 
 describe("useLogout.signOutOthers", () => {

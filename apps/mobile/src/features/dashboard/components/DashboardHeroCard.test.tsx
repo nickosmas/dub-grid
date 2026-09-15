@@ -19,7 +19,7 @@ describe("DashboardHeroCard", () => {
           title: "2 coverage gaps",
           description: "Resolve staffing gaps.",
         }}
-        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0 }}
+        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
       />,
     );
 
@@ -31,7 +31,7 @@ describe("DashboardHeroCard", () => {
     render(
       <DashboardHeroCard
         summary={{ statusLabel: "Healthy", title: "Schedule health looks good", description: "" }}
-        metrics={{ coveragePct: 86, openGapCount: 0, pendingApprovalsCount: 0 }}
+        metrics={{ coveragePct: 86, openGapCount: 0, pendingApprovalsCount: 0, draftSummary: null }}
       />,
     );
 
@@ -46,7 +46,12 @@ describe("DashboardHeroCard", () => {
           title: "Coverage requirements not configured",
           description: "",
         }}
-        metrics={{ coveragePct: null, openGapCount: 0, pendingApprovalsCount: 0 }}
+        metrics={{
+          coveragePct: null,
+          openGapCount: 0,
+          pendingApprovalsCount: 0,
+          draftSummary: null,
+        }}
       />,
     );
 

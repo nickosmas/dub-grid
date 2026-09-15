@@ -11,13 +11,90 @@ import {
   buildActivityFeed,
   buildCoverageSectionsResponse,
   buildHeroSummary,
+  classifyDashboardDraftChange,
   computeStaffHoursForPeriod,
   loadMobileDashboardPayload,
+  summarizeDashboardDraftComparisons,
+  summarizeDashboardDraftChanges,
   type DashboardPublishHistoryRow,
   type DashboardScheduleCellRow,
   type DashboardShiftCategoryRow,
   type MobileCoverageSummary,
 } from "./dashboard";
+
+describe("summarizeDashboardDraftChanges", () => {
+  it("keeps zero distinct from redaction when an editor has no draft changes", () => {
+    expect(summarizeDashboardDraftChanges([], true)).toEqual({
+      newCount: 0,
+      modifiedCount: 0,
+      deletedCount: 0,
+      total: 0,
+    });
+  });
+
+  it("counts each web draft classification", () => {
+    expect(
+      summarizeDashboardDraftChanges(["new", "modified", "modified", "deleted"], true),
+    ).toEqual({
+      newCount: 1,
+      modifiedCount: 2,
+      deletedCount: 1,
+      total: 4,
+    });
+  });
+
+  it("redacts draft information when the member cannot edit the schedule", () => {
+    expect(summarizeDashboardDraftChanges(["new"], false)).toBeNull();
+  });
+});
+
+describe("dashboard draft comparison semantics", () => {
+  const workedState = {
+    kind: "worked" as const,
+    absenceTypeId: null,
+    customStartTime: null,
+    customEndTime: null,
+    seriesId: null,
+    fromRecurring: false,
+    segments: [{ shiftId: 1, jobId: 2, position: 0, isMentored: false }],
+  };
+
+  it("matches web's new, modified, and deleted classifications", () => {
+    expect(
+      classifyDashboardDraftChange({
+        draftState: workedState,
+        draftDeleted: false,
+        publishedState: null,
+      }),
+    ).toBe("new");
+    expect(
+      classifyDashboardDraftChange({
+        draftState: { ...workedState, customEndTime: "15:00" },
+        draftDeleted: false,
+        publishedState: workedState,
+      }),
+    ).toBe("modified");
+    expect(
+      classifyDashboardDraftChange({
+        draftState: null,
+        draftDeleted: true,
+        publishedState: workedState,
+      }),
+    ).toBe("deleted");
+  });
+
+  it("does not count an unchanged draft or a deletion without a published cell", () => {
+    expect(
+      summarizeDashboardDraftComparisons(
+        [
+          { draftState: workedState, draftDeleted: false, publishedState: workedState },
+          { draftState: null, draftDeleted: true, publishedState: null },
+        ],
+        true,
+      ),
+    ).toEqual({ newCount: 0, modifiedCount: 0, deletedCount: 0, total: 0 });
+  });
+});
 
 function makeOpenShift(overrides: Partial<MobileOpenShift> = {}): MobileOpenShift {
   return {
@@ -422,6 +499,7 @@ describe("loadMobileDashboardPayload", () => {
     return {
       fetchMobileCoverageSummary: vi.fn().mockResolvedValue(makeCoverageSummary()),
       fetchMobileShiftRequests: vi.fn().mockResolvedValue([]),
+      fetchMobileDashboardDraftComparisons: vi.fn().mockResolvedValue([]),
       fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({
         shiftCategoryRows: [],
         coverageRequirementRows: [],
@@ -437,6 +515,7 @@ describe("loadMobileDashboardPayload", () => {
     const auth = {
       currentOrg: { id: "org-1" },
       effectiveRole: "user",
+      canEditSchedule: false,
       serviceClient: {} as never,
     };
 
@@ -465,6 +544,7 @@ describe("loadMobileDashboardPayload", () => {
     const adminAuth = {
       currentOrg: { id: "org-1" },
       effectiveRole: "admin",
+      canEditSchedule: false,
       serviceClient: {} as never,
     };
     const adminPayload = await loadMobileDashboardPayload(adminAuth, range, deps);
@@ -476,6 +556,7 @@ describe("loadMobileDashboardPayload", () => {
     const superAdminAuth = {
       currentOrg: { id: "org-1" },
       effectiveRole: "super_admin",
+      canEditSchedule: false,
       serviceClient: {} as never,
     };
     const superAdminPayload = await loadMobileDashboardPayload(superAdminAuth, range, deps);
@@ -484,6 +565,52 @@ describe("loadMobileDashboardPayload", () => {
     expect(deps.fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
     expect(superAdminPayload.actionQueue).toEqual([]);
     expect(superAdminPayload.metrics.pendingApprovalsCount).toBe(1);
+  });
+
+  it("loads draft metrics only for a schedule editor and scopes the read to the requested org", async () => {
+    const deps = makeDeps();
+    deps.fetchMobileDashboardDraftComparisons.mockResolvedValue([
+      {
+        draftState: {
+          kind: "worked",
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+          segments: [{ shiftId: 1, jobId: 2, position: 0, isMentored: false }],
+        },
+        draftDeleted: false,
+        publishedState: null,
+      },
+    ]);
+    const editorAuth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      canEditSchedule: true,
+      serviceClient: {} as never,
+    };
+
+    const editorPayload = await loadMobileDashboardPayload(editorAuth, range, deps);
+
+    expect(deps.fetchMobileDashboardDraftComparisons).toHaveBeenCalledWith(
+      {},
+      { orgId: "org-1", startDate: "2026-05-11", endDate: "2026-05-17" },
+    );
+    expect(editorPayload.metrics.draftSummary).toEqual({
+      newCount: 1,
+      modifiedCount: 0,
+      deletedCount: 0,
+      total: 1,
+    });
+
+    const viewerPayload = await loadMobileDashboardPayload(
+      { ...editorAuth, canEditSchedule: false },
+      range,
+      deps,
+    );
+    expect(viewerPayload.metrics.draftSummary).toBeNull();
+    expect(deps.fetchMobileDashboardDraftComparisons).toHaveBeenCalledTimes(1);
   });
 
   it("returns open shifts and the action queue in full, not capped at a fixed count", async () => {

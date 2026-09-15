@@ -12,8 +12,7 @@ import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
 import { fetchAccountOrgContext } from "@/features/account/client";
 import { useOrgRealtimeInvalidation } from "./useOrgRealtimeInvalidation";
 import {
-  fetchOrganizationBootstrap,
-  getOrganizationBootstrapRetryDelay,
+  getOrganizationBootstrapQueryPolicy,
   isRetryableOrganizationBootstrapError,
   type OrganizationBootstrap,
 } from "@/features/organization/client";
@@ -242,18 +241,8 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   // (effectiveOrgId), which is a different question from whether to ask.
   const bootstrapQuery = useQuery({
     queryKey: bootstrapQueryKey,
-    // Consume React Query's signal so sign-out, org changes, and an unmounted
-    // gate cannot let an old bootstrap response populate the current shell.
-    queryFn: (context) => fetchOrganizationBootstrap(context?.signal),
+    ...getOrganizationBootstrapQueryPolicy(),
     enabled,
-    staleTime: 5 * 60_000,
-    // A transient failed fan-out must not take the whole authenticated app
-    // down. This critical request has a bounded retry budget; permanent
-    // failures are handled by OnboardingGate's recovery surface instead of a
-    // generic error toast over an empty page.
-    retry: (failureCount, error) =>
-      failureCount < 3 && isRetryableOrganizationBootstrapError(error),
-    retryDelay: (failureCount, error) => getOrganizationBootstrapRetryDelay(error, failureCount),
   });
 
   const bootstrap = bootstrapQuery.data;

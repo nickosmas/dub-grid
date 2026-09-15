@@ -16,6 +16,7 @@ import { AuthActions, AuthFields, AuthHeader, AuthShell, AuthStage } from "../co
 import { AuthField, AuthFieldError } from "../components/AuthField";
 import { PasswordStrengthHints } from "../components/PasswordStrengthHints";
 import { getRecoveryErrorMessage } from "../lib/recovery-errors";
+import { settleMobileAuthAction } from "../lib/request-deadline";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -34,6 +35,7 @@ export default function ResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
   const codeInputRef = useRef<TextInput>(null);
@@ -67,6 +69,8 @@ export default function ResetPasswordScreen() {
   }, [cooldown]);
 
   async function verifyCode() {
+    if (submitting) return;
+
     if (code.length !== CODE_LENGTH) {
       setError(`Enter the ${CODE_LENGTH}-digit code from your email.`);
       return;
@@ -75,11 +79,13 @@ export default function ResetPasswordScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: "recovery",
-      });
+      const { error: verifyError } = await settleMobileAuthAction(
+        supabase.auth.verifyOtp({
+          email,
+          token: code,
+          type: "recovery",
+        }),
+      );
       if (verifyError) throw verifyError;
 
       setStage("password");
@@ -92,21 +98,30 @@ export default function ResetPasswordScreen() {
   }
 
   async function resendCode() {
+    if (resending) return;
+
     setError(null);
-    setCooldown(RESEND_COOLDOWN_SECONDS);
+    setResending(true);
     try {
       // Resolves with `{ error }` rather than throwing, so ignoring the return
       // value claimed "we sent a new code" even when the resend was rejected.
-      const { error: resendError } = await supabase.auth.resetPasswordForEmail(email);
+      const { error: resendError } = await settleMobileAuthAction(
+        supabase.auth.resetPasswordForEmail(email),
+      );
       if (resendError) throw resendError;
 
+      setCooldown(RESEND_COOLDOWN_SECONDS);
       pushToast({ message: "We sent a new code.", tone: "info" });
     } catch (caught) {
       setError(getRecoveryErrorMessage(caught));
+    } finally {
+      setResending(false);
     }
   }
 
   async function savePassword() {
+    if (submitting) return;
+
     if (!isPasswordAcceptable(password)) {
       setError("Choose a stronger password.");
       return;
@@ -118,18 +133,36 @@ export default function ResetPasswordScreen() {
 
     setError(null);
     setSubmitting(true);
+    let passwordUpdated = false;
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const { error: updateError } = await settleMobileAuthAction(
+        supabase.auth.updateUser({ password }),
+      );
       if (updateError) throw updateError;
+      passwordUpdated = true;
 
       // Revoke everywhere: a password reset usually means the old one was
       // compromised, so any session still holding it has to go. Same posture as
       // the in-app password change.
-      await supabase.auth.signOut({ scope: "global" });
+      const { error: signOutError } = await settleMobileAuthAction(
+        supabase.auth.signOut({ scope: "global" }),
+      );
+      if (signOutError) throw signOutError;
 
       pushToast({ message: "Password updated. Sign in with your new password!", tone: "success" });
       router.replace("/(auth)/login");
     } catch (caught) {
+      if (passwordUpdated) {
+        await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(
+          () => undefined,
+        );
+        pushToast({
+          message: "Password updated. Sign in and review your active sessions.",
+          tone: "info",
+        });
+        router.replace("/(auth)/login");
+        return;
+      }
       setError(getRecoveryErrorMessage(caught));
     } finally {
       setSubmitting(false);
@@ -165,7 +198,6 @@ export default function ResetPasswordScreen() {
               placeholder="000000"
               ref={codeInputRef}
               returnKeyType="go"
-              textContentType="oneTimeCode"
               value={code}
               variant="code"
             />
@@ -183,8 +215,9 @@ export default function ResetPasswordScreen() {
             }
           >
             <Button
-              disabled={cooldown > 0 || submitting}
+              disabled={cooldown > 0 || submitting || resending}
               label={cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+              loading={resending}
               onPress={() => resendCode()}
               tone="link"
             />
@@ -224,7 +257,6 @@ export default function ResetPasswordScreen() {
               ref={passwordInputRef}
               returnKeyType="next"
               secureTextEntry={!showPassword}
-              textContentType="newPassword"
               trailingAccessory={
                 <Button
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
@@ -252,7 +284,6 @@ export default function ResetPasswordScreen() {
               ref={confirmPasswordInputRef}
               returnKeyType="go"
               secureTextEntry={!showPassword}
-              textContentType="newPassword"
               value={confirmPassword}
             />
             {mismatchError ? <AuthFieldError message={mismatchError} /> : null}

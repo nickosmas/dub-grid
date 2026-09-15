@@ -32,12 +32,17 @@
     "test:mobile": "turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/contracts --filter=@dubgrid/schedule-core",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "measure:auth:web": "AUTH_ENTRY_MEASUREMENT=1 PORT=3101 PERF_TIMING=1 NEXT_PUBLIC_PERF_TIMING=1 playwright test e2e/auth-entry-performance.spec.ts --project=chromium --workers=1 --reporter=line",
+    "measure:auth:mobile": "npx tsx scripts/summarize-mobile-auth-entry.ts",
     "seed": "npx tsx --env-file=.env.local seed.ts",
     "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
     "db:reset:mobile": "npm run db:reset && node scripts/reset-mobile-android-storage.mjs",
     "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
     "db:reset:staging": "npx tsx --env-file=.env.staging scripts/reset-remote-db.ts && npx tsx --env-file=.env.staging seed.ts",
     "db:seed:branch": "npx tsx seed.ts",
+    "db:migrations:check": "npx tsx scripts/check-migration-readiness.ts",
+    "db:migrations:inspect": "npx tsx --env-file=.env.remote scripts/inspect-migration-readiness.ts",
+    "db:migrations:inspect:local": "npx tsx --env-file=.env.local scripts/inspect-migration-readiness.ts --local",
     "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
     "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",
@@ -59,8 +64,11 @@
     "@opentelemetry/otlp-transformer": {
       "protobufjs": "7.5.9"
     },
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^3.15.2"
+    },
     "@react-email/ui": {
-      "next": "16.3.0"
+      "next": "16.3.5"
     },
     "@sentry/nextjs": {
       "fast-uri": "^3.1.6"
@@ -80,7 +88,8 @@
     "follow-redirects": "1.16.0",
     "hono": "4.13.0",
     "ip-address": "^10.4.0",
-    "next": "16.3.0",
+    "js-yaml": "^4.3.2",
+    "next": "16.3.5",
     "postcss": "8.5.25",
     "posthog-js": {
       "dompurify": "3.4.13"
@@ -91,7 +100,7 @@
       "socket.io-parser": "^4.2.7",
       "fast-uri": "^3.1.6"
     },
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "socket.io-parser": "^4.2.7",
     "tar": "^7.5.22",
     "tmp": ">=0.2.3",

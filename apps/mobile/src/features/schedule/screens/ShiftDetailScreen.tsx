@@ -38,6 +38,7 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
@@ -284,14 +285,8 @@ export default function ShiftDetailScreen() {
   }, [range, requestMode]);
 
   const myScheduleQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "schedule",
-      accessToken,
-      myScheduleRange.startDate,
-      myScheduleRange.endDate,
-    ],
-    queryFn: () => getMySchedule(accessToken!, myScheduleRange),
+    queryKey: mobileQueryKeys.schedule(accessToken, "mine", myScheduleRange),
+    queryFn: ({ signal }) => getMySchedule(accessToken!, myScheduleRange, signal),
     enabled:
       Boolean(accessToken) &&
       Boolean(myScheduleRange.startDate) &&
@@ -305,15 +300,8 @@ export default function ShiftDetailScreen() {
     Boolean(teamScheduleRange.endDate) &&
     (canViewTeamSchedule || needsTeamScheduleForShift);
   const teamScheduleQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "schedule",
-      "team",
-      accessToken,
-      teamScheduleRange.startDate,
-      teamScheduleRange.endDate,
-    ],
-    queryFn: () => getOrgSchedule(accessToken!, teamScheduleRange),
+    queryKey: mobileQueryKeys.schedule(accessToken, "team", teamScheduleRange),
+    queryFn: ({ signal }) => getOrgSchedule(accessToken!, teamScheduleRange, signal),
     enabled: canLoadTeamSchedule,
   });
   useEffect(() => {
@@ -326,22 +314,23 @@ export default function ShiftDetailScreen() {
     }
   }, [teamScheduleQuery.error, pushToast]);
   const swapOptionsQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "shift-swap-options",
-      accessToken,
-      linkedEmployeeId,
-      shiftDate,
-      teamScheduleRange.startDate,
-      teamScheduleRange.endDate,
-    ],
-    queryFn: () =>
-      getShiftSwapOptions(accessToken!, {
-        requesterEmpId: linkedEmployeeId!,
-        requesterShiftDate: shiftDate!,
-        startDate: teamScheduleRange.startDate,
-        endDate: teamScheduleRange.endDate,
-      }),
+    queryKey: mobileQueryKeys.shiftSwapOptions(accessToken, {
+      requesterEmpId: linkedEmployeeId,
+      requesterShiftDate: shiftDate,
+      startDate: teamScheduleRange.startDate,
+      endDate: teamScheduleRange.endDate,
+    }),
+    queryFn: ({ signal }) =>
+      getShiftSwapOptions(
+        accessToken!,
+        {
+          requesterEmpId: linkedEmployeeId!,
+          requesterShiftDate: shiftDate!,
+          startDate: teamScheduleRange.startDate,
+          endDate: teamScheduleRange.endDate,
+        },
+        signal,
+      ),
     enabled:
       Boolean(accessToken) &&
       Boolean(linkedEmployeeId) &&
@@ -351,8 +340,8 @@ export default function ShiftDetailScreen() {
       requestMode === "swap",
   });
   const requestsQuery = useQuery({
-    queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
-    queryFn: () => getShiftRequests(accessToken!, range),
+    queryKey: mobileQueryKeys.shiftRequests(accessToken, range),
+    queryFn: ({ signal }) => getShiftRequests(accessToken!, range, signal),
     enabled:
       Boolean(accessToken) &&
       Boolean(linkedEmployeeId) &&
@@ -360,8 +349,8 @@ export default function ShiftDetailScreen() {
       Boolean(range.endDate),
   });
   const peopleQuery = useQuery({
-    queryKey: ["mobile", "people", accessToken],
-    queryFn: () => getPeople(accessToken!),
+    queryKey: mobileQueryKeys.people(accessToken),
+    queryFn: ({ signal }) => getPeople(accessToken!, signal),
     enabled: Boolean(accessToken) && requestMode === "coverage" && coverageRequestType === "pickup",
   });
   const createRequestMutation = useMutation({

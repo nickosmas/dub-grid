@@ -9,6 +9,7 @@ const getSupabaseClient = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
+const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -56,6 +57,10 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   useToast: () => ({
     pushToast,
   }),
+}));
+
+vi.mock("../hooks/useMobileStepUpAction", () => ({
+  useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
 
 let ProfileSessionsScreen: (typeof import("./ProfileSessionsScreen"))["default"];
@@ -121,6 +126,10 @@ describe("ProfileSessionsScreen", () => {
     disablePushForCurrentDevice.mockReset();
     disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
+    stepUpRun.mockReset().mockImplementation(async (action) => {
+      await action("fresh-token");
+      return true;
+    });
 
     useAccessToken.mockReturnValue("token-123");
     useMutation.mockReturnValue({
@@ -174,7 +183,28 @@ describe("ProfileSessionsScreen", () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
-    expect(mutateAsync).toHaveBeenCalledWith("hash-other");
+    expect(stepUpRun).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledWith({
+      actionAccessToken: "fresh-token",
+      refreshTokenHash: "hash-other",
+    });
+  });
+
+  it("keeps the selected device and confirmation intact when identity confirmation is cancelled", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    useMutation.mockReturnValue({ isPending: false, mutate: vi.fn(), mutateAsync });
+    stepUpRun.mockResolvedValue(false);
+
+    render(<ProfileSessionsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Pixel 8" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
+    });
+
+    expect(screen.getByText("Sign out this device?")).toBeInTheDocument();
+    expect(screen.getByText("Pixel 8 will lose access immediately.")).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it("puts the two bulk sign-outs in a sheet that explains the difference", async () => {

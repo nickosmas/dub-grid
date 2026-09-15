@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/Button";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -355,28 +356,22 @@ export default function NotificationBell({
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span
+          <NumericBadge
+            aria-label={`${unreadCount} unread alerts`}
+            size="sm"
+            value={unreadCountLabel}
             style={{
               position: "absolute",
               top: -1,
               right: 1,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
               background: "var(--dg-color-danger)",
               color: "var(--dg-color-text-inverse)",
               fontSize: unreadCountFontSize,
               fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
               lineHeight: 1,
               zIndex: 1,
             }}
-          >
-            {unreadCountLabel}
-          </span>
+          />
         )}
       </Button>
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
+const requireMobileSensitiveActionAuth = vi.fn();
 const fetchSelfProfileSnapshot = vi.fn();
 const listOwnProfileChangeRequests = vi.fn();
 const updateSelfProfileDetails = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("@dubgrid/data-access", async (importOriginal) => ({
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
+  requireMobileSensitiveActionAuth,
   fetchLinkedEmployeeForUser,
   fetchMobileFocusAreas,
   mapOrganizationToMobileConfig,
@@ -44,6 +46,7 @@ function mockAuth() {
     user: {
       id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
       email: "manager@dubgrid.com",
+      factors: [{ factor_type: "totp", status: "verified" }],
       created_at: "2024-01-01T00:00:00.000Z",
       last_sign_in_at: "2024-01-02T00:00:00.000Z",
       user_metadata: {
@@ -75,6 +78,7 @@ describe("mobile profile routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireMobileAuth.mockResolvedValue(mockAuth());
+    requireMobileSensitiveActionAuth.mockResolvedValue(mockAuth());
     fetchSelfProfileSnapshot.mockResolvedValue({
       firstName: "Mina",
       lastName: "Diaz",
@@ -327,12 +331,12 @@ describe("mobile profile routes", () => {
     expect(updateSelfLinkedEmployeePhone).not.toHaveBeenCalled();
   });
 
-  it("persists the mfa_enabled flag after a mobile enrollment completes", async () => {
+  it("reconciles mfa_enabled from live Auth after a mobile enrollment completes", async () => {
     const { PATCHMfaStatus } = await import("./profile");
     const response = await PATCHMfaStatus(
       new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
         method: "PATCH",
-        body: JSON.stringify({ enabled: true }),
+        body: JSON.stringify({}),
       }) as never,
     );
     const payload = await response.json();
@@ -340,6 +344,66 @@ describe("mobile profile routes", () => {
     expect(response.status).toBe(200);
     expect(updateSelfMfaStatus).toHaveBeenCalledWith("8af6f242-c060-4920-a7db-91b4cb66fd26", true);
     expect(payload.user.mfaEnabled).toBe(true);
+  });
+
+  it.each([
+    { factors: undefined, enabled: false },
+    { factors: [], enabled: false },
+    { factors: [{ factor_type: "totp", status: "unverified" }], enabled: false },
+    { factors: [{ factor_type: "totp", status: "verified" }], enabled: true },
+    {
+      factors: [
+        { factor_type: "totp", status: "unverified" },
+        { factor_type: "totp", status: "verified" },
+      ],
+      enabled: true,
+    },
+  ])("ignores a conflicting legacy client MFA flag: $enabled", async ({ factors, enabled }) => {
+    const auth = mockAuth();
+    requireMobileAuth.mockResolvedValueOnce({ ...auth, user: { ...auth.user, factors } });
+    fetchSelfProfileSnapshot.mockResolvedValueOnce({ mfaEnabled: !enabled });
+    const { PATCHMfaStatus } = await import("./profile");
+    const response = await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: !enabled, userId: "another-user" }),
+      }) as never,
+    );
+    expect(response.status).toBe(200);
+    expect(updateSelfMfaStatus).toHaveBeenCalledWith(auth.user.id, enabled);
+    expect((await response.json()).user.mfaEnabled).toBe(enabled);
+  });
+
+  it.each([null, {}, [{ factor_type: "totp" }], [{ status: "verified" }]])(
+    "does not overwrite status when live factors are malformed",
+    async (factors) => {
+      const auth = mockAuth();
+      requireMobileAuth.mockResolvedValueOnce({ ...auth, user: { ...auth.user, factors } });
+      const { PATCHMfaStatus } = await import("./profile");
+      const response = await PATCHMfaStatus(
+        new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+          method: "PATCH",
+          body: "{}",
+        }) as never,
+      );
+      expect(response.status).toBe(503);
+      expect(updateSelfMfaStatus).not.toHaveBeenCalled();
+      expect(fetchSelfProfileSnapshot).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves the mobile authentication boundary before reconciliation", async () => {
+    requireMobileAuth.mockResolvedValueOnce({ response: new Response(null, { status: 401 }) });
+    const { PATCHMfaStatus } = await import("./profile");
+    const response = await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: "{}",
+      }) as never,
+    );
+    expect(response.status).toBe(401);
+    expect(updateSelfMfaStatus).not.toHaveBeenCalled();
+    expect(fetchSelfProfileSnapshot).not.toHaveBeenCalled();
   });
 
   it("rejects an mfa-status update with a non-boolean body", async () => {
@@ -467,5 +531,31 @@ describe("mobile profile preference and session routes", () => {
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
       "hash",
     );
+    expect(requireMobileSensitiveActionAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reach session revocation when recent identity proof is required", async () => {
+    requireMobileSensitiveActionAuth.mockResolvedValue({
+      response: Response.json(
+        {
+          code: "STEP_UP_REQUIRED",
+          method: "totp",
+          error: "Confirm your identity, then try again.",
+        },
+        { status: 403 },
+      ),
+    });
+    const { DELETE } = await import("./profile-sessions");
+
+    const response = await DELETE(
+      new Request("http://localhost/api/mobile/v1/profile/sessions", {
+        method: "DELETE",
+        body: JSON.stringify({ refreshTokenHash: "hash" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "STEP_UP_REQUIRED", method: "totp" });
+    expect(revokeUserSessionForUser).not.toHaveBeenCalled();
   });
 });

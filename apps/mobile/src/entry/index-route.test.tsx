@@ -90,6 +90,20 @@ describe("IndexScreen", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
+  it("does not route a recoverable session-restore failure as signed out", () => {
+    useSessionState.mockReturnValue({
+      accessToken: null,
+      isLoading: false,
+      restoreError: true,
+    });
+    useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });
+
+    render(<IndexScreen />);
+
+    expect(screen.getByText("Enter your subdomain")).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalledWith("/(auth)/onboarding");
+  });
+
   it("routes first-run users to the onboarding screen", () => {
     useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
     useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });
@@ -102,12 +116,14 @@ describe("IndexScreen", () => {
     expect(screen.queryByText("Enter your subdomain")).not.toBeInTheDocument();
   });
 
-  it("routes signed-in users to the Home tab", () => {
+  it("routes signed-in users to the Home tab even when the device-local intro tour is unseen", () => {
     useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
+    useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });
 
     render(<IndexScreen />);
 
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    expect(routerReplace).not.toHaveBeenCalledWith("/(auth)/onboarding");
   });
 
   it("waits for the first-run flag before picking a destination", () => {

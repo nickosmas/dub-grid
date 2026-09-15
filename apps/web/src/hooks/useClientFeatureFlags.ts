@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/components/AuthProvider";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -18,8 +19,8 @@ const DEFAULT_FLAGS: ClientFeatureFlags = {
   printing: true,
 };
 
-async function fetchClientFeatureFlags(): Promise<ClientFeatureFlags> {
-  const response = await fetch("/api/feature-flags");
+async function fetchClientFeatureFlags(signal?: AbortSignal): Promise<ClientFeatureFlags> {
+  const response = await fetch("/api/feature-flags", { signal });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(
@@ -40,9 +41,11 @@ async function fetchClientFeatureFlags(): Promise<ClientFeatureFlags> {
  * how quickly a button reflects reality, never enforcement.
  */
 export function useClientFeatureFlags(): ClientFeatureFlags {
+  const { user } = useAuth();
   const query = useQuery({
     queryKey: queryKeys.featureFlags(),
-    queryFn: fetchClientFeatureFlags,
+    queryFn: ({ signal }) => fetchClientFeatureFlags(signal),
+    enabled: Boolean(user),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });

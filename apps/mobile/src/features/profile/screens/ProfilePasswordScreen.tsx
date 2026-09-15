@@ -17,13 +17,14 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { getProfile } from "../../../shared/lib/api";
+import { getProfile, requireMobileCredentialAssurance } from "../../../shared/lib/api";
 import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
 } from "../../../shared/lib/auth-reset";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -39,8 +40,9 @@ import {
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { ProfilePanel, ProfileSection, ProfileTextInput } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 
-type PasswordField = "currentPassword" | "newPassword" | "confirmPassword";
+type PasswordField = "newPassword" | "confirmPassword";
 
 function PasswordStrengthHints({ password }: { password: string }) {
   const mobileColors = useMobileColors();
@@ -123,7 +125,7 @@ export default function ProfilePasswordScreen() {
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
-  const [currentPassword, setCurrentPassword] = useState("");
+  const stepUp = useMobileStepUpAction();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -133,14 +135,13 @@ export default function ProfilePasswordScreen() {
   const [visiblePasswordFields, setVisiblePasswordFields] = useState<
     Record<PasswordField, boolean>
   >({
-    currentPassword: false,
     newPassword: false,
     confirmPassword: false,
   });
 
   const profileQuery = useQuery({
-    queryKey: ["mobile", "profile", accessToken],
-    queryFn: () => getProfile(accessToken!),
+    queryKey: mobileQueryKeys.profile(accessToken),
+    queryFn: ({ signal }) => getProfile(accessToken!, signal),
     enabled: Boolean(accessToken),
   });
   const contentState = useMobileContentState({
@@ -148,27 +149,23 @@ export default function ProfilePasswordScreen() {
     isLoading: profileQuery.isLoading,
     error: profileQuery.error,
   });
-  const accountEmail = profileQuery.data?.user.email ?? null;
   const confirmPasswordError = getPasswordMismatchError(newPassword, confirmPassword);
   // The same bar as the reset flow and web, via the shared rule. Gating on
   // length alone let a password the reset screen would reject enable this
   // submit, which is the exact drift `@dubgrid/domain/password` exists to stop.
   const passwordLooksReady =
-    currentPassword.length > 0 &&
-    isPasswordAcceptable(newPassword) &&
-    passwordsMatch(newPassword, confirmPassword);
+    isPasswordAcceptable(newPassword) && passwordsMatch(newPassword, confirmPassword);
 
   // Anything typed into any of the three fields. Back navigation is the only
   // way off this screen, so without a guard a part-entered password change is
   // gone the moment a swipe is misread as a back gesture.
-  const hasUnsavedChanges = currentPassword !== "" || newPassword !== "" || confirmPassword !== "";
+  const hasUnsavedChanges = newPassword !== "" || confirmPassword !== "";
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: passwordSaving,
     title: "Discard this password change?",
     body: "The password you were entering won't be saved.",
     onDiscard: () => {
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     },
@@ -191,16 +188,6 @@ export default function ProfilePasswordScreen() {
       return;
     }
 
-    if (!accountEmail) {
-      showPasswordError(
-        "This account does not have an email address available for password verification.",
-      );
-      return;
-    }
-    if (!currentPassword) {
-      showPasswordError("Enter your current password.");
-      return;
-    }
     if (!isPasswordAcceptable(newPassword)) {
       // Same wording as the reset flow: the strength hints above the field
       // already name the specific rule that is still unmet.
@@ -211,11 +198,6 @@ export default function ProfilePasswordScreen() {
       showPasswordError(PASSWORD_MISMATCH_MESSAGE);
       return;
     }
-    if (newPassword === currentPassword) {
-      showPasswordError("New password must be different from your current password.");
-      return;
-    }
-
     setConfirmError(null);
     setIsConfirming(true);
   }
@@ -224,11 +206,6 @@ export default function ProfilePasswordScreen() {
     if (passwordSaving) {
       return;
     }
-    if (!accountEmail) {
-      setIsConfirming(false);
-      return;
-    }
-
     setPasswordSaving(true);
     setConfirmError(null);
     let isRedirecting = false;
@@ -238,6 +215,7 @@ export default function ProfilePasswordScreen() {
     // dialog needs to stay open and show it.
     let inlineError: string | null = null;
     let failed = false;
+    let identityCancelled = false;
 
     function fail(error: unknown, fallbackMessage: string) {
       failed = true;
@@ -246,20 +224,19 @@ export default function ProfilePasswordScreen() {
     }
 
     try {
-      const verifyResult = await getSupabaseClient().auth.signInWithPassword({
-        email: accountEmail,
-        password: currentPassword,
+      const completed = await stepUp.run(async (actionAccessToken) => {
+        // The preflight must finish before calling Supabase's public mutation.
+        // The mutation is never replayed after an ambiguous provider failure.
+        await requireMobileCredentialAssurance(actionAccessToken);
+        const updateResult = await getSupabaseClient().auth.updateUser({
+          password: newPassword,
+        });
+        if (updateResult.error) {
+          throw updateResult.error;
+        }
       });
-      if (verifyResult.error) {
-        fail(verifyResult.error, "That password did not match this account.");
-        return;
-      }
-
-      const updateResult = await getSupabaseClient().auth.updateUser({
-        password: newPassword,
-      });
-      if (updateResult.error) {
-        fail(updateResult.error, "We couldn't update your password right now.");
+      if (!completed) {
+        identityCancelled = true;
         return;
       }
 
@@ -285,7 +262,7 @@ export default function ProfilePasswordScreen() {
       // and sign out" for an immediate retry — closing unconditionally (as a
       // plain `finally` once did) meant a toast was the only trace of what
       // happened, easy to miss and gone once dismissed.
-      if (!isRedirecting && !(failed && inlineError)) {
+      if (!isRedirecting && !identityCancelled && !(failed && inlineError)) {
         setIsConfirming(false);
       }
     }
@@ -327,33 +304,10 @@ export default function ProfilePasswordScreen() {
         <ProfileSection description="Choose a password you don't use anywhere else. You'll be signed out everywhere once it changes.">
           <ProfilePanel>
             <ProfileTextInput
-              accessibilityLabel="Current password"
-              autoCapitalize="none"
-              autoComplete="current-password"
-              autoCorrect={false}
-              textContentType="password"
-              focused={focusedPasswordField === "currentPassword"}
-              label="Current password"
-              placeholder="Current password"
-              secureTextEntry={!visiblePasswordFields.currentPassword}
-              trailingAccessory={
-                <PasswordVisibilityToggle
-                  isVisible={visiblePasswordFields.currentPassword}
-                  label="current password"
-                  onPress={() => togglePasswordVisibility("currentPassword")}
-                />
-              }
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              onBlur={() => setFocusedPasswordField(null)}
-              onFocus={() => setFocusedPasswordField("currentPassword")}
-            />
-            <ProfileTextInput
               accessibilityLabel="New password"
               autoCapitalize="none"
               autoComplete="new-password"
               autoCorrect={false}
-              textContentType="newPassword"
               focused={focusedPasswordField === "newPassword"}
               label="New password"
               placeholder="New password"
@@ -376,7 +330,6 @@ export default function ProfilePasswordScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               autoCorrect={false}
-              textContentType="newPassword"
               error={confirmPasswordError}
               focused={focusedPasswordField === "confirmPassword"}
               label="Confirm new password"
@@ -412,7 +365,7 @@ export default function ProfilePasswordScreen() {
         }}
         onConfirm={() => saveNewPassword()}
         title="Update password?"
-        visible={isConfirming}
+        visible={isConfirming && !stepUp.active}
       >
         {confirmError ? (
           <View style={styles.confirmErrorBlock}>
@@ -421,6 +374,7 @@ export default function ProfilePasswordScreen() {
           </View>
         ) : null}
       </ConfirmationModal>
+      {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );

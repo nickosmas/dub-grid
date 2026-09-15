@@ -47,6 +47,7 @@ vi.mock("@/hooks", () => ({
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
+  HEADER_NARROW: "(max-width: 1200px)",
   useClientFeatureFlags: () => ({
     stripe: true,
     csvImport: true,
@@ -63,6 +64,12 @@ vi.mock("@/components/AuthProvider", () => ({
 vi.mock("@/features/organization/client/api", () => ({
   fetchOrganizationBootstrap: vi.fn().mockResolvedValue({
     org: { workspaceKind: "real" },
+  }),
+  getOrganizationBootstrapQueryPolicy: () => ({
+    queryFn: vi.fn().mockResolvedValue({ org: { workspaceKind: "real" } }),
+    staleTime: 300_000,
+    retry: false,
+    retryOnMount: false,
   }),
 }));
 

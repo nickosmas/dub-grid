@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedUserWithClaims = vi.fn();
-const requireFreshAuth = vi.fn();
+const requireSensitiveActionAuth = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
 const getServiceClient = vi.fn();
 const canManageProfileChangeRequests = vi.fn();
-const extractJwtClaims = vi.fn();
 const captureException = vi.fn();
 const loggerError = vi.fn();
 const loggerInfo = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
+  requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
-  requireFreshAuth: (req: NextRequest, userId: string) => requireFreshAuth(req, userId),
 }));
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -30,9 +27,6 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/features/account/server", () => ({
   canManageProfileChangeRequests: (...args: unknown[]) => canManageProfileChangeRequests(...args),
-}));
-vi.mock("@/features/permissions/shared", () => ({
-  extractJwtClaims: (...args: unknown[]) => extractJwtClaims(...args),
 }));
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
@@ -150,14 +144,12 @@ beforeEach(() => {
     reset: 0,
     misconfigured: false,
   });
-  extractJwtClaims.mockReturnValue({ orgId: ORG_ID });
   canManageProfileChangeRequests.mockResolvedValue(true);
-  requireAuthenticatedUserWithClaims.mockResolvedValue({
+  requireSensitiveActionAuth.mockResolvedValue({
     user: { id: USER_ID, email: "u@test.com" },
     session: { access_token: "tok" },
+    claims: { org_id: ORG_ID },
   });
-  // null = the caller is still live according to Supabase Auth.
-  requireFreshAuth.mockResolvedValue(null);
 });
 
 async function importRoute() {
@@ -178,17 +170,20 @@ describe("DELETE /api/auth/delete-account", () => {
     expect(res.status).toBe(429);
   });
 
-  it("rejects a caller whose session is no longer live", async () => {
-    // API routes verify tokens locally, so a token can be up to an hour stale.
-    // Irreversible endpoints re-check against Supabase Auth before acting.
-    requireFreshAuth.mockResolvedValueOnce(
-      NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 }),
-    );
+  it("returns STEP_UP_REQUIRED before accessing account data when proof is stale", async () => {
+    requireSensitiveActionAuth.mockResolvedValueOnce({
+      response: NextResponse.json(
+        { error: "Confirm your identity.", code: "STEP_UP_REQUIRED", method: "password" },
+        { status: 403 },
+      ),
+    });
     const { client, authDeleteUser } = buildServiceClient({});
     getServiceClient.mockReturnValue(client);
     const { DELETE } = await importRoute();
     const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: "STEP_UP_REQUIRED" });
+    expect(getServiceClient).not.toHaveBeenCalled();
     expect(authDeleteUser).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { mobileQueryKeys } from "./mobile-query-keys";
 
 export type MobileRealtimeTable =
   | "organizations"
@@ -34,18 +35,20 @@ export function getMobileRealtimeInvalidationKeys(
   // Prefix-only key — the bootstrap entry is keyed by user id, which is stable
   // across token refreshes and which this module has no reason to restate.
   const bootstrap = ["mobile", "bootstrap"] as const;
-  const profile = ["mobile", "profile", accessToken] as const;
-  const people = ["mobile", "people", accessToken] as const;
-  const person = ["mobile", "person", accessToken] as const;
+  const profile = mobileQueryKeys.profile(accessToken);
+  const people = mobileQueryKeys.people(accessToken);
+  const person = mobileQueryKeys.personPrefix(accessToken);
   const schedule = ["mobile", "schedule"] as const;
   const requests = ["mobile", "requests"] as const;
-  const profileChangeRequests = ["mobile", "profile-change-requests"] as const;
-  const profileChangeRequestsOwn = ["mobile", "profile", "change-requests", accessToken] as const;
+  const profileChangeRequests = mobileQueryKeys.adminProfileChangeRequests(accessToken);
+  const profileChangeRequestsOwn = mobileQueryKeys.profileChangeRequests(accessToken);
   const shiftSwapOptions = ["mobile", "shift-swap-options"] as const;
-  const notifications = ["mobile", "notifications-infinite"] as const;
-  const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
+  const notifications = mobileQueryKeys.notificationsPrefix(accessToken);
+  const notificationFacets = mobileQueryKeys.notificationFacets(accessToken);
   // Prefix-matches both useAdminDashboard's query key and MyScheduleCard's
-  // own ["mobile", "dashboard", "my-schedule", accessToken] query.
+  // own dashboard query. AuthSessionProvider clears the cache at an account or
+  // organization boundary, so this family prefix can only reach the current
+  // identity's remaining entries.
   const dashboard = ["mobile", "dashboard"] as const;
 
   switch (table) {
