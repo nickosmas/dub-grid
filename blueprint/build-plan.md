@@ -203,6 +203,34 @@
         border lines (some vertical/horizontal divider junctions show a visible
         break instead of a clean connection). The header trial-badge overflow
         fix (commit 8c56a501) is prior art for this item, already landed.
+    - [x] 25b1. **Fix breakpoint-dependent first paint** - `useMediaQuery`
+          returns `false` on first client render regardless of the real
+          viewport, so every mobile/tablet/narrow-desktop load briefly paints
+          the wide-desktop layout before snapping to the correct one.
+          Foundation for 25b2 and 25b4's viewport checks.
+    - [ ] 25b2. **Repair the tablet dashboard layout** - the dashboard's card
+          grid switches from 1 to 2 columns at 768px with no tablet-width
+          step, and the coverage heatmap's horizontal-scroll fallback is keyed
+          off the same viewport-wide check instead of its own rendered width,
+          so long day columns overflow their halved card at tablet widths.
+    - [ ] 25b3. **Fix Alerts toolbar high-zoom overflow** - three toolbar
+          controls carry fixed `minWidth` floors that don't shrink on wrap, so
+          the row overflows horizontally at high browser zoom.
+    - [ ] 25b4. **Fix Schedule toolbar high-zoom overflow** - the toolbar's
+          right zone (presence avatars, Coverage, Tools) lacks the
+          `minWidth: 0` / wrap handling already applied to its nav and filter
+          zones, so it overflows at high zoom the same way those zones used
+          to.
+    - [ ] 25b5. **Fix the Gridmaster sidebar's hardcoded header height** - it
+          hardcodes `top: 56` / `calc(100dvh - 56px)` instead of reading the
+          app shell's measured `--dg-app-shell-header-height`, so it
+          overlaps or gaps whenever a banner stacks above the header.
+    - [ ] 25b6. **Fix the Schedule grid's totals-row border-junction break** -
+          the totals-row label cell still draws its bottom divider with a
+          real `border-bottom` on a `position: sticky` cell, which Chromium
+          clips at fractional browser zoom, while its neighboring cells
+          already use the background-image divider technique. Same bug class
+          already fixed elsewhere in this file; apply the same technique.
   - [ ] 25c. **Restore the Inter-aware browser audit** - get the automated
         visual/typography audit tooling working again so 25d has something to
         run.

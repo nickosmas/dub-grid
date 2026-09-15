@@ -1,4 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
+
+// useLayoutEffect runs synchronously before the browser paints, so the
+// corrected match lands before the client's first paint instead of one
+// frame after — avoiding a visible flash of the wrong layout. On the
+// server it falls back to useEffect (a no-op during SSR) so React doesn't
+// warn that useLayoutEffect does nothing there.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 // Breakpoint constants
 export const MOBILE = "(max-width: 767px)";
@@ -24,7 +31,7 @@ export const HEADER_NARROW = "(max-width: 1200px)";
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const mql = window.matchMedia(query);
     setMatches(mql.matches);
 
