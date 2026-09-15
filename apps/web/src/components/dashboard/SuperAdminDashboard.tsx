@@ -32,6 +32,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     periodLabel,
     overtimeThreshold,
     isMobile,
+    isTablet,
     onExpandPanel,
   } = props;
   const overtimeHours = useMemo(
@@ -61,7 +62,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gridTemplateColumns: isMobile || isTablet ? "1fr" : "1fr 1fr",
           gap: "var(--dg-space-lg)",
         }}
       >
@@ -90,7 +91,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gridTemplateColumns: isMobile || isTablet ? "1fr" : "1fr 1fr",
           gap: "var(--dg-space-lg)",
         }}
       >

@@ -37,7 +37,6 @@ interface CoverageBySectionCardProps {
 export default function CoverageBySectionCard({
   sections,
   focusAreaLabel,
-  isMobile,
   hasRequirements,
   canManageCoverageRequirements = false,
   publishedWindowState = "published",
@@ -229,7 +228,7 @@ export default function CoverageBySectionCard({
                 display: "grid",
                 gridTemplateColumns: `80px repeat(${sections[0].daily.length}, 1fr)`,
                 gap: 4,
-                overflowX: isMobile ? "auto" : undefined,
+                overflowX: "auto",
               }}
             >
               {/* Header row */}

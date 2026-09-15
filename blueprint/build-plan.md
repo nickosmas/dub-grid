@@ -208,7 +208,7 @@
           viewport, so every mobile/tablet/narrow-desktop load briefly paints
           the wide-desktop layout before snapping to the correct one.
           Foundation for 25b2 and 25b4's viewport checks.
-    - [ ] 25b2. **Repair the tablet dashboard layout** - the dashboard's card
+    - [x] 25b2. **Repair the tablet dashboard layout** - the dashboard's card
           grid switches from 1 to 2 columns at 768px with no tablet-width
           step, and the coverage heatmap's horizontal-scroll fallback is keyed
           off the same viewport-wide check instead of its own rendered width,
