@@ -213,7 +213,7 @@
           step, and the coverage heatmap's horizontal-scroll fallback is keyed
           off the same viewport-wide check instead of its own rendered width,
           so long day columns overflow their halved card at tablet widths.
-    - [ ] 25b3. **Fix Alerts toolbar high-zoom overflow** - three toolbar
+    - [x] 25b3. **Fix Alerts toolbar high-zoom overflow** - three toolbar
           controls carry fixed `minWidth` floors that don't shrink on wrap, so
           the row overflows horizontally at high browser zoom.
     - [ ] 25b4. **Fix Schedule toolbar high-zoom overflow** - the toolbar's

@@ -1063,8 +1063,8 @@ function Toolbar({
       <div
         style={{
           position: "relative",
-          flex: 1,
-          minWidth: 220,
+          flex: "1 1 220px",
+          minWidth: 0,
         }}
       >
         <Search
@@ -1102,7 +1102,7 @@ function Toolbar({
         value={category}
         options={categoryOptions}
         onChange={onCategoryChange}
-        style={{ minWidth: 160 }}
+        style={{ flex: "0 1 160px", minWidth: 0 }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
@@ -1114,7 +1114,7 @@ function Toolbar({
         value={priority}
         options={priorityOptions}
         onChange={onPriorityChange}
-        style={{ minWidth: 140 }}
+        style={{ flex: "0 1 140px", minWidth: 0 }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
