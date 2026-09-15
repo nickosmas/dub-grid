@@ -720,14 +720,13 @@ export default function Header({ orgName }: HeaderProps) {
             </div>
             {!isTablet && (
               <>
-                <div style={{ textAlign: "left" }}>
+                <div style={{ textAlign: "left", maxWidth: 120 }}>
                   <div
                     style={{
                       fontSize: "var(--dg-fs-caption)",
                       fontWeight: 600,
                       color: "var(--dg-color-text-primary)",
                       lineHeight: 1.2,
-                      maxWidth: 120,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -740,6 +739,9 @@ export default function Header({ orgName }: HeaderProps) {
                       fontSize: "var(--dg-fs-footnote)",
                       color: "var(--dg-color-text-muted)",
                       lineHeight: 1.2,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {roleLabel}
