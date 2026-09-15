@@ -60,6 +60,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
 import {
   Table,
@@ -2023,25 +2024,13 @@ export function MembersSection({
                           : person.employeeStatus === "inactive"
                             ? "Inactive"
                             : "Active";
-                      const statusColors = isPending
-                        ? {
-                            background: "var(--dg-color-warning-bg)",
-                            color: "var(--dg-color-warning-text)",
-                          }
+                      const statusTone: StatusPillTone = isPending
+                        ? "warning"
                         : person.employeeStatus === "removed"
-                          ? {
-                              background: "var(--dg-color-danger-bg)",
-                              color: "var(--dg-color-danger-text)",
-                            }
+                          ? "danger"
                           : person.employeeStatus === "inactive"
-                            ? {
-                                background: "var(--dg-color-warning-bg)",
-                                color: "var(--dg-color-warning-text)",
-                              }
-                            : {
-                                background: "var(--dg-color-success-bg)",
-                                color: "var(--dg-color-success-text)",
-                              };
+                            ? "warning"
+                            : "success";
                       const displayName =
                         person.firstName || person.lastName
                           ? `${person.firstName} ${person.lastName}`.trim()
@@ -2196,12 +2185,7 @@ export function MembersSection({
                           </TableCell>
 
                           <TableCell className="py-4">
-                            <span
-                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--dg-type-badge-size)] font-medium"
-                              style={statusColors}
-                            >
-                              {statusLabel}
-                            </span>
+                            <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
                           </TableCell>
 
                           <TableCell className="w-[40px] py-4 pr-6 text-right">

@@ -193,7 +193,103 @@
       DubGrid's shared tokens, platform-specific mobile motion, reduced-motion
       behavior, and established density; these references guide review and do
       not authorize a new dependency or a wholesale visual rewrite.
-- [ ] 26. **Production migration safety** - final release gate only after all
+  - [x] 25a. **Consolidate shared UI primitives** - one shared component or
+        pattern for numeric counts, semantic statuses, switches, auth actions,
+        empty states, and action copy, currently duplicated and inconsistent
+        across routes. Foundation for 25b's repairs.
+  - [ ] 25b. **Repair known layout defects** - the tablet dashboard, high-zoom
+        Alerts and Schedule overflow, breakpoint-dependent first paint,
+        app-shell-aware route boundaries, and the Schedule grid's inconsistent
+        border lines (some vertical/horizontal divider junctions show a visible
+        break instead of a clean connection). The header trial-badge overflow
+        fix (commit 8c56a501) is prior art for this item, already landed.
+  - [ ] 25c. **Restore the Inter-aware browser audit** - get the automated
+        visual/typography audit tooling working again so 25d has something to
+        run.
+  - [ ] 25d. **Full qualification matrix pass** - route, role, theme, viewport,
+        zoom, permission, and loading/empty/error/overlay states, with
+        reproducible evidence. The closing verification sweep once 25a-25c are
+        done.
+- [ ] 26. **Fix staff pages double load** - the Staff / People page loads its
+      data twice on entry (duplicate fetch and/or duplicate render), wasting a
+      round trip and causing a visible re-render. Find the duplicate trigger
+      (effect re-run, duplicate query key, non-memoized fetch call) and remove
+      it without changing the page's data or behavior.
+- [ ] 27. **Fix stuck "show highlights" after publish** - after publishing a
+      schedule, the show-highlights button in the publish confirmation banner
+      stops responding until the banner is closed and highlights are reopened
+      from the toolbar. The control likely reads stale state set before publish
+      completes; the fix should make the banner's control reflect current
+      state instead of requiring a full close/reopen.
+- [ ] 28. **Fix schedule page double-fetching published date ranges** - on every
+      schedule page mount, `fetchPublishedDateRanges` fires twice: once inside
+      `loadSchedule()`'s initial `Promise.all`, and again from a separate
+      `useEffect` that unconditionally calls `refetchPublishedRanges` whenever
+      its `[org, shiftFetchEnd, shiftFetchStart]`-keyed callback identity
+      changes, which it does on the same mount. Gate the second effect on
+      `scheduleLoadStarted` (mirroring the existing draft-recheck effect) so it
+      only refetches on a genuine window change, not on initial load.
+- [ ] 29. **Fix dashboard duplicate shift-requests fetch and realtime channel** -
+      `DashboardView` fetches shift requests twice for the same org/period
+      window: once directly via `fetchShiftRequests` inside its main data
+      effect (for the activity feed), and again via `useShiftRequests` (for
+      open-shift matching). `useShiftRequests` also opens its own raw
+      `createBrowserRealtimeChannel` subscription on `shift_requests` instead
+      of routing through the shared, reference-counted
+      `useOrgRealtimeInvalidation` helper that `shift_requests` is already
+      registered under - reintroducing the exact per-hook-channel problem that
+      helper was built to fix. Fold the activity-feed fetch into
+      `useShiftRequests`'s result (or expose an unfiltered variant), and move
+      its invalidation onto the shared channel.
+- [ ] 30. **Fix Reports page duplicate operations-report fetch** - whenever a
+      report is generated with any non-empty filter, `ReportsPageContent`
+      fetches the full operations report twice for the same org/date range:
+      once via `targetOptionsQuery` (meant only to populate filter-option
+      dropdowns) and again via `reportsQuery`, because `fetchOperationsReport`
+      returns the full payload (rows and filter options together) rather than
+      a lightweight options-only response. Split a lightweight
+      `fetchOperationsReportOptions` endpoint, or have `reportsQuery` reuse
+      `targetOptionsQuery`'s `filterOptions` when the range already matches.
+- [ ] 31. **Fix inert "Highlight Changes" toggle on Month view and Mobile Day
+      view** - same bug family as item 27 (stuck publish-banner controls).
+      `showPublishDiff`/`publishDiffForKey` are only threaded into the desktop
+      `ScheduleGrid`; neither `MobileDayView` nor `MonthView` accept or read
+      any publish-diff prop, so toggling "Highlight Changes" on those views
+      flips React state with no visible effect. Thread the publish-diff
+      accessors into both views, or hide the toggle when the active view can't
+      render it.
+- [ ] 32. **Harden the adjacent-day overlap check for scheduler open-shift
+      staffing** - `checkCrossDateOverlap`'s adjacent-day conflict guard
+      (added with feature 22) looks up the neighboring day from the
+      currently-fetched `shifts` map; if that date falls outside the loaded
+      shift window, the lookup silently returns "no conflict" instead of
+      re-fetching or flagging an unknown state. Verify the neighboring day is
+      always loaded before running the check, or surface an explicit
+      "can't verify" state instead of a false negative.
+- [ ] 33. **Manually smoke-test the new `finalize_scheduler_staffed_calloffs`
+      publish trigger** - shipped with feature 22
+      (`supabase/migrations/019_finalize_scheduler_staffed_calloffs.sql`), this
+      SQL trigger runs inside the publish transaction and has never executed
+      against real data. Reads structurally sound on inspection (locks target
+      rows, matches shift/job segments positionally) but needs an actual
+      publish-with-staffed-calloff-pickup smoke test before/soon after launch.
+- [ ] 34. **Decide whether swap-request final approval should notify the swap
+      partner** - `resolve_shift_request`'s notification only ever messages
+      the original requester; for `swap`-type requests, the target employee
+      who accepted the swap (and is directly affected by the resulting
+      schedule change) gets no notification at final approval/rejection, only
+      at the earlier "awaiting approval" step. May be intentional - needs a
+      product decision, then a matching fix in `events.ts`'s
+      `shift_request_resolved` case.
+- [ ] 35. **Share one realtime channel for mobile shift-request screens** -
+      `useMobileShiftRequestsRealtime` deliberately does not reference-count
+      (unlike `useOrgRealtimeInvalidation` on web), so the Home, Requests, and
+      Team tabs each mount their own `shift_requests` Supabase channel and
+      independently refetch on the same DB change. Documented as an accepted
+      trade-off, not a hidden bug, but worth promoting to a shared,
+      reference-counted provider-level subscription to cut the socket/refetch
+      overhead.
+- [ ] 36. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

@@ -15,7 +15,9 @@ import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
-import { resolveShiftPillColors, SHIFT_REQUEST_STATUS_COLORS } from "@/lib/colors";
+import { resolveShiftPillColors } from "@/lib/colors";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,9 +68,14 @@ function timeRemainingLabel(expiresAt: string): string {
   return `${days}d left`;
 }
 
-// Lives in lib/colors.ts because the schedule grid's request fold tints itself
-// from the same table — two copies would drift the moment one is restyled.
-const STATUS_COLORS = SHIFT_REQUEST_STATUS_COLORS;
+const STATUS_TONES: Record<ShiftRequestStatus, StatusPillTone> = {
+  open: "info",
+  pending_approval: "warning",
+  approved: "success",
+  rejected: "danger",
+  cancelled: "neutral",
+  expired: "neutral",
+};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -157,27 +164,12 @@ export default function ShiftRequestBoard({
   // ── Status badge ─────────────────────────────────────────────────────────
 
   function renderStatusBadge(status: ShiftRequestStatus) {
-    const colors = STATUS_COLORS[status];
     const label =
       status === "pending_approval" ? "Pending" : status.charAt(0).toUpperCase() + status.slice(1);
     return (
-      <span
-        style={{
-          display: "inline-block",
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          padding: "2px 7px",
-          borderRadius: "var(--dg-radius-xs)",
-          background: colors.bg,
-          color: colors.text,
-          border: `1px solid ${colors.border}`,
-          lineHeight: 1.4,
-        }}
-      >
+      <StatusPill tone={STATUS_TONES[status]} className="uppercase tracking-wide">
         {label}
-      </span>
+      </StatusPill>
     );
   }
 
@@ -742,7 +734,20 @@ export default function ShiftRequestBoard({
                       className={`dg-span-tab${isActive ? " active" : ""}`}
                     >
                       {tab.label}
-                      {tab.count > 0 ? ` (${tab.count})` : ""}
+                      {tab.count > 0 && (
+                        <NumericBadge
+                          value={tab.count}
+                          size="sm"
+                          style={{
+                            marginLeft: 6,
+                            background: isActive
+                              ? "rgba(255,255,255,0.25)"
+                              : "var(--dg-color-border-light)",
+                            color: isActive ? "inherit" : "var(--dg-color-text-muted)",
+                            fontWeight: 700,
+                          }}
+                        />
+                      )}
                     </Button>
                   </Fragment>
                 );

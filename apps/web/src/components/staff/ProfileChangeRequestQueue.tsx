@@ -13,6 +13,7 @@ import {
 } from "@/features/account/client";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import ProgressBar from "@/components/ProgressBar";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
@@ -40,25 +41,19 @@ const FIELD_LABELS: Record<string, string> = {
   departmentIds: "Departments",
 };
 
-const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; className: string }> =
-  {
-    pending: {
-      label: "Pending",
-      className: "bg-[var(--dg-color-warning-bg)] text-[var(--dg-color-warning-text)]",
-    },
-    approved: {
-      label: "Approved",
-      className: "bg-[var(--dg-color-success-bg)] text-[var(--dg-color-success-text)]",
-    },
-    rejected: {
-      label: "Rejected",
-      className: "bg-[var(--dg-color-danger-bg)] text-[var(--dg-color-danger-text)]",
-    },
-    cancelled: {
-      label: "Cancelled",
-      className: "bg-[var(--dg-color-bg)] text-[var(--dg-color-text-muted)]",
-    },
-  };
+const STATUS_LABELS: Record<ProfileChangeRequest["status"], string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const STATUS_TONES: Record<ProfileChangeRequest["status"], StatusPillTone> = {
+  pending: "warning",
+  approved: "success",
+  rejected: "danger",
+  cancelled: "neutral",
+};
 
 function formatDate(value: string | null): string {
   if (!value) return "Not recorded";
@@ -375,11 +370,9 @@ export function ProfileChangeRequestQueue({
                   {request.requesterName || request.requesterEmail || "Unknown user"}
                 </div>
               </div>
-              <span
-                className={`rounded-full px-2 py-1 text-[length:var(--dg-type-badge-size)] font-medium uppercase ${STATUS_STYLES[request.status].className}`}
-              >
-                {STATUS_STYLES[request.status].label}
-              </span>
+              <StatusPill tone={STATUS_TONES[request.status]} className="uppercase">
+                {STATUS_LABELS[request.status]}
+              </StatusPill>
             </div>
             <div className="dg-card-body flex flex-col gap-3">
               <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 sm:grid-cols-3">

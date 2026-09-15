@@ -11,6 +11,7 @@ import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/cli
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
@@ -57,25 +58,10 @@ const SESSION_STATUS_LABELS: Record<GridmasterUserSession["status"], string> = {
   stale: "Stale",
 };
 
-const SESSION_STATUS_STYLES: Record<
-  GridmasterUserSession["status"],
-  { bg: string; text: string; border: string }
-> = {
-  active: {
-    bg: "var(--dg-color-success-bg)",
-    text: "var(--dg-color-success)",
-    border: "var(--dg-color-success-border)",
-  },
-  recent: {
-    bg: "var(--dg-color-warning-bg)",
-    text: "var(--dg-color-warning)",
-    border: "var(--dg-color-warning-border)",
-  },
-  stale: {
-    bg: "var(--dg-color-bg-secondary)",
-    text: "var(--dg-color-text-muted)",
-    border: "var(--dg-color-border)",
-  },
+const SESSION_STATUS_TONES: Record<GridmasterUserSession["status"], StatusPillTone> = {
+  active: "success",
+  recent: "warning",
+  stale: "neutral",
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -131,22 +117,8 @@ function groupSessionsByDate(
 }
 
 function statusBadge(status: GridmasterUserSession["status"]) {
-  const colors = SESSION_STATUS_STYLES[status];
   return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: "var(--dg-fs-footnote)",
-        fontWeight: 700,
-        padding: "2px 8px",
-        borderRadius: "var(--dg-radius-xs)",
-        background: colors.bg,
-        color: colors.text,
-        border: `1px solid ${colors.border}`,
-      }}
-    >
-      {SESSION_STATUS_LABELS[status]}
-    </span>
+    <StatusPill tone={SESSION_STATUS_TONES[status]}>{SESSION_STATUS_LABELS[status]}</StatusPill>
   );
 }
 
