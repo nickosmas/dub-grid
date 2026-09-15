@@ -47,6 +47,7 @@ vi.mock("@/hooks", () => ({
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
+  HEADER_NARROW: "(max-width: 1200px)",
   useClientFeatureFlags: () => ({
     stripe: true,
     csvImport: true,

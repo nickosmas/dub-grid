@@ -24,6 +24,7 @@ import {
   useMediaQuery,
   MOBILE,
   TABLET,
+  HEADER_NARROW,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
@@ -261,6 +262,11 @@ export default function Header({ orgName }: HeaderProps) {
   const isManagementOnlyUser = role === "user" && isManagementUser && !isOnSchedule;
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  // Wider than the tablet compaction (which the trial badge already survives
+  // via its own `compact` prop) but still not enough room for the full row —
+  // most visibly at 125%+ browser zoom on an ordinary desktop width. The
+  // badge is the one element here that's least costly to drop entirely.
+  const isHeaderNarrow = useMediaQuery(HEADER_NARROW);
   const featureFlags = useClientFeatureFlags();
 
   // Match each top-nav route explicitly. Routes like /profile and
@@ -656,13 +662,13 @@ export default function Header({ orgName }: HeaderProps) {
         {/* Alerts */}
         {!isGridmaster && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {canShowBillingNotice && orgId && (
+            {canShowBillingNotice && orgId && !isHeaderNarrow && (
               <HeaderBillingNotice orgId={orgId} compact={isTablet} />
             )}
             <NotificationBell />
           </div>
         )}
-        {isGridmaster && canShowBillingNotice && orgId && (
+        {isGridmaster && canShowBillingNotice && orgId && !isHeaderNarrow && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <HeaderBillingNotice orgId={orgId} compact={isTablet} />
           </div>

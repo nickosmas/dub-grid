@@ -10,6 +10,12 @@ export const SMALL_DESKTOP = "(min-width: 768px) and (max-width: 1280px)";
 // pay-period snap swallowed every "next period" tap.
 export const AUTO_ONE_WEEK = "(max-width: 1200px)";
 export const DESKTOP = "(min-width: 1025px)";
+// The org nav (logo, org name, tab links, trial badge, bell, account menu)
+// doesn't shrink on its own between the tablet breakpoint and a full-width
+// desktop, so anything wider than tablet but no wider than this can still
+// overflow — most visibly at 125%+ browser zoom on an otherwise ordinary
+// desktop width.
+export const HEADER_NARROW = "(max-width: 1200px)";
 
 /**
  * Returns true when the given media query matches.

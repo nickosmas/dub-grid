@@ -54,6 +54,7 @@ export {
   SMALL_DESKTOP,
   AUTO_ONE_WEEK,
   DESKTOP,
+  HEADER_NARROW,
 } from "./useMediaQuery";
 
 export { useShiftRequests } from "./useShiftRequests";
