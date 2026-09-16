@@ -196,8 +196,14 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/schedule/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["grid", "toolbar"],
-    sourceReviewedStates: ["loading", "error", "not found", "dialogs"],
+    // error.tsx and not-found.tsx exist for route-convention consistency but
+    // are not currently reachable: SchedulePageClient.tsx has no throw
+    // statement anywhere (every failure path is a caught toast.error, 59
+    // call sites checked) and no file under app/(app)/schedule/ calls
+    // notFound(). Not evidenced states, since there is nothing to trigger.
+    // "loading" and "dialogs": e2e/schedule-states.spec.ts.
+    browserStates: ["grid", "toolbar", "loading", "dialogs"],
+    sourceReviewedStates: [],
   },
   {
     route: "/people",

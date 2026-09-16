@@ -271,6 +271,13 @@
       - [ ] 25d1b. **Schedule and People state coverage** - loading, error,
             not-found, dialogs (`/schedule`), and drawers/dialogs
             (`/people`, `/people/[id]`).
+        - [x] 25d1b1. **Schedule state coverage** - loading (route-level
+              Suspense), dialogs, and resolving whether the manifest's
+              "not found" claim is reachable at all (`/schedule` has no
+              `notFound()` call in its route today) or should be corrected.
+        - [ ] 25d1b2. **People and People-detail state coverage** - loading,
+              error, not-found (`/people/[id]`'s UUID-format guard is a
+              concrete, deterministic trigger), drawers, and dialogs.
       - [ ] 25d1c. **Profile, Reports, Alerts, and Settings state coverage** -
             lazy panels (`/profile`), popovers (`/reports`), empty inbox
             (`/alerts`), and dialogs/not-found (`/settings`).
