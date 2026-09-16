@@ -88,10 +88,14 @@ async function requirePrivilegedActor(
   req: NextRequest,
   orgId: string,
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+  // Matches invitations/create: an admin who can send invitations must also
+  // be able to list, resend, and revoke them, or the dashboard and People
+  // page 403 on load for every admin.
   const auth = await requireOrgPermissions(
     req,
     orgId,
-    (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
+    (permissions) =>
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
   );
   if ("response" in auth) {
     return { ok: false, response: auth.response };

@@ -2988,6 +2988,30 @@ async function main() {
       employee_status: "inactive",
     },
     {
+      email: "qa-admin@dubgrid.test",
+      platform_role: "none",
+      org_role: "admin",
+      label: "qa_admin (release qualification)",
+      first_name: "QA",
+      last_name: "Admin",
+      preferred_org: "calmhaven",
+      management_access: true,
+      employee_status: "active",
+    },
+    {
+      // Platform-level QA identity so automated runs never sign in as the
+      // personal gridmaster account above.
+      email: "qa-gridmaster@dubgrid.test",
+      platform_role: "gridmaster",
+      org_role: "user",
+      label: "qa_gridmaster (release qualification)",
+      first_name: "QA",
+      last_name: "Gridmaster",
+      preferred_org: "calmhaven",
+      management_access: false,
+      employee_status: "active",
+    },
+    {
       email: "qa-mfa-chromium@dubgrid.test",
       platform_role: "none",
       org_role: "super_admin",

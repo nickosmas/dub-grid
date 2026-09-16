@@ -437,7 +437,12 @@ export default function DashboardView({
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
 
-  const invitations = useDashboardInvitations(orgId, !isUserDashboardMode);
+  // Only members who can manage staff may list invitations (the API enforces
+  // the same rule), so don't request them for other management-tier viewers.
+  const invitations = useDashboardInvitations(
+    orgId,
+    !isUserDashboardMode && permissions.canManageEmployees,
+  );
 
   useEffect(() => {
     let cancelled = false;

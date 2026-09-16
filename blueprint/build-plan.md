@@ -293,6 +293,20 @@
           the current qa-super-admin baseline), confirming the same visual and
           interaction contract holds regardless of role, and closing any
           contract violation found.
+      - [x] 25d2a. **Admin and Gridmaster QA fixtures** - the seed has no
+            admin-tier account and its only gridmaster is a personal
+            dev-login account, so neither role can be automated safely. Add
+            `qa-admin@dubgrid.test` and `qa-gridmaster@dubgrid.test` to the
+            seed's `TEST_USERS`, e2e login helpers for both, and a smoke
+            test proving each lands where its role should.
+      - [ ] 25d2b. **Regular and management user variance** - re-run the
+            25d1 route-state matrix as `qa-regular` and `qa-management`,
+            asserting each route's role-gated outcome (redirect, read-only
+            variant, or the same state), and closing any contract violation.
+      - [ ] 25d2c. **Admin and Gridmaster-impersonation variance** - after
+            25d2a, re-run the matrix as `qa-admin`, then as `qa-gridmaster`
+            impersonating a Calm Haven member through the portal's
+            impersonation flow, and close any contract violation.
     - [ ] 25d3. **Qualify the Gridmaster portal live** - the manifest's
           `/gridmaster` entry has browser evidence only for its
           authorization-gate redirect; the portal's own views (dashboard, org
@@ -377,7 +391,19 @@
       trade-off, not a hidden bug, but worth promoting to a shared,
       reference-counted provider-level subscription to cut the socket/refetch
       overhead.
-- [ ] 36. **Production migration safety** - final release gate only after all
+- [ ] 36. **Fix trial welcome appearing before onboarding completes** - on a
+      super admin's first login the "Welcome to <org>!" trial-welcome modal
+      opens while the onboarding wizard is still up. `AppShell.tsx` renders
+      `TrialWelcomeModal` as a sibling outside `OnboardingGate`, and the
+      modal's `enabled` condition (`TrialWelcomeModal.tsx`) checks terms,
+      super-admin, and impersonation but never onboarding, whereas the
+      header's trial pill is already held back by `hideForSetupLock`
+      (`entryGate.onboardingCompleted !== true`). Gate the modal on the same
+      `entryGate.onboardingCompleted === true` signal (and keep the
+      welcome-state query disabled until then, so it never paints a frame
+      under or over the wizard), verify with the first-login flow as
+      `qa-super-admin` on a fresh seed, and add a unit test for the gate.
+- [ ] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
       branch, apply only reviewed forward migrations, and verify health, schema,

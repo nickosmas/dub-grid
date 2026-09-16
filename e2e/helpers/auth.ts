@@ -10,6 +10,8 @@ export const QA_SUPER_ADMIN_PASSWORD = "password123";
 export const QA_REGULAR_EMAIL = "qa-regular@dubgrid.test";
 export const QA_MANAGEMENT_EMAIL = "qa-management@dubgrid.test";
 export const QA_INACTIVE_EMAIL = "qa-inactive@dubgrid.test";
+export const QA_ADMIN_EMAIL = "qa-admin@dubgrid.test";
+export const QA_GRIDMASTER_EMAIL = "qa-gridmaster@dubgrid.test";
 export const QA_MFA_EMAIL_BY_BROWSER = {
   chromium: "qa-mfa-chromium@dubgrid.test",
   firefox: "qa-mfa-firefox@dubgrid.test",
@@ -20,6 +22,9 @@ const PORT = process.env.PORT || 3000;
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const QA_SUPER_ADMIN_ORIGIN = `http://ardenwood.${BASE_DOMAIN}:${PORT}`;
 export const QA_CALM_HAVEN_ORIGIN = `http://calmhaven.${BASE_DOMAIN}:${PORT}`;
+// The login route refuses a gridmaster on any organization host; the platform
+// portal has its own host and sign-in form.
+export const QA_GRIDMASTER_ORIGIN = `http://gridmaster.${BASE_DOMAIN}:${PORT}`;
 
 /**
  * Clears dismissible overlays (cookie consent, an MFA nag banner, etc.) that
@@ -58,9 +63,14 @@ export async function clearBlockingOverlays(page: Page): Promise<void> {
  * WebKit.
  */
 export async function waitForClientHydration(page: Page): Promise<void> {
-  await expect(page.getByTestId("organization-login")).toHaveAttribute("data-hydrated", "true", {
-    timeout: 15_000,
-  });
+  // .first(): navigating back to /login from an authenticated page can leave
+  // two login roots mounted for a moment (seen on Firefox); both carry the
+  // marker once the client has taken over.
+  await expect(page.getByTestId("organization-login").first()).toHaveAttribute(
+    "data-hydrated",
+    "true",
+    { timeout: 15_000 },
+  );
 }
 
 /** A timeout of 0 means the run has no limit, so it is never lowered. */
@@ -153,6 +163,51 @@ export async function loginAsQaAccount(page: Page, email: string, origin: string
   await clearBlockingOverlays(page);
 
   await expect(dashboardLink).toBeVisible({ timeout: 15_000 });
+}
+
+/**
+ * Signs the seeded QA gridmaster into the platform portal. The portal's form
+ * ("Platform admin sign in", submit "Access Portal") differs from the org
+ * login, and a gridmaster has no org membership, so the signed-in signal is
+ * the portal's own navigation rather than the org shell's Dashboard link.
+ */
+export async function loginAsQaGridmaster(page: Page): Promise<void> {
+  const currentTimeout = test.info().timeout;
+  if (currentTimeout !== 0 && currentTimeout < LOGIN_TIMEOUT_FLOOR_MS) {
+    test.setTimeout(LOGIN_TIMEOUT_FLOOR_MS);
+  }
+
+  await page.goto(`${QA_GRIDMASTER_ORIGIN}/login`);
+  // .first(): a route transition can briefly leave two copies mounted; the
+  // marker flips on both once the client has taken over.
+  await expect(page.getByTestId("gridmaster-login").first()).toHaveAttribute(
+    "data-hydrated",
+    "true",
+    { timeout: 15_000 },
+  );
+
+  await page.getByLabel("Email").fill(QA_GRIDMASTER_EMAIL);
+  await page.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
+  await page.getByRole("button", { name: "Access Portal" }).click();
+
+  // Same one-time Terms interstitial as org accounts on a fresh seed.
+  const termsHeading = page.getByRole("heading", { name: "Updated Terms of Service" });
+  // GridmasterPortal's nav items are SidebarMenuButtons (view switches), not links.
+  const portalNavLink = page.getByRole("button", { name: "All Users" });
+  await Promise.race([
+    termsHeading.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    portalNavLink.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+  ]);
+
+  if (await termsHeading.isVisible()) {
+    await page.getByLabel("Terms of Service content").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await page.getByRole("button", { name: "Accept & Continue" }).click();
+  }
+
+  await clearBlockingOverlays(page);
+  await expect(portalNavLink).toBeVisible({ timeout: 15_000 });
 }
 
 /** Logs in as the original seeded QA super admin used by existing specs. */

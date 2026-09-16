@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
@@ -31,6 +31,12 @@ export default function GridmasterLogin() {
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
+  // Mirrors OrgLogin's marker so browser automation can wait for the form to
+  // be interactive instead of typing into inert server-rendered markup.
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
   const submittingRef = useRef(false);
 
   useSessionInvalidToast();
@@ -136,38 +142,40 @@ export default function GridmasterLogin() {
   return (
     <PublicRoute>
       <PageShell signInDisclaimer>
-        <Card>
-          <a href={landingUrl} className="dg-auth-logo-block">
-            <DubGridLogo size={52} />
-            <span className="dg-auth-portal-label">Gridmaster portal</span>
-          </a>
-
-          <h1 className="dg-auth-heading">Platform admin sign in</h1>
-
-          <EmailPasswordForm
-            email={email}
-            setEmail={setEmail}
-            password={password}
-            setPassword={setPassword}
-            loading={loading}
-            onSubmit={handleSubmit}
-            submitLabel="Access Portal"
-            forgotPasswordHref="/forgot-password"
-          />
-
-          {/* Navigation links */}
-          <div className="dg-auth-login-navigation">
-            <a
-              href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
-              className="dg-auth-link"
-            >
-              Back to standard login
+        <div data-testid="gridmaster-login" data-hydrated={isHydrated}>
+          <Card>
+            <a href={landingUrl} className="dg-auth-logo-block">
+              <DubGridLogo size={52} />
+              <span className="dg-auth-portal-label">Gridmaster portal</span>
             </a>
-            <a href={landingUrl} className="dg-auth-link">
-              Back to home
-            </a>
-          </div>
-        </Card>
+
+            <h1 className="dg-auth-heading">Platform admin sign in</h1>
+
+            <EmailPasswordForm
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              loading={loading}
+              onSubmit={handleSubmit}
+              submitLabel="Access Portal"
+              forgotPasswordHref="/forgot-password"
+            />
+
+            {/* Navigation links */}
+            <div className="dg-auth-login-navigation">
+              <a
+                href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
+                className="dg-auth-link"
+              >
+                Back to standard login
+              </a>
+              <a href={landingUrl} className="dg-auth-link">
+                Back to home
+              </a>
+            </div>
+          </Card>
+        </div>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
       </PageShell>
     </PublicRoute>
