@@ -58,10 +58,6 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
 import { X } from "lucide-react";
 
-const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
-  ssr: false,
-  loading: LazyOverlayFallback,
-});
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
   ssr: false,
   loading: LazyOverlayFallback,
@@ -79,6 +75,7 @@ const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   loading: LazyProgressFallback,
 });
 
+import ShiftEditPanel from "@/components/schedule/ShiftEditPanelLazy";
 import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
 import {
   addDays,

@@ -2,11 +2,13 @@
 import { ChevronLeft, Clock } from "lucide-react";
 
 import { Fragment, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
@@ -97,6 +99,7 @@ export default function ShiftRequestBoard({
   assignmentNameMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
+  const { closing, close } = useSlideoverClose(onClose);
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const [activeTab, setActiveTab] = useState<Tab>("available");
@@ -613,7 +616,7 @@ export default function ShiftRequestBoard({
 
   const tabData = getTabData();
 
-  return (
+  return createPortal(
     <>
       <ProgressBar loading={loading} />
       {pendingConfirmation && (
@@ -632,17 +635,14 @@ export default function ShiftRequestBoard({
         />
       )}
       {/* Backdrop */}
-      <div className="dg-panel-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
 
       {/* Panel */}
       <div
-        className="dg-panel"
+        className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Shift requests"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         {/* Header */}
         <div
@@ -658,7 +658,7 @@ export default function ShiftRequestBoard({
         >
           {isMobile && (
             <Button
-              onClick={onClose}
+              onClick={close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -697,7 +697,7 @@ export default function ShiftRequestBoard({
               Pickups, swaps, and approvals
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close panel" />}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close panel" />}
         </div>
 
         {/* Tab bar */}
@@ -796,6 +796,7 @@ export default function ShiftRequestBoard({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

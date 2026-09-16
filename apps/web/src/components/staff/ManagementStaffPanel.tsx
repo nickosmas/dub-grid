@@ -2,7 +2,7 @@
 import { ChevronRight, Clock } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useLatestRef } from "@/hooks/useLatestRef";
+import { useSlideoverClose, useSlideoverEscape } from "@/hooks/useSlideoverClose";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
@@ -124,8 +124,7 @@ export function ManagementStaffPanel({
   isSelf = false,
 }: ManagementStaffPanelProps) {
   const { resolvedTheme } = useTheme();
-  const [closing, setClosing] = useState(false);
-  const onCloseRef = useLatestRef(onClose);
+  const { closing, close: closePanel } = useSlideoverClose(onClose, { escape: false });
 
   // employees.email (when present) is the single source of truth — it
   // overrides person.email, which falls back to a linked auth user's or a
@@ -179,14 +178,6 @@ export function ManagementStaffPanel({
     setTouched({});
   }, [person.personId, personDraft]);
 
-  const closePanel = useCallback(() => {
-    setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      onCloseRef.current();
-    }, 200);
-  }, []);
-
   const markTouched = useCallback((field: string) => {
     setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
   }, []);
@@ -234,13 +225,7 @@ export function ManagementStaffPanel({
 
   const dismissLabel = getEditorDismissLabel({ hasUnsavedChanges: hasChanges });
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") handleRequestClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleRequestClose]);
+  useSlideoverEscape(handleRequestClose);
   const isPending = person.invitationStatus !== null && !person.hasAppAccess;
   // Sign-in activity is admin telemetry: staff managers and access managers
   // see it, view-only members don't (the directory API redacts it for them
@@ -468,10 +453,15 @@ export function ManagementStaffPanel({
   return createPortal(
     <>
       <div
-        className={`staff-detail-overlay${closing ? " closing" : ""}`}
+        className={`dg-panel-overlay${closing ? " closing" : ""}`}
         onClick={handleRequestClose}
       />
-      <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+      <div
+        className={`dg-panel dg-panel--x-wide${closing ? " closing" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Management staff detail"
+      >
         {/* Header */}
         <div className="staff-detail-header">
           <CloseButton

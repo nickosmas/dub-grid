@@ -2918,7 +2918,9 @@ describe("ScheduleGrid", () => {
     expect(secondCell.dataset.active).toBeUndefined();
   });
 
-  it("marks the externally active cell for the fill highlight", () => {
+  // The mark is applied by the active-cell outline's layout effect (on the
+  // next animation frame), not rendered as a prop, so wait for it.
+  it("marks the externally active cell for the fill highlight", async () => {
     renderGrid({
       activeCellId: {
         empId: "emp-1",
@@ -2927,11 +2929,12 @@ describe("ScheduleGrid", () => {
       },
     });
 
-    const activeCells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
-      (cell) => cell.dataset.active === "true",
-    );
-
-    expect(activeCells).toHaveLength(1);
+    await waitFor(() => {
+      const activeCells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.active === "true",
+      );
+      expect(activeCells).toHaveLength(1);
+    });
   });
 
   // Another editor's marker is informational. Blocking on it is exactly the

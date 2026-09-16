@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useLatestRef } from "@/hooks/useLatestRef";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import {
@@ -71,24 +71,7 @@ export function StaffReadOnlyDetailPanel({
   const { resolvedTheme } = useTheme();
   const avatarTone = getAvatarTone(resolveAvatarSeed(employee), resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [closing, setClosing] = useState(false);
-  const onCloseRef = useLatestRef(onClose);
-
-  const closePanel = useCallback(() => {
-    setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      onCloseRef.current();
-    }, 200);
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closePanel();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [closePanel]);
+  const { closing, close: closePanel } = useSlideoverClose(onClose);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -115,8 +98,13 @@ export function StaffReadOnlyDetailPanel({
 
   return createPortal(
     <>
-      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={closePanel} />
-      <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={closePanel} />
+      <div
+        className={`dg-panel dg-panel--x-wide${closing ? " closing" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Staff detail"
+      >
         {/* Header */}
         <div
           className="staff-detail-header"

@@ -664,20 +664,21 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Close interactions", () => {
-    it("clicking close button calls onClose", () => {
+    // The panel portals to document.body and defers onClose until its exit
+    // animation finishes, so assert on the body and wait for the callback.
+    it("clicking close button calls onClose", async () => {
       const { onClose } = renderPanel();
       const closeButton = screen.getAllByRole("button", { name: "Close" })[0];
       fireEvent.click(closeButton);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     });
 
-    it("clicking the backdrop overlay calls onClose", () => {
-      const { container, onClose } = renderPanel();
-      // The backdrop uses className="dg-panel-overlay" with no inline inset style
-      const backdrop = container.querySelector(".dg-panel-overlay");
+    it("clicking the backdrop overlay calls onClose", async () => {
+      const { onClose } = renderPanel();
+      const backdrop = document.body.querySelector(".dg-panel-overlay");
       expect(backdrop).not.toBeNull();
       fireEvent.click(backdrop!);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     });
   });
 
@@ -913,7 +914,7 @@ describe("ShiftEditPanel", () => {
 
   describe("Diff badges", () => {
     it("keeps an added second shift marked as new without flagging the published shift", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "D/E",
         currentAssignmentIds: [1, 2],
         draftKind: "modified",
@@ -921,14 +922,16 @@ describe("ShiftEditPanel", () => {
       });
 
       const badges = Array.from(
-        container.querySelectorAll("[data-shift-diff-badge]"),
+        document.body.querySelectorAll("[data-shift-diff-badge]"),
       ) as HTMLElement[];
 
-      expect(container.querySelector('[data-shift-diff-index="0"]')).toBeNull();
+      expect(document.body.querySelector('[data-shift-diff-index="0"]')).toBeNull();
       expect(badges).toHaveLength(0);
 
-      const firstCard = container.querySelector('[data-shift-edit-card="0"]') as HTMLElement | null;
-      const secondCard = container.querySelector(
+      const firstCard = document.body.querySelector(
+        '[data-shift-edit-card="0"]',
+      ) as HTMLElement | null;
+      const secondCard = document.body.querySelector(
         '[data-shift-edit-card="1"]',
       ) as HTMLElement | null;
 
@@ -941,18 +944,20 @@ describe("ShiftEditPanel", () => {
     });
 
     it("keeps split-shift card corners aligned with the outer card radius", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "D/E",
         currentAssignmentIds: [1, 2],
         draftKind: "modified",
         publishedAssignmentIds: [1],
       });
 
-      const card = container.querySelector('[data-shift-edit-card="0"]') as HTMLElement | null;
-      const header = container.querySelector(
+      const card = document.body.querySelector('[data-shift-edit-card="0"]') as HTMLElement | null;
+      const header = document.body.querySelector(
         '[data-shift-edit-card-header="0"]',
       ) as HTMLElement | null;
-      const body = container.querySelector('[data-shift-edit-card-body="0"]') as HTMLElement | null;
+      const body = document.body.querySelector(
+        '[data-shift-edit-card-body="0"]',
+      ) as HTMLElement | null;
 
       expect(card?.style.borderRadius).toBe("var(--dg-radius-md)");
       expect(header?.style.borderRadius).toBe(
@@ -965,7 +970,7 @@ describe("ShiftEditPanel", () => {
     });
 
     it("shows independent time and new badges when editing the published shift and adding a second shift", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "D/E",
         currentAssignmentIds: [1, 2],
         customStartTime: "08:00|16:00",
@@ -976,15 +981,16 @@ describe("ShiftEditPanel", () => {
         publishedCustomEndTime: "15:00",
       });
 
-      expect(container.querySelector('[data-shift-diff-index="0"]')?.textContent).toBe("Time");
+      expect(document.body.querySelector('[data-shift-diff-index="0"]')?.textContent).toBe("Time");
       expect(
-        (container.querySelector('[data-shift-diff-index="0"]') as HTMLElement)?.style.background,
+        (document.body.querySelector('[data-shift-diff-index="0"]') as HTMLElement)?.style
+          .background,
       ).toBe("var(--dg-color-warning)");
-      expect(container.querySelector('[data-shift-diff-index="1"]')).toBeNull();
+      expect(document.body.querySelector('[data-shift-diff-index="1"]')).toBeNull();
     });
 
     it("keeps a brand-new shift with custom time border-only", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "E",
         currentAssignmentIds: [2],
         customStartTime: "16:00",
@@ -992,11 +998,11 @@ describe("ShiftEditPanel", () => {
         draftKind: "new",
       });
 
-      expect(container.querySelector('[data-shift-diff-badge="new"]')).toBeNull();
+      expect(document.body.querySelector('[data-shift-diff-badge="new"]')).toBeNull();
     });
 
     it("renders stale split custom times as a single clean custom time after one shift remains", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "D",
         currentAssignmentIds: [1],
         currentSegments: [
@@ -1013,22 +1019,22 @@ describe("ShiftEditPanel", () => {
         onCustomTimeChange: vi.fn(),
       });
 
-      expect(container.textContent).toContain("7:00 AM");
-      expect(container.textContent).toContain("4:30 PM");
-      expect(container.textContent).toContain("9h 30m");
-      expect(container.textContent).not.toContain("NaN");
-      expect(container.textContent).not.toContain("|");
+      expect(document.body.textContent).toContain("7:00 AM");
+      expect(document.body.textContent).toContain("4:30 PM");
+      expect(document.body.textContent).toContain("9h 30m");
+      expect(document.body.textContent).not.toContain("NaN");
+      expect(document.body.textContent).not.toContain("|");
     });
 
     it("shows the compact Edited status when a published single shift is replaced", () => {
-      const { container } = renderPanel({
+      renderPanel({
         currentShift: "E",
         currentAssignmentIds: [2],
         draftKind: "modified",
         publishedAssignmentIds: [1],
       });
 
-      expect(container.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
+      expect(document.body.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
         "Edited",
       );
     });

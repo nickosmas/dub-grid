@@ -2,6 +2,8 @@
 import { ChevronLeft } from "lucide-react";
 
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import { Button } from "@/components/Button";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
@@ -41,6 +43,7 @@ export default function CoveragePanel({
   onClose,
 }: CoveragePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
+  const { closing, close } = useSlideoverClose(onClose);
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
   const [filterFocusArea, setFilterFocusArea] = useState<number | "all">(activeFocusArea ?? "all");
@@ -78,17 +81,14 @@ export default function CoveragePanel({
         : "All requirements met"
       : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`;
 
-  return (
+  return createPortal(
     <>
-      <div className="dg-panel-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
       <div
-        className="dg-panel"
+        className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Coverage overview"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         {/* Header */}
         <div
@@ -104,7 +104,7 @@ export default function CoveragePanel({
         >
           {isMobile && (
             <Button
-              onClick={onClose}
+              onClick={close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -143,9 +143,7 @@ export default function CoveragePanel({
               {subtitle}
             </div>
           </div>
-          {!isMobile && (
-            <CloseButton size="md" onClick={onClose} aria-label="Close coverage panel" />
-          )}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close coverage panel" />}
         </div>
 
         {!isUnpublished && (
@@ -349,6 +347,7 @@ export default function CoveragePanel({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

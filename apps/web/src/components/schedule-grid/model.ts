@@ -107,6 +107,8 @@ export interface ScheduleGridModel {
   departments: ScheduleGridDepartmentModel[];
   focusAreas: FocusArea[];
   departmentsById: Map<number, Department>;
+  /** The departments exactly as given, so identity survives a model rebuild. */
+  departmentList: Department[];
   focusAreasById: Map<number, FocusArea>;
   assignments: AssignmentDefinition[];
   historicalAssignments: AssignmentDefinition[];
@@ -426,6 +428,7 @@ export function buildScheduleGridModel({
     departments: departmentsModel,
     focusAreas,
     departmentsById,
+    departmentList: departments,
     focusAreasById,
     assignments,
     historicalAssignments,

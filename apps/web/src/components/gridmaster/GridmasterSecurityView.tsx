@@ -2,6 +2,8 @@
 import { User } from "lucide-react";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
 import { Pagination } from "@/components/ui/pagination";
@@ -190,14 +192,16 @@ function SessionDetailPanel({
   session: GridmasterUserSession;
   onClose: () => void;
 }) {
-  return (
+  const { closing, close } = useSlideoverClose(onClose);
+
+  return createPortal(
     <>
-      <div className="staff-detail-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Session details"
-        className="staff-detail-pane"
+        className={`dg-panel${closing ? " closing" : ""}`}
       >
         <div
           style={{
@@ -228,7 +232,7 @@ function SessionDetailPanel({
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
+          <CloseButton size="md" onClick={close} aria-label="Close session details" />
         </div>
         <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
@@ -253,7 +257,8 @@ function SessionDetailPanel({
         </div>
         <ScrollOverflowCue />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

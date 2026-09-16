@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
@@ -35,6 +36,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
@@ -348,6 +350,7 @@ export default function ShiftEditPanel({
     [focusAreas, jobs, shiftCategories, assignments],
   );
   const isMobile = useMediaQuery(MOBILE);
+  const { closing, close } = useSlideoverClose(onClose);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<
     { type: "all" } | { type: "pill"; index: number } | null
@@ -1317,7 +1320,7 @@ export default function ShiftEditPanel({
     setShowPickupTargetOptions(false);
     resetSwapSelection();
     if (requestOnlyMode) {
-      onClose();
+      close();
       return;
     }
     setActiveRequestMode(null);
@@ -3323,17 +3326,14 @@ export default function ShiftEditPanel({
 
   // ── Request-only mode: show the shared request controls without edit UI ──
   if (requestOnlyMode && (canRenderCoverage || canRenderSwap)) {
-    return (
+    return createPortal(
       <>
-        <div className="dg-panel-overlay" onClick={onClose} />
+        <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
         <div
-          className="dg-panel"
+          className={`dg-panel${closing ? " closing" : ""}`}
           role="dialog"
           aria-modal="true"
           aria-label="Shift requests"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
-          }}
         >
           {/* Header */}
           <div
@@ -3370,7 +3370,7 @@ export default function ShiftEditPanel({
                 })}
               </div>
             </div>
-            <CloseButton size="md" onClick={onClose} aria-label="Close" />
+            <CloseButton size="md" onClick={close} aria-label="Close" />
           </div>
           <div
             style={{
@@ -3414,24 +3414,22 @@ export default function ShiftEditPanel({
           <ScrollOverflowCue />
         </div>
         {renderPendingRequestConfirmation()}
-      </>
+      </>,
+      document.body,
     );
   }
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
-      <div className="dg-panel-overlay" onClick={onClose} />
+      <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
 
       {/* Slide-over panel */}
       <div
-        className="dg-panel"
+        className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label="Edit shift"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         {/* Panel Header */}
         <div
@@ -3447,7 +3445,7 @@ export default function ShiftEditPanel({
         >
           {isMobile && (
             <Button
-              onClick={onClose}
+              onClick={close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -3499,7 +3497,7 @@ export default function ShiftEditPanel({
               )}
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close" />}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close" />}
         </div>
 
         {/* Scrollable content */}
@@ -4206,6 +4204,7 @@ export default function ShiftEditPanel({
           onCancel={() => setPendingDelete(null)}
         />
       )}
-    </>
+    </>,
+    document.body,
   );
 }

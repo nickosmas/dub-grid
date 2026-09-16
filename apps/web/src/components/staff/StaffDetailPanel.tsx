@@ -2,11 +2,12 @@
 import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLatestRef } from "@/hooks/useLatestRef";
+import { createPortal } from "react-dom";
+import { useSlideoverClose, useSlideoverEscape } from "@/hooks/useSlideoverClose";
 import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { isSelfAction } from "@dubgrid/domain";
@@ -102,10 +103,9 @@ export function StaffDetailPanel({
   const avatarTone = getAvatarTone(resolveAvatarSeed(employee), resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
-  const [open, setOpen] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditorSaveBlocked, setIsEditorSaveBlocked] = useState(false);
-  const onCloseRef = useLatestRef(onClose);
+  const { closing, close: closePanel } = useSlideoverClose(onClose, { escape: false });
   const pendingInvitation = canManageEmployees
     ? pendingInviteByEmployeeId.get(employee.id)
     : undefined;
@@ -138,9 +138,6 @@ export function StaffDetailPanel({
   const showProfileLink =
     canManageEmployees || isCurrentUsersEmployee(employee.userId, currentUser?.id ?? null);
 
-  const closePanel = useCallback(() => {
-    setOpen(false);
-  }, []);
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
     onDiscard: closePanel,
@@ -169,10 +166,11 @@ export function StaffDetailPanel({
     if (el) el.scrollTop = 0;
   }, [employee.id]);
 
+  useSlideoverEscape(handleRequestClose);
+
   useEffect(() => {
     setHasUnsavedChanges(false);
     setIsEditorSaveBlocked(false);
-    setOpen(true);
   }, [employee.id]);
 
   const handleFooterDismiss = useCallback(() => {
@@ -192,20 +190,17 @@ export function StaffDetailPanel({
   // one dropped the promise, so the same operation had two different buttons.
   const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
 
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) handleRequestClose();
-      }}
-      onOpenChangeComplete={(next) => {
-        if (!next) onCloseRef.current();
-      }}
-    >
-      <SheetContent
-        side="right"
-        showCloseButton={false}
-        className="gap-0 overflow-hidden bg-[var(--dg-color-surface)] shadow-[var(--shadow-panel)] data-[side=right]:inset-y-auto data-[side=right]:top-3 data-[side=right]:right-3 data-[side=right]:bottom-3 data-[side=right]:h-auto data-[side=right]:w-[min(560px,calc(100vw-24px))] data-[side=right]:rounded-[var(--dg-radius-lg)] data-[side=right]:border data-[side=right]:border-[var(--dg-color-border)] data-[side=right]:sm:max-w-none max-[767px]:data-[side=right]:inset-0 max-[767px]:data-[side=right]:h-full max-[767px]:data-[side=right]:w-full max-[767px]:data-[side=right]:rounded-none max-[767px]:data-[side=right]:border-0 max-[767px]:data-[side=right]:shadow-none"
+  return createPortal(
+    <>
+      <div
+        className={`dg-panel-overlay${closing ? " closing" : ""}`}
+        onClick={handleRequestClose}
+      />
+      <div
+        className={`dg-panel dg-panel--wide${closing ? " closing" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Staff detail"
       >
         {/* Panel header */}
         <div className="staff-detail-header">
@@ -480,8 +475,10 @@ export function StaffDetailPanel({
             />
           }
         />
-      </SheetContent>
+        <ScrollOverflowCue />
+      </div>
       {unsavedChangesDialog}
-    </Sheet>
+    </>,
+    document.body,
   );
 }
