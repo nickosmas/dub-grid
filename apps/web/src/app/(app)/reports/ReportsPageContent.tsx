@@ -1272,7 +1272,7 @@ function ReportsContent() {
           </section>
         ) : null}
 
-        {appliedRequest ? (
+        {appliedRequest && !reportsQuery.error ? (
           <section style={hasVisibleRows ? tableShellStyle : undefined}>
             {hasVisibleRows ? (
               <div style={{ overflowX: "auto" }}>

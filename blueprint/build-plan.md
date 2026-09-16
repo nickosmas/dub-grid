@@ -258,7 +258,7 @@
         zoom, permission, and loading/empty/error/overlay states, with
         reproducible evidence. The closing verification sweep once 25a-25c are
         done.
-    - [ ] 25d1. **Convert core-app route states to live browser evidence** -
+    - [x] 25d1. **Convert core-app route states to live browser evidence** -
           `e2e/typography-route-manifest.ts`'s `sourceReviewedStates` (loading,
           error, empty, overlay) for the dashboard, schedule, people, profile,
           reports, alerts, account, and settings routes are verified only by
@@ -278,13 +278,13 @@
         - [x] 25d1b2. **People and People-detail state coverage** - loading,
               error, not-found (`/people/[id]`'s UUID-format guard is a
               concrete, deterministic trigger), drawers, and dialogs.
-      - [ ] 25d1c. **Profile, Reports, Alerts, and Settings state coverage** -
+      - [x] 25d1c. **Profile, Reports, Alerts, and Settings state coverage** -
             lazy panels (`/profile`), popovers (`/reports`), empty inbox
             (`/alerts`), and dialogs/not-found (`/settings`).
         - [x] 25d1c1. **Profile and Alerts state coverage** - section panels,
               loading, and the self-profile error (`/profile`); loading,
               error, and empty inbox (`/alerts`).
-        - [ ] 25d1c2. **Reports and Settings state coverage** - loading,
+        - [x] 25d1c2. **Reports and Settings state coverage** - loading,
               error, empty, and popovers (`/reports`); loading, error,
               dialogs, and resolving whether the "not found" claim is
               reachable at all (`/settings` has no `notFound()` call today).

@@ -240,6 +240,7 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/profile/page.tsx",
     browserExpectation: "rendered",
+    // "loading", "error", and "lazy panels": e2e/profile-states.spec.ts.
     browserStates: ["overview", "loading", "error", "lazy panels"],
     sourceReviewedStates: [],
   },
@@ -250,8 +251,9 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/reports/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["report builder", "tables"],
-    sourceReviewedStates: ["loading", "error", "empty", "popovers"],
+    // "popovers", "loading", "error", and "empty": e2e/reports-states.spec.ts.
+    browserStates: ["report builder", "tables", "popovers", "loading", "error", "empty"],
+    sourceReviewedStates: [],
   },
   {
     route: "/alerts",
@@ -260,6 +262,7 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/alerts/page.tsx",
     browserExpectation: "rendered",
+    // "loading", "error", and "empty": e2e/alerts-states.spec.ts.
     browserStates: ["inbox", "loading", "error", "empty"],
     sourceReviewedStates: [],
   },
@@ -281,8 +284,15 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/settings/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["all lazy panels", "tables"],
-    sourceReviewedStates: ["loading", "error", "not found", "dialogs"],
+    // not-found.tsx exists for route-convention consistency but is not
+    // reachable: nothing under app/(app)/settings/ or components/settings/
+    // calls notFound(), and the only child route (staff-config) is a
+    // redirect(). /settings/does-not-exist matches no segment, so Next
+    // renders the root app/not-found.tsx ("404 / This page could not be
+    // found."), confirmed live. Not an evidenced state.
+    // "loading", "error", and "dialogs": e2e/settings-states.spec.ts.
+    browserStates: ["all lazy panels", "tables", "loading", "error", "dialogs"],
+    sourceReviewedStates: [],
   },
   {
     route: "/settings/staff-config",
