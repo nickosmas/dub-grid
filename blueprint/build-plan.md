@@ -281,6 +281,13 @@
       - [ ] 25d1c. **Profile, Reports, Alerts, and Settings state coverage** -
             lazy panels (`/profile`), popovers (`/reports`), empty inbox
             (`/alerts`), and dialogs/not-found (`/settings`).
+        - [x] 25d1c1. **Profile and Alerts state coverage** - section panels,
+              loading, and the self-profile error (`/profile`); loading,
+              error, and empty inbox (`/alerts`).
+        - [ ] 25d1c2. **Reports and Settings state coverage** - loading,
+              error, empty, and popovers (`/reports`); loading, error,
+              dialogs, and resolving whether the "not found" claim is
+              reachable at all (`/settings` has no `notFound()` call today).
     - [ ] 25d2. **Qualify role and permission variance** - re-run 25d1's state
           matrix as Admin, User, and Gridmaster-impersonation roles (not only
           the current qa-super-admin baseline), confirming the same visual and

@@ -240,8 +240,8 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/profile/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["overview"],
-    sourceReviewedStates: ["lazy panels", "loading", "error"],
+    browserStates: ["overview", "loading", "error", "lazy panels"],
+    sourceReviewedStates: [],
   },
   {
     route: "/reports",
@@ -260,8 +260,8 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/alerts/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["inbox"],
-    sourceReviewedStates: ["loading", "error", "empty"],
+    browserStates: ["inbox", "loading", "error", "empty"],
+    sourceReviewedStates: [],
   },
   {
     route: "/account",
