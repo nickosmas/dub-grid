@@ -212,8 +212,11 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/people/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["directory", "table"],
-    sourceReviewedStates: ["loading", "error", "not found", "drawers", "dialogs"],
+    // "not found", "loading", "error", "drawers", and "dialogs":
+    // e2e/people-states.spec.ts ("not found" via the shared not-found.tsx
+    // boundary, triggered through /people/[id] with a malformed id).
+    browserStates: ["directory", "table", "not found", "loading", "error", "drawers", "dialogs"],
+    sourceReviewedStates: [],
   },
   {
     route: "/people/[id]",
@@ -222,8 +225,13 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/people/[id]/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["detail"],
-    sourceReviewedStates: ["loading", "error", "not found", "dialogs"],
+    // "not found", "loading", and "dialogs": e2e/people-states.spec.ts.
+    // "error" was checked (StaffDetailPage.tsx read in full, 1109 lines):
+    // every failure path, including the one throw statement (:429), is
+    // caught locally and shown via toast.error - none reach the shared
+    // people/error.tsx boundary, so there is nothing to trigger.
+    browserStates: ["detail", "not found", "loading", "dialogs"],
+    sourceReviewedStates: [],
   },
   {
     route: "/profile",
