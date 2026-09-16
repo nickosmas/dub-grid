@@ -239,13 +239,51 @@
           clips at fractional browser zoom, while its neighboring cells
           already use the background-image divider technique. Same bug class
           already fixed elsewhere in this file; apply the same technique.
-  - [ ] 25c. **Restore the Inter-aware browser audit** - get the automated
-        visual/typography audit tooling working again so 25d has something to
-        run.
+  - [x] 25c. ~~**Restore the Inter-aware browser audit**~~ - invalidated by
+        `/feature` on 2026-09-15: ran `e2e/typography.spec.ts`'s full suite
+        (manifest coverage, public/gated/authenticated route matrices, lazy
+        settings panels, directory filter overlays, and the full
+        route/theme/viewport/zoom matrix) across chromium, firefox, and
+        webkit - all 18 test/browser combinations pass. The two defects that
+        likely motivated this item are already fixed: `e2e/helpers/auth.ts`'s
+        shared login-timeout helper now only raises the floor instead of
+        clobbering a longer caller-requested budget (documented in
+        `CHANGELOG.md`), and this session's earlier CI-fix pass corrected a
+        stale `"DM Sans"` assertion plus the `/schedule` scroll-width
+        exception in the same spec file. The suite already runs standalone
+        (`npx playwright test e2e/typography.spec.ts`) and is already wired
+        into `e2e.yml`'s CI job - no missing tooling for 25d to build
+        against. No fix needed.
   - [ ] 25d. **Full qualification matrix pass** - route, role, theme, viewport,
         zoom, permission, and loading/empty/error/overlay states, with
         reproducible evidence. The closing verification sweep once 25a-25c are
         done.
+    - [ ] 25d1. **Convert core-app route states to live browser evidence** -
+          `e2e/typography-route-manifest.ts`'s `sourceReviewedStates` (loading,
+          error, empty, overlay) for the dashboard, schedule, people, profile,
+          reports, alerts, account, and settings routes are verified only by
+          reading source, not by a live browser check. Add Playwright coverage
+          converting them to `browserStates` wherever feasible, closing any
+          defect found. Excludes the auth/onboarding lifecycle routes
+          (`/login` through `/goodbye`), already qualified by 19e.
+      - [x] 25d1a. **Dashboard state coverage** - loading, error, empty cards,
+            and the trial-welcome overlay.
+      - [ ] 25d1b. **Schedule and People state coverage** - loading, error,
+            not-found, dialogs (`/schedule`), and drawers/dialogs
+            (`/people`, `/people/[id]`).
+      - [ ] 25d1c. **Profile, Reports, Alerts, and Settings state coverage** -
+            lazy panels (`/profile`), popovers (`/reports`), empty inbox
+            (`/alerts`), and dialogs/not-found (`/settings`).
+    - [ ] 25d2. **Qualify role and permission variance** - re-run 25d1's state
+          matrix as Admin, User, and Gridmaster-impersonation roles (not only
+          the current qa-super-admin baseline), confirming the same visual and
+          interaction contract holds regardless of role, and closing any
+          contract violation found.
+    - [ ] 25d3. **Qualify the Gridmaster portal live** - the manifest's
+          `/gridmaster` entry has browser evidence only for its
+          authorization-gate redirect; the portal's own views (dashboard, org
+          list, security, audit log, etc.) are source-reviewed only. Add live
+          Gridmaster-authenticated browser coverage for the portal itself.
 - [ ] 26. **Fix staff pages double load** - the Staff / People page loads its
       data twice on entry (duplicate fetch and/or duplicate render), wasting a
       round trip and causing a visible re-render. Find the duplicate trigger

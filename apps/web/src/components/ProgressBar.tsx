@@ -46,6 +46,7 @@ export default function ProgressBar({ loading }: { loading: boolean }) {
 
   return (
     <div
+      data-progress-bar
       style={{
         position: "fixed",
         top: 0,

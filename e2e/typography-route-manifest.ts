@@ -171,8 +171,12 @@ export const typographyRouteAuditManifest = [
     access: "authenticated",
     source: "apps/web/src/app/(app)/dashboard/page.tsx",
     browserExpectation: "rendered",
-    browserStates: ["dashboard"],
-    sourceReviewedStates: ["loading", "error", "empty cards", "trial overlay"],
+    // "loading", "empty cards", and "trial overlay": e2e/dashboard-states.spec.ts.
+    // "error": e2e/auth-degraded-network-recovery.spec.ts's "Calm Haven cold
+    // bootstrap recovers in place after exhausted 503 responses" (asserts
+    // OrganizationBootstrapRecovery's rendered UI on this route).
+    browserStates: ["dashboard", "loading", "error", "empty cards", "trial overlay"],
+    sourceReviewedStates: [],
   },
   {
     route: "/gridmaster",
