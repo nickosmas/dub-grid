@@ -107,5 +107,9 @@ glow on a black page.
 - `dac8809f`: the schedule strip lost its card. `DashboardCard` gained
   `surface={false}` (title and See all, no box); the shift pills are the
   section's only shapes and the strip runs to the screen edges.
-- `ea5d929d`: the pills lifted by `mobileElevation("card")` instead of a
-  hairline, the edge every other dashboard surface has.
+- `ea5d929d`, `3883c75a`, `747d454b`, `8b1a711c`: the pills tried the card
+  shadow in place of a hairline; the strip's ScrollView clipped the cast to
+  a hard line under each pill, padding for it did not read as fixed, and
+  the pills ended as flat fills with no edge and no cast. (`3883c75a` named
+  a spacing key that does not exist; the hook refused the push and
+  `747d454b` corrected it.)
