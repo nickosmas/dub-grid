@@ -56,19 +56,19 @@ function formatFullTimestamp(value: string): string {
 
 function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
   if (type === "schedule_published" || type === "shift_change") {
-    return "calendar-outline";
+    return "calendar";
   }
   if (
     type === "shift_request_new" ||
     type === "shift_request_approved" ||
     type === "shift_request_rejected"
   ) {
-    return "swap-horizontal-outline";
+    return "swap-horizontal";
   }
   if (type === "impersonation_start" || type === "impersonation_end") {
-    return "shield-outline";
+    return "shield";
   }
-  return "notifications-outline";
+  return "notifications";
 }
 
 function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
@@ -272,7 +272,7 @@ export default function NotificationDetailScreen() {
         <EmptyStateCard
           fillScreen
           body="That alert is no longer accessible."
-          iconName="notifications-off-outline"
+          iconName="notifications-off"
           title="Alert not available"
         />
       </Screen>
@@ -314,7 +314,7 @@ export default function NotificationDetailScreen() {
           <Button tone="primary" label={action.label} onPress={handleOpenAction} />
         ) : action ? (
           <View style={styles.webOnlyHint}>
-            <Ionicons name="globe-outline" size={16} color={mobileColors.textMuted} />
+            <Ionicons name="globe" size={16} color={mobileColors.textMuted} />
             <Text style={styles.webOnlyHintLabel}>
               This action isn't available in the mobile app. Sign in on the web to complete it.
             </Text>
@@ -331,7 +331,7 @@ export default function NotificationDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Mark unread"
           >
-            <Ionicons name="mail-unread-outline" size={18} color={mobileColors.textPrimary} />
+            <Ionicons name="mail-unread" size={18} color={mobileColors.textPrimary} />
             <Text style={styles.actionLabel}>Mark unread</Text>
           </Pressable>
           <Pressable
@@ -342,7 +342,7 @@ export default function NotificationDetailScreen() {
             accessibilityLabel={isArchived ? "Restore from archive" : "Archive"}
           >
             <Ionicons
-              name={isArchived ? "archive" : "archive-outline"}
+              name={isArchived ? "archive" : "archive"}
               size={18}
               color={mobileColors.textPrimary}
             />

@@ -18,7 +18,7 @@ export function RouteErrorScreen({
   detail,
   actionLabel,
   onAction,
-  iconName = "alert-circle-outline",
+  iconName = "alert-circle",
 }: {
   title: string;
   body: string;

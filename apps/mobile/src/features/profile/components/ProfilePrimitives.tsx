@@ -190,7 +190,6 @@ export function ProfileHero({
               <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
                 <Text
                   numberOfLines={1}
-                  adjustsFontSizeToFit
                   maxFontSizeMultiplier={MAX_FONT_SCALE}
                   style={[styles.avatarText, isCentered && styles.avatarTextLarge, avatarTextStyle]}
                 >

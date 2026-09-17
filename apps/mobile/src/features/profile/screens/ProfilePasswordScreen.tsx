@@ -101,11 +101,7 @@ function PasswordVisibilityToggle({
       onPress={onPress}
       style={styles.passwordVisibilityButton}
     >
-      <Ionicons
-        color={mobileColors.textMuted}
-        name={isVisible ? "eye-off-outline" : "eye-outline"}
-        size={22}
-      />
+      <Ionicons color={mobileColors.textMuted} name={isVisible ? "eye-off" : "eye"} size={22} />
     </Pressable>
   );
 }
@@ -357,7 +353,7 @@ export default function ProfilePasswordScreen() {
         body="You'll be signed out of every device after the password is updated."
         confirmLabel="Update and sign out"
         confirmTone="warning"
-        iconName="key-outline"
+        iconName="key"
         loading={passwordSaving}
         onCancel={() => {
           setIsConfirming(false);

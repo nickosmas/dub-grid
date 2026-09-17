@@ -4,7 +4,6 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
-import { CountBadge } from "./CountBadge";
 
 export type DraftSummary = NonNullable<MobileDashboardResponse["metrics"]["draftSummary"]>;
 
@@ -28,7 +27,6 @@ export function DraftSummaryCard({ summary }: { summary: DraftSummary }) {
   return (
     <Card
       title="Unpublished changes"
-      headerAccessory={<CountBadge label={String(summary.total)} tone="warning" />}
       detail={
         <View style={styles.detail}>
           <Text style={styles.description}>These schedule changes are not published yet.</Text>

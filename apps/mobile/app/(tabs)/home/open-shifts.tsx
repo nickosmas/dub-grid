@@ -149,10 +149,7 @@ export default function OpenShiftsExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard
-          iconName="checkmark-circle-outline"
-          title="No open shifts match this filter"
-        />
+        <EmptyStateCard iconName="checkmark-circle" title="No open shifts match this filter" />
       ) : (
         <DashboardRowList
           items={filtered}

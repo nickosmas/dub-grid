@@ -857,7 +857,7 @@ export default function RequestsScreen() {
         <EmptyStateCard
           fillScreen
           body="Coverage and pickup requests will appear here when someone needs help."
-          iconName="swap-horizontal-outline"
+          iconName="swap-horizontal"
           title="No requests yet"
         />
       ) : activeTab === "available" ? (
@@ -866,7 +866,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Open shifts you can claim will appear here."
-              iconName="briefcase-outline"
+              iconName="briefcase"
               title="Nothing to pick up"
             />
           ) : (
@@ -910,7 +910,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Open and pending requests will appear here."
-              iconName="list-outline"
+              iconName="list"
               title="No active requests"
             />
           ) : (
@@ -933,7 +933,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Your requests stay here until they're resolved or canceled."
-              iconName="document-text-outline"
+              iconName="document-text"
               title="You haven't made any requests"
             />
           ) : (
@@ -956,7 +956,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Requests appear here when they need your approval."
-              iconName="checkmark-done-outline"
+              iconName="checkmark"
               title="Nothing to approve"
             />
           ) : (
@@ -994,7 +994,7 @@ export default function RequestsScreen() {
             <EmptyStateCard
               fillScreen
               body="Resolved, canceled, and expired requests appear here."
-              iconName="time-outline"
+              iconName="time"
               title="No history yet"
             />
           ) : (
@@ -1093,7 +1093,7 @@ function RequestCard({
     <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleRow}>
-          <CardIcon muted={highlighted} name="swap-horizontal-outline" />
+          <CardIcon muted={highlighted} name="swap-horizontal" />
           <View style={styles.titleColumn}>
             <Text style={styles.requestTitle}>{request.requesterName}</Text>
             <View style={styles.requestTypeRow}>

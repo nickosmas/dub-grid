@@ -65,27 +65,27 @@ export function SessionDetailSheet({
       {session ? (
         <ProfileList>
           <ProfileInfoRow
-            iconName="phone-portrait-outline"
+            iconName="phone-portrait"
             label="Platform"
             value={formatSessionPlatform(session.platform)}
           />
           <ProfileInfoRow
-            iconName="cube-outline"
+            iconName="cube"
             label={session.platform === "web" ? "Browser" : "App"}
             value={formatSessionClient(session)}
           />
           <ProfileInfoRow
-            iconName="globe-outline"
+            iconName="globe"
             label="IP address"
             value={formatSessionLocation(session)}
           />
           <ProfileInfoRow
-            iconName="log-in-outline"
+            iconName="log-in"
             label="First signed in"
             value={formatSessionTimestamp(session.createdAt)}
           />
           <ProfileInfoRow
-            iconName="time-outline"
+            iconName="time"
             isLast
             label="Last active"
             value={formatSessionTimestamp(session.lastActiveAt)}

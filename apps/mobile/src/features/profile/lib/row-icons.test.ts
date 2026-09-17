@@ -58,12 +58,12 @@ describe("profile and people row icons", () => {
   });
 
   /**
-   * Rows draw the glyph exactly as named, so an accidentally solid name would
-   * ship one heavier icon in a list of outlines.
+   * Icons are filled app-wide, so an accidentally outlined name would ship
+   * one lighter icon in a list of solids.
    */
-  it("uses the outline variant on every row", () => {
-    const solid = collectIconNamesInUse().filter((name) => !name.endsWith("-outline"));
+  it("uses the filled variant on every row", () => {
+    const outlined = collectIconNamesInUse().filter((name) => name.endsWith("-outline"));
 
-    expect(solid).toEqual([]);
+    expect(outlined).toEqual([]);
   });
 });

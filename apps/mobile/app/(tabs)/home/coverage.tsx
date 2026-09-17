@@ -119,7 +119,7 @@ export default function CoverageExpandedScreen() {
       {filtered.length === 0 ? (
         <EmptyStateCard
           body="Coverage appears here once staffing requirements are configured and the period is published."
-          iconName="stats-chart-outline"
+          iconName="stats-chart"
           title="No coverage to track yet"
         />
       ) : (

@@ -7,8 +7,6 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import {
   MAX_FONT_SCALE,
   mobileElevation,
-  mobileMotion,
-  mobilePillOverflow,
   mobileRadii,
   mobileSpace,
   mobileTabularText,
@@ -18,15 +16,14 @@ import {
 import type { CardIconTone } from "../../../shared/components/Screen";
 import { coverageColor } from "../lib/coverage";
 
-// Fill only, no stroke: the same rule as `CountBadge` and `Chip`.
-function createToneStyles(
-  mobileColors: MobileColors,
-): Record<CardIconTone, { backgroundColor: string; color: string }> {
+// Text colour only: the hero carries no pills. A status word and a figure
+// read in their tone's colour, and the surface stays one white card.
+function createToneColors(mobileColors: MobileColors): Record<CardIconTone, string> {
   return {
-    brand: { backgroundColor: mobileColors.brandSoft, color: mobileColors.brand },
-    warning: { backgroundColor: mobileColors.warningSoft, color: mobileColors.warningText },
-    danger: { backgroundColor: mobileColors.dangerSoft, color: mobileColors.dangerText },
-    success: { backgroundColor: mobileColors.successSoft, color: mobileColors.successText },
+    brand: mobileColors.brand,
+    warning: mobileColors.warningText,
+    danger: mobileColors.dangerText,
+    success: mobileColors.successText,
   };
 }
 
@@ -38,27 +35,25 @@ const STATUS_TONE: Record<string, CardIconTone> = {
 };
 
 /**
- * A secondary figure under the coverage meter, tappable when it has somewhere
- * to go. A chip rather than a tile: the number is the content, and the tile's
- * own border, icon frame and caption were three more edges around one digit.
+ * A secondary figure under the coverage meter: the number in its tone's
+ * colour, the label beneath, a chevron when it opens something. No fill and
+ * no icon; the figure is the content.
  */
-function MetricChip({
+function MetricStat({
   label,
   value,
-  icon,
   tone,
   onPress,
 }: {
   label: string;
   value: number;
-  icon: keyof typeof Ionicons.glyphMap;
   tone: CardIconTone;
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
+  const color = useMemo(() => createToneColors(mobileColors), [mobileColors])[tone];
 
   return (
     <Pressable
@@ -67,27 +62,19 @@ function MetricChip({
       android_ripple={onPress ? { color: mobileColors.rippleNeutral } : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: toneStyle.backgroundColor },
-        pressed && onPress && styles.chipPressed,
-      ]}
+      style={({ pressed }) => [styles.stat, pressed && onPress && styles.statPressed]}
     >
-      <Ionicons color={toneStyle.color} name={icon} size={16} />
-      <Text
-        maxFontSizeMultiplier={MAX_FONT_SCALE}
-        style={[styles.chipValue, { color: toneStyle.color }]}
-      >
-        {value}
-      </Text>
-      <Text
-        maxFontSizeMultiplier={MAX_FONT_SCALE}
-        numberOfLines={1}
-        style={[styles.chipLabel, { color: toneStyle.color }]}
-      >
+      <View style={styles.statFigureRow}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[styles.statValue, { color }]}>
+          {value}
+        </Text>
+        {onPress ? (
+          <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={14} />
+        ) : null}
+      </View>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} style={styles.statLabel}>
         {label}
       </Text>
-      {onPress ? <Ionicons color={toneStyle.color} name="chevron-forward" size={14} /> : null}
     </Pressable>
   );
 }
@@ -107,7 +94,7 @@ export function DashboardHeroCard({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
-  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
+  const statusColor = useMemo(() => createToneColors(mobileColors), [mobileColors])[tone];
   const coverage = metrics.coveragePct;
   const meterColor =
     coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
@@ -115,11 +102,12 @@ export function DashboardHeroCard({
   return (
     <View style={styles.card}>
       <View style={styles.headerCopy}>
-        <View style={[styles.statusPill, { backgroundColor: toneStyle.backgroundColor }]}>
-          <Text style={[styles.statusPillLabel, { color: toneStyle.color }]}>
-            {summary.statusLabel}
-          </Text>
-        </View>
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          style={[styles.status, { color: statusColor }]}
+        >
+          {summary.statusLabel}
+        </Text>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
           {summary.title}
         </Text>
@@ -164,16 +152,15 @@ export function DashboardHeroCard({
         </View>
       </View>
 
-      <View style={styles.chipRow}>
-        <MetricChip
-          icon="alert-circle-outline"
+      <View style={styles.statRow}>
+        <MetricStat
           label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
           onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
           tone={metrics.openGapCount > 0 ? "danger" : "success"}
           value={metrics.openGapCount}
         />
-        <MetricChip
-          icon="checkmark-done-outline"
+        <View style={styles.statDivider} />
+        <MetricStat
           label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
           onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
           tone={metrics.pendingApprovalsCount > 0 ? "warning" : "success"}
@@ -197,18 +184,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileElevation("card", isDark),
     },
     headerCopy: {
-      gap: mobileSpace.sm,
+      gap: mobileSpace.xs,
     },
-    statusPill: {
-      ...mobilePillOverflow.displayContainer,
-      alignSelf: "flex-start",
-      borderRadius: mobileRadii.pill,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-    },
-    statusPillLabel: {
-      ...mobileText.badge,
-      ...mobilePillOverflow.displayText,
+    status: {
+      ...mobileText.label,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
     },
     title: {
       ...mobileText.title,
@@ -250,31 +231,34 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       height: "100%",
       borderRadius: mobileRadii.pill,
     },
-    chipRow: {
+    statRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: mobileSpace.sm,
+      alignItems: "stretch",
+      gap: mobileSpace.lg,
     },
-    chip: {
+    stat: {
+      flex: 1,
+      gap: mobileSpace.xs,
+      borderRadius: mobileRadii.control,
+    },
+    statPressed: {
+      opacity: 0.6,
+    },
+    statFigureRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.xs,
-      borderRadius: mobileRadii.pill,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-      // Hugs its content; two chips share the row and wrap under large text.
-      alignSelf: "flex-start",
-      maxWidth: "100%",
     },
-    chipPressed: {
-      transform: [{ scale: mobileMotion.press.scale }],
-    },
-    chipValue: {
-      ...mobileText.bodyStrong,
+    statValue: {
+      ...mobileText.title,
       ...mobileTabularText,
     },
-    chipLabel: {
-      ...mobileText.meta,
-      flexShrink: 1,
+    statLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    statDivider: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
   });

@@ -120,7 +120,7 @@ export default function ActivityExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard iconName="options-outline" title="No activity matches this filter" />
+        <EmptyStateCard iconName="options" title="No activity matches this filter" />
       ) : (
         <DashboardRowList
           items={filtered}

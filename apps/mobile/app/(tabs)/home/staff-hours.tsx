@@ -148,7 +148,7 @@ export default function StaffHoursExpandedScreen() {
 
       {sorted.length === 0 ? (
         <EmptyStateCard
-          iconName="checkmark-circle-outline"
+          iconName="checkmark-circle"
           title={`No one is over ${dashboardQuery.data.overtimeThresholdHours}h this period`}
         />
       ) : (

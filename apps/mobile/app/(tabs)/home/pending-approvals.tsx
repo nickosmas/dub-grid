@@ -63,10 +63,7 @@ export default function PendingApprovalsExpandedScreen() {
       onRefresh={manualRefresh.refresh}
     >
       {requests.length === 0 ? (
-        <EmptyStateCard
-          iconName="checkmark-circle-outline"
-          title="No requests are waiting on you"
-        />
+        <EmptyStateCard iconName="checkmark-circle" title="No requests are waiting on you" />
       ) : (
         <DashboardRowList
           items={requests}

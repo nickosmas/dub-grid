@@ -14,7 +14,6 @@ import {
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { CountBadge } from "./CountBadge";
 import { DashboardRowList } from "./DashboardRowList";
 import { coverageColor } from "../lib/coverage";
 
@@ -71,18 +70,12 @@ export function CoverageBySectionCard({
   focusAreaLabel: string;
   onSeeAll?: () => void;
 }) {
-  const totalOpenSlots = sections.reduce((sum, section) => sum + section.openSlots, 0);
   const title = `Coverage by ${focusAreaLabel.toLowerCase()}`;
 
   return (
     <Card
       title={title}
       onSeeAll={onSeeAll}
-      headerAccessory={
-        totalOpenSlots > 0 ? (
-          <CountBadge label={`${totalOpenSlots} open`} tone="warning" />
-        ) : undefined
-      }
       detail={
         sections.length > 0 ? (
           <DashboardRowList
@@ -95,7 +88,7 @@ export function CoverageBySectionCard({
           <EmptyStateCard
             compact
             body="Coverage appears here once staffing requirements are configured and the period is published."
-            iconName="stats-chart-outline"
+            iconName="stats-chart"
             title="No coverage to track yet"
           />
         )

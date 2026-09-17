@@ -6,11 +6,12 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
-  mobileSpace,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { CountBadge, type CountBadgeTone } from "./CountBadge";
+import type { CountBadgeTone } from "./CountBadge";
+import { createToneTextColors } from "../lib/tone-text";
 import { DashboardRowList } from "./DashboardRowList";
 
 export type ActivityItem = MobileDashboardResponse["activity"][number];
@@ -49,12 +50,16 @@ export function formatRelativeTime(isoTimestamp: string): string {
 export function ActivityRow({ item }: { item: ActivityItem }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toneColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   return (
     <View style={styles.row}>
-      <View style={styles.rowHeader}>
-        <CountBadge label={ACTIVITY_TYPE_LABEL[item.type]} tone={ACTIVITY_TYPE_TONE[item.type]} />
-        <Text style={styles.value}>{formatRelativeTime(item.timestamp)}</Text>
-      </View>
+      <Text style={styles.value}>
+        <Text style={[styles.type, { color: toneColor[ACTIVITY_TYPE_TONE[item.type]] }]}>
+          {ACTIVITY_TYPE_LABEL[item.type]}
+        </Text>
+        {" · "}
+        {formatRelativeTime(item.timestamp)}
+      </Text>
       <Text style={styles.label}>{item.description}</Text>
     </View>
   );
@@ -80,7 +85,7 @@ export function ActivityFeedCard({
             renderItem={(item) => <ActivityRow item={item} />}
           />
         ) : (
-          <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
+          <EmptyStateCard compact iconName="time" title="No recent activity" />
         )
       }
     />
@@ -95,11 +100,8 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileListRow.titleGap,
       paddingVertical: mobileListRow.paddingVertical,
     },
-    rowHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.sm,
+    type: {
+      ...mobileTextWeighted("caption", "semibold"),
     },
     label: {
       ...mobileText.body,

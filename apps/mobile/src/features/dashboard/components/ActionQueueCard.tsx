@@ -11,11 +11,12 @@ import {
   mobileListRow,
   mobileSpace,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { formatUsDate } from "../../../shared/lib/dates";
 import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../../shift-requests/lib/request-type";
-import { CountBadge } from "./CountBadge";
+import { createToneTextColors } from "../lib/tone-text";
 import { DashboardRowList } from "./DashboardRowList";
 
 export { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE };
@@ -27,6 +28,7 @@ export { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE };
 export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const typeColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   return (
     <PressableRow
       accessibilityLabel={`${request.requesterName}, ${REQUEST_TYPE_LABEL[request.type]} request`}
@@ -38,10 +40,13 @@ export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
       }
       style={styles.row}
     >
-      <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
       <View style={styles.copy}>
         <Text style={styles.label}>{request.requesterName}</Text>
         <Text style={styles.meta}>
+          <Text style={[styles.type, { color: typeColor[REQUEST_TYPE_TONE[request.type]] }]}>
+            {REQUEST_TYPE_LABEL[request.type]}
+          </Text>
+          {" · "}
           {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
         </Text>
       </View>
@@ -61,11 +66,6 @@ export function ActionQueueCard({
     <Card
       title="Pending approvals"
       onSeeAll={onSeeAll}
-      headerAccessory={
-        requests.length > 0 ? (
-          <CountBadge label={String(requests.length)} tone="brand" />
-        ) : undefined
-      }
       detail={
         requests.length > 0 ? (
           <DashboardRowList
@@ -77,7 +77,7 @@ export function ActionQueueCard({
         ) : (
           <EmptyStateCard
             compact
-            iconName="checkmark-circle-outline"
+            iconName="checkmark-circle"
             title="No requests are waiting on you"
           />
         )
@@ -106,5 +106,10 @@ const createStyles = (mobileColors: MobileColors) =>
     meta: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
+    },
+    // The request type as a word in the caption, coloured by its tone; a
+    // pill per row was the loudest thing on the card.
+    type: {
+      ...mobileTextWeighted("caption", "semibold"),
     },
   });

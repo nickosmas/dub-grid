@@ -260,7 +260,7 @@ export default function ResetPasswordScreen() {
               trailingAccessory={
                 <Button
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                  icon={showPassword ? "eye-off" : "eye"}
                   iconOnly
                   onPress={() => setShowPassword((current) => !current)}
                   tone="ghost"

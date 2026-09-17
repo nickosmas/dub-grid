@@ -51,7 +51,7 @@ export function AlertsHeaderButton() {
         {...pressHandlers}
         style={[styles.button, animatedStyle]}
       >
-        <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
+        <Ionicons color={mobileColors.textPrimary} name="notifications" size={20} />
       </AnimatedPressable>
       {unreadCount > 0 ? (
         <View pointerEvents="none" style={styles.badge}>

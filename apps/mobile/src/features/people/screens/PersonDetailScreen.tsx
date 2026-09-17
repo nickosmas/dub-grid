@@ -729,7 +729,7 @@ export default function PersonDetailScreen() {
         <EmptyStateCard
           fillScreen
           body="This teammate isn't in your directory anymore."
-          iconName="person-outline"
+          iconName="person"
           title="Person not found"
         />
       </Screen>
@@ -1077,12 +1077,12 @@ export default function PersonDetailScreen() {
           <ProfileSection title="Contact">
             <ProfileList>
               <ProfileInfoRow
-                iconName="mail-outline"
+                iconName="mail"
                 label="Email"
                 value={person.email || "No email on file"}
               />
               <ProfileInfoRow
-                iconName="call-outline"
+                iconName="call"
                 isLast
                 label="Phone"
                 value={person.phone || "No phone on file"}
@@ -1102,25 +1102,21 @@ export default function PersonDetailScreen() {
                   so it rides on the same permission web gates it behind. */}
               {canViewEmployeeDetails ? (
                 <ProfileInfoRow
-                  iconName="card-outline"
+                  iconName="card"
                   label="Employee ID"
                   value={`#${person.employeeNumber}`}
                 />
               ) : null}
+              <ProfileInfoRow iconName="briefcase" label="Employment" value={employmentLabel} />
               <ProfileInfoRow
-                iconName="briefcase-outline"
-                label="Employment"
-                value={employmentLabel}
-              />
-              <ProfileInfoRow
-                iconName="ribbon-outline"
+                iconName="ribbon"
                 isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
                 label={certificationLabel}
                 value={certificationName}
               />
               {canManageEmployees && person.statusChangedAt ? (
                 <ProfileInfoRow
-                  iconName="calendar-outline"
+                  iconName="calendar"
                   isLast={!person.statusNote}
                   label="Status updated"
                   value={formatDate(person.statusChangedAt)}
@@ -1128,7 +1124,7 @@ export default function PersonDetailScreen() {
               ) : null}
               {canManageEmployees && person.statusNote ? (
                 <ProfileInfoRow
-                  iconName="document-text-outline"
+                  iconName="document-text"
                   isLast
                   label="Status note"
                   value={person.statusNote}
@@ -1146,7 +1142,7 @@ export default function PersonDetailScreen() {
                   instead of in a section of its own, which read as a second
                   Assignments block for anyone who had both. */}
               <ProfileInfoRow
-                iconName="business-outline"
+                iconName="business"
                 label={departmentLabel}
                 value={scheduledDepartmentNames}
               />
@@ -1155,22 +1151,13 @@ export default function PersonDetailScreen() {
                   invitation, and would print an empty row for one. */}
               {person.managementDepartmentIds.length > 0 ? (
                 <ProfileInfoRow
-                  iconName="briefcase-outline"
+                  iconName="briefcase"
                   label={MANAGEMENT_DEPARTMENT_LABELS.plural}
                   value={managementDepartmentNames}
                 />
               ) : null}
-              <ProfileInfoRow
-                iconName="albums-outline"
-                label={focusAreaLabel}
-                value={focusAreaNames}
-              />
-              <ProfileInfoRow
-                iconName="people-circle-outline"
-                isLast
-                label={roleLabel}
-                value={roleNames}
-              />
+              <ProfileInfoRow iconName="albums" label={focusAreaLabel} value={focusAreaNames} />
+              <ProfileInfoRow iconName="people-circle" isLast label={roleLabel} value={roleNames} />
             </ProfileList>
           </ProfileSection>
 

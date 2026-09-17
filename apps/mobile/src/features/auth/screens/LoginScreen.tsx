@@ -528,7 +528,7 @@ export default function LoginScreen() {
                 <View style={styles.eyeButton}>
                   <Button
                     accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                    icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                    icon={showPassword ? "eye-off" : "eye"}
                     iconOnly
                     onPress={() => setShowPassword((current) => !current)}
                     tone="ghost"

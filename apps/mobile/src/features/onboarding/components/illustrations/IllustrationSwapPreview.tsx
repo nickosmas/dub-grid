@@ -52,7 +52,7 @@ export function IllustrationSwapPreview() {
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
             <View style={styles.cardIconFrame}>
-              <Ionicons color={mobileColors.brand} name="swap-horizontal-outline" size={18} />
+              <Ionicons color={mobileColors.brand} name="swap-horizontal" size={18} />
             </View>
             <View style={styles.titleColumn}>
               <Text style={styles.requestTitle}>Laura Marshall</Text>

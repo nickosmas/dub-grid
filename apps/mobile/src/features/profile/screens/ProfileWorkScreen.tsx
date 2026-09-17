@@ -485,7 +485,7 @@ export default function ProfileWorkScreen() {
         <EmptyStateCard
           fillScreen
           body="We couldn't load your profile."
-          iconName="person-circle-outline"
+          iconName="person-circle"
           title="Profile unavailable"
         />
       ) : (
@@ -506,25 +506,25 @@ export default function ProfileWorkScreen() {
                 <ProfileSection title="Staff profile">
                   <ProfileList>
                     <ProfileInfoRow
-                      iconName="pulse-outline"
+                      iconName="pulse"
                       label="Status"
                       value={formatProfileStatus(linkedEmployee.status)}
                     />
                     {linkedEmployee.employeeNumber != null ? (
                       <ProfileInfoRow
-                        iconName="card-outline"
+                        iconName="card"
                         label="Employee ID"
                         value={`#${linkedEmployee.employeeNumber}`}
                       />
                     ) : null}
                     <ProfileInfoRow
-                      iconName="business-outline"
+                      iconName="business"
                       label={profile.currentOrg.labels.department}
                       value={departmentNames.length > 0 ? departmentNames.join(", ") : "Not set"}
                     />
                     {managementDepartmentNames.length > 0 ? (
                       <ProfileInfoRow
-                        iconName="briefcase-outline"
+                        iconName="briefcase"
                         isLast
                         label={MANAGEMENT_DEPARTMENT_LABELS.plural}
                         value={managementDepartmentNames.join(", ")}

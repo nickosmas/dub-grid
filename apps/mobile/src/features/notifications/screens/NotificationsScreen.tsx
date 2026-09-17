@@ -92,19 +92,19 @@ function getNotificationsQueryKey(accessToken: string | null, filter: FilterKey,
 
 function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
   if (type === "schedule_published" || type === "shift_change") {
-    return "calendar-outline";
+    return "calendar";
   }
   if (
     type === "shift_request_new" ||
     type === "shift_request_approved" ||
     type === "shift_request_rejected"
   ) {
-    return "swap-horizontal-outline";
+    return "swap-horizontal";
   }
   if (type === "impersonation_start" || type === "impersonation_end") {
-    return "shield-outline";
+    return "shield";
   }
-  return "notifications-outline";
+  return "notifications";
 }
 
 function formatRelativeTime(value: string): string {
@@ -380,7 +380,7 @@ export default function NotificationsScreen() {
               ? "Try clearing your filters or search."
               : "Schedule updates and request decisions will appear here."
           }
-          iconName="notifications-outline"
+          iconName="notifications"
           title={debouncedSearch || filter !== "all" ? "No matching alerts" : "No alerts yet"}
         />
       ) : (
@@ -513,14 +513,14 @@ function NotificationCard({ notification, pending, onPress, onArchive }: Notific
             />
           ) : action ? (
             <View style={styles.webOnlyHint}>
-              <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
+              <Ionicons name="globe" size={14} color={mobileColors.textMuted} />
               <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
             </View>
           ) : null}
         </View>
         <Button
           accessibilityLabel={isArchived ? "Restore from archive" : "Archive"}
-          icon={isArchived ? "archive" : "archive-outline"}
+          icon={isArchived ? "archive" : "archive"}
           iconOnly
           onPress={(event) => {
             // Sits inside a pressable row; without this the row navigates too.

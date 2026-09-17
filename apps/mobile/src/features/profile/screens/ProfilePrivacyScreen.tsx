@@ -90,17 +90,17 @@ export default function ProfilePrivacyScreen() {
       <ProfileSection title="Policies">
         <ProfileList>
           <ProfileNavRow
-            iconName="lock-closed-outline"
+            iconName="lock-closed"
             label="Privacy policy"
             onPress={() => openInAppBrowser(getLegalUrls().privacy, mobileColors)}
           />
           <ProfileNavRow
-            iconName="document-text-outline"
+            iconName="document-text"
             label="Terms of service"
             onPress={() => openInAppBrowser(getLegalUrls().terms, mobileColors)}
           />
           <ProfileNavRow
-            iconName="information-circle-outline"
+            iconName="information-circle"
             isLast
             label="Cookie policy"
             onPress={() => openInAppBrowser(getLegalUrls().cookies, mobileColors)}

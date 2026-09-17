@@ -10,10 +10,10 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
   mobileSpace,
+  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { CountBadge } from "./CountBadge";
 import { DashboardRowList } from "./DashboardRowList";
 
 export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
@@ -37,7 +37,10 @@ export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
           {entry.totalHours}h total{entry.focusAreaName ? ` · ${entry.focusAreaName}` : ""}
         </Text>
       </View>
-      <CountBadge label={`+${entry.overtimeHours}h OT`} tone="danger" />
+      <View style={styles.figure}>
+        <Text style={styles.overtime}>+{entry.overtimeHours}h</Text>
+        <Text style={styles.overtimeLabel}>overtime</Text>
+      </View>
       <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
   );
@@ -56,9 +59,6 @@ export function StaffHoursCard({
     <Card
       title="Overtime watch"
       onSeeAll={onSeeAll}
-      headerAccessory={
-        entries.length > 0 ? <CountBadge label={String(entries.length)} tone="danger" /> : undefined
-      }
       detail={
         entries.length > 0 ? (
           <DashboardRowList
@@ -70,7 +70,7 @@ export function StaffHoursCard({
         ) : (
           <EmptyStateCard
             compact
-            iconName="checkmark-circle-outline"
+            iconName="checkmark-circle"
             title={`No one is over ${thresholdHours}h this period`}
           />
         )
@@ -90,6 +90,20 @@ const createStyles = (mobileColors: MobileColors) =>
     copy: {
       flex: 1,
       gap: mobileListRow.titleGap,
+    },
+    // The overtime as a figure in the danger colour, no pill around it.
+    figure: {
+      alignItems: "flex-end",
+      flexShrink: 0,
+    },
+    overtime: {
+      ...mobileText.bodyStrong,
+      ...mobileTabularText,
+      color: mobileColors.dangerText,
+    },
+    overtimeLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
     },
     label: {
       ...mobileText.body,

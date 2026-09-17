@@ -231,7 +231,7 @@ export default function ProfileSessionsScreen() {
               <EmptyStateCard
                 compact
                 body="We couldn't find any active sessions for this account."
-                iconName="phone-portrait-outline"
+                iconName="phone-portrait"
                 title="No devices signed in"
               />
             ) : (
@@ -304,7 +304,7 @@ export default function ProfileSessionsScreen() {
       />
       <ConfirmationModal
         body={confirmationBody}
-        iconName="log-out-outline"
+        iconName="log-out"
         confirmLabel="Sign out"
         confirmTone="danger"
         loading={revokeMutation.isPending || sessionScopeLoading != null}

@@ -43,7 +43,7 @@ export default function TabsLayout() {
             <Label>Home</Label>
             <Icon
               src={{
-                default: <VectorIcon family={Ionicons} name="home-outline" />,
+                default: <VectorIcon family={Ionicons} name="home" />,
                 selected: <VectorIcon family={Ionicons} name="home" />,
               }}
             />
@@ -56,7 +56,7 @@ export default function TabsLayout() {
             <Label>Schedule</Label>
             <Icon
               androidSrc={{
-                default: <VectorIcon family={Ionicons} name="calendar-outline" />,
+                default: <VectorIcon family={Ionicons} name="calendar" />,
                 selected: <VectorIcon family={Ionicons} name="calendar" />,
               }}
               sf={{ default: "calendar", selected: "calendar" }}
@@ -70,11 +70,11 @@ export default function TabsLayout() {
             <Label>Requests</Label>
             <Icon
               androidSrc={{
-                default: <VectorIcon family={Ionicons} name="swap-horizontal-outline" />,
+                default: <VectorIcon family={Ionicons} name="swap-horizontal" />,
                 selected: <VectorIcon family={Ionicons} name="swap-horizontal" />,
               }}
               sf={{
-                default: "arrow.left.arrow.right",
+                default: "arrow.left.arrow.right.circle.fill",
                 selected: "arrow.left.arrow.right.circle.fill",
               }}
             />
@@ -85,21 +85,21 @@ export default function TabsLayout() {
       <Label>People</Label>
       <Icon
         androidSrc={{
-          default: <VectorIcon family={Ionicons} name="people-outline" />,
+          default: <VectorIcon family={Ionicons} name="people" />,
           selected: <VectorIcon family={Ionicons} name="people" />,
         }}
-        sf={{ default: "person.2", selected: "person.2.fill" }}
+        sf={{ default: "person.2.fill", selected: "person.2.fill" }}
       />
     </NativeTabs.Trigger>,
     <NativeTabs.Trigger key="profile" name="profile">
       <Label>Profile</Label>
       <Icon
         androidSrc={{
-          default: <VectorIcon family={Ionicons} name="person-circle-outline" />,
+          default: <VectorIcon family={Ionicons} name="person-circle" />,
           selected: <VectorIcon family={Ionicons} name="person-circle" />,
         }}
         sf={{
-          default: "person.crop.circle",
+          default: "person.crop.circle.fill",
           selected: "person.crop.circle.fill",
         }}
       />

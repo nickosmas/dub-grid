@@ -21,7 +21,8 @@ describe("DraftSummaryCard", () => {
     );
 
     expect(screen.getByText("Unpublished changes")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    // No count pill in the header; the rows carry the numbers.
+    expect(screen.queryByText("3")).not.toBeInTheDocument();
     expect(screen.getByText("1 new change")).toBeInTheDocument();
     expect(screen.getByText("2 modified changes")).toBeInTheDocument();
     expect(screen.queryByText(/deleted change/)).not.toBeInTheDocument();

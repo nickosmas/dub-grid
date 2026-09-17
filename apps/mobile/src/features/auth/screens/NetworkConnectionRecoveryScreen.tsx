@@ -38,7 +38,7 @@ export function NetworkConnectionRecoveryScreen({
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
         <View style={styles.iconFrame}>
-          <Ionicons color={colors.brand} name="cloud-offline-outline" size={28} />
+          <Ionicons color={colors.brand} name="cloud-offline" size={28} />
         </View>
         <Text style={styles.title}>{NETWORK_ERROR_TITLE}</Text>
         <Text style={styles.body}>{NETWORK_ERROR_MESSAGE}</Text>

@@ -157,7 +157,7 @@ export default function AddToScheduleScreen() {
               : "This teammate isn't in your directory anymore."
           }
           fillScreen
-          iconName="lock-closed-outline"
+          iconName="lock-closed"
           title="Scheduling unavailable"
         />
       </Screen>
@@ -199,7 +199,7 @@ export default function AddToScheduleScreen() {
         <EmptyStateCard
           body={`There are no ${focusAreaLabel.toLowerCase()} yet. Add one on the web app, under Settings, before putting anyone on the schedule.`}
           fillScreen
-          iconName="albums-outline"
+          iconName="albums"
           title={`No ${focusAreaLabel.toLowerCase()}`}
         />
       ) : (

@@ -44,11 +44,11 @@ const CARD_ENTRANCE_SCALE = 0.98;
  * small accent beside text - the same role this badge plays here.
  */
 const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.glyphMap> = {
-  primary: "checkmark-circle-outline",
-  secondary: "checkmark-circle-outline",
-  neutral: "information-circle-outline",
-  danger: "warning-outline",
-  warning: "warning-outline",
+  primary: "checkmark-circle",
+  secondary: "checkmark-circle",
+  neutral: "information-circle",
+  danger: "warning",
+  warning: "warning",
 };
 
 /**

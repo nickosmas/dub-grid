@@ -146,7 +146,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
             <Button label="Unlock" loading={authenticating} onPress={() => attemptUnlock()} />
           </SheetActions>
         }
-        header={<SheetHeader icon="lock-closed-outline" title="App locked" />}
+        header={<SheetHeader icon="lock-closed" title="App locked" />}
         visible={showLock}
         onDismiss={() => {}}
       >

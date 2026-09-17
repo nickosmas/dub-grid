@@ -184,7 +184,7 @@ export function FilterButton({
       }
       expanded={expanded}
       fullWidth
-      icon="options-outline"
+      icon="options"
       label="Filter"
       trailingAccessory={
         activeCount > 0 ? (

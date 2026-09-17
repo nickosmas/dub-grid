@@ -29,7 +29,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "alert-circle" as const,
-      centeredIconName: "alert-circle-outline" as const,
+      centeredIconName: "alert-circle" as const,
       inlineActionTone: "danger" as const,
     },
     warning: {
@@ -40,7 +40,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "warning" as const,
-      centeredIconName: "warning-outline" as const,
+      centeredIconName: "warning" as const,
       inlineActionTone: "secondary" as const,
     },
     info: {
@@ -51,7 +51,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "information-circle" as const,
-      centeredIconName: "information-circle-outline" as const,
+      centeredIconName: "information-circle" as const,
       inlineActionTone: "secondary" as const,
     },
     success: {
@@ -62,7 +62,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
       iconName: "checkmark-circle" as const,
-      centeredIconName: "checkmark-circle-outline" as const,
+      centeredIconName: "checkmark-circle" as const,
       inlineActionTone: "secondary" as const,
     },
   }) as const;

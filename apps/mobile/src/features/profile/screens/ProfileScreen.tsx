@@ -438,7 +438,7 @@ export default function ProfileScreen() {
         <EmptyStateCard
           fillScreen
           body="We couldn't load your account details. Try signing out and back in."
-          iconName="person-circle-outline"
+          iconName="person-circle"
           title="Profile unavailable"
         />
       ) : (
@@ -513,13 +513,9 @@ export default function ProfileScreen() {
               only for the people who have somewhere to switch to. */}
           <ProfileSection title="Organization">
             <ProfileList>
+              <ProfileInfoRow iconName="business" label="Name" value={profile.currentOrg.name} />
               <ProfileInfoRow
-                iconName="business-outline"
-                label="Name"
-                value={profile.currentOrg.name}
-              />
-              <ProfileInfoRow
-                iconName="compass-outline"
+                iconName="compass"
                 isLast
                 label="Subdomain"
                 value={formatProfileValue(profile.currentOrg.slug)}
@@ -537,7 +533,7 @@ export default function ProfileScreen() {
               <ProfileList>
                 {scheduledDepartmentNames.length > 0 ? (
                   <ProfileInfoRow
-                    iconName="business-outline"
+                    iconName="business"
                     isLast={managementDepartmentNames.length === 0}
                     label={departmentLabel}
                     value={scheduledDepartmentNames.join(", ")}
@@ -545,7 +541,7 @@ export default function ProfileScreen() {
                 ) : null}
                 {managementDepartmentNames.length > 0 ? (
                   <ProfileInfoRow
-                    iconName="briefcase-outline"
+                    iconName="briefcase"
                     isLast
                     label={MANAGEMENT_DEPARTMENT_LABELS.plural}
                     value={managementDepartmentNames.join(", ")}
@@ -561,27 +557,27 @@ export default function ProfileScreen() {
           <ProfileSection title="Settings">
             <ProfileList>
               <ProfileNavRow
-                iconName="id-card-outline"
+                iconName="id-card"
                 label="Profile details"
                 onPress={() => router.push("/(tabs)/profile/work")}
               />
               <ProfileNavRow
-                iconName="lock-closed-outline"
+                iconName="lock-closed"
                 label="Security & sessions"
                 onPress={() => router.push("/(tabs)/profile/security")}
               />
               <ProfileNavRow
-                iconName="notifications-outline"
+                iconName="notifications"
                 label="Notifications"
                 onPress={() => router.push("/(tabs)/profile/notifications")}
               />
               <ProfileNavRow
-                iconName="shield-outline"
+                iconName="shield"
                 label="Privacy & data"
                 onPress={() => router.push("/(tabs)/profile/privacy")}
               />
               <ProfileNavRow
-                iconName="color-palette-outline"
+                iconName="color-palette"
                 isLast={!canSwitchOrganizations}
                 label="Appearance"
                 value={getThemePreferenceLabel(preference)}
@@ -593,7 +589,7 @@ export default function ProfileScreen() {
                   equals. */}
               {canSwitchOrganizations ? (
                 <ProfileNavRow
-                  iconName="swap-horizontal-outline"
+                  iconName="swap-horizontal"
                   isLast
                   label="Switch organization"
                   value={profile.currentOrg.name}
@@ -733,7 +729,7 @@ function OrganizationOptionRow({
           tile brand, so the icon column stays scannable. Swapping the glyph
           itself for a bare checkmark left the current row as the only one
           without an organization icon. */}
-      <ProfileIcon name="business-outline" tone={membership.isCurrent ? "brand" : undefined} />
+      <ProfileIcon name="business" tone={membership.isCurrent ? "brand" : undefined} />
       <View style={styles.orgOptionCopy}>
         <Text
           numberOfLines={1}

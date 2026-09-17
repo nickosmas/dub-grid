@@ -153,7 +153,7 @@ export function AdminHomeScreen() {
           actionLabel="Refresh"
           body="There's nothing to show for this organization yet. Pull to refresh once your schedule is set up."
           fillScreen
-          iconName="stats-chart-outline"
+          iconName="stats-chart"
           onAction={() => {
             void dashboardQuery.refetch();
           }}
@@ -286,8 +286,6 @@ export function AdminHomeScreen() {
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
-          orgName={bootstrapQuery.data?.currentOrg.name ?? ""}
-          timezone={bootstrapQuery.data?.currentOrg.timezone ?? null}
           periodLabel={formatDashboardDateRange(
             data.range.startDate,
             data.range.endDate,

@@ -32,13 +32,13 @@ const CHANNELS: Array<{
     id: "in_app",
     label: "In-app",
     description: "Shows up in your in-app notification list.",
-    icon: "phone-portrait-outline",
+    icon: "phone-portrait",
   },
   {
     id: "email",
     label: "Email",
     description: "Sent to the address on your account.",
-    icon: "mail-outline",
+    icon: "mail",
   },
 ];
 

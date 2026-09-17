@@ -18,7 +18,6 @@ import {
 } from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
-import { ExpandButton } from "./ExpandButton";
 
 // Kept as narrow as possible while still fitting a full time range like
 // "10:00 PM–6:00 AM" on one line at the pill's 11px font — a double shift
@@ -172,11 +171,7 @@ export function MyScheduleCard({
   return (
     <Card
       title="Your schedule"
-      headerAccessory={
-        onExpand ? (
-          <ExpandButton accessibilityLabel="Expand your schedule" onPress={onExpand} />
-        ) : undefined
-      }
+      onSeeAll={onExpand}
       detail={
         dates.length > 0 ? (
           <ScrollView
@@ -277,7 +272,7 @@ export function MyScheduleCard({
             actionLabel={onExpand ? "View full schedule" : undefined}
             actionVariant="link"
             compact
-            iconName="calendar-clear-outline"
+            iconName="calendar-clear"
             onAction={onExpand}
             title="You're not scheduled this week"
           />

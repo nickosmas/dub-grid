@@ -177,7 +177,7 @@ describe("Button", () => {
     render(
       <Button
         accessibilityLabel="Archive notification"
-        icon="archive-outline"
+        icon="archive"
         iconOnly
         onPress={vi.fn()}
       />,

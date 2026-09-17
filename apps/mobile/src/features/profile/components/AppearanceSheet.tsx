@@ -28,10 +28,10 @@ const APPEARANCE_OPTIONS: AppearanceOptionSpec[] = [
   // Outline, not the filled glyphs the settings rows use: at 30px a solid
   // shape is a heavy blob, and these three sit next to each other where the
   // outline's detail is what tells them apart at a glance.
-  { id: "light", label: "Light", icon: "sunny-outline" },
-  { id: "dark", label: "Dark", icon: "moon-outline" },
+  { id: "light", label: "Light", icon: "sunny" },
+  { id: "dark", label: "Dark", icon: "moon" },
   // The device itself, which is exactly what "System" follows.
-  { id: "system", label: "System", icon: "phone-portrait-outline" },
+  { id: "system", label: "System", icon: "phone-portrait" },
 ];
 
 const APPEARANCE_LABELS: Record<ThemePreference, string> = {

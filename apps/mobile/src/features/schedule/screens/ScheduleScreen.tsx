@@ -1730,7 +1730,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           <EmptyStateCard
             fillScreen
             body="You don't have permission to view the team schedule. Ask an admin if you need access."
-            iconName="lock-closed-outline"
+            iconName="lock-closed"
             title="Team schedule unavailable"
           />
         ) : !isTeamScope && !linkedEmployee ? (
@@ -1741,7 +1741,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 ? "Open the People tab to link your account to a staff profile. This page will update automatically once you're done."
                 : "Ask an admin to finish setting up your account. This page will update automatically once they're done."
             }
-            iconName="person-add-outline"
+            iconName="person-add"
             title="Your account isn't linked yet"
           />
         ) : !isTeamScope ? (
@@ -1830,7 +1830,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           <EmptyStateCard
             fillScreen
             body={emptyStateBody}
-            iconName="calendar-clear-outline"
+            iconName="calendar-clear"
             title={emptyStateTitle}
           />
         ) : (
@@ -1999,7 +1999,7 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
         pressed && styles.iconControlButtonPressed,
       ]}
     >
-      <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
+      <Ionicons color={mobileColors.textPrimary} name="notifications" size={20} />
       {unreadCount > 0 ? (
         <View style={styles.alertBadge}>
           <Text style={styles.alertBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
@@ -2375,7 +2375,7 @@ function PreviousShiftRow({
     <View accessibilityLabel={`Previous shift: ${summary}`} style={styles.previousShiftRow}>
       <Ionicons
         color={inverse ? "rgba(255, 255, 255, 0.74)" : mobileColors.textSubtle}
-        name="arrow-undo-outline"
+        name="arrow-undo"
         size={14}
       />
       <Text style={[styles.previousShiftText, inverse && styles.previousShiftTextInverse]}>
@@ -2405,7 +2405,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   return (
     <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
       <View style={styles.meHeroCollaboratorLabelRow}>
-        <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
+        <Ionicons color="rgba(255, 255, 255, 0.76)" name="people" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
       </View>
       <View style={styles.meHeroAvatarStack}>
@@ -2432,7 +2432,6 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
               >
                 <Text
                   numberOfLines={1}
-                  adjustsFontSizeToFit
                   style={[styles.meHeroCollaboratorAvatarText, { color: avatarTone.textColor }]}
                 >
                   {getInitials(entry.employeeName)}
@@ -2489,7 +2488,7 @@ function MeHeroCard({
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
         <EmptyStateCard
-          iconName="calendar-outline"
+          iconName="calendar"
           title="Nothing scheduled this week"
           body="Your upcoming shifts will appear here once published."
         />
@@ -2595,14 +2594,14 @@ function MeHeroCard({
         <View style={styles.meHeroContextGroup}>
           {focusAreaName ? (
             <View style={styles.meHeroAreaRow}>
-              <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
+              <Ionicons color="rgba(255, 255, 255, 0.82)" name="location" size={18} />
               <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
             </View>
           ) : null}
           {timeRange ? (
             <View style={styles.meHeroScheduleRow}>
               <View style={styles.meHeroTimeRow}>
-                <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
+                <Ionicons color="rgba(255, 255, 255, 0.82)" name="time" size={24} />
                 <Text style={styles.meHeroTimeText}>{timeRange}</Text>
               </View>
               {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
@@ -3107,7 +3106,7 @@ function OpenShiftsSection({
           </Text>
           {!hasSplitSegments && timeRange ? (
             <View style={styles.scheduleRowTime}>
-              <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
+              <Ionicons color={mobileColors.textMuted} name="time" size={18} />
               <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
             </View>
           ) : null}
@@ -3140,9 +3139,7 @@ function OpenShiftsSection({
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
             label="Volunteer"
-            leadingAccessory={
-              <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
-            }
+            leadingAccessory={<Ionicons color={mobileColors.brand} name="add-circle" size={18} />}
             loading={isVolunteerLoading}
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
@@ -3196,7 +3193,7 @@ function OpenShiftsSection({
         ) : null}
         {timeRange ? (
           <View style={styles.scheduleRowTime}>
-            <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
+            <Ionicons color={mobileColors.textMuted} name="time" size={18} />
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
@@ -3216,7 +3213,7 @@ function OpenShiftsSection({
         ) : null}
         {timeRange ? (
           <View style={styles.scheduleRowTime}>
-            <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
+            <Ionicons color={mobileColors.textMuted} name="time" size={18} />
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
@@ -3232,7 +3229,7 @@ function OpenShiftsSection({
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}
-              name={isPendingVolunteerRequest ? "hourglass-outline" : "add-circle-outline"}
+              name={isPendingVolunteerRequest ? "hourglass" : "add-circle"}
               size={18}
             />
           }
@@ -3428,7 +3425,6 @@ function ShiftCoverRequestsSection({
                   >
                     <Text
                       numberOfLines={1}
-                      adjustsFontSizeToFit
                       maxFontSizeMultiplier={MAX_FONT_SCALE}
                       style={[styles.requestAvatarText, { color: avatarTone.textColor }]}
                     >
@@ -3456,7 +3452,7 @@ function ShiftCoverRequestsSection({
               ) : null}
               {timeRange ? (
                 <View style={styles.scheduleRowTime}>
-                  <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
+                  <Ionicons color={mobileColors.textMuted} name="time" size={18} />
                   <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
                 </View>
               ) : null}
@@ -3532,7 +3528,6 @@ function TeamShiftMemberRow({
       >
         <Text
           numberOfLines={1}
-          adjustsFontSizeToFit
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
         >
