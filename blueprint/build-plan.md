@@ -323,7 +323,7 @@
       from the toolbar. The control likely reads stale state set before publish
       completes; the fix should make the banner's control reflect current
       state instead of requiring a full close/reopen.
-- [ ] 28. **Fix schedule page double-fetching published date ranges** - on every
+- [x] 28. **Fix schedule page double-fetching published date ranges** - on every
       schedule page mount, `fetchPublishedDateRanges` fires twice: once inside
       `loadSchedule()`'s initial `Promise.all`, and again from a separate
       `useEffect` that unconditionally calls `refetchPublishedRanges` whenever

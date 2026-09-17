@@ -1059,6 +1059,10 @@ function SchedulerContent() {
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
   const draftCheckStarted = useRef(false);
+  // The org + window the published ranges have already been fetched for, so the
+  // window-change effect below doesn't re-request what the initial load just
+  // fetched inside its own Promise.all (build plan item 28).
+  const publishedRangesWindowRef = useRef<string | null>(null);
   const initialLoadUsedEditPerms = useRef(false);
   const prevOrgIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1067,6 +1071,7 @@ function SchedulerContent() {
       prevOrgIdRef.current = org.id;
       scheduleLoadStarted.current = false;
       draftCheckStarted.current = false;
+      publishedRangesWindowRef.current = null;
       setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
       setPublicationRangeState(beginPublicationRangeLoad());
     }
@@ -1074,6 +1079,10 @@ function SchedulerContent() {
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
+    // Claim this window before the fetch below runs, so the window-change
+    // effect treats the initial load as the fetch for it rather than issuing
+    // a second, identical request on every mount.
+    publishedRangesWindowRef.current = `${orgId}|${defaultShiftFetchStart}|${defaultShiftFetchEnd}`;
 
     // Paint the previous visit's grid immediately while the fetch below
     // refreshes it. Coming back to /schedule otherwise blocked on refetching
@@ -2359,9 +2368,20 @@ function SchedulerContent() {
   }, [org, shiftFetchEnd, shiftFetchStart]);
   refetchPublishedRangesRef.current = refetchPublishedRanges;
 
+  // Refetch the published ranges when the window (or org) genuinely changes.
+  // This used to run unconditionally on mount as well, duplicating the fetch
+  // the initial load had already issued for the same window.
   useEffect(() => {
+    if (!org) {
+      publishedRangesWindowRef.current = null;
+      void refetchPublishedRanges();
+      return;
+    }
+    const windowKey = `${org.id}|${shiftFetchStart}|${shiftFetchEnd}`;
+    if (publishedRangesWindowRef.current === windowKey) return;
+    publishedRangesWindowRef.current = windowKey;
     void refetchPublishedRanges();
-  }, [refetchPublishedRanges]);
+  }, [org, shiftFetchStart, shiftFetchEnd, refetchPublishedRanges]);
 
   // Register focus areas as sub-nav items for the mobile bottom sheet
   const focusAreaSubNav: SubNavItem[] = useMemo(
