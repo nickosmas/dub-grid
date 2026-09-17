@@ -312,7 +312,7 @@
           authorization-gate redirect; the portal's own views (dashboard, org
           list, security, audit log, etc.) are source-reviewed only. Add live
           Gridmaster-authenticated browser coverage for the portal itself.
-- [ ] 26. **Fix staff pages double load** - the Staff / People page loads its
+- [x] 26. **Fix staff pages double load** - the Staff / People page loads its
       data twice on entry (duplicate fetch and/or duplicate render), wasting a
       round trip and causing a visible re-render. Find the duplicate trigger
       (effect re-run, duplicate query key, non-memoized fetch call) and remove
