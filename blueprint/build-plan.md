@@ -383,7 +383,7 @@
       at the earlier "awaiting approval" step. May be intentional - needs a
       product decision, then a matching fix in `events.ts`'s
       `shift_request_resolved` case.
-- [ ] 35. **Share one realtime channel for mobile shift-request screens** -
+- [x] 35. **Share one realtime channel for mobile shift-request screens** -
       `useMobileShiftRequestsRealtime` deliberately does not reference-count
       (unlike `useOrgRealtimeInvalidation` on web), so the Home, Requests, and
       Team tabs each mount their own `shift_requests` Supabase channel and
