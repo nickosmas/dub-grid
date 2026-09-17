@@ -958,7 +958,17 @@ export default function ShiftDetailScreen() {
     setSelectedTargetShift(null);
   }
 
-  const requestSheetFooter = (
+  // The sheets draw a footer shell (hairline, padding) whenever a footer is
+  // passed, so an always-truthy fragment left an empty band under the body
+  // until a choice was made. Only hand the footer over when it has content.
+  const hasRequestSheetFooter =
+    !!createRequestError ||
+    (requestMode === "swap" && !!selectedTargetEntry && !!shiftEntry) ||
+    (requestMode === "coverage" &&
+      !!shiftEntry &&
+      ((coverageRequestType === "pickup" && !!selectedTargetedPickupEntry) ||
+        (coverageRequestType === "calloff" && !!selectedCalloffAbsenceType)));
+  const requestSheetFooter = hasRequestSheetFooter ? (
     <>
       {createRequestError ? <InlineError message={createRequestError} /> : null}
       {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
@@ -1033,7 +1043,7 @@ export default function ShiftDetailScreen() {
         </SheetActions>
       ) : null}
     </>
-  );
+  ) : undefined;
   const requestSheetBody = (
     <View style={styles.modalContent}>
       {actionSegmentOptions.length > 1 && shiftEntry ? (
