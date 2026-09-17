@@ -443,7 +443,7 @@
         schedule, first-paint stagger and period crossfade through
         `useMotionPreference`, haptics on the period toggle, and a skeleton that
         reuses the new styles.
-  - [ ] 38c. **Request flows without friction** - swap target selection moves
+  - [x] 38c. **Request flows without friction** - swap target selection moves
         to a full-page modal route (`presentation: "modal"`) with its own
         header and native swipe-down; the sheet keeps drop and pickup; the
         confirmation step remains for call-off only; the Requests tab uses the
