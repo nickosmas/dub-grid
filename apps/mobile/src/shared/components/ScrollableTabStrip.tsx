@@ -6,8 +6,9 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
 import { SkeletonBlock } from "./skeleton";
 import {
-  mobileRadii,
+  mobileControl,
   mobilePillOverflow,
+  mobileRadii,
   mobileSpace,
   mobileSpacing,
   mobileText,
@@ -224,7 +225,7 @@ export function ScrollableTabStripSkeleton({
 }
 
 /** The pill's `minHeight`, which is also its resting height at one line. */
-const SKELETON_TAB_HEIGHT = 36;
+const SKELETON_TAB_HEIGHT = mobileControl.sm;
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
@@ -245,7 +246,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
-      minHeight: 36,
+      minHeight: mobileControl.sm,
       maxWidth: 180,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,

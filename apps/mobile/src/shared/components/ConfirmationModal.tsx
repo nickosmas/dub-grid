@@ -20,7 +20,13 @@ import { registerModalPresentation } from "../lib/modal-presentation";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMotionPreference } from "../motion/useMotionPreference";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import {
+  mobileControl,
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  type MobileColors,
+} from "../theme/tokens";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 type ConfirmationTone = Extract<
@@ -46,30 +52,27 @@ const CONFIRMATION_ICON_NAME: Record<ConfirmationTone, keyof typeof Ionicons.gly
 };
 
 /**
- * Background/border/icon colour for the tone badge, mirroring
- * `StatusBanner`'s tone-to-colour mapping (`dangerSoft`/`dangerBorder`/
- * `dangerText`, etc.) rather than inventing a second one. `neutral` has no
- * matching semantic-soft token in the palette, so it composes the same
- * control-surface tokens `Button`'s own neutral tone already uses.
+ * Background/icon colour for the tone badge, mirroring `StatusBanner`'s
+ * tone-to-colour mapping (`dangerSoft`/`dangerText`, etc.) rather than
+ * inventing a second one. `neutral` has no matching semantic-soft token in the
+ * palette, so it composes the same control-surface tokens `Button`'s own
+ * neutral tone already uses. Fill only: the badge carries no stroke.
  */
 function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileColors) {
   switch (tone) {
     case "danger":
       return {
         background: mobileColors.dangerSoft,
-        border: mobileColors.dangerBorder,
         icon: mobileColors.dangerText,
       };
     case "warning":
       return {
         background: mobileColors.warningSoft,
-        border: mobileColors.warningBorder,
         icon: mobileColors.warningText,
       };
     case "neutral":
       return {
         background: mobileColors.controlNeutralBg,
-        border: mobileColors.borderSubtle,
         icon: mobileColors.textSecondary,
       };
     case "primary":
@@ -77,7 +80,6 @@ function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileC
     default:
       return {
         background: mobileColors.brandSoft,
-        border: mobileColors.brandBorder,
         icon: mobileColors.brand,
       };
   }
@@ -216,12 +218,7 @@ export function ConfirmationModal({
           >
             <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
               <View style={styles.header}>
-                <View
-                  style={[
-                    styles.iconBadge,
-                    { backgroundColor: iconColors.background, borderColor: iconColors.border },
-                  ]}
-                >
+                <View style={[styles.iconBadge, { backgroundColor: iconColors.background }]}>
                   <Ionicons
                     color={iconColors.icon}
                     name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
@@ -316,11 +313,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       paddingTop: mobileSpace["2xl"],
       paddingBottom: mobileSpace.sm,
     },
+    // Fill only, like every badge: a stroke around a soft fill read as an
+    // outline sticker on the card.
     iconBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      borderWidth: 1,
+      width: mobileControl.md,
+      height: mobileControl.md,
+      borderRadius: mobileRadii.pill,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: mobileSpace.md,
@@ -336,9 +334,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
     // No top divider: unlike a sheet, this card has no scrollable body long
     // enough to need a permanent "more below" cue, and the mockup this
     // redesign matches separates the actions with space alone.
+    // The body ends 16 above and the footer adds 8: 24 above the actions, so
+    // 24 below them too, per the popup-footer symmetry rule.
     footer: {
       paddingHorizontal: mobileSpace.xl,
       paddingTop: mobileSpace.sm,
-      paddingBottom: mobileSpace.xl,
+      paddingBottom: mobileSpace["2xl"],
     },
   });

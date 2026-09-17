@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { mobileSpace } from "../../../../../../../../../tmp/dg-1789654574/apps/mobile/src/shared/theme/tokens";
+import { mobileSpace } from "../../../shared/theme/tokens";
 import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
