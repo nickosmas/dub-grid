@@ -716,6 +716,86 @@ describe("dispatchNotificationEvent", () => {
     );
   });
 
+  // Build plan 34: the swap partner is affected as directly as the requester.
+  it.each([
+    [true, "shift_request_approved", "Swap approved", "was approved"],
+    [false, "shift_request_rejected", "Swap declined", "was declined"],
+  ] as const)(
+    "notifies the swap partner at final resolution (approved=%s)",
+    async (approved, type, title, phrase) => {
+      fromMock.mockImplementation((table: string) => {
+        if (table === "shift_requests") {
+          return makeShiftRequestBuilder({
+            status: approved ? "approved" : "rejected",
+            type: "swap",
+            requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+            target: { user_id: "partner-user", first_name: "Ada", last_name: "Ng" },
+          });
+        }
+        return makeSingleRowBuilder(null);
+      });
+
+      await dispatchNotificationEvent("admin-user", {
+        action: "shift_request_resolved",
+        orgId: "org-1",
+        requestId: "req-1",
+        requestType: "swap",
+        approved,
+        adminNote: "Covered",
+      });
+
+      expect(sendNotification).toHaveBeenCalledTimes(2);
+      expect(sendNotification).toHaveBeenCalledWith(
+        "requester-user",
+        "org-1",
+        type,
+        expect.stringMatching(/^Request/),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(sendNotification).toHaveBeenCalledWith(
+        "partner-user",
+        "org-1",
+        type,
+        title,
+        `The swap with Sam Lee ${phrase}. Note: Covered`,
+        expect.objectContaining({ requestId: "req-1", requestType: "swap", approved }),
+      );
+    },
+  );
+
+  it("does not notify the other party when they are the actor", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "approved",
+          type: "swap",
+          requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+          target: { user_id: "partner-user", first_name: "Ada", last_name: "Ng" },
+        });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("partner-user", {
+      action: "shift_request_resolved",
+      orgId: "org-1",
+      requestId: "req-1",
+      requestType: "swap",
+      approved: true,
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "requester-user",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it("skips the claimant notification when there is no previousTargetEmpId", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {

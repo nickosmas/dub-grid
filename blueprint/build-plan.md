@@ -382,7 +382,7 @@
       against real data. Reads structurally sound on inspection (locks target
       rows, matches shift/job segments positionally) but needs an actual
       publish-with-staffed-calloff-pickup smoke test before/soon after launch.
-- [ ] 34. **Decide whether swap-request final approval should notify the swap
+- [x] 34. **Decide whether swap-request final approval should notify the swap
       partner** - `resolve_shift_request`'s notification only ever messages
       the original requester; for `swap`-type requests, the target employee
       who accepted the swap (and is directly affected by the resulting
@@ -398,10 +398,8 @@
       a boundary. Apply it generally: whenever `requestInfo.targetUserId`
       exists and differs from both the requester and the actor, send a
       target-worded notification ("The swap with {requesterName} was
-      approved/declined.") alongside the requester's. _Not implemented
-      here_ because `events.ts` had uncommitted edits from another session
-      adding the pickup-rejection claimant notification to this exact
-      `case`; that work is the natural place to fold this in.
+      approved/declined.") alongside the requester's. Implemented once
+      that session's claimant work landed.
 - [x] 35. **Share one realtime channel for mobile shift-request screens** -
       `useMobileShiftRequestsRealtime` deliberately does not reference-count
       (unlike `useOrgRealtimeInvalidation` on web), so the Home, Requests, and

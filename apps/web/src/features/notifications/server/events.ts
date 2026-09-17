@@ -661,6 +661,35 @@ async function dispatchNotificationEventInternal(
         );
       }
 
+      // The other party is affected just as directly as the requester: a swap
+      // partner's schedule changes on approval and their agreed swap falls
+      // through on rejection, and an approved pickup's claimant now holds the
+      // shift. They already hear about the earlier "awaiting approval" step,
+      // so silence at the final one was a gap, not a boundary (build plan 34).
+      const { targetUserId } = requestInfo;
+      if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
+        const status = event.approved ? "approved" : "declined";
+        const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+        await sendNotification(
+          targetUserId,
+          event.orgId,
+          event.approved
+            ? "shift_request_approved"
+            : ("shift_request_rejected" as NotificationType),
+          `${capitalize(typeLabel)} ${status}`,
+          requestType === "swap"
+            ? `The swap with ${requestInfo.requesterName} was ${status}.${noteText}`
+            : `Your claim on ${requestInfo.requesterName}'s ${typeLabel} request was ${status}.${noteText}`,
+          {
+            requestId: event.requestId,
+            requestType,
+            approved: event.approved,
+            action: "view_request",
+            tab: "mine",
+          },
+        );
+      }
+
       // Rejecting a claimed pickup reopens it and clears target_emp_id, so
       // requestInfo's target is already gone by the time this runs. The
       // requester notification above tells the original poster nothing
