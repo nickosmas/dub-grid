@@ -6,7 +6,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { useNetworkRecovery } from "../../../shared/providers/NetworkRecoveryProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 
 /**
  * Recovery surface for a signed-in session whose required bootstrap data could
@@ -70,5 +75,5 @@ const createStyles = (colors: MobileColors) =>
       marginTop: 12,
       textAlign: "center",
     },
-    actions: { gap: 12, marginTop: 28, width: "100%" },
+    actions: { gap: 12, marginTop: mobileSpace["3xl"], width: "100%" },
   });

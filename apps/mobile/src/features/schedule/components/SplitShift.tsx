@@ -12,6 +12,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
@@ -354,9 +355,9 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 5,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      gap: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
     badgeCompact: {
       paddingHorizontal: 8,
@@ -372,13 +373,13 @@ const createStyles = (mobileColors: MobileColors) =>
       textTransform: "none",
     },
     badgeTextCompact: {
-      fontSize: 11,
+      fontSize: mobileText.badge.fontSize,
     },
     badgeTextInverse: {
       color: mobileColors.textInverse,
     },
     segmentList: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     segmentListHero: {
       gap: 12,
@@ -388,10 +389,10 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 12,
     },
     segmentBlock: {
-      gap: 5,
+      gap: mobileSpace.xs,
     },
     segmentBlockHero: {
-      gap: 6,
+      gap: mobileSpace.sm,
       width: "100%",
     },
     segmentBlockDetail: {
@@ -409,7 +410,7 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentDivider: {
       borderTopColor: mobileColors.borderSubtle,
       borderTopWidth: 1,
-      paddingTop: 10,
+      paddingTop: mobileSpace.md,
     },
     segmentDividerHero: {
       borderTopColor: "rgba(255, 255, 255, 0.18)",
@@ -432,7 +433,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     segmentHeroBody: {
       width: "100%",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     segmentHeroShiftGroup: {
       gap: 4,
@@ -441,7 +442,7 @@ const createStyles = (mobileColors: MobileColors) =>
       width: "100%",
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     segmentHeroTitleText: {
       flexShrink: 1,
@@ -453,7 +454,7 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentHeroFocusRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     segmentHeroContextGroup: {
       gap: 8,
@@ -517,7 +518,7 @@ const createStyles = (mobileColors: MobileColors) =>
     segmentFocusRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     segmentContextGroup: {
       gap: 8,

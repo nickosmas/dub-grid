@@ -658,13 +658,11 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 24,
     },
     header: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     title: {
-      ...mobileText.heroMetric,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
-      fontSize: 30,
-      lineHeight: 36,
     },
     subtitle: {
       ...mobileText.body,

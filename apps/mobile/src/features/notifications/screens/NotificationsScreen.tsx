@@ -51,6 +51,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -537,8 +538,8 @@ function NotificationCard({ notification, pending, onPress, onArchive }: Notific
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     headerArea: {
-      gap: 10,
-      paddingBottom: 10,
+      gap: mobileSpace.md,
+      paddingBottom: mobileSpace.md,
     },
     actionRow: {
       flexDirection: "row",
@@ -551,13 +552,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     list: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     alertCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       padding: 16,
-      gap: 10,
+      gap: mobileSpace.md,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       ...mobileElevation("card", isDark),
@@ -571,7 +572,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     alertTitleRow: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 10,
+      gap: mobileSpace.md,
       flex: 1,
     },
     titleColumn: {
@@ -582,7 +583,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "center",
       flexWrap: "wrap",
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     alertIconFrame: {
       width: 32,
@@ -637,8 +638,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobilePillOverflow.displayText,
       color: mobileColors.textMuted,
       backgroundColor: mobileColors.surfaceSecondary,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
       borderRadius: 999,
     },
     cardActionsLead: {
@@ -648,15 +649,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardActions: {
       flexDirection: "row",
       alignItems: "center",
-      marginLeft: 42,
-      paddingTop: 10,
+      marginLeft: mobileSpace["4xl"],
+      paddingTop: mobileSpace.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
     },
     webOnlyHint: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: mobileRadii.pill,

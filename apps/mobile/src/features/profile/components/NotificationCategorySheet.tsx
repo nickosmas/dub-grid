@@ -9,6 +9,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { ProfileIcon } from "./ProfilePrimitives";
 
@@ -128,7 +129,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 12,
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     rowDivider: {
       borderBottomColor: mobileColors.borderSubtle,
@@ -136,7 +137,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     copy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     label: {

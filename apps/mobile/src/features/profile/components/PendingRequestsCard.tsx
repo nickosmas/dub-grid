@@ -4,7 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 
 const TYPE_LABELS: Record<MobileProfileChangeRequest["type"], string> = {
   profile_update: "Name change",
@@ -90,7 +95,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.warningBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: 14,
+      gap: mobileSpace.md,
       padding: 16,
     },
     header: {
@@ -115,18 +120,18 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textMuted,
     },
     list: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     row: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.border,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      gap: 10,
+      gap: mobileSpace.md,
       padding: 12,
     },
     rowCopy: {
-      gap: 3,
+      gap: mobileSpace.xs,
     },
     rowTitle: {
       ...mobileText.cardTitle,

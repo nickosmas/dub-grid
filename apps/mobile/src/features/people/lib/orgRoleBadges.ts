@@ -8,6 +8,7 @@ import {
 import {
   mobileRadii,
   mobilePillOverflow,
+  mobileSpace,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -66,7 +67,7 @@ export function getMobileOrgRoleBadge(
         borderWidth: 1,
         flexDirection: "row" as const,
         gap: 4,
-        paddingHorizontal: 9,
+        paddingHorizontal: mobileSpace.sm,
         paddingVertical: 4,
       },
       textStyle: {
@@ -90,7 +91,7 @@ export function getMobileOrgRoleBadge(
       borderWidth: 1,
       flexDirection: "row" as const,
       gap: 4,
-      paddingHorizontal: 9,
+      paddingHorizontal: mobileSpace.sm,
       paddingVertical: 4,
     },
     textStyle: {

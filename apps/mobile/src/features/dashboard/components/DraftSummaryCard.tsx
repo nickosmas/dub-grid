@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileText, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 import { CountBadge } from "./CountBadge";
 
 export type DraftSummary = NonNullable<MobileDashboardResponse["metrics"]["draftSummary"]>;
@@ -60,7 +60,7 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       borderLeftWidth: 2,
       borderLeftColor: mobileColors.warningBorder,
-      paddingLeft: 10,
+      paddingLeft: mobileSpace.md,
     },
     label: {
       ...mobileText.label,

@@ -131,17 +131,13 @@ const createStyles = (mobileColors: MobileColors) =>
       width: "100%",
     },
     title: {
-      ...mobileText.heroMetric,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
-      fontSize: 26,
-      lineHeight: 32,
       textAlign: "center",
     },
     body: {
       ...mobileText.body,
       color: mobileColors.textMuted,
-      fontSize: 15,
-      lineHeight: 22,
       textAlign: "center",
     },
   });

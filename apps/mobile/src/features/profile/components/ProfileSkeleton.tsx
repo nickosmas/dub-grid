@@ -14,6 +14,7 @@ import {
   mobileRadii,
   mobileSpacing,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import type { ProfileHeroAlign } from "./ProfilePrimitives";
 
@@ -219,7 +220,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpacing.sectionGap,
     },
     hero: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
     heroCentered: {
@@ -235,11 +236,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     heroCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     heroTitleRow: {
@@ -252,14 +253,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "stretch",
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     heroDetailCentered: {
       justifyContent: "center",
     },
     heroMetaItem: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 120,
     },
     heroMetaItemCentered: {
@@ -268,14 +269,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     quickActions: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
       paddingBottom: 16,
     },
     quickActionsCentered: {
       justifyContent: "center",
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     list: {
       backgroundColor: mobileColors.surface,
@@ -309,7 +310,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
   });

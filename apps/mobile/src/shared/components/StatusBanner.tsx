@@ -4,7 +4,13 @@ import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { MAX_FONT_SCALE, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  MAX_FONT_SCALE,
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
@@ -199,7 +205,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       padding: 16,
-      gap: 14,
+      gap: mobileSpace.md,
     },
     copyRow: {
       flexDirection: "row",
@@ -234,7 +240,7 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
     },
     copy: {
-      gap: 6,
+      gap: mobileSpace.sm,
       alignItems: "center",
     },
     actionRow: {

@@ -171,12 +171,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: mobileSpace["2xl"],
-    paddingTop: 72,
+    // Clears the wordmark row above the form: two ramp steps, not a number.
+    paddingTop: mobileSpace["5xl"] + mobileSpace["2xl"],
   },
   column: {
     width: "100%",
     maxWidth: MAX_COLUMN_WIDTH,
-    gap: 36,
+    gap: mobileSpace["4xl"],
   },
   stage: {
     gap: mobileSpace["2xl"],

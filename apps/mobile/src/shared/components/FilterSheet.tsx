@@ -222,7 +222,7 @@ const createStyles = (mobileColors: MobileColors) =>
       includeFontPadding: false,
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     sectionTitle: {
       ...mobileText.label,
@@ -273,7 +273,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     selectionRowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     selectionRowTitle: {
       ...mobileText.body,

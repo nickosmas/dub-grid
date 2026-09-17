@@ -12,6 +12,8 @@ const tester = new RuleTester({
 tester.run("no-raw-mobile-metrics", noRawMobileMetrics, {
   valid: [
     "const s = { padding: 16, gap: 8, marginTop: -4, paddingHorizontal: 0 };",
+    // A 1pt optical nudge is alignment, not spacing.
+    "const s = { marginTop: 1, gap: -1 };",
     "const s = { padding: mobileSpace.lg, ...mobileText.body };",
     "const s = { width: 46, height: 10, borderRadius: 6, top: 14 };",
     'const s = { ["padding"]: 10 };',

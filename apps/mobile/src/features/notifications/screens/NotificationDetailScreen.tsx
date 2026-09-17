@@ -33,6 +33,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -356,7 +357,7 @@ export default function NotificationDetailScreen() {
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     container: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingBottom: 24,
     },
     header: {
@@ -398,7 +399,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       gap: 8,
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: mobileSpace.md,
       borderRadius: mobileRadii.control,
       backgroundColor: mobileColors.surfaceMuted,
     },
@@ -419,7 +420,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     metadataCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      padding: 14,
+      padding: mobileSpace.md,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       gap: 8,
@@ -454,9 +455,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     actionButton: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: mobileSpace.sm,
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: mobileSpace.md,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       borderColor: mobileColors.border,

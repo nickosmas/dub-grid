@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { mobileSpace } from "../../../../../../../../../tmp/dg-1789654574/apps/mobile/src/shared/theme/tokens";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
@@ -816,7 +817,7 @@ function EditPanel({
 const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: mobileSpace.md,
   },
   actionButton: {
     flex: 1,

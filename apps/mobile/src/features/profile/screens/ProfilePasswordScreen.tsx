@@ -391,7 +391,7 @@ const createStyles = (mobileColors: MobileColors) =>
     passwordStrengthHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       justifyContent: "space-between",
     },
     passwordStrengthTitle: {
@@ -411,7 +411,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.successText,
     },
     passwordHintList: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     passwordHintRow: {
       alignItems: "center",

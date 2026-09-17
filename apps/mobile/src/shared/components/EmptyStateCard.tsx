@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { MAX_FONT_SCALE, mobileText, type MobileColors } from "../theme/tokens";
+import { MAX_FONT_SCALE, mobileText, type MobileColors, mobileSpace } from "../theme/tokens";
 
 /**
  * Empty states are centred: an icon badge, then the copy, then the way out.
@@ -125,7 +125,7 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     copy: {
-      gap: 6,
+      gap: mobileSpace.sm,
       alignItems: "center",
     },
     title: {

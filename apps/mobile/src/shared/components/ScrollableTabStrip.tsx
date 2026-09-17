@@ -238,7 +238,7 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: mobileSpace.sm,
       paddingHorizontal: getScreenGutter(),
-      paddingVertical: 2,
+      paddingVertical: mobileSpace.xs,
     },
     tab: {
       ...mobilePillOverflow.interactiveContainer,
@@ -247,7 +247,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.sm,
       minHeight: 36,
       maxWidth: 180,
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
       borderRadius: mobileRadii.pill,
       // Same hairline the shared SegmentedControl carries: the neutral fill
@@ -275,8 +275,8 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     badge: {
       minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.surface,
     },

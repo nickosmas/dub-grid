@@ -8,7 +8,7 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { type MobileColors } from "../../../shared/theme/tokens";
+import { type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 
 /** `personAvatar` in PeopleScreen. */
 const AVATAR_SIZE = 44;
@@ -62,7 +62,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     copy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
   });

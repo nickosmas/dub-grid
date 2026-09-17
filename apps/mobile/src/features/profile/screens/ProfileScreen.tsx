@@ -826,7 +826,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     orgOptionCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     orgOptionName: {

@@ -367,7 +367,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dayStrip: {
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       overflow: "hidden",
     },
     // Borderless, matching MyScheduleCard's day cards.
@@ -382,12 +382,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 124,
     },
     expandedPage: {
-      gap: 14,
+      gap: mobileSpace.md,
     },
     filterHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
       justifyContent: "space-between",
       paddingBottom: 4,
       paddingTop: 12,

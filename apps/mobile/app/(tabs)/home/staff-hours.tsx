@@ -16,7 +16,7 @@ import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
+import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
 type SortMode = "overtime" | "alphabetical";
 const UNASSIGNED_LABEL = "Unassigned";
@@ -168,7 +168,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 10,
+      gap: mobileSpace.md,
       paddingTop: 12,
       paddingBottom: 4,
     },

@@ -220,8 +220,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     badge: {
       minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.surface,
     },

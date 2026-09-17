@@ -13,6 +13,7 @@ import {
   mobileRadii,
   mobileSpacing,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 
 /** `ProfileTextInput`'s field height. */
@@ -77,19 +78,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpacing.sectionGap,
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     panel: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: 14,
+      gap: mobileSpace.md,
       padding: 16,
       ...mobileElevation("card", isDark),
     },
     field: {
-      gap: 7,
+      gap: mobileSpace.sm,
     },
     chipRow: {
       flexDirection: "row",

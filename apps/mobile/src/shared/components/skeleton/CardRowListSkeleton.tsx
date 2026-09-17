@@ -99,7 +99,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.skeletonBase,
       borderRadius: 999,
       height: 10,
-      marginTop: 6,
+      marginTop: mobileSpace.sm,
       width: 10,
     },
     actions: {

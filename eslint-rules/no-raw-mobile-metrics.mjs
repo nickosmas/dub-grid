@@ -12,19 +12,21 @@
  *  - a numeric `fontSize`: every size lives in `mobileTypographyTokens.text`,
  *    reached through `mobileText.<variant>` or `<AppText variant>`;
  *  - a numeric `padding*`, `margin*`, `gap`, `rowGap` or `columnGap` whose
- *    absolute value is not 0 and not on the ramp. On-ramp literals pass: the
- *    rule is about the grid, and `mobileSpace.md` versus `12` is a readability
- *    choice the migration (38d) makes file by file.
+ *    absolute value is not 0, not 1, and not on the ramp. On-ramp literals
+ *    pass: the rule is about the grid, and `mobileSpace.md` versus `12` is a
+ *    readability choice the migration (38d) makes file by file. A 1pt value
+ *    is an optical nudge (an icon dropped a point to sit on the text's
+ *    baseline, a dot centred on a hairline), not a spacing decision, and it
+ *    passes for the same reason 0 does.
  *
  * Deliberately not flagged: `width`, `height`, `top`, `left`, radii, border
  * widths and icon sizes. Those have their own tokens where it matters
  * (`mobileControl`, `mobileRadii`) and their own reasons to be exact.
  *
- * Wired as a warning until the schedule and requests screens are migrated;
- * the report per file is that migration's checklist.
+ * Wired as an error since the 38d migration cleared the last literal.
  */
 
-const SPACING_RAMP = new Set([0, 4, 8, 12, 16, 20, 24, 32, 40, 48]);
+const SPACING_RAMP = new Set([0, 1, 4, 8, 12, 16, 20, 24, 32, 40, 48]);
 const SPACING_KEY = /^(padding|margin)[A-Za-z]*$|^(gap|rowGap|columnGap)$/;
 
 function numericValue(node) {

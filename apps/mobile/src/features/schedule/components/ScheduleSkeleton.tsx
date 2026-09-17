@@ -9,7 +9,7 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileRadii, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
 
 /**
@@ -158,7 +158,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     teamMemberCopy: {
       flex: 1,
-      gap: 6,
+      gap: mobileSpace.sm,
       minWidth: 0,
     },
     rowArrow: {

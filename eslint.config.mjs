@@ -185,10 +185,9 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // Mobile styles draw from the token ramps. A warning until the schedule
-    // and requests screens are migrated (build plan 38d), whose per-file
-    // counts this rule reports; then it becomes an error. The illustration
-    // files are drawings, not layout, and the token module is the ramp itself.
+    // Mobile styles draw from the token ramps; the 38d migration cleared the
+    // last raw literal, so this is now enforced. The illustration files are
+    // drawings, not layout, and the token module is the ramp itself.
     files: ["apps/mobile/src/**/*.{ts,tsx}", "apps/mobile/app/**/*.{ts,tsx}"],
     ignores: [
       "apps/mobile/src/**/*.test.{ts,tsx}",
@@ -198,7 +197,7 @@ const eslintConfig = defineConfig([
     ],
     plugins: { design: designPlugin },
     rules: {
-      "design/no-raw-mobile-metrics": "warn",
+      "design/no-raw-mobile-metrics": "error",
     },
   },
   {

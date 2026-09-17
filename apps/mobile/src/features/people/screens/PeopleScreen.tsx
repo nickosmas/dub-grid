@@ -64,6 +64,7 @@ import {
   mobileRadii,
   mobileText,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -1221,7 +1222,7 @@ function PersonRow({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     sectionTitle: {
       ...mobileText.label,
@@ -1231,7 +1232,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     searchBarRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     rosterTabs: {
       // The control sizes to its own labels, so it needs a start-aligned row
@@ -1275,10 +1276,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     requestRow: {
       gap: 12,
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingVertical: mobileSpace.md,
     },
     requestCopy: {
-      gap: 3,
+      gap: mobileSpace.xs,
     },
     requestActions: {
       flexDirection: "row",
@@ -1298,7 +1299,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     personCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     personNameRow: {

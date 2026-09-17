@@ -430,6 +430,17 @@ export const mobileTypographyTokens = {
       fontSize: 14,
       lineHeight: 21,
     },
+    /**
+     * Editable text. A step above `body` so a field reads as something you
+     * type into rather than something you read; the family here is the
+     * requested one, and `mobileInputText()` decides at runtime whether a
+     * native field may name it.
+     */
+    input: {
+      fontFamily: "Inter_400Regular",
+      fontSize: 16,
+      lineHeight: 22,
+    },
     bodyStrong: {
       fontFamily: "Inter_600SemiBold",
       fontSize: 14,

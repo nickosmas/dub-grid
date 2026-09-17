@@ -59,6 +59,7 @@ import {
   mobileText,
   mobileVisiblePillBorder,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -1152,7 +1153,11 @@ export default function ShiftDetailScreen() {
 
           {isCheckingExistingRequests ? (
             <SkeletonCardSurface>
-              <SkeletonLine style={{ marginBottom: 6 }} variant="screenTitle" width="60%" />
+              <SkeletonLine
+                style={{ marginBottom: mobileSpace.sm }}
+                variant="screenTitle"
+                width="60%"
+              />
               <SkeletonLine variant="body" width="90%" />
             </SkeletonCardSurface>
           ) : null}

@@ -82,6 +82,7 @@ import {
   mobileTextWeighted,
   mobileTypography,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -1757,7 +1758,7 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsRow: {
       flexDirection: "row",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     actionButton: {
       flex: 1,
@@ -1788,7 +1789,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
     modalActionStack: {
-      gap: 10,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
   });

@@ -9,7 +9,12 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileElevation, mobileRadii, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileElevation,
+  mobileRadii,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 
 /**
  * A single alert.
@@ -66,7 +71,7 @@ export function NotificationDetailSkeleton({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     container: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingBottom: 24,
     },
     header: {
@@ -85,7 +90,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 8,
-      padding: 14,
+      padding: mobileSpace.md,
       ...mobileElevation("card", isDark),
     },
     metadataRow: {

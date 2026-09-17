@@ -243,7 +243,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 6,
+      paddingVertical: mobileSpace.sm,
     },
     iconPill: {
       width: 64,
@@ -255,7 +255,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     label: {
       ...mobileText.micro,
-      marginTop: 2,
+      marginTop: mobileSpace.xs,
     },
     labelActive: {
       color: mobileColors.brand,

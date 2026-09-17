@@ -2,7 +2,13 @@ import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import { mobileElevation, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  mobileElevation,
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+  mobileSpace,
+} from "../theme/tokens";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenBottomPadding } from "./screen-layout";
 
@@ -102,7 +108,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     card: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      padding: 18,
+      padding: mobileSpace.lg,
       gap: 12,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
@@ -114,9 +120,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       textTransform: "uppercase",
     },
     title: {
-      ...mobileText.heroMetric,
-      fontSize: 28,
-      lineHeight: 34,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
     },
     body: {

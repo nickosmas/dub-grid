@@ -35,6 +35,7 @@ import {
   mobileText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
@@ -576,17 +577,17 @@ const personLayoutStyles = StyleSheet.create({
   quickActions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: mobileSpace.md,
     justifyContent: "center",
     paddingBottom: 16,
   },
   actionStack: {
-    gap: 10,
+    gap: mobileSpace.md,
     paddingTop: 12,
   },
   actionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: mobileSpace.md,
   },
   actionRowItem: {
     flex: 1,
@@ -635,7 +636,7 @@ export function ProfileActionRow({ children }: { children: ReactNode }) {
 const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     actionsStack: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     supportingText: {
       ...mobileText.body,
@@ -656,17 +657,17 @@ export function useProfilePrimitiveStyles() {
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     hero: {
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 4,
     },
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 14,
+      gap: mobileSpace.md,
     },
     heroTopCentered: {
       flexDirection: "column",
-      gap: 14,
+      gap: mobileSpace.md,
       paddingTop: 8,
     },
     avatar: {
@@ -691,7 +692,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     // Stretched rather than flexed: in a column `flex: 1` would stretch the
@@ -701,7 +702,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "stretch",
       flexBasis: "auto",
       flexGrow: 0,
-      gap: 6,
+      gap: mobileSpace.sm,
     },
     heroTitleRow: {
       alignItems: "center",
@@ -719,8 +720,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     heroTitleCentered: {
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: mobileText.display.fontSize,
+      lineHeight: mobileText.display.lineHeight,
       textAlign: "center",
     },
     heroSubtitle: {
@@ -738,9 +739,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      gap: mobileSpace.sm,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     heroBadgeCentered: {
       alignSelf: "center",
@@ -769,7 +770,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     heroDetail: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     heroDetailCentered: {
       alignItems: "center",
@@ -777,7 +778,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroMetaItem: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 120,
     },
     heroMetaItemCentered: {
@@ -799,7 +800,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     sectionTitle: {
       ...mobileTextWeighted("label", "medium"),
@@ -829,7 +830,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: 14,
+      gap: mobileSpace.md,
       padding: 16,
       ...mobileElevation("card", isDark),
     },
@@ -861,7 +862,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     rowLabel: {
@@ -881,7 +882,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     field: {
-      gap: 7,
+      gap: mobileSpace.sm,
     },
     fieldLabel: {
       ...mobileTextWeighted("caption", "medium"),
@@ -889,15 +890,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     input: {
       ...mobileInputText("regular"),
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: mobileText.input.fontSize,
+      lineHeight: mobileText.input.lineHeight,
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       color: mobileColors.textPrimary,
       minHeight: 48,
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 12,
     },
     inputShell: {
@@ -919,7 +920,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     inputAccessory: {
       alignItems: "center",
       justifyContent: "center",
-      paddingRight: 6,
+      paddingRight: mobileSpace.sm,
     },
     inputMultiline: {
       minHeight: 96,

@@ -473,7 +473,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.borderSubtle,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      paddingHorizontal: 14,
+      paddingHorizontal: mobileSpace.md,
       paddingVertical: 12,
     },
     mfaSecretText: {

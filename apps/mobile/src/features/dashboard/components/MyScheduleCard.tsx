@@ -14,6 +14,7 @@ import {
   mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
+  mobileSpace,
 } from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
@@ -295,11 +296,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // first/last day cards still sit inset at rest; only the track between
     // them (visible while actively scrolling) is truly edge-to-edge.
     scrollView: {
-      marginHorizontal: -18,
+      marginHorizontal: -mobileSpace.lg,
     },
     scrollContent: {
       gap: DAY_CARD_GAP,
-      paddingHorizontal: 18,
+      paddingHorizontal: mobileSpace.lg,
     },
     // No box. The shift pill below already carries its own fill and edge, so a
     // hairline around the day only drew a second container inside the card:
@@ -321,24 +322,22 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     shiftPill: {
       width: PILL_WIDTH,
-      gap: 2,
+      gap: mobileSpace.xs,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
       borderRadius: PILL_RADIUS,
       borderWidth: 1,
       borderColor: mobileColors.border,
       backgroundColor: mobileColors.surface,
-      paddingHorizontal: 6,
-      paddingVertical: 6,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.sm,
     },
     shiftName: {
       ...mobileText.bodyStrong,
       color: mobileColors.textPrimary,
     },
     shiftJobName: {
-      ...mobileTextWeighted("caption", "medium"),
-      fontSize: 11,
-      lineHeight: 14,
+      ...mobileTextWeighted("badge", "medium"),
       color: mobileColors.textMuted,
       opacity: 0.85,
     },
@@ -346,10 +345,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // range like "10:00 PM–6:00 AM" fits in the pill's width without
     // ellipsizing.
     shiftTime: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("badge", "regular"),
       ...mobileTabularText,
-      fontSize: 11,
-      lineHeight: 14,
       color: mobileColors.textMuted,
     },
     emptyPill: {

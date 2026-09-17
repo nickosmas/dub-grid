@@ -401,7 +401,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     sessionCopy: {
       flex: 1,
-      gap: 3,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     sessionTitleRow: {
@@ -419,8 +419,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     sessionCurrentBadge: {
       backgroundColor: mobileColors.brand,
       borderRadius: 999,
-      paddingHorizontal: 7,
-      paddingVertical: 1,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     sessionCurrentBadgeText: {
       ...mobileTextWeighted("micro", "bold"),

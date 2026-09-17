@@ -17,17 +17,17 @@ import {
 export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     section: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     dateGroup: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     dateGroupLabel: {
       ...mobileText.bodyStrong,
       color: mobileColors.textMuted,
     },
     dateGroupItems: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     requestCard: {
       backgroundColor: mobileColors.surface,
@@ -35,12 +35,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
       padding: 16,
-      gap: 10,
+      gap: mobileSpace.md,
       ...mobileElevation("card", isDark),
     },
     openShiftCard: {
       gap: 12,
-      padding: 18,
+      padding: mobileSpace.lg,
     },
     requestCardHighlighted: {
       borderColor: mobileColors.brand,
@@ -62,7 +62,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: 10,
+      gap: mobileSpace.md,
     },
     cardIconFrame: {
       width: 32,
@@ -78,15 +78,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     titleColumn: {
       flex: 1,
       minWidth: 0,
-      gap: 10,
+      gap: mobileSpace.md,
     },
     cardActions: {
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "flex-start",
       gap: 8,
-      marginLeft: 42,
-      paddingTop: 10,
+      marginLeft: mobileSpace["4xl"],
+      paddingTop: mobileSpace.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
     },
@@ -127,7 +127,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     splitShiftPanel: {
-      gap: 10,
+      gap: mobileSpace.md,
     },
     splitShiftPanelLabel: {
       ...mobileTextWeighted("meta", "bold"),
@@ -149,8 +149,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.border,
       backgroundColor: mobileColors.surfaceSecondary,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
       alignSelf: "flex-start",
     },
     statusChipText: {
@@ -175,17 +175,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
       borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
     jobPillCompact: {
       borderRadius: mobileRadius.md,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     jobPillTextStack: {
       minWidth: 0,
-      gap: 2,
+      gap: mobileSpace.xs,
     },
     jobPillInlineTextRow: {
       flexDirection: "row",
@@ -198,8 +198,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.micro,
       includeFontPadding: false,
     },
+    // The ramp floors at `micro`; a compact eyebrow keeps that size.
     jobPillEyebrowTextCompact: {
-      fontSize: 9,
+      fontSize: mobileText.micro.fontSize,
     },
     jobPillText: {
       ...mobileText.badge,
@@ -219,12 +220,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       includeFontPadding: false,
     },
     jobPillMentoredInlineTextCompact: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: mobileText.label.fontSize,
+      lineHeight: mobileText.label.lineHeight,
     },
     jobPillTextCompact: {
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: mobileText.label.fontSize,
+      lineHeight: mobileText.label.lineHeight,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
@@ -232,7 +233,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       includeFontPadding: false,
     },
     jobPillValueTextCompact: {
-      fontSize: 12,
+      fontSize: mobileText.label.fontSize,
     },
     mentoredPill: {
       ...mobilePillOverflow.displayContainer,
@@ -243,8 +244,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.surfaceSecondary,
       minHeight: 28,
       justifyContent: "center",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
       ...mobileText.badge,
