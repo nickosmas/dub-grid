@@ -1,35 +1,27 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { useIsDarkMode, useMobileColors } from "../../providers/ThemeModeProvider";
-import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../../theme/tokens";
 import {
-  SkeletonCircle,
-  SkeletonGroup,
-  SkeletonLine,
-  SkeletonPill,
-  skeletonRows,
-} from "./primitives";
-
-/** Alert and request cards both lead with the same 32pt round icon. */
-const ICON_SIZE = 32;
-/** Their action strips both inset past that icon plus its 10pt gap. */
-const ACTION_STRIP_INSET = ICON_SIZE + 10;
+  mobileControl,
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  type MobileColors,
+} from "../../theme/tokens";
+import { SkeletonGroup, SkeletonLine, SkeletonPill, skeletonRows } from "./primitives";
 
 /**
- * The card-with-leading-icon list, shared by Alerts and Requests.
- *
- * Those two screens render structurally identical rows — a 16-radius card with
- * a 32pt icon, a title, message lines and a hairline-topped action strip inset
- * past the icon — so they get one placeholder rather than two that drift.
+ * The request card list, as the Requests tabs and a shift's own request list
+ * draw it: a 16-radius card whose header carries the title with a status
+ * chip at the far end, two lines of detail, then a hairline and one control
+ * (Volunteer, Approve). One placeholder for every tab so none drifts.
  */
 export function CardRowListSkeleton({
   rows = 4,
   showActions = true,
-  showUnreadDot = true,
 }: {
   rows?: number;
   showActions?: boolean;
-  showUnreadDot?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -40,20 +32,14 @@ export function CardRowListSkeleton({
       {skeletonRows(rows, (index) => (
         <View key={`card-row-skeleton-${index}`} style={styles.card}>
           <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <SkeletonCircle size={ICON_SIZE} />
-              <View style={styles.titleColumn}>
-                <SkeletonLine variant="cardTitle" width="72%" />
-                <SkeletonLine variant="body" width="94%" />
-                <SkeletonLine variant="body" width="58%" />
-              </View>
-            </View>
-            {showUnreadDot ? <View style={styles.unreadDot} /> : null}
+            <SkeletonLine variant="cardTitle" width={index % 2 === 0 ? "44%" : "56%"} />
+            <SkeletonPill height={24} width={88} />
           </View>
+          <SkeletonLine variant="body" width="46%" />
+          <SkeletonLine variant="meta" width="64%" />
           {showActions ? (
             <View style={styles.actions}>
-              <SkeletonPill height={36} width={104} />
-              <SkeletonPill height={36} width={88} />
+              <SkeletonPill height={mobileControl.md} width={128} />
             </View>
           ) : null}
         </View>
@@ -65,50 +51,26 @@ export function CardRowListSkeleton({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     list: {
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
     },
-    // Not `getCardSurfaceStyle`: these two lists use a flatter card than the
-    // dashboard's — same radius, but 16pt padding, a hairline in both themes,
-    // and no shadow.
     card: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      gap: mobileSpace.sm,
+      gap: mobileSpace.md,
       padding: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
     header: {
-      alignItems: "flex-start",
+      alignItems: "center",
       flexDirection: "row",
       gap: mobileSpace.md,
       justifyContent: "space-between",
     },
-    titleRow: {
-      alignItems: "flex-start",
-      flex: 1,
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-    },
-    titleColumn: {
-      flex: 1,
-      gap: 4,
-    },
-    unreadDot: {
-      backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 999,
-      height: 10,
-      marginTop: mobileSpace.sm,
-      width: 10,
-    },
     actions: {
-      alignItems: "center",
       borderTopColor: mobileColors.borderSubtle,
       borderTopWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-      marginLeft: ACTION_STRIP_INSET,
-      paddingTop: mobileSpace.sm,
+      paddingTop: mobileSpace.md,
     },
   });

@@ -19,16 +19,17 @@ import {
 
 /**
  * Row shapes the dashboard cards actually use. Each card renders one of these
- * repeatedly through `ExpandableList` at its 10pt gap.
+ * through `DashboardRowList`, a hairline between rows, and the full-page
+ * screen behind the card renders the same rows.
  */
 type DashboardRowVariant =
-  /** ActionQueueCard: leading count badge, two stacked lines. */
-  | "badgeLead"
+  /** ActionQueueCard: two stacked lines, a chevron. */
+  | "text"
   /** CoverageSectionRow: label row above a 6pt progress track. */
   | "meter"
-  /** OpenShiftsCard and StaffHoursCard: copy left, badges right. */
-  | "trailingBadges"
-  /** ActivityFeedCard: badge + timestamp header, then a body line. */
+  /** OpenShiftsCard and StaffHoursCard: two lines, a figure with its label, a chevron. */
+  | "figure"
+  /** ActivityFeedCard: a typed line over a description, nothing at the end. */
   | "feed";
 
 function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
@@ -51,44 +52,39 @@ function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
   if (variant === "feed") {
     return (
       <View style={styles.feedRow}>
-        <View style={styles.feedHeader}>
-          <SkeletonPill height={20} width={72} />
-          <SkeletonLine variant="caption" width={64} />
-        </View>
-        <SkeletonLine variant="body" width="88%" />
+        <SkeletonLine variant="body" width="82%" />
+        <SkeletonLine variant="meta" width="64%" />
       </View>
     );
   }
 
-  if (variant === "badgeLead") {
+  if (variant === "text") {
     return (
-      <View style={styles.badgeLeadRow}>
-        <SkeletonPill height={22} width={34} />
+      <View style={styles.textRow}>
         <View style={styles.rowCopy}>
-          <SkeletonLine variant="body" width="70%" />
-          <SkeletonLine variant="caption" width="45%" />
+          <SkeletonLine variant="body" width="58%" />
+          <SkeletonLine variant="caption" width="46%" />
         </View>
+        <View style={styles.chevron} />
       </View>
     );
   }
 
   return (
-    <View style={styles.trailingBadgesRow}>
+    <View style={styles.textRow}>
       <View style={styles.rowCopy}>
-        <SkeletonLine variant="body" width="76%" />
-        <SkeletonLine variant="caption" width="52%" />
+        <SkeletonLine variant="body" width="52%" />
+        <SkeletonLine variant="caption" width="66%" />
       </View>
-      <SkeletonPill height={22} width={44} />
+      <View style={styles.figure}>
+        <SkeletonLine variant="title" width={24} />
+        <SkeletonLine variant="caption" width={48} />
+      </View>
+      <View style={styles.chevron} />
     </View>
   );
 }
 
-/**
- * One dashboard card: the title above the surface, then N rows inside it.
- *
- * Mirrors the shared `Card`, whose header now sits above the white surface
- * rather than inside it.
- */
 function DashboardCardSkeleton({
   rows,
   variant,
@@ -212,9 +208,9 @@ export function DashboardSkeleton({
       <SkeletonPill height={36} width={180} />
       {showMySchedule ? <MyScheduleSkeleton /> : null}
       <DashboardHeroSkeleton />
-      {showActionQueue ? <DashboardCardSkeleton rows={3} variant="badgeLead" /> : null}
-      <DashboardCardSkeleton rows={3} variant="trailingBadges" />
-      <DashboardCardSkeleton rows={3} variant="trailingBadges" />
+      {showActionQueue ? <DashboardCardSkeleton rows={3} variant="text" /> : null}
+      <DashboardCardSkeleton rows={3} variant="figure" />
+      <DashboardCardSkeleton rows={3} variant="figure" />
       <DashboardCardSkeleton rows={3} variant="feed" />
     </SkeletonGroup>
   );
@@ -241,7 +237,7 @@ export function DashboardHeaderSkeleton() {
 export function DashboardListSkeleton({
   rows = 4,
   showFilterHeader = true,
-  variant = "trailingBadges",
+  variant = "figure",
 }: {
   rows?: number;
   showFilterHeader?: boolean;
@@ -326,18 +322,21 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // Every row variant sits at the real rows' vertical padding, so the
     // placeholder list is as tall as the list it stands in for.
-    badgeLeadRow: {
+    textRow: {
       alignItems: "center",
       flexDirection: "row",
       gap: mobileSpace.sm,
       paddingVertical: mobileListRow.paddingVertical,
     },
-    trailingBadgesRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-      justifyContent: "space-between",
-      paddingVertical: mobileListRow.paddingVertical,
+    figure: {
+      alignItems: "flex-end",
+      gap: mobileSpace.xs,
+    },
+    chevron: {
+      backgroundColor: mobileColors.skeletonBase,
+      borderRadius: 2,
+      height: 16,
+      width: 8,
     },
     meterRow: {
       gap: mobileSpace.sm,
@@ -357,12 +356,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     feedRow: {
       gap: mobileListRow.titleGap,
       paddingVertical: mobileListRow.paddingVertical,
-    },
-    feedHeader: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-      justifyContent: "space-between",
     },
     dayStrip: {
       flexDirection: "row",

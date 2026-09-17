@@ -9,7 +9,12 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpacing, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
+import {
+  mobileControl,
+  mobileSpacing,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailScreenStyles";
 
 /**
@@ -64,8 +69,8 @@ export function ShiftDetailSkeleton({
           </View>
         </View>
         <View style={detailStyles.detailActionsRow}>
-          <SkeletonPill height={48} style={styles.action} />
-          <SkeletonPill height={48} style={styles.action} />
+          <SkeletonPill height={mobileControl.md} style={styles.action} />
+          <SkeletonPill height={mobileControl.md} style={styles.action} />
         </View>
         <View style={detailStyles.detailPublishedFooter}>
           <SkeletonCircle size={16} />

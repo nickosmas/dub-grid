@@ -48,9 +48,7 @@ export default function StaffHoursExpandedScreen() {
       // A skeleton stands in for content; it must not scroll, and there is
       // nothing to pull-to-refresh while the thing is still loading.
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? (
-          <DashboardListSkeleton rows={4} variant="trailingBadges" />
-        ) : null}
+        {contentState.showSkeleton ? <DashboardListSkeleton rows={4} variant="figure" /> : null}
       </Screen>
     );
   }

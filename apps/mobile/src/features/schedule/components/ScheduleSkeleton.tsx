@@ -9,15 +9,20 @@ import {
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
+import {
+  mobileControl,
+  mobileRadii,
+  type MobileColors,
+  mobileSpace,
+} from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
 
 /**
- * The personal schedule: the rounded hero, then the upcoming-shifts card.
+ * The staff home: the rounded hero, the open-shifts strip, then the week's
+ * card of 132pt rows.
  *
- * Both surfaces are the screen's own styles, borrowed from
- * `scheduleScreenStyles`. The hero is a gradient card and the upcoming list a
- * card with 132pt rows, neither of which the old flat-bar skeleton resembled.
+ * Every surface is the screen's own style, borrowed from
+ * `scheduleScreenStyles`, so the placeholder cannot drift from the page.
  */
 export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
   const mobileColors = useMobileColors();
@@ -52,8 +57,29 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
+          <SkeletonLine variant="sectionTitle" width="40%" />
+          <SkeletonLine variant="label" width={52} />
+        </View>
+        <View style={styles.openShiftStrip}>
+          {skeletonRows(2, (index) => (
+            <View
+              key={`open-shift-skeleton-${index}`}
+              style={[scheduleStyles.openShiftCard, styles.openShiftCardFill]}
+            >
+              <SkeletonLine variant="cardTitle" width="56%" />
+              <SkeletonLine variant="body" width="48%" />
+              <SkeletonLine variant="body" width="62%" />
+              <SkeletonLine variant="meta" width="54%" />
+              <SkeletonPill height={mobileControl.md} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={scheduleStyles.upcomingSectionBlock}>
+        <View style={scheduleStyles.upcomingSectionHeader}>
           <SkeletonLine variant="sectionTitle" width="46%" />
-          <SkeletonBlock height={38} radius={12} width={92} />
+          <SkeletonPill height={mobileControl.sm} width={132} />
         </View>
         <View style={scheduleStyles.upcomingShiftsCard}>
           {skeletonRows(rows, (index) => (
@@ -79,8 +105,8 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 }
 
 /**
- * The team schedule: shift groups, each a 28-radius card of 72pt member rows
- * with the 48pt round arrow on the right.
+ * The team schedule: shift groups, each a card of 72pt member rows with a
+ * 48pt avatar, the name, and on some a status badge at the end.
  */
 export function ScheduleTeamSkeleton({
   groups = 2,
@@ -114,12 +140,11 @@ export function ScheduleTeamSkeleton({
                   rowIndex > 0 ? scheduleStyles.teamMemberRowBorder : null,
                 ]}
               >
-                <SkeletonCircle size={44} />
+                <SkeletonCircle size={48} />
                 <View style={styles.teamMemberCopy}>
-                  <SkeletonLine variant="rowTitle" width="58%" />
-                  <SkeletonLine variant="caption" width="40%" />
+                  <SkeletonLine variant="rowTitle" width={rowIndex === 1 ? "44%" : "58%"} />
                 </View>
-                <View style={styles.rowArrow} />
+                {rowIndex === 0 ? <SkeletonPill height={22} width={92} /> : null}
               </View>
             ))}
           </View>
@@ -161,10 +186,17 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.sm,
       minWidth: 0,
     },
-    rowArrow: {
-      backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 24,
-      height: 48,
-      width: 48,
+    // Two cards of the strip, the second cut by the screen edge as it is at
+    // rest; the strip does not scroll while it is a placeholder.
+    openShiftStrip: {
+      flexDirection: "row",
+      gap: mobileSpace.md,
+      overflow: "hidden",
+    },
+    openShiftCardFill: {
+      width: 320,
+      backgroundColor: mobileColors.surface,
+      borderWidth: 1,
+      borderColor: mobileColors.cardBorder,
     },
   });

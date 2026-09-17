@@ -27,7 +27,7 @@ export default function PendingApprovalsExpandedScreen() {
       // nothing to pull-to-refresh while the thing is still loading.
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
         {contentState.showSkeleton ? (
-          <DashboardListSkeleton rows={3} showFilterHeader={false} variant="badgeLead" />
+          <DashboardListSkeleton rows={3} showFilterHeader={false} variant="text" />
         ) : null}
       </Screen>
     );

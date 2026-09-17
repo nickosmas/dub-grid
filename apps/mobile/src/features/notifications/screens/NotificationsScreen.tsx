@@ -35,7 +35,7 @@ import {
   mobileQueryKeys,
 } from "../../../shared/lib/mobile-query-keys";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
-import { CardRowListSkeleton } from "../../../shared/components/skeleton";
+import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -348,7 +348,7 @@ export default function NotificationsScreen() {
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <CardRowListSkeleton rows={4} />
+          <NotificationRowListSkeleton rows={5} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
