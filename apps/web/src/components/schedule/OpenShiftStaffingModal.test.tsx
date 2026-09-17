@@ -49,6 +49,7 @@ function candidates(): OpenShiftStaffingCandidate[] {
       options: [dayOption, eveningOption],
       existingState: null,
       existingAssignments: [],
+      adjacentCheckUnverified: false,
     },
     {
       employee: employee("grace", "Grace", "part_time"),
@@ -62,6 +63,7 @@ function candidates(): OpenShiftStaffingCandidate[] {
         customEndTime: null,
       },
       existingAssignments: [{ assignmentId: 101, timeRange: { start: "15:00", end: "23:00" } }],
+      adjacentCheckUnverified: false,
     },
     {
       employee: employee("lin", "Lin"),
@@ -75,6 +77,7 @@ function candidates(): OpenShiftStaffingCandidate[] {
         customEndTime: null,
       },
       existingAssignments: [],
+      adjacentCheckUnverified: false,
     },
   ];
 }
@@ -184,5 +187,24 @@ describe("OpenShiftStaffingModal", () => {
     expect(cancel).toBeDisabled();
     expect(assign).toBeDisabled();
     expect(cancel.parentElement).toHaveClass("dg-open-shift-staffing-actions");
+  });
+});
+
+describe("OpenShiftStaffingModal adjacent-day notice", () => {
+  it("stays quiet when both neighbouring days were checked", () => {
+    renderModal();
+    expect(screen.queryByText(/could not be checked/)).not.toBeInTheDocument();
+  });
+
+  it("warns when a neighbouring day was outside the loaded window", () => {
+    renderModal({
+      candidates: candidates().map((candidate) => ({
+        ...candidate,
+        adjacentCheckUnverified: true,
+      })),
+    });
+    expect(
+      screen.getByText(/overnight overlaps with them could not be checked/),
+    ).toBeInTheDocument();
   });
 });

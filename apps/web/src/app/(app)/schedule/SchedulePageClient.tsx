@@ -5706,11 +5706,19 @@ function SchedulerContent() {
         next: staffingStateFor(employee.id, nextDateKey),
       });
     }
+    // `shifts` only holds the loaded window, so a neighbouring day outside it
+    // reads as "no shift" above. The window carries a 90-day buffer past the
+    // visible range, so this is not expected to trip for any open shift the
+    // scheduler can click; when it does, the builder flags every candidate
+    // rather than letting the adjacent-day check pass silently.
+    const isLoaded = (key: string) =>
+      key >= loadedShiftWindow.start && key <= loadedShiftWindow.end;
     return buildOpenShiftStaffingCandidates({
       openShift: staffingOpenShift,
       employees,
       scheduleByEmployeeId,
       adjacentScheduleByEmployeeId,
+      adjacentDaysLoaded: { previous: isLoaded(previousDateKey), next: isLoaded(nextDateKey) },
       assignments,
       shiftCategories,
       jobs,
@@ -5722,6 +5730,7 @@ function SchedulerContent() {
     canEditShifts,
     employees,
     jobs,
+    loadedShiftWindow,
     orgRoles,
     scheduleSortBy,
     shiftCategories,

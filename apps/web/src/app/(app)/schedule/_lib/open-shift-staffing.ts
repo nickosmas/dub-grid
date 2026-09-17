@@ -39,6 +39,11 @@ export interface OpenShiftStaffingCandidate {
   options: OpenShiftStaffingOption[];
   existingState: StaffingScheduleState | null;
   existingAssignments: OpenShiftStaffingExistingAssignment[];
+  /** True when the day before or after the open shift was not in the loaded
+   *  shift window, so the adjacent-day overlap check could not see that day.
+   *  The candidate is still offered; the scheduler is told what was not
+   *  checked instead of the check silently passing. */
+  adjacentCheckUnverified: boolean;
 }
 
 interface AdjacentStaffingSchedule {
@@ -58,6 +63,11 @@ interface BuildCandidatesInput extends StaffingContext {
   employees: Employee[];
   scheduleByEmployeeId: ReadonlyMap<string, StaffingScheduleState | null>;
   adjacentScheduleByEmployeeId?: ReadonlyMap<string, AdjacentStaffingSchedule>;
+  /** Whether the day before and after the open shift fall inside the loaded
+   *  shift window. `adjacentScheduleByEmployeeId` is read from that window, so
+   *  a day outside it looks identical to a day with no shift; this is how the
+   *  builder tells the two apart. Omitted means both are loaded. */
+  adjacentDaysLoaded?: { previous: boolean; next: boolean };
   sortBy?: "seniority" | "name";
 }
 
@@ -197,6 +207,7 @@ export function buildOpenShiftStaffingCandidates({
   employees,
   scheduleByEmployeeId,
   adjacentScheduleByEmployeeId,
+  adjacentDaysLoaded,
   sortBy = "seniority",
   ...context
 }: BuildCandidatesInput): OpenShiftStaffingCandidate[] {
@@ -204,6 +215,8 @@ export function buildOpenShiftStaffingCandidates({
     context.assignments.map((assignment) => [assignment.id, assignment]),
   );
   const options = buildOptions(openShift, context);
+  const adjacentCheckUnverified =
+    !(adjacentDaysLoaded?.previous ?? true) || !(adjacentDaysLoaded?.next ?? true);
 
   return employees
     .flatMap((employee): OpenShiftStaffingCandidate[] => {
@@ -241,6 +254,7 @@ export function buildOpenShiftStaffingCandidates({
                   assignmentId,
                   timeRange: existingAlignedRanges[index] ?? null,
                 })) ?? [],
+              adjacentCheckUnverified,
             },
           ]
         : [];

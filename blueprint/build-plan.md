@@ -360,7 +360,7 @@
       flips React state with no visible effect. Thread the publish-diff
       accessors into both views, or hide the toggle when the active view can't
       render it.
-- [ ] 32. **Harden the adjacent-day overlap check for scheduler open-shift
+- [x] 32. **Harden the adjacent-day overlap check for scheduler open-shift
       staffing** - `checkCrossDateOverlap`'s adjacent-day conflict guard
       (added with feature 22) looks up the neighboring day from the
       currently-fetched `shifts` map; if that date falls outside the loaded

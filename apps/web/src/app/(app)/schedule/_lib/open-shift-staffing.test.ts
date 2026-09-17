@@ -241,6 +241,45 @@ describe("buildOpenShiftStaffingCandidates", () => {
     expect(beforeNextDayWork.map((candidate) => candidate.employee.id)).toEqual(["available"]);
   });
 
+  // The adjacent-day schedules are read from the loaded shift window, so a
+  // neighbouring day outside it looks identical to a day with no shift. The
+  // builder must not let that pass as "no conflict" without saying so.
+  it("flags every candidate when a neighbouring day is outside the loaded window", () => {
+    const employees = [employee({ id: "a" }), employee({ id: "b" })];
+    const input = {
+      ...baseContext,
+      openShift: gap({ eligibleAssignmentDefinitionIds: [100] }),
+      employees,
+      scheduleByEmployeeId: new Map(),
+      adjacentScheduleByEmployeeId: new Map(),
+    };
+
+    const loaded = buildOpenShiftStaffingCandidates({
+      ...input,
+      adjacentDaysLoaded: { previous: true, next: true },
+    });
+    expect(loaded.map((candidate) => candidate.adjacentCheckUnverified)).toEqual([false, false]);
+
+    const omitted = buildOpenShiftStaffingCandidates(input);
+    expect(omitted.map((candidate) => candidate.adjacentCheckUnverified)).toEqual([false, false]);
+
+    const previousMissing = buildOpenShiftStaffingCandidates({
+      ...input,
+      adjacentDaysLoaded: { previous: false, next: true },
+    });
+    expect(previousMissing.map((candidate) => candidate.employee.id)).toEqual(["a", "b"]);
+    expect(previousMissing.map((candidate) => candidate.adjacentCheckUnverified)).toEqual([
+      true,
+      true,
+    ]);
+
+    const nextMissing = buildOpenShiftStaffingCandidates({
+      ...input,
+      adjacentDaysLoaded: { previous: true, next: false },
+    });
+    expect(nextMissing.every((candidate) => candidate.adjacentCheckUnverified)).toBe(true);
+  });
+
   it("requires every exact calloff segment to be qualified and conflict-free", () => {
     const candidates = buildOpenShiftStaffingCandidates({
       ...baseContext,
