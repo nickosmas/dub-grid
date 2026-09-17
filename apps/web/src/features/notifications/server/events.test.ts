@@ -670,6 +670,84 @@ describe("dispatchNotificationEvent", () => {
       { trialEndsAt: "2026-06-08T00:00:00Z" },
     );
   });
+  it("notifies both the requester and the claimant when a claimed pickup is rejected", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        // Rejecting a claimed pickup clears target_emp_id on the row before
+        // this re-fetch runs, so the target here is already gone.
+        return makeShiftRequestBuilder({
+          status: "open",
+          type: "pickup",
+          requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+          target: null,
+        });
+      }
+      if (table === "employees") {
+        return makeSingleRowBuilder({ user_id: "claimant-user" });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "shift_request_resolved",
+      orgId: "org-1",
+      requestId: "req-1",
+      requestType: "pickup",
+      approved: false,
+      previousTargetEmpId: "claimant-emp",
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(2);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "requester-user",
+      "org-1",
+      "shift_request_rejected",
+      "Request rejected",
+      expect.stringContaining("has been rejected"),
+      expect.objectContaining({ requestId: "req-1" }),
+    );
+    expect(sendNotification).toHaveBeenCalledWith(
+      "claimant-user",
+      "org-1",
+      "shift_request_rejected",
+      "Claim not approved",
+      expect.stringContaining("wasn't approved"),
+      expect.objectContaining({ requestId: "req-1", approved: false }),
+    );
+  });
+
+  it("skips the claimant notification when there is no previousTargetEmpId", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "rejected",
+          type: "pickup",
+          requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+          target: null,
+        });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "shift_request_resolved",
+      orgId: "org-1",
+      requestId: "req-1",
+      requestType: "pickup",
+      approved: false,
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "requester-user",
+      "org-1",
+      "shift_request_rejected",
+      "Request rejected",
+      expect.stringContaining("has been rejected"),
+      expect.anything(),
+    );
+  });
+
   it("names who joined, and the role they joined as, on invitation_accepted", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "organizations") {

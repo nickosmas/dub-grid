@@ -485,6 +485,17 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        // Rejecting a claimed pickup clears target_emp_id on the row (it
+        // reopens for another claimant), so the claimant is unreadable from
+        // the request after the RPC runs. Capture it first so the
+        // notification can still reach them.
+        const { data: preResolveRequest } = await auth.serviceClient
+          .from("shift_requests")
+          .select("target_emp_id")
+          .eq("id", data.requestId)
+          .maybeSingle();
+        const previousTargetEmpId = preResolveRequest?.target_emp_id ?? null;
+
         const { error } = await auth.userClient.rpc("resolve_shift_request", {
           p_request_id: data.requestId,
           p_approved: data.approved,
@@ -500,6 +511,7 @@ export async function POST(req: NextRequest) {
           requestId: data.requestId,
           requestType: "pickup",
           approved: data.approved,
+          previousTargetEmpId,
           ...(data.note !== undefined ? { adminNote: data.note } : {}),
         });
 

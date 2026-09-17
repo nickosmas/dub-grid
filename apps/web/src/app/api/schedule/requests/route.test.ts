@@ -147,4 +147,54 @@ describe("POST /api/schedule/requests", () => {
       "and(type.eq.pickup,status.eq.open,target_emp_id.is.null)",
     );
   });
+
+  it("captures the pre-resolve target_emp_id and forwards it to the notification dispatch", async () => {
+    const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
+    const CLAIMANT_EMP_ID = "44444444-4444-4444-8444-444444444444";
+    const shiftRequestsQuery = chainableQuery({
+      data: { target_emp_id: CLAIMANT_EMP_ID },
+      error: null,
+    });
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    requireOrgPermissions.mockImplementation(async () => ({
+      serviceClient: {
+        from: (table: string) =>
+          table === "shift_requests"
+            ? shiftRequestsQuery
+            : chainableQuery({ data: null, error: null }),
+      },
+      userClient: { rpc },
+      actor: { id: "admin-user" },
+      orgId: ORG_ID,
+      permissions: { canApproveShiftRequests: true },
+    }));
+
+    const request = new NextRequest("http://localhost/api/schedule/requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "resolveShiftRequest",
+        orgId: ORG_ID,
+        requestId: REQUEST_ID,
+        approved: false,
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(
+      "resolve_shift_request",
+      expect.objectContaining({ p_request_id: REQUEST_ID, p_approved: false }),
+    );
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+      "admin-user",
+      expect.objectContaining({
+        action: "shift_request_resolved",
+        requestId: REQUEST_ID,
+        approved: false,
+        previousTargetEmpId: CLAIMANT_EMP_ID,
+      }),
+    );
+  });
 });

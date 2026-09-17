@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getIsoDateInTimeZone, resolveActiveShiftRequests } from "@dubgrid/schedule-core";
-import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -102,8 +101,6 @@ export function useShiftRequests(
   const [now, setNow] = useState(() => Date.now());
   const orgIdRef = useRef(orgId);
   orgIdRef.current = orgId;
-  const requestsRef = useRef(requests);
-  requestsRef.current = requests;
 
   // Stabilize the Map reference: serialize to a string key so useCallback
   // doesn't get a new identity every render (Map is compared by reference).
@@ -321,14 +318,9 @@ export function useShiftRequests(
                 : "Shift posted as available"
               : "Swap request sent",
         );
-        if (id) {
-          queueNotification({
-            action: "shift_request_created",
-            orgId,
-            requestId: id,
-            requestType: type,
-          });
-        }
+        // The server route already dispatches shift_request_created via
+        // dispatchNotificationEvent; queuing it again here double-sent every
+        // request's notification.
         await refetchAfterMutation();
         return id;
       } catch (err: unknown) {
@@ -345,12 +337,7 @@ export function useShiftRequests(
       try {
         await claimShiftRequest(requestId, claimerEmpId, orgId);
         toast.success("Shift claimed. Awaiting admin approval.");
-        queueNotification({
-          action: "shift_request_claimed",
-          orgId,
-          requestId,
-          requestType: "pickup",
-        });
+        // Server route already dispatches shift_request_claimed.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -372,14 +359,7 @@ export function useShiftRequests(
       try {
         const id = await volunteerForOpenShift(orgId, empId, shiftDate, input, focusAreaId);
         toast.success("Volunteered for shift. Awaiting admin approval.");
-        if (id) {
-          queueNotification({
-            action: "shift_request_created",
-            orgId,
-            requestId: id,
-            requestType: "pickup",
-          });
-        }
+        // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
@@ -412,16 +392,7 @@ export function useShiftRequests(
       try {
         await resolveShiftRequest(requestId, approved, note, orgId);
         toast.success(approved ? "Request approved" : "Request rejected");
-        // Find the request to get its type for the notification
-        const request = requestsRef.current.find((r) => r.id === requestId);
-        queueNotification({
-          action: "shift_request_resolved",
-          orgId,
-          requestId,
-          requestType: request?.type ?? "pickup",
-          approved,
-          adminNote: note,
-        });
+        // Server route already dispatches shift_request_resolved.
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
