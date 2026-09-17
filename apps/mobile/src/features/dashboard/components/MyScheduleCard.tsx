@@ -9,6 +9,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileElevation,
   mobileRadius,
   mobileText,
   mobileTabularText,
@@ -198,12 +199,7 @@ export function MyScheduleCard({
                         key={segment.key}
                         style={[
                           styles.shiftPill,
-                          segment.pill
-                            ? {
-                                backgroundColor: segment.pill.color,
-                                borderColor: segment.pill.border,
-                              }
-                            : null,
+                          segment.pill ? { backgroundColor: segment.pill.color } : null,
                         ]}
                       >
                         <Text
@@ -312,15 +308,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: PILL_GAP,
     },
+    // On the page with no card around it, the pill is lifted by the card
+    // shadow rather than drawn by a hairline: the same edge every dashboard
+    // surface has, so the strip reads as cards of its own.
     shiftPill: {
       width: PILL_WIDTH,
       gap: mobileSpace.xs,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
       borderRadius: PILL_RADIUS,
-      borderWidth: 1,
-      borderColor: mobileColors.border,
       backgroundColor: mobileColors.surface,
+      ...mobileElevation("card", isDark),
       paddingHorizontal: mobileSpace.sm,
       paddingVertical: mobileSpace.sm,
     },
