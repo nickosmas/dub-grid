@@ -217,9 +217,9 @@ export function DashboardSkeleton({
         <SkeletonLine variant="screenTitle" width="70%" />
         <SkeletonLine variant="body" width="88%" />
       </View>
+      {showMySchedule ? <MyScheduleSkeleton /> : null}
       <DashboardHeroSkeleton />
       {showActionQueue ? <DashboardCardSkeleton rows={3} variant="badgeLead" /> : null}
-      {showMySchedule ? <MyScheduleSkeleton /> : null}
       <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="feed" />

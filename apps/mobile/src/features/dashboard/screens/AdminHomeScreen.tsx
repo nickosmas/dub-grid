@@ -184,7 +184,22 @@ export function AdminHomeScreen() {
 
   // Keyed so the stagger indexes the cards actually shown; a card that is
   // absent for this role or period does not leave a gap in the sequence.
+  // Your schedule leads when the person has one: the day ahead first, the
+  // organisation's coverage second.
   const sections: Array<{ key: string; node: ReactNode }> = [
+    ...(!managementOnly && hasPersonalSchedule
+      ? [
+          {
+            key: "my-schedule",
+            node: (
+              <MyScheduleCard
+                accessToken={accessToken}
+                onExpand={() => router.push("/(tabs)/home/my-schedule")}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: "coverage-summary",
       node: (
@@ -215,19 +230,6 @@ export function AdminHomeScreen() {
               <ActionQueueCard
                 requests={data.actionQueue}
                 onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(!managementOnly && hasPersonalSchedule
-      ? [
-          {
-            key: "my-schedule",
-            node: (
-              <MyScheduleCard
-                accessToken={accessToken}
-                onExpand={() => router.push("/(tabs)/home/my-schedule")}
               />
             ),
           },
