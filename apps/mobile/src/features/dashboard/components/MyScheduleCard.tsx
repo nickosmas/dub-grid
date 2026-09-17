@@ -36,7 +36,7 @@ const PILL_RADIUS = mobileRadius.md;
 // clips at its bounds, and without it the cast ended in a hard line under
 // each pill. The same room is taken back as a negative margin so the
 // section's rhythm is unchanged.
-const SHADOW_ROOM = mobileSpace.sectionGap;
+const SHADOW_ROOM = mobileSpace["2xl"];
 // Explicit min-height, shared by the worked-shift pill and the empty-day
 // placeholder, sized for 3 stacked lines (name/job/time) so every pill is
 // the same height regardless of whether a given shift has a job name or a
