@@ -102,6 +102,7 @@ noted in the archive of the feature that captured them.
 - 2026-09-17, alerts (design review on device): cards with inline buttons.
   Replaced by mailbox rows with swipe actions; then one open swipe at a
   time, a gap before the actions, and rows bleeding to the screen edge.
-- 2026-09-17, dashboard (design review on device, four rounds): tinted cards
-  read as borders, coloured halos as a rainbow. Settled on one subtle
-  diagonal page wash keyed to the sections, two hues only.
+- 2026-09-17, dashboard (design review on device, eight rounds): tinted cards
+  read as borders, coloured halos as a rainbow, a multi-stop wash likewise.
+  Settled on the login page's aurora in the coverage colour alone, deep
+  hues so red stays red.

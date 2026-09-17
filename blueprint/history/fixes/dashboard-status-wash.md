@@ -83,3 +83,16 @@ glow on a black page.
   inspected against each round of feedback.
 - Rule recorded for later work: colour on the dashboard is the page's, not a
   card's, and it means one of two things: red for broken, amber for waiting.
+
+## Follow-up rounds (2026-09-17, after the archive)
+
+- `a8e026b1`: the wash reduced to two colours at a time.
+- `67d9974d`: status colours dropped; the page took the login page's brand
+  aurora (`GradientBackdrop kind="aurora"`).
+- `93c8fd93`: the aurora recoloured by the period's coverage percentage only
+  (green ahead, amber close, red behind; absent when not configured), the
+  status-gradient model and per-section tones removed.
+- `d17ed516`: wash hues one step deeper down each ramp so red reads red rather
+  than pink at the aurora's alphas.
+- Device check: 92% (green) and 47% (red) coverage captured in dark mode; the
+  wash runs unbroken through the sticky header.
