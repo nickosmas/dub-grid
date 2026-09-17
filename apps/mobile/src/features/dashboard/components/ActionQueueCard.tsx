@@ -14,20 +14,11 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { formatUsDate } from "../../../shared/lib/dates";
-import { CountBadge, type CountBadgeTone } from "./CountBadge";
+import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../../shift-requests/lib/request-type";
+import { CountBadge } from "./CountBadge";
 import { DashboardRowList } from "./DashboardRowList";
 
-export const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
-  pickup: "Pickup",
-  swap: "Swap",
-  calloff: "Time off",
-};
-
-export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTone> = {
-  pickup: "brand",
-  swap: "success",
-  calloff: "warning",
-};
+export { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE };
 
 // Shared with the full-page expanded pending-approvals screen
 // (apps/mobile/app/(tabs)/home/pending-approvals.tsx). Owns its navigation so

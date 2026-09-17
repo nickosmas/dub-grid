@@ -733,6 +733,10 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Target Evening")).toBeInTheDocument();
     expect(screen.getAllByText("Shift 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Shift 2").length).toBeGreaterThan(0);
+    // The type reads as the same badge Home's approval queue uses. The page
+    // also has a Swap tab, so the badge is one of several "Swap" texts.
+    expect(screen.getAllByText("Swap").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Swap request")).not.toBeInTheDocument();
   });
 
   it("uses the org timezone for available day labels", () => {

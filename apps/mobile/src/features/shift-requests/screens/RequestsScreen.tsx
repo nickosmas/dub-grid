@@ -1,4 +1,6 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
+import { CountBadge } from "../../dashboard/components/CountBadge";
+import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../lib/request-type";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
@@ -1068,12 +1070,6 @@ function RequestCard({
     request.targetPresentation,
     request.targetState ?? null,
   );
-  const typeLabel =
-    request.type === "pickup"
-      ? "Pickup request"
-      : request.type === "swap"
-        ? "Swap request"
-        : "Calloff request";
   const statusTone = statusChipTones[request.status];
 
   const canCancel =
@@ -1100,10 +1096,13 @@ function RequestCard({
           <CardIcon muted={highlighted} name="swap-horizontal-outline" />
           <View style={styles.titleColumn}>
             <Text style={styles.requestTitle}>{request.requesterName}</Text>
-            <Text style={styles.metaText}>
-              {typeLabel}
-              {showDate ? ` • ${request.requesterShiftDate}` : ""}
-            </Text>
+            <View style={styles.requestTypeRow}>
+              <CountBadge
+                label={REQUEST_TYPE_LABEL[request.type]}
+                tone={REQUEST_TYPE_TONE[request.type]}
+              />
+              {showDate ? <Text style={styles.metaText}>{request.requesterShiftDate}</Text> : null}
+            </View>
             {requesterSplitSegments.length > 1 ? (
               <View style={styles.splitShiftPanel}>
                 <SplitShiftBadge count={requesterSplitSegments.length} compact />

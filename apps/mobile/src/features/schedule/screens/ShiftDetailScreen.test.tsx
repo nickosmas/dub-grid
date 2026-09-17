@@ -2233,12 +2233,9 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Offer for pickup"));
     fireEvent.click(screen.getByText("Offer to everyone"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Offer this shift for pickup?")).toBeInTheDocument();
-    expect(screen.getByText(/will be offered/)).toBeInTheDocument();
-
-    confirmDialog("Offer Shift");
-
+    // Offering is a request teammates still have to accept, so the offer
+    // itself is the commitment: no second popup.
+    expect(screen.queryByText("Offer this shift for pickup?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
       requesterEmpId: "emp-1",
@@ -2336,7 +2333,6 @@ describe("ShiftDetailScreen", () => {
     ).toBeDisabled();
     fireEvent.click(screen.getByText("Offer for pickup"));
     fireEvent.click(screen.getByText("Offer to everyone"));
-    confirmDialog("Offer Shift");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
@@ -2549,12 +2545,7 @@ describe("ShiftDetailScreen", () => {
 
     fireEvent.click(screen.getByText("Submit"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Send a pickup request?")).toBeInTheDocument();
-    expect(screen.getByText(/Jordan Lee will be asked to pick up your/)).toBeInTheDocument();
-
-    confirmDialog("Send Request");
-
+    expect(screen.queryByText("Send a pickup request?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
       requesterEmpId: "emp-1",
@@ -2666,7 +2657,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText(/A Paid time off absence will be submitted/)).toBeInTheDocument();
   });
 
-  it("confirms before submitting a swap request", () => {
+  it("submits a swap request from the full-page sheet without a second popup", () => {
     const mutate = vi.fn();
     useMutation.mockReturnValue({
       error: null,
@@ -2682,12 +2673,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Chris Hall"));
     fireEvent.click(screen.getByText("Submit"));
 
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Send this swap request?")).toBeInTheDocument();
-    expect(screen.getByText(/You.ll swap your/)).toBeInTheDocument();
-
-    confirmDialog("Send Swap");
-
+    expect(screen.queryByText("Send this swap request?")).not.toBeInTheDocument();
     expect(mutate).toHaveBeenCalledWith({
       type: "swap",
       requesterEmpId: "emp-1",
@@ -2703,7 +2689,7 @@ describe("ShiftDetailScreen", () => {
     render(<ShiftDetailScreen />);
 
     fireEvent.click(screen.getByText("Swap"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
@@ -2769,7 +2755,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Swap"));
     selectFridaySwapDate();
     fireEvent.click(screen.getByText("Chris Hall"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
 
     // The sheet is still open behind the confirmation — the swap the user
     // picked is right there to go back to.
@@ -2800,7 +2786,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Swap"));
     selectFridaySwapDate();
     fireEvent.click(screen.getByText("Chris Hall"));
-    fireEvent.click(screen.getByLabelText("Dismiss"));
+    fireEvent.click(screen.getByLabelText("Close"));
     // Not "Cancel": the sheet's own dismiss button is Cancel, so the
     // confirmation would be asking the user to cancel their cancel.
     confirmDialog("Keep Editing");

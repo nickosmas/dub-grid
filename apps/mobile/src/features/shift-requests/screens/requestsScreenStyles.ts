@@ -163,6 +163,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
+    requestTypeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
+    },
     openShiftContextStack: {
       gap: 8,
     },

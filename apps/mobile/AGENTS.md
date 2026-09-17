@@ -188,28 +188,28 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 
 ### Reach for these before inventing anything
 
-| Need                        | Use                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                         |
-| Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`              |
-| A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                           |
-| A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view |
-| A pressable that is neither | `usePressAnimation()`                                                                       |
-| Status/metadata/filter pill | `<Chip>`                                                                                    |
-| Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)      |
-| Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                   |
-| Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                |
-| Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
-| List entrance               | `<AnimatedListItem index>`                                                                  |
-| Show/hide a block           | `<Collapsible open>`                                                                        |
-| A short task or selection   | `<BottomSheetModal>`; use a page for substantial or multi-step editing                      |
-| A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body             |
-| A consequential decision    | `<ConfirmationModal>`; cancel left, confirm right; always side by side                      |
-| Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
-| An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel               |
-| Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
-| Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
-| Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`     |
+| Need                        | Use                                                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                                                                |
+| Any button                  | `<Button>` — solid fill, no border, squircle, sizes `sm`/`md`/`lg`, `iconOnly`                                                     |
+| A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                                                                  |
+| A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view                                        |
+| A pressable that is neither | `usePressAnimation()`                                                                                                              |
+| Status/metadata/filter pill | `<Chip>`                                                                                                                           |
+| Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)                                             |
+| Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                                                          |
+| Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                                                       |
+| Soft brand wash             | `<GradientBackdrop kind>`                                                                                                          |
+| List entrance               | `<AnimatedListItem index>`                                                                                                         |
+| Show/hide a block           | `<Collapsible open>`                                                                                                               |
+| A short task or selection   | `<BottomSheetModal>`; use `<FullPageSheet>` for a task that needs the whole page (the swap browser), a page for multi-step editing |
+| A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body                                                    |
+| A consequential decision    | `<ConfirmationModal>`; cancel left, confirm right; always side by side                                                             |
+| Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                                                                      |
+| An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel                                                      |
+| Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`                                                     |
+| Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                                                                    |
+| Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`                                            |
 
 ### The metric contract
 
@@ -273,6 +273,13 @@ Choose the surface by the user's task:
 - **ConfirmationModal:** a short consequence and an explicit action. Use for
   discarded edits, access changes, and significant side effects. Do not put
   editable forms or competing configuration choices inside a confirmation.
+  A request the other party still has to accept (a pickup offer, a swap) is
+  not one: its Submit is the commitment. A call-off is, since it takes the
+  requester off the roster.
+- **FullPageSheet:** the platform's card sheet (iOS `pageSheet`, Android
+  full-screen slide) with a header, Close, scrolling body and pinned footer,
+  for a task that needs the page but is still modal to the screen beneath it.
+  Same `onDismiss` funnel and one-task-sheet rule as `BottomSheetModal`.
 - **BottomSheetModal:** contextual choices, filters, short forms, and compact
   review tasks. Use a page for long or multi-step workflows.
 - **Ordinary saves:** save directly and show progress and success. Ask again
