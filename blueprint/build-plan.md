@@ -343,6 +343,13 @@
       helper was built to fix. Fold the activity-feed fetch into
       `useShiftRequests`'s result (or expose an unfiltered variant), and move
       its invalidation onto the shared channel.
+      _Deferred on 2026-09-17, not for lack of time:_ `useShiftRequests.ts`
+      had uncommitted edits from another session (removing the client-side
+      `queueNotification` calls the server route already dispatches), and
+      this repo's concurrent-session rule is to leave such files alone.
+      Pick it up once that lands. The mobile half of the same problem was
+      fixed in 35 and shows the shape: a module-level, reference-counted
+      registry keyed on the org that fans events out to listeners.
 - [x] 30. **Fix Reports page duplicate operations-report fetch** - whenever a
       report is generated with any non-empty filter, `ReportsPageContent`
       fetches the full operations report twice for the same org/date range:
@@ -383,6 +390,18 @@
       at the earlier "awaiting approval" step. May be intentional - needs a
       product decision, then a matching fix in `events.ts`'s
       `shift_request_resolved` case.
+      _Decision taken on 2026-09-17: yes, notify the target._ The swap
+      partner's schedule changes on approval and their agreed swap
+      evaporates on rejection, they already hear about the intermediate
+      "awaiting approval" step, and the calloff trigger notifies its target
+      on end, so silence at the final step is an inconsistency rather than
+      a boundary. Apply it generally: whenever `requestInfo.targetUserId`
+      exists and differs from both the requester and the actor, send a
+      target-worded notification ("The swap with {requesterName} was
+      approved/declined.") alongside the requester's. _Not implemented
+      here_ because `events.ts` had uncommitted edits from another session
+      adding the pickup-rejection claimant notification to this exact
+      `case`; that work is the natural place to fold this in.
 - [x] 35. **Share one realtime channel for mobile shift-request screens** -
       `useMobileShiftRequestsRealtime` deliberately does not reference-count
       (unlike `useOrgRealtimeInvalidation` on web), so the Home, Requests, and
