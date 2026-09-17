@@ -51,6 +51,18 @@ describe("Button", () => {
     expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
   });
 
+  it("lets a link ellipsize instead of shrinking, with text padding", () => {
+    render(<Button label="Skip" onPress={vi.fn()} tone="link" />);
+
+    // A link is text: given a filled button's padding in a tight slot it
+    // starved its own label, and iOS shrank "Skip" to a fraction of its size.
+    const label = screen.getByText("Skip");
+    expect(label).toHaveAttribute("data-number-of-lines", "1");
+    expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
+    expect(label).not.toHaveAttribute("data-minimum-font-scale");
+    expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
+  });
+
   it("uses the pill radius by default", () => {
     render(<Button label="Save changes" onPress={vi.fn()} />);
 

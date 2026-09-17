@@ -57,6 +57,13 @@ const SIZE = {
   lg: { minHeight: 56, paddingHorizontal: 24, gap: 10, icon: 20, iconOnly: 52 },
 } as const;
 
+/**
+ * Filled and outlined labels scale down to a legible floor before they
+ * truncate, so equal-width peers in an action grid keep whole words. Links
+ * skip this: a link is text, and shrinking text reads as a rendering fault.
+ */
+const SCALE_THEN_TRUNCATE = { adjustsFontSizeToFit: true, minimumFontScale: 0.75 } as const;
+
 const LABEL_VARIANT = {
   sm: "bodyStrong",
   md: "rowTitle",
@@ -137,6 +144,13 @@ export function Button({
 
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];
+  // A link is text, not a filled control. Given a filled button's padding it
+  // starved its own label in a tight slot (onboarding's 64pt "Skip" box left
+  // 24pt for the word), and iOS then shrank the text far past the floor the
+  // scale-then-truncate rule sets for filled buttons. A link keeps text
+  // padding and ellipsizes instead.
+  const isLink = tone === "link";
+  const paddingHorizontal = isLink ? mobileSpace.sm : metrics.paddingHorizontal;
   const isDisabled = disabled || isBusy;
   const stretches = fullWidth ?? !iconOnly;
 
@@ -177,7 +191,7 @@ export function Button({
         styles.button,
         {
           minHeight: metrics.minHeight,
-          paddingHorizontal: iconOnly ? 0 : metrics.paddingHorizontal,
+          paddingHorizontal: iconOnly ? 0 : paddingHorizontal,
         },
         // An icon-only button is a fixed square, so its own width/height define
         // the box. Leaving the base vertical padding on top of that squeezes the
@@ -202,10 +216,9 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
-            adjustsFontSizeToFit
+            {...(isLink ? undefined : SCALE_THEN_TRUNCATE)}
             ellipsizeMode="tail"
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            minimumFontScale={0.75}
             numberOfLines={1}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
