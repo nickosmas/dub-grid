@@ -368,7 +368,7 @@
       re-fetching or flagging an unknown state. Verify the neighboring day is
       always loaded before running the check, or surface an explicit
       "can't verify" state instead of a false negative.
-- [ ] 33. **Manually smoke-test the new `finalize_scheduler_staffed_calloffs`
+- [x] 33. **Manually smoke-test the new `finalize_scheduler_staffed_calloffs`
       publish trigger** - shipped with feature 22
       (`supabase/migrations/019_finalize_scheduler_staffed_calloffs.sql`), this
       SQL trigger runs inside the publish transaction and has never executed
