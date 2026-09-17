@@ -158,12 +158,12 @@ export default function ProfileSecurityScreen() {
           <ProfileSection title="Sign-in">
             <ProfileList>
               <ProfileNavRow
-                iconName="key"
+                iconName="key-outline"
                 label="Password"
                 onPress={() => router.push("/(tabs)/profile/password")}
               />
               <ProfileNavRow
-                iconName="shield-checkmark"
+                iconName="shield-checkmark-outline"
                 isLast
                 label="Two-factor authentication"
                 value={profileQuery.data.user.mfaEnabled ? "Enabled" : "Not enabled"}
@@ -175,7 +175,7 @@ export default function ProfileSecurityScreen() {
           <ProfileSection title="Devices">
             <ProfileList>
               <ProfileNavRow
-                iconName="phone-portrait"
+                iconName="phone-portrait-outline"
                 isLast
                 label="Signed-in devices"
                 value={formatSessionCount(activeSessionCount)}

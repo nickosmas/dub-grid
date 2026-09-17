@@ -21,7 +21,7 @@ export function IllustrationNotifications() {
         <View style={styles.alertHeader}>
           <View style={styles.alertTitleRow}>
             <View style={styles.iconFrame}>
-              <Ionicons color={mobileColors.brand} name="swap-horizontal" size={18} />
+              <Ionicons color={mobileColors.brand} name="swap-horizontal-outline" size={18} />
             </View>
             <View style={styles.titleColumn}>
               <Text style={styles.title}>Swap approved</Text>
@@ -33,7 +33,7 @@ export function IllustrationNotifications() {
         </View>
         <View style={styles.cardActions}>
           <MockButton icon="arrow-forward" label="View request" tone="secondary" />
-          <MockIconButton icon="archive" />
+          <MockIconButton icon="archive-outline" />
         </View>
       </View>
 
@@ -41,7 +41,7 @@ export function IllustrationNotifications() {
         <View style={styles.alertHeader}>
           <View style={styles.alertTitleRow}>
             <View style={[styles.iconFrame, styles.iconFrameMuted]}>
-              <Ionicons color={mobileColors.textMuted} name="calendar" size={18} />
+              <Ionicons color={mobileColors.textMuted} name="calendar-outline" size={18} />
             </View>
             <View style={styles.titleColumn}>
               <Text style={[styles.title, styles.titleMuted]}>Schedule published</Text>
@@ -55,7 +55,7 @@ export function IllustrationNotifications() {
             slot. */}
         <View style={styles.cardActions}>
           <View />
-          <MockIconButton icon="archive" />
+          <MockIconButton icon="archive-outline" />
         </View>
       </View>
     </IllustrationFrame>

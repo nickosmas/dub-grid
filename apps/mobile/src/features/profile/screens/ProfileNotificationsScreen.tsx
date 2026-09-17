@@ -53,9 +53,9 @@ type CategoryKey = (typeof CATEGORIES)[number]["key"];
 
 /** One glyph per category, so the rows are told apart by shape as well as text. */
 const CATEGORY_ICONS: Record<CategoryKey, ComponentProps<typeof Ionicons>["name"]> = {
-  schedule: "calendar",
-  shift_requests: "swap-horizontal",
-  system: "settings",
+  schedule: "calendar-outline",
+  shift_requests: "swap-horizontal-outline",
+  system: "settings-outline",
 };
 
 type Channel = "in_app" | "email";

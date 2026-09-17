@@ -114,43 +114,37 @@ export function DashboardHeroCard({
       </View>
 
       {/* Coverage is the one figure that summarises the period, so it is the
-          only large number on the surface; everything else reads against it. */}
-      <View style={styles.coverage}>
-        <View style={styles.coverageFigureRow}>
-          <Text
-            accessibilityLabel={
-              coverage == null ? "Coverage not configured" : `Coverage ${coverage} percent`
-            }
-            maxFontSizeMultiplier={MAX_FONT_SCALE}
-            style={styles.coverageFigure}
-          >
-            {coverage == null ? "—" : `${coverage}%`}
-          </Text>
-          <View style={styles.coverageCopy}>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
-              Coverage
+          only large number on the surface. When requirements are not
+          configured the headline already says so, and a dash over an empty
+          meter only repeated it. */}
+      {coverage != null ? (
+        <View style={styles.coverage}>
+          <View style={styles.coverageFigureRow}>
+            <Text
+              accessibilityLabel={`Coverage ${coverage} percent`}
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={styles.coverageFigure}
+            >
+              {coverage}%
             </Text>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageDetail}>
-              {coverage == null ? "Not configured" : "Current staffing coverage"}
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
+              coverage
             </Text>
           </View>
-        </View>
-        <View
-          accessibilityRole="progressbar"
-          accessibilityValue={coverage == null ? undefined : { min: 0, max: 100, now: coverage }}
-          style={styles.track}
-        >
           <View
-            style={[
-              styles.fill,
-              {
-                backgroundColor: meterColor,
-                width: `${Math.min(100, Math.max(0, coverage ?? 0))}%`,
-              },
-            ]}
-          />
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: coverage }}
+            style={styles.track}
+          >
+            <View
+              style={[
+                styles.fill,
+                { backgroundColor: meterColor, width: `${Math.min(100, Math.max(0, coverage))}%` },
+              ]}
+            />
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.statRow}>
         <MetricStat
@@ -200,25 +194,16 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     coverageFigureRow: {
       flexDirection: "row",
-      alignItems: "flex-end",
-      gap: mobileSpace.md,
+      alignItems: "baseline",
+      gap: mobileSpace.sm,
     },
     coverageFigure: {
       ...mobileText.display,
       ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
-    coverageCopy: {
-      flex: 1,
-      // Sits on the figure's baseline rather than centred against its cap.
-      paddingBottom: mobileSpace.xs,
-    },
     coverageLabel: {
-      ...mobileText.label,
-      color: mobileColors.textSecondary,
-    },
-    coverageDetail: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
     track: {
@@ -236,8 +221,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "stretch",
       gap: mobileSpace.lg,
     },
+    // Centred in their half of the card: two left-aligned stats read as a
+    // list that stopped after one row.
     stat: {
       flex: 1,
+      alignItems: "center",
       gap: mobileSpace.xs,
       borderRadius: mobileRadii.control,
     },
@@ -247,6 +235,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     statFigureRow: {
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       gap: mobileSpace.xs,
     },
     statValue: {
@@ -256,6 +245,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     statLabel: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
+      textAlign: "center",
     },
     statDivider: {
       width: StyleSheet.hairlineWidth,

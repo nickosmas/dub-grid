@@ -418,7 +418,7 @@ export default function ProfileTwoFactorScreen() {
         <ProfileSection description="An authenticator app generates a short code that the app asks for alongside your password, so a stolen password isn't enough to sign in.">
           <ProfileList>
             <ProfileInfoRow
-              iconName="shield"
+              iconName="shield-outline"
               isLast
               label="Status"
               value={needsReconciliation ? "Needs refresh" : mfaEnabled ? "Enabled" : "Not enabled"}

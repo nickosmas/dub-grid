@@ -153,7 +153,7 @@ export function AdminHomeScreen() {
           actionLabel="Refresh"
           body="There's nothing to show for this organization yet. Pull to refresh once your schedule is set up."
           fillScreen
-          iconName="stats-chart"
+          iconName="stats-chart-outline"
           onAction={() => {
             void dashboardQuery.refetch();
           }}

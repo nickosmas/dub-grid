@@ -83,13 +83,13 @@ export function IllustrationUpcomingShift() {
           </View>
 
           <View style={styles.areaRow}>
-            <Ionicons color="rgba(255, 255, 255, 0.82)" name="location" size={18} />
+            <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
             <Text style={styles.areaLabel}>Skilled Nursing</Text>
           </View>
 
           <View style={styles.scheduleRow}>
             <View style={styles.timeRow}>
-              <Ionicons color="rgba(255, 255, 255, 0.82)" name="time" size={24} />
+              <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
               <Text style={styles.timeText}>7:00 AM - 3:30 PM</Text>
             </View>
             <Text style={styles.progressLabel}>Starts in 2h</Text>
@@ -97,7 +97,7 @@ export function IllustrationUpcomingShift() {
 
           <View style={[styles.collaborators, collaboratorBackground]}>
             <View style={styles.collaboratorLabelRow}>
-              <Ionicons color="rgba(255, 255, 255, 0.76)" name="people" size={22} />
+              <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
               <Text style={styles.collaboratorLabel}>Working with</Text>
             </View>
             <View style={styles.avatarStack}>

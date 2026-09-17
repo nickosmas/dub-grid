@@ -61,7 +61,7 @@ describe("DashboardHeroCard", () => {
     expect(onOpenApprovals).not.toHaveBeenCalled();
   });
 
-  it("shows a dash and 'Not configured' when coveragePct is null", () => {
+  it("omits the coverage figure and meter when coveragePct is null", () => {
     render(
       <DashboardHeroCard
         summary={{
@@ -78,7 +78,10 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("Not configured")).toBeInTheDocument();
+    // The headline already says requirements are not configured; a dash over
+    // an empty meter only repeated it.
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not configured")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });

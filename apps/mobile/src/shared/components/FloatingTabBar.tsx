@@ -50,23 +50,23 @@ type TabIcon =
 const TAB_CONFIG: Record<string, { label: string; icon: TabIcon }> = {
   home: {
     label: "Home",
-    icon: { family: "material-community", outline: "home", filled: "home" },
+    icon: { family: "material-community", outline: "home-outline", filled: "home" },
   },
   team: {
     label: "Schedule",
-    icon: { family: "ionicons", outline: "calendar", filled: "calendar" },
+    icon: { family: "ionicons", outline: "calendar-outline", filled: "calendar" },
   },
   requests: {
     label: "Requests",
-    icon: { family: "ionicons", outline: "swap-horizontal", filled: "swap-horizontal" },
+    icon: { family: "ionicons", outline: "swap-horizontal-outline", filled: "swap-horizontal" },
   },
   people: {
     label: "People",
-    icon: { family: "ionicons", outline: "people", filled: "people" },
+    icon: { family: "ionicons", outline: "people-outline", filled: "people" },
   },
   profile: {
     label: "Profile",
-    icon: { family: "ionicons", outline: "person-circle", filled: "person-circle" },
+    icon: { family: "ionicons", outline: "person-circle-outline", filled: "person-circle" },
   },
 };
 

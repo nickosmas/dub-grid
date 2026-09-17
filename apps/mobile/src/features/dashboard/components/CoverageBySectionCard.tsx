@@ -88,7 +88,7 @@ export function CoverageBySectionCard({
           <EmptyStateCard
             compact
             body="Coverage appears here once staffing requirements are configured and the period is published."
-            iconName="stats-chart"
+            iconName="stats-chart-outline"
             title="No coverage to track yet"
           />
         )

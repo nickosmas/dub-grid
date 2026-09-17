@@ -1100,7 +1100,7 @@ export default function ShiftDetailScreen() {
                 {targetedPickupOptions.length === 0 ? (
                   <EmptyStateCard
                     compact
-                    iconName="person-remove"
+                    iconName="person-remove-outline"
                     title="No absent teammates on this date"
                   />
                 ) : (
@@ -1207,7 +1207,7 @@ export default function ShiftDetailScreen() {
                 ) : swapTargetOptions.length === 0 ? (
                   <EmptyStateCard
                     compact
-                    iconName="swap-horizontal"
+                    iconName="swap-horizontal-outline"
                     title="No eligible shifts"
                     body="Eligible teammate shifts will appear here once published."
                   />
@@ -1385,7 +1385,7 @@ export default function ShiftDetailScreen() {
         <EmptyStateCard
           fillScreen
           body="This shift isn't in the schedule range you're viewing."
-          iconName="calendar-clear"
+          iconName="calendar-clear-outline"
           title="Shift not found"
         />
       ) : (
@@ -1446,10 +1446,19 @@ export default function ShiftDetailScreen() {
                 </Text>
               ) : null}
               {!hasMultipleSegments && timeRange ? (
-                <DetailInfoRow iconName="time" label="Shift time" value={timeRange} prominent />
+                <DetailInfoRow
+                  iconName="time-outline"
+                  label="Shift time"
+                  value={timeRange}
+                  prominent
+                />
               ) : null}
               {!hasMultipleSegments && focusAreaName ? (
-                <DetailInfoRow iconName="location" label="Focus area" value={focusAreaName} />
+                <DetailInfoRow
+                  iconName="location-outline"
+                  label="Focus area"
+                  value={focusAreaName}
+                />
               ) : null}
             </View>
 
@@ -1460,7 +1469,7 @@ export default function ShiftDetailScreen() {
                     accessibilityLabel="Drop shift"
                     disabled={createRequestMutation.isPending}
                     fullWidth
-                    icon="exit"
+                    icon="exit-outline"
                     label="Drop shift"
                     onPress={() => resetRequestMode("coverage")}
                     shape="pill"
@@ -1474,7 +1483,7 @@ export default function ShiftDetailScreen() {
                       accessibilityLabel="Swap"
                       disabled={createRequestMutation.isPending}
                       fullWidth
-                      icon="swap-horizontal"
+                      icon="swap-horizontal-outline"
                       label="Swap"
                       onPress={() => resetRequestMode("swap")}
                       shape="pill"
@@ -1772,7 +1781,7 @@ function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"]
         onPress={() => setShowPreviousShift(true)}
         style={styles.detailPreviousShiftFooter}
       >
-        <Ionicons color={mobileColors.textSubtle} name="arrow-undo" size={16} />
+        <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailPreviousShiftText}>
           View previous shift
         </Text>
@@ -1830,10 +1839,14 @@ function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"]
               {getPreviousPresentationTitle(previous)}
             </Text>
             {previousTimeRange ? (
-              <DetailInfoRow iconName="time" label="Shift time" value={previousTimeRange} />
+              <DetailInfoRow iconName="time-outline" label="Shift time" value={previousTimeRange} />
             ) : null}
             {previousFocusAreaName ? (
-              <DetailInfoRow iconName="location" label="Focus area" value={previousFocusAreaName} />
+              <DetailInfoRow
+                iconName="location-outline"
+                label="Focus area"
+                value={previousFocusAreaName}
+              />
             ) : null}
           </View>
         )}
@@ -2055,7 +2068,11 @@ function ShiftmateSegmentGroups({
               ))}
             </View>
           ) : (
-            <EmptyStateCard compact iconName="people" title={`No one in ${group.label} yet`} />
+            <EmptyStateCard
+              compact
+              iconName="people-outline"
+              title={`No one in ${group.label} yet`}
+            />
           )}
         </View>
       ))}
@@ -2348,7 +2365,7 @@ function SwapDateChip({
         accessibilityLabel={`${count} eligible teammate${count === 1 ? "" : "s"}`}
         style={[styles.swapDateChipCount, active && styles.swapDateChipCountActive]}
       >
-        <Ionicons color={countColor} name="person" size={11} />
+        <Ionicons color={countColor} name="person-outline" size={11} />
         <Text style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}>
           {count}
         </Text>

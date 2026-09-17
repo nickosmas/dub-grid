@@ -13,7 +13,7 @@ export default function NotFoundScreen() {
       <RouteErrorScreen
         actionLabel="Go to Home"
         body="That link doesn't point anywhere in the app. It may have expired or been moved."
-        iconName="compass"
+        iconName="compass-outline"
         onAction={() => {
           router.replace("/");
         }}

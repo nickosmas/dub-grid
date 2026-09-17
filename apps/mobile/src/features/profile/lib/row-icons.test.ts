@@ -58,12 +58,14 @@ describe("profile and people row icons", () => {
   });
 
   /**
-   * Icons are filled app-wide, so an accidentally outlined name would ship
-   * one lighter icon in a list of solids.
+   * Rows name a thing (a calendar, a key), and those glyphs are outlined; only
+   * a glyph that states a status (a checkmark, an alert) is filled, and none
+   * of those sits on a profile row. An accidentally solid name would ship one
+   * heavier icon in a list of outlines.
    */
-  it("uses the filled variant on every row", () => {
-    const outlined = collectIconNamesInUse().filter((name) => name.endsWith("-outline"));
+  it("uses the outline variant on every row", () => {
+    const solid = collectIconNamesInUse().filter((name) => !name.endsWith("-outline"));
 
-    expect(outlined).toEqual([]);
+    expect(solid).toEqual([]);
   });
 });

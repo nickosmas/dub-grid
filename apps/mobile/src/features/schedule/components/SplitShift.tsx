@@ -44,7 +44,7 @@ export function SplitShiftBadge({
       accessibilityLabel={customLabel ? label : `Multiple Shifts, ${label}`}
       style={[styles.badge, compact && styles.badgeCompact, inverse && styles.badgeInverse]}
     >
-      <Ionicons color={contentColor} name="layers" size={compact ? 13 : 15} />
+      <Ionicons color={contentColor} name="layers-outline" size={compact ? 13 : 15} />
       <Text
         style={[
           styles.badgeText,
@@ -192,7 +192,7 @@ export function SplitShiftSegmentList({
                     <View style={styles.segmentHeroContextGroup}>
                       {focusAreaName ? (
                         <View style={styles.segmentHeroFocusRow}>
-                          <Ionicons color={metaIconColor} name="location" size={16} />
+                          <Ionicons color={metaIconColor} name="location-outline" size={16} />
                           <Text
                             numberOfLines={1}
                             style={[
@@ -207,7 +207,7 @@ export function SplitShiftSegmentList({
                       {timeRange || timingLabel ? (
                         <View style={styles.segmentHeroTimingRow}>
                           {timeRange ? (
-                            <Ionicons color={metaIconColor} name="time" size={16} />
+                            <Ionicons color={metaIconColor} name="time-outline" size={16} />
                           ) : null}
                           {timeRange ? (
                             <Text
@@ -272,7 +272,7 @@ export function SplitShiftSegmentList({
                     <View style={styles.segmentContextGroup}>
                       {focusAreaName ? (
                         <View style={styles.segmentFocusRow}>
-                          <Ionicons color={metaIconColor} name="location" size={16} />
+                          <Ionicons color={metaIconColor} name="location-outline" size={16} />
                           <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
                             {focusAreaName}
                           </Text>
@@ -282,7 +282,7 @@ export function SplitShiftSegmentList({
                         <View style={styles.segmentTimingRow}>
                           {timeRange ? (
                             <>
-                              <Ionicons color={metaIconColor} name="time" size={16} />
+                              <Ionicons color={metaIconColor} name="time-outline" size={16} />
                               <Text
                                 style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}
                               >

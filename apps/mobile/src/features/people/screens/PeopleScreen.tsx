@@ -900,14 +900,14 @@ export default function PeopleScreen() {
           <EmptyStateCard
             fillScreen
             body="Nobody has management access yet. Invite someone, or add a teammate to management from their staff profile."
-            iconName="briefcase"
+            iconName="briefcase-outline"
             title="No management users yet"
           />
         ) : filteredManagementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
             body="Try a different name, email, department, or access level."
-            iconName="search"
+            iconName="search-outline"
             title="No matches"
           />
         ) : (
@@ -970,7 +970,7 @@ export default function PeopleScreen() {
         <EmptyStateCard
           fillScreen
           body="Teammates will appear here once they're added to your organization."
-          iconName="people"
+          iconName="people-outline"
           title="No teammates yet"
         />
       ) : filteredPeople.length === 0 ? (
@@ -981,7 +981,7 @@ export default function PeopleScreen() {
               ? "Try a different name, focus area, certification, or role."
               : "Try a different name, email, phone, focus area, certification, or role."
           }
-          iconName="search"
+          iconName="search-outline"
           title="No matches"
         />
       ) : (
@@ -1128,7 +1128,7 @@ function AddPersonButton({
       {...pressHandlers}
       style={[styles.addPersonButton, animatedStyle]}
     >
-      <Ionicons color={mobileColors.textInverse} name="person-add" size={18} />
+      <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
     </AnimatedPressable>
   );
 }
