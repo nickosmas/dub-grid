@@ -22,14 +22,12 @@ import type {
   PublishHistoryEntryWithName,
   NamedItem,
   Department,
-  ShiftRequest,
 } from "@/types";
 import {
   fetchShifts,
   fetchPublishHistory,
   fetchPublishedDateRanges,
   fetchRecentPublishHistory,
-  fetchShiftRequests,
 } from "@/features/schedule/client";
 import {
   buildPublishedDateSet,
@@ -425,7 +423,6 @@ export default function DashboardView({
   const [activityPublishHistory, setActivityPublishHistory] = useState<
     PublishHistoryEntryWithName[]
   >([]);
-  const [activityRequests, setActivityRequests] = useState<ShiftRequest[]>([]);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [publishedDateRanges, setPublishedDateRanges] = useState<
     { startDate: string; endDate: string }[]
@@ -526,21 +523,13 @@ export default function DashboardView({
             startDate: periodStartKey,
             endDate: periodEndKey,
           }).catch(() => []),
-      // Period-scoped for the Activity Feed, matching mobile's date-bounded
-      // request fetch — separate from the `shiftRequests` hook above, which
-      // is also now period-scoped but drives Pending Approvals, not the feed.
-      fetchShiftRequests(orgId, assignmentLabelMapRef.current, {
-        startDate: periodStartKey,
-        endDate: periodEndKey,
-      }).catch(() => []),
     ])
-      .then(([shifts, publishedRanges, publishRows, requestRows]) => {
+      .then(([shifts, publishedRanges, publishRows]) => {
         if (cancelled) return;
         setAllShifts(shifts);
         setPublishedDateRanges(publishedRanges);
         setPublishHistory(publishRows[0] ?? null);
         setActivityPublishHistory(publishRows);
-        setActivityRequests(requestRows);
         setShiftsLoading(false);
       })
       .catch(() => {
@@ -582,9 +571,13 @@ export default function DashboardView({
     permissions.canApproveShiftRequests,
     org.timezone ?? null,
     // Period-scoped to match mobile's Pending Approvals/Activity Feed
-    // semantics instead of an org-wide, unbounded fetch.
+    // semantics instead of an org-wide, unbounded fetch. Every status, so the
+    // activity feed reads the same result (`allRequests`) instead of the
+    // separate fetch it used to make for the same window (build plan 29).
     { startDate: periodStartKey, endDate: periodEndKey },
+    { includeAllStatuses: true },
   );
+  const activityRequests = shiftRequests.allRequests;
 
   // ─── Filter shifts by period ─────────────────────────────
   const currentPeriodShifts = useMemo(

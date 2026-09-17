@@ -331,7 +331,7 @@
       changes, which it does on the same mount. Gate the second effect on
       `scheduleLoadStarted` (mirroring the existing draft-recheck effect) so it
       only refetches on a genuine window change, not on initial load.
-- [ ] 29. **Fix dashboard duplicate shift-requests fetch and realtime channel** -
+- [x] 29. **Fix dashboard duplicate shift-requests fetch and realtime channel** -
       `DashboardView` fetches shift requests twice for the same org/period
       window: once directly via `fetchShiftRequests` inside its main data
       effect (for the activity feed), and again via `useShiftRequests` (for
@@ -347,9 +347,7 @@
       had uncommitted edits from another session (removing the client-side
       `queueNotification` calls the server route already dispatches), and
       this repo's concurrent-session rule is to leave such files alone.
-      Pick it up once that lands. The mobile half of the same problem was
-      fixed in 35 and shows the shape: a module-level, reference-counted
-      registry keyed on the org that fans events out to listeners.
+      Done once that session's work landed.
 - [x] 30. **Fix Reports page duplicate operations-report fetch** - whenever a
       report is generated with any non-empty filter, `ReportsPageContent`
       fetches the full operations report twice for the same org/date range:

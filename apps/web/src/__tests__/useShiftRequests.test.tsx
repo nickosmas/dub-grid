@@ -1,12 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useShiftRequests } from "@/hooks/useShiftRequests";
 import type { ShiftRequest } from "@/types";
 
 const mockFetchShiftRequests = vi.fn();
 const mockClaimShiftRequest = vi.fn();
-const mockCreateBrowserRealtimeChannel = vi.fn();
-const mockRemoveBrowserRealtimeChannel = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockQueueNotification = vi.fn();
@@ -22,10 +22,30 @@ vi.mock("@/features/schedule/client", () => ({
   volunteerForOpenShift: vi.fn(),
 }));
 
+// The hook no longer opens a channel of its own; it lives under the org's
+// shiftRequests query prefix, which the shared org realtime channel
+// invalidates (build plan item 29). Any use of the raw channel API here
+// would be a regression.
+const mockCreateBrowserRealtimeChannel = vi.fn();
 vi.mock("@/features/account/client", () => ({
   createBrowserRealtimeChannel: (...args: unknown[]) => mockCreateBrowserRealtimeChannel(...args),
-  removeBrowserRealtimeChannel: (...args: unknown[]) => mockRemoveBrowserRealtimeChannel(...args),
+  removeBrowserRealtimeChannel: vi.fn(),
 }));
+
+// react-query delivers results through a batched notify timer, and this
+// suite runs on fake timers, so a resolved fetch only reaches the hook once
+// pending timers are flushed too.
+async function flush() {
+  await act(async () => {
+    await Promise.resolve();
+    await vi.runOnlyPendingTimersAsync();
+  });
+}
+
+function wrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
 
 vi.mock("sonner", () => ({
   toast: {
@@ -128,16 +148,6 @@ describe("useShiftRequests", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-18T12:00:00.000Z"));
     vi.clearAllMocks();
-
-    const channel = {
-      on: vi.fn(),
-      subscribe: vi.fn(),
-      state: "joined",
-    };
-    channel.on.mockReturnValue(channel);
-    channel.subscribe.mockReturnValue(channel);
-    mockCreateBrowserRealtimeChannel.mockReturnValue(channel);
-    mockRemoveBrowserRealtimeChannel.mockResolvedValue("ok");
   });
 
   afterEach(() => {
@@ -174,13 +184,12 @@ describe("useShiftRequests", () => {
       }),
     ]);
 
-    const { result } = renderHook(() =>
-      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+      { wrapper },
     );
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     expect(result.current.requests.map((request) => request.id)).toEqual(["future-request"]);
     expect(result.current.openPickups.map((request) => request.id)).toEqual(["future-request"]);
@@ -192,17 +201,17 @@ describe("useShiftRequests", () => {
       .mockResolvedValueOnce([]);
     mockClaimShiftRequest.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() =>
-      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+      { wrapper },
     );
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     await act(async () => {
       await result.current.claim("claimable-request", "claimer-1");
     });
+    await flush();
 
     expect(result.current.requests).toEqual([]);
 
@@ -229,13 +238,12 @@ describe("useShiftRequests", () => {
       }),
     ]);
 
-    const { result } = renderHook(() =>
-      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+      { wrapper },
     );
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     expect(result.current.openPickups.map((request) => request.id)).toEqual([
       "public-pickup",
@@ -250,12 +258,10 @@ describe("useShiftRequests", () => {
     const { rerender } = renderHook(
       ({ dateRange }: { dateRange?: { startDate: string; endDate: string } }) =>
         useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles", dateRange),
-      { initialProps: {} },
+      { initialProps: {}, wrapper },
     );
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     expect(mockFetchShiftRequests).toHaveBeenLastCalledWith(
       "org-1",
@@ -265,14 +271,57 @@ describe("useShiftRequests", () => {
 
     rerender({ dateRange: { startDate: "2026-04-14", endDate: "2026-04-20" } });
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     expect(mockFetchShiftRequests).toHaveBeenLastCalledWith(
       "org-1",
       expect.any(Map),
       expect.objectContaining({ startDate: "2026-04-14", endDate: "2026-04-20" }),
     );
+  });
+
+  it("does not open a realtime channel of its own", async () => {
+    mockFetchShiftRequests.mockResolvedValue([]);
+
+    renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+      { wrapper },
+    );
+    await flush();
+
+    expect(mockCreateBrowserRealtimeChannel).not.toHaveBeenCalled();
+  });
+
+  it("fetches every status when asked and still reports only the active ones", async () => {
+    mockFetchShiftRequests.mockResolvedValue([
+      buildRequest({ id: "open-request", status: "open" }),
+      buildRequest({ id: "settled-request", status: "approved" }),
+    ]);
+
+    const { result } = renderHook(
+      () =>
+        useShiftRequests(
+          "org-1",
+          new Map(),
+          "claimer-1",
+          false,
+          "America/Los_Angeles",
+          { startDate: "2026-04-14", endDate: "2026-04-20" },
+          { includeAllStatuses: true },
+        ),
+      { wrapper },
+    );
+    await flush();
+
+    expect(mockFetchShiftRequests).toHaveBeenLastCalledWith(
+      "org-1",
+      expect.any(Map),
+      expect.not.objectContaining({ status: expect.anything() }),
+    );
+    expect(result.current.allRequests.map((request) => request.id)).toEqual([
+      "open-request",
+      "settled-request",
+    ]);
+    expect(result.current.requests.map((request) => request.id)).toEqual(["open-request"]);
   });
 });

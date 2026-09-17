@@ -333,6 +333,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     shiftBreakdown: { byFocusArea: [], totalShifts: 0 },
     shiftCategories: [shiftCategory],
     shiftRequests: {
+      allRequests: [],
       badgeCount: 1,
       cancel: vi.fn().mockResolvedValue(true),
       claim,
