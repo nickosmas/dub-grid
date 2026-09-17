@@ -189,6 +189,9 @@ export function BottomSheetModal({
     if (dismissDisabled) return;
     onDismiss();
   };
+  // A gate never shows the close button; a task sheet always does, and only
+  // disables it while a request is in flight.
+  const showsClose = presentationKind !== "gate";
   const {
     backdropStyle,
     gesture,
@@ -251,84 +254,99 @@ export function BottomSheetModal({
                 onPress={handleDismiss}
               />
             )}
-            <GestureDetector gesture={gesture}>
-              <Animated.View
-                accessibilityRole={accessibilityRole}
-                style={[styles.sheet, keyboardStyle, sheetStyle]}
-              >
-                {/* The drag region. Deliberately tall and outside the ScrollView:
+            <Animated.View
+              accessibilityRole={accessibilityRole}
+              style={[styles.sheet, keyboardStyle, sheetStyle]}
+            >
+              <GestureDetector gesture={gesture}>
+                <View style={styles.dragSurface}>
+                  {/* The drag region. Deliberately tall and outside the ScrollView:
                   a touch starting here can never be claimed by the scrolling
                   body, so the sheet always drags — without the user having to
                   hit the 40x4 handle itself. */}
-                <View
-                  style={[styles.dragRegion, dismissDisabled ? null : styles.dragRegionWithClose]}
-                >
-                  {/* Every sheet carries the handle, blocking ones included: it is
+                  <View style={[styles.dragRegion, showsClose ? styles.dragRegionWithClose : null]}>
+                    {/* Every sheet carries the handle, blocking ones included: it is
                     what marks the top of the sheet as the thing you grab, and a
                     blocking sheet answers that grab by following the finger a
                     little and settling back rather than by not moving. */}
-                  <View style={styles.grabberArea}>
-                    <View style={styles.grabber} />
+                    <View style={styles.grabberArea}>
+                      <View style={styles.grabber} />
+                    </View>
+                    {header ? <View style={styles.header}>{header}</View> : null}
                   </View>
-                  {/* The one *visible* way out. The drag, the outside tap and
-                    the Android back gesture all leave too, but a sheet holding
-                    unsaved input answers its own dismiss button with Discard,
-                    which resets rather than leaves — so without this there is
-                    no control on screen that closes it. Routed through
-                    `handleDismiss` like every other exit, so a guard still gets
-                    its say. Hidden when dismissal is disabled at all: a gate
-                    must not offer a way out it will refuse. */}
-                  {dismissDisabled ? null : (
-                    <Pressable
-                      accessibilityLabel="Close"
-                      accessibilityRole="button"
-                      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-                      hitSlop={10}
-                      style={({ pressed }) => [
-                        styles.closeButton,
-                        pressed && styles.closeButtonPressed,
-                      ]}
-                      onPress={handleDismiss}
+                  {scrollable ? (
+                    <Animated.ScrollView
+                      ref={scrollRef}
+                      // No rubber-banding at either edge: both are where the sheet's
+                      // own drag takes over, and the two fighting reads as jitter.
+                      // `bounces` is the iOS half of that, `overScrollMode` Android's.
+                      bounces={false}
+                      overScrollMode="never"
+                      contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
+                      // Without this the list defaults to `"never"`, so the first
+                      // tap on a sheet's submit button while a field is focused was
+                      // swallowed dismissing the keyboard, and the user had to tap
+                      // twice. Every sheet with a form sits in here.
+                      keyboardShouldPersistTaps="handled"
+                      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                      // The two together say whether the list has anywhere left to
+                      // scroll, which is what decides who owns an upward drag.
+                      onContentSizeChange={onScrollContentSizeChange}
+                      onLayout={onScrollViewLayout}
+                      onScroll={scrollHandler}
+                      scrollEventThrottle={16}
+                      showsVerticalScrollIndicator={false}
+                      style={styles.scrollArea}
                     >
-                      <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
-                    </Pressable>
+                      {children}
+                    </Animated.ScrollView>
+                  ) : (
+                    <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>
+                      {children}
+                    </View>
                   )}
-                  {header ? <View style={styles.header}>{header}</View> : null}
+                  {footer ? <View style={styles.footer}>{footer}</View> : null}
                 </View>
-                {scrollable ? (
-                  <Animated.ScrollView
-                    ref={scrollRef}
-                    // No rubber-banding at either edge: both are where the sheet's
-                    // own drag takes over, and the two fighting reads as jitter.
-                    // `bounces` is the iOS half of that, `overScrollMode` Android's.
-                    bounces={false}
-                    overScrollMode="never"
-                    contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
-                    // Without this the list defaults to `"never"`, so the first
-                    // tap on a sheet's submit button while a field is focused was
-                    // swallowed dismissing the keyboard, and the user had to tap
-                    // twice. Every sheet with a form sits in here.
-                    keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                    // The two together say whether the list has anywhere left to
-                    // scroll, which is what decides who owns an upward drag.
-                    onContentSizeChange={onScrollContentSizeChange}
-                    onLayout={onScrollViewLayout}
-                    onScroll={scrollHandler}
-                    scrollEventThrottle={16}
-                    showsVerticalScrollIndicator={false}
-                    style={styles.scrollArea}
-                  >
-                    {children}
-                  </Animated.ScrollView>
-                ) : (
-                  <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>
-                    {children}
-                  </View>
-                )}
-                {footer ? <View style={styles.footer}>{footer}</View> : null}
-              </Animated.View>
-            </GestureDetector>
+              </GestureDetector>
+              {/* The one *visible* way out. The drag, the outside tap and the
+                Android back gesture all leave too, but a sheet holding unsaved
+                input answers its own dismiss button with Discard, which resets
+                rather than leaves — so without this there is no control on
+                screen that closes it. Routed through `handleDismiss` like every
+                other exit, so a guard still gets its say.
+
+                A sibling of the pan detector, not a child: inside it, a thumb
+                tap that slid past the pan's activation distance activated the
+                drag, which cancelled the press, and the sheet wobbled instead
+                of closing. Out here the pan cannot claim the touch at all.
+
+                Kept mounted, disabled, while a task sheet is busy: a control
+                that vanishes mid-request reads as the sheet having lost its
+                exit. A gate is the exception, since it must not offer a way
+                out it will then refuse. */}
+              {showsClose ? (
+                <Pressable
+                  accessibilityLabel="Close"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: dismissDisabled }}
+                  android_ripple={
+                    dismissDisabled
+                      ? undefined
+                      : { color: mobileColors.rippleNeutral, borderless: true }
+                  }
+                  disabled={dismissDisabled}
+                  hitSlop={10}
+                  style={({ pressed }) => [
+                    styles.closeButton,
+                    dismissDisabled && styles.closeButtonDisabled,
+                    pressed && !dismissDisabled && styles.closeButtonPressed,
+                  ]}
+                  onPress={handleDismiss}
+                >
+                  <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
+                </Pressable>
+              ) : null}
+            </Animated.View>
           </View>
         </GestureHandlerRootView>
       </InsideSheetContext.Provider>
@@ -382,6 +400,14 @@ const createStyles = (
     },
     closeButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],
+    },
+    closeButtonDisabled: {
+      opacity: 0.4,
+    },
+    // The pan detector needs one native view to attach to; this is that view,
+    // holding the drag region and body while the close button sits beside it.
+    dragSurface: {
+      flexShrink: 1,
     },
     header: {
       paddingHorizontal: mobileSpace.xl,

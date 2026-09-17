@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
@@ -461,6 +461,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -623,6 +624,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -645,6 +647,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -673,7 +676,7 @@ describe("ShiftDetailScreen", () => {
   });
 
   it("opens the complete publication information from the compact footer", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
     render(<ShiftDetailScreen />);
 
     expect(screen.queryByText("Publication details")).not.toBeInTheDocument();
@@ -828,6 +831,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1000,6 +1004,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1118,6 +1123,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1216,6 +1222,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1267,6 +1274,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1359,6 +1367,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1378,6 +1387,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1420,6 +1430,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1453,6 +1464,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1518,6 +1530,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1569,7 +1582,7 @@ describe("ShiftDetailScreen", () => {
       isLoading: false,
       refetch: vi.fn(),
     }));
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
@@ -1668,6 +1681,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1767,6 +1781,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -1906,6 +1921,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2038,6 +2054,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2060,6 +2077,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2183,6 +2201,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate: vi.fn(),
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2205,6 +2224,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2242,6 +2262,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       if (queryKey[1] === "requests") {
@@ -2496,6 +2517,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2549,6 +2571,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2629,6 +2652,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2648,6 +2672,7 @@ describe("ShiftDetailScreen", () => {
       error: null,
       isPending: false,
       mutate,
+      reset: vi.fn(),
     });
 
     render(<ShiftDetailScreen />);
@@ -2673,7 +2698,7 @@ describe("ShiftDetailScreen", () => {
   });
 
   it("closes the request sheet outright when nothing has been chosen yet", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
@@ -2684,8 +2709,60 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
   });
 
+  it("shows a failed request inside the sheet instead of a toast behind it", () => {
+    useMutation.mockReturnValue({
+      error: new Error("Shift already has a pending request"),
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+
+    // The sheet is its own native window; a toast would render behind it.
+    expect(screen.getByText("Shift already has a pending request")).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Could not create request" }),
+    );
+    // The close button stays: a failure must never strand the user.
+    expect(screen.getByLabelText("Close")).toBeInTheDocument();
+  });
+
+  it("closes the request sheet on one tap after single-tap choices", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    // Drop, then Call off, then an absence type: three choices, each one tap
+    // to redo, so none of them is worth a discard question.
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByText("Sick"));
+    fireEvent.click(screen.getByLabelText("Close"));
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Call off")).not.toBeInTheDocument();
+  });
+
+  it("forgets single-tap choices once the sheet has closed", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByLabelText("Close"));
+    fireEvent.click(screen.getByText("Drop shift"));
+
+    // Reopened at the choice step, not on the absence list it was closed from.
+    expect(screen.getByText("Call off")).toBeInTheDocument();
+    expect(screen.queryByText("Sick")).not.toBeInTheDocument();
+  });
+
   it("confirms before discarding a request sheet with selections in it", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 
@@ -2701,11 +2778,22 @@ describe("ShiftDetailScreen", () => {
 
     confirmDialog("Discard");
 
+    // The confirmation leaves first, the selections reset at once, and the
+    // sheet (its "Swap" title alongside the page's Swap button) follows only
+    // once that transition is done; closing both in one commit strands it.
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.queryByText("You give")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Swap")).toHaveLength(2);
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getAllByText("Swap")).toHaveLength(1);
   });
 
   it("keeps the request sheet and its selections when the discard is cancelled", () => {
-    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
 
     render(<ShiftDetailScreen />);
 

@@ -265,6 +265,16 @@ Choose the surface by the user's task:
 - **Confirmation behavior:** backdrop and Android back mean Cancel while idle.
   Pending work blocks every dismissal path. Keep request failures in the
   active surface via `error`, rather than a toast or an obscured parent.
+- **A sheet's close button stays mounted while the sheet is busy.** A
+  `dismissDisabled` task sheet shows it disabled at reduced opacity rather than
+  unmounting it; only a `presentationKind="gate"` sheet has no close button.
+  It renders as a sibling of the pan `GestureDetector`, never inside it, so a
+  slidy thumb tap cannot be swallowed as the start of a drag.
+- **Dirty means work the user cannot redo in one tap.** A single radio or list
+  choice does not arm the discard confirmation; typed text or a selection that
+  took browsing to reach (a swap target) does. The request sheet's guard splits
+  `onDiscard` (reset selections) from `onClose` (drop the mode) for the
+  sequencing reason `useModalHandoff` documents.
   Use specific sentence-case action labels and an action-specific `iconName`
   when helpful; danger does not imply a trash icon. Horizontal actions put
   Cancel left and Confirm right, always side by side. Long labels wrap inside

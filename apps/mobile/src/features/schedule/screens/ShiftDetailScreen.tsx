@@ -21,6 +21,7 @@ import { Button } from "../../../shared/components/Button";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -36,7 +37,10 @@ import {
   getShiftRequests,
   getShiftSwapOptions,
 } from "../../../shared/lib/api";
-import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import {
+  getClientFriendlyErrorMessage,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { getQueryErrorMessage } from "../../../shared/lib/query-state";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -364,13 +368,9 @@ export default function ShiftDetailScreen() {
       targetSegmentIndex?: number;
       absenceTypeId?: number;
     }) => createShiftRequest(accessToken!, input),
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not create request",
-        fallbackMessage: "We couldn't create that request.",
-      });
-    },
+    // No `onError` toast: the request is sent from inside the sheet, which is
+    // its own native window, and a toast lands in the root window behind it
+    // where nobody sees it. The error renders in the sheet's footer instead.
     onSuccess: async (_, variables) => {
       pushToast({
         tone: "success",
@@ -783,12 +783,23 @@ export default function ShiftDetailScreen() {
     ]),
   );
 
-  function resetRequestMode(nextMode: RequestMode) {
-    setRequestMode(nextMode);
+  // Selections only, never the mode: the unsaved-changes guard runs this on
+  // every exit, and closing the sheet from inside it would tear the sheet and
+  // the discard confirmation down in one commit. UIKit drops the second of two
+  // simultaneous modal dismissals and the sheet stays on screen.
+  function resetRequestSelections() {
     setCoverageRequestType(null);
     setSelectedTargetShift(null);
     setSelectedRequesterSegmentIndex(firstRequestableRequesterSegmentIndex);
     setSelectedSwapDate(null);
+    setSelectedTargetedPickupEmployeeId(null);
+    setSelectedCalloffAbsenceTypeId(null);
+  }
+
+  function resetRequestMode(nextMode: RequestMode) {
+    setRequestMode(nextMode);
+    resetRequestSelections();
+    createRequestMutation.reset();
     setSwapWeekStartDate(
       nextMode === "swap"
         ? range.startDate
@@ -798,34 +809,32 @@ export default function ShiftDetailScreen() {
             : null
         : null,
     );
-    setSelectedTargetedPickupEmployeeId(null);
-    setSelectedCalloffAbsenceTypeId(null);
   }
 
   /**
-   * Anything the user has chosen inside the request sheet that a dismissal
-   * would throw away. The segment index counts: on a split shift, picking the
-   * other half is a real decision, not a default.
+   * Work the user cannot redo in one tap, which is the only thing worth a
+   * discard question. A swap target is found by browsing weeks and teammates;
+   * every other choice in the sheet (drop or pick up, an absence type, a
+   * segment, a targeted teammate) is a single tap, and asking "Discard this
+   * request?" after one tap read as the close button being broken.
    */
-  const hasUnsavedRequestInput =
-    requestMode != null &&
-    (coverageRequestType != null ||
-      selectedTargetShift != null ||
-      selectedTargetedPickupEmployeeId != null ||
-      selectedCalloffAbsenceTypeId != null ||
-      selectedRequesterSegmentIndex !== firstRequestableRequesterSegmentIndex);
+  const hasUnsavedRequestInput = requestMode != null && selectedTargetShift != null;
 
   // Leaving the sheet open is what makes this a guard: a dragged sheet settles
-  // back into place while the confirmation sits on top of it. Resetting the
-  // mode is also what closes the sheet, so it is the discard and the close at
-  // once.
+  // back into place while the confirmation sits on top of it. `onClose` is
+  // what closes the sheet, kept apart from `onDiscard` so the guard can
+  // sequence the confirmation's dismissal before the sheet's.
   const requestGuard = useUnsavedChangesGuard({
     isDirty: hasUnsavedRequestInput,
     disabled: createRequestMutation.isPending,
     title: "Discard this request?",
     body: "Your selections won't be saved.",
-    onDiscard: () => resetRequestMode(null),
+    onDiscard: resetRequestSelections,
+    onClose: () => resetRequestMode(null),
   });
+  const createRequestError = createRequestMutation.error
+    ? getClientFriendlyErrorMessage(createRequestMutation.error, "We couldn't create that request.")
+    : null;
 
   function submitSwapRequest() {
     if (!linkedEmployeeId || !shiftEntry || requestMode !== "swap") {
@@ -1168,6 +1177,7 @@ export default function ShiftDetailScreen() {
         dismissDisabled={createRequestMutation.isPending}
         footer={
           <>
+            {createRequestError ? <InlineError message={createRequestError} /> : null}
             {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
               <SheetActions
                 primaryAction={
