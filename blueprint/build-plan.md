@@ -448,7 +448,7 @@
         header and native swipe-down; the sheet keeps drop and pickup; the
         confirmation step remains for call-off only; the Requests tab uses the
         shared request-type badge map.
-  - [ ] 38d. **Schedule and requests screen token migration** - replace every
+  - [x] 38d. **Schedule and requests screen token migration** - replace every
         raw spacing and font-size literal in `scheduleScreenStyles.ts`,
         `shiftDetailScreenStyles.ts`, `requestsScreenStyles.ts`,
         `ProfilePrimitives.tsx`, and `SplitShift.tsx` with tokens, recording each
