@@ -317,7 +317,7 @@
       round trip and causing a visible re-render. Find the duplicate trigger
       (effect re-run, duplicate query key, non-memoized fetch call) and remove
       it without changing the page's data or behavior.
-- [ ] 27. **Fix stuck "show highlights" after publish** - after publishing a
+- [x] 27. **Fix stuck "show highlights" after publish** - after publishing a
       schedule, the show-highlights button in the publish confirmation banner
       stops responding until the banner is closed and highlights are reopened
       from the toolbar. The control likely reads stale state set before publish
@@ -352,7 +352,7 @@
       a lightweight options-only response. Split a lightweight
       `fetchOperationsReportOptions` endpoint, or have `reportsQuery` reuse
       `targetOptionsQuery`'s `filterOptions` when the range already matches.
-- [ ] 31. **Fix inert "Highlight Changes" toggle on Month view and Mobile Day
+- [x] 31. **Fix inert "Highlight Changes" toggle on Month view and Mobile Day
       view** - same bug family as item 27 (stuck publish-banner controls).
       `showPublishDiff`/`publishDiffForKey` are only threaded into the desktop
       `ScheduleGrid`; neither `MobileDayView` nor `MonthView` accept or read

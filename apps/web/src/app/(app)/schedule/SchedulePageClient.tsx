@@ -1607,6 +1607,28 @@ function SchedulerContent() {
     return counts;
   }, [publishChangesMap, publishNoteChangesMap]);
 
+  // Whether "Highlight Changes" can actually put anything on screen. Two ways
+  // it cannot, and both used to render the control anyway — it flipped state
+  // and nothing changed, which reads as a dead button (build plan items 27
+  // and 31):
+  //  - only the desktop week/2-week grid renders the overlay. MonthView and
+  //    MobileDayView take no publish-diff props at all.
+  //  - a publish whose recorded changes are all outside the window (or which
+  //    recorded none) has nothing to paint.
+  const publishDiffRenderable = spanWeeks !== "month" && !isMobile;
+  const publishChangeTotal =
+    publishChangeCounts.newShifts +
+    publishChangeCounts.modifiedShifts +
+    publishChangeCounts.deletedShifts +
+    publishChangeCounts.notes;
+  const canHighlightPublishChanges = publishDiffRenderable && publishChangeTotal > 0;
+
+  // Switching to a view that cannot paint the overlay would otherwise strand it
+  // on, with its only off switch hidden along with the control.
+  useEffect(() => {
+    if (!publishDiffRenderable) setShowPublishDiff(false);
+  }, [publishDiffRenderable]);
+
   // Dismissals persist for the tab session via useDismissibleBanner — no
   // auto-reset on data change. The X means "hide this for the rest of the
   // session"; sign-out wipes it.
@@ -6725,13 +6747,15 @@ function SchedulerContent() {
                     )}
                     <div className="dg-draft-banner-actions">
                       {!canNavigatePublishHistory ? (
-                        <Button
-                          onClick={() => setShowPublishDiff((visible) => !visible)}
-                          className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
-                          style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
-                        >
-                          {showPublishDiff ? "Hide changes" : "Show changes"}
-                        </Button>
+                        canHighlightPublishChanges && (
+                          <Button
+                            onClick={() => setShowPublishDiff((visible) => !visible)}
+                            className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                            style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                          >
+                            {showPublishDiff ? "Hide changes" : "Show changes"}
+                          </Button>
+                        )
                       ) : isMobile ? (
                         // Publish History's "Show on Grid" reaches the overlay
                         // on a phone too, so the way back out has to live here
@@ -6759,21 +6783,36 @@ function SchedulerContent() {
                         )
                       ) : (
                         <>
-                          <Hint
-                            content={hint("Highlight this publish's changes on the grid")}
-                            side="bottom"
-                          >
-                            <Button
-                              onClick={() => setShowPublishDiff((v) => !v)}
-                              className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                          {canHighlightPublishChanges && (
+                            <Hint
+                              content={hint("Highlight this publish's changes on the grid")}
+                              side="bottom"
+                            >
+                              <Button
+                                onClick={() => setShowPublishDiff((v) => !v)}
+                                className={`dg-btn ${showPublishDiff ? "dg-btn-info" : "dg-btn-secondary"}`}
+                                style={{
+                                  fontSize: "var(--dg-fs-caption)",
+                                  padding: "5px 12px",
+                                }}
+                              >
+                                {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
+                              </Button>
+                            </Hint>
+                          )}
+                          {/* The changes exist, this view just cannot paint
+                              them. Say so instead of offering a control that
+                              would do nothing. */}
+                          {!publishDiffRenderable && publishChangeTotal > 0 && (
+                            <span
                               style={{
-                                fontSize: "var(--dg-fs-caption)",
-                                padding: "5px 12px",
+                                fontSize: "var(--dg-fs-footnote)",
+                                fontStyle: "italic",
                               }}
                             >
-                              {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
-                            </Button>
-                          </Hint>
+                              Switch to week view to highlight changes
+                            </span>
+                          )}
                           <Button
                             onClick={() => setShowPublishHistory(true)}
                             className="dg-btn dg-btn-secondary"
