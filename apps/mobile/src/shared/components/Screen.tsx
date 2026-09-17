@@ -171,14 +171,14 @@ export function Screen({
   // container already does — so it renders as a sibling of the scroll view
   // instead, keeping the scroll view shallow and the title collapsing.
   const shouldRenderFooterAsSibling = !stickyHeader && !renderOverlay && Boolean(footer);
-  // The floating shell is `position: absolute; top: 0`, so it spans the status
-  // bar and has to pad itself clear of it. The non-scrolling shell sits in
-  // normal flow, already below the system bars, where that same inset is pure
-  // dead space — a band above the sticky header the size of the notch. It only
-  // became visible once skeletons moved into the non-scrolling branch, which is
-  // where the schedule's calendar strip started floating away from its title.
-  const resolvedStickyHeaderTopPadding =
-    stickyHeaderTopPadding ?? (scrollEnabled ? Math.max(insets.top, 8) : mobileSpace.sm);
+  // A sticky header only exists on a route that hides the native header (the
+  // dashboard and the schedule), so nothing above it clears the status bar on
+  // its behalf: the shell pads itself by the safe-area inset whether it floats
+  // over the scroll view or sits in normal flow above a skeleton. The two
+  // branches used to disagree, with the non-scrolling one padding by 8pt on the
+  // assumption that it was "already below the system bars", and every skeleton
+  // drew under the Dynamic Island and then jumped down when its content landed.
+  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
   // Android's RefreshControl has progressViewOffset to push the pull-to-
   // refresh spinner below the floating sticky header; iOS has no such prop.
   // A JS-level paddingTop doesn't move the ScrollView's own frame origin
@@ -317,6 +317,9 @@ export function Screen({
   ) : null;
 
   if (!scrollEnabled) {
+    // Without a sticky header this branch assumes a native header above it, and
+    // every caller today has one. A headerless skeleton screen of its own would
+    // need a sticky header, or `stickyHeaderTopPadding`, to clear the status bar.
     return (
       <View style={styles.root}>
         {stickyHeader ? (

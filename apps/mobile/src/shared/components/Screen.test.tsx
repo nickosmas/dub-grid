@@ -3,6 +3,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 
 const nativeScrollTo = vi.fn();
+// Mutable so a test can stand the screen under a real notch. The default 8 is
+// deliberately small: it is also the floor the sticky header pads by, so a test
+// that wants to see the inset applied has to raise it first.
+const safeAreaInsets = vi.hoisted(() => ({ top: 8, right: 0, bottom: 14, left: 0 }));
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -152,12 +156,7 @@ vi.mock("react-native-safe-area-context", async () => {
   return {
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", {}, children),
-    useSafeAreaInsets: () => ({
-      top: 8,
-      right: 0,
-      bottom: 14,
-      left: 0,
-    }),
+    useSafeAreaInsets: () => ({ ...safeAreaInsets }),
   };
 });
 
@@ -170,9 +169,21 @@ beforeAll(async () => {
   Card = screenModule.Card;
 });
 
+/** The sticky-header shell is the View wrapping whatever `stickyHeader` renders. */
+function getStickyHeaderShellPaddingTop(): number | undefined {
+  const shell = screen.getByText("Header").parentElement;
+  const style = JSON.parse(shell?.getAttribute("data-style") ?? "null") as unknown;
+  const layers = Array.isArray(style) ? style : [style];
+  return layers.reduce<number | undefined>((found, layer) => {
+    const value = (layer as { paddingTop?: number } | null)?.paddingTop;
+    return typeof value === "number" ? value : found;
+  }, undefined);
+}
+
 describe("Screen", () => {
   beforeEach(() => {
     nativeScrollTo.mockClear();
+    safeAreaInsets.top = 8;
   });
 
   it("exposes the scroll view as the top-level element for native header scroll tracking", () => {
@@ -308,6 +319,39 @@ describe("Screen", () => {
 
     expect(container.firstElementChild).not.toBe(scrollView);
     expect(container.firstElementChild?.contains(scrollView)).toBe(true);
+  });
+
+  it("pads a non-scrolling sticky header by the top safe-area inset, the same as the floating one", () => {
+    safeAreaInsets.top = 59;
+
+    const { unmount } = render(
+      <Screen scrollEnabled={false} stickyHeader={<span>Header</span>}>
+        <div>Skeleton</div>
+      </Screen>,
+    );
+    const nonScrollingPadding = getStickyHeaderShellPaddingTop();
+    unmount();
+
+    render(
+      <Screen stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(nonScrollingPadding).toBe(59);
+    expect(getStickyHeaderShellPaddingTop()).toBe(nonScrollingPadding);
+  });
+
+  it("keeps the sticky header off the top edge on a device with no inset", () => {
+    safeAreaInsets.top = 0;
+
+    render(
+      <Screen scrollEnabled={false} stickyHeader={<span>Header</span>}>
+        <div>Skeleton</div>
+      </Screen>,
+    );
+
+    expect(getStickyHeaderShellPaddingTop()).toBe(8);
   });
 
   it("renders overlays with the measured sticky header height", () => {
