@@ -213,3 +213,19 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Why it matters:** The `80px` stands in for the label plus date-row height. At larger font settings or if the cap gains chrome, a searched-to row lands partly under the sticky group; nothing fails loudly.
 **Suggested fix:** Publish the measured group height as a CSS custom property from the existing geometry effect (it already measures the grid) and use it in the calc, or accept the constant and name it beside `CHIP_OVERHANG_PX`.
 **Resolution:** Repaired 2026-09-07 in the same session: the geometry effect publishes `--dg-grid-sticky-height` on the section and the row scroll margin reads it, keeping `80px` only as the fallback.
+
+### F-67 [P3] open - Read-only shift detail panel is announced as "Edit shift"
+
+**File:** apps/web/src/components/ShiftEditPanel.tsx:3430-3433
+**Found:** 2026-09-17 by feature 25d2b Step 3 (role variance, `qa-regular` and `qa-management`)
+**Why it matters:** When a viewer without edit rights opens their own cell, `ShiftEditPanel` renders in detail mode (`allowShiftEdits` false) but keeps the static `aria-label="Edit shift"`, so a screen reader announces a read-only panel as an editor. The request-only return block already labels itself "Shift requests"; only this branch is mislabeled. `e2e/role-variance.spec.ts` matches the panel on its rendered content for that reason.
+**Suggested fix:** Derive the dialog label from the mode (for example "Shift details" when `!allowShiftEdits`), then let the role-variance test assert the accessible name.
+**Resolution:**
+
+### F-68 [P3] open - Shell renders nothing while the organization bootstrap retries a 5xx
+
+**File:** apps/web/src/features/organization/client/api.ts:125-144; apps/web/src/components/onboarding/OnboardingGate.tsx:237-254; apps/web/src/components/SetupGuard.tsx:43-44
+**Found:** 2026-09-17 by feature 25d2b Step 5 (role variance, bootstrap states)
+**Why it matters:** A 5xx from `/api/organization/bootstrap` is retried up to three times with jittered backoff (worst case about 7s) before the query errors and `OrganizationBootstrapRecovery` appears. During that window `SetupGuard` returns null and no page-level progress bar is mounted, so every role sees a blank shell with no header and no loading affordance. The role-variance probe measured 4-5s of empty `body` on Firefox before the recovery copy rendered. Role-independent, so not a 25d2b contract violation.
+**Suggested fix:** Keep a loading affordance mounted while the bootstrap query is retrying (the shared progress bar above `SetupGuard`, or `AuthTransitionScreen` with its workspace phase), so a transient failure never reads as a hung page.
+**Resolution:**

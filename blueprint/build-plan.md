@@ -299,7 +299,7 @@
             `qa-admin@dubgrid.test` and `qa-gridmaster@dubgrid.test` to the
             seed's `TEST_USERS`, e2e login helpers for both, and a smoke
             test proving each lands where its role should.
-      - [ ] 25d2b. **Regular and management user variance** - re-run the
+      - [x] 25d2b. **Regular and management user variance** - re-run the
             25d1 route-state matrix as `qa-regular` and `qa-management`,
             asserting each route's role-gated outcome (redirect, read-only
             variant, or the same state), and closing any contract violation.
