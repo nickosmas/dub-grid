@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type MutableRefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import ReanimatedSwipeable, {
@@ -23,6 +23,13 @@ import { formatRelativeTime } from "../../dashboard/components/ActivityFeedCard"
 const SWIPE_ACTION_WIDTH = 88;
 
 /**
+ * The one row whose actions are showing. A list shares a single ref so that
+ * opening a second row closes the first: two open reveals read as a broken
+ * list, and iOS Mail never allows it either.
+ */
+export type OpenSwipeRegistry = MutableRefObject<SwipeableMethods | null>;
+
+/**
  * One alert as a mailbox item: an unread dot, the title with its time on the
  * same line, two lines of the message, a hairline below. The actions live
  * behind a left swipe (read or unread, archive or restore) rather than as
@@ -32,12 +39,14 @@ const SWIPE_ACTION_WIDTH = 88;
 export function NotificationRow({
   notification,
   pending,
+  openRegistry,
   onPress,
   onToggleRead,
   onArchive,
 }: {
   notification: MobileNotification;
   pending: boolean;
+  openRegistry?: OpenSwipeRegistry;
   onPress: () => void;
   onToggleRead: () => void;
   onArchive: () => void;
@@ -57,11 +66,25 @@ export function NotificationRow({
     swipeable.current?.close();
     action();
   };
+  const handleWillOpen = () => {
+    if (!openRegistry) return;
+    if (openRegistry.current && openRegistry.current !== swipeable.current) {
+      openRegistry.current.close();
+    }
+    openRegistry.current = swipeable.current;
+  };
+  const handleClose = () => {
+    if (openRegistry && openRegistry.current === swipeable.current) {
+      openRegistry.current = null;
+    }
+  };
 
   return (
     <ReanimatedSwipeable
       ref={swipeable}
       friction={2}
+      onSwipeableClose={handleClose}
+      onSwipeableWillOpen={handleWillOpen}
       overshootRight={false}
       renderRightActions={() => (
         <View style={styles.actions}>
@@ -197,8 +220,12 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.meta,
       color: mobileColors.textSecondary,
     },
+    // The gap between the row's text and the first action is the page
+    // showing through, so the actions read as a control beside the row
+    // rather than as the row's own edge.
     actions: {
       flexDirection: "row",
+      marginLeft: mobileSpace.md,
     },
     action: {
       width: SWIPE_ACTION_WIDTH,

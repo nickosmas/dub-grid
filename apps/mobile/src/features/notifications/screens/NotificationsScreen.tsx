@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -16,7 +16,7 @@ import {
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
-import { NotificationRow } from "../components/NotificationRow";
+import { NotificationRow, type OpenSwipeRegistry } from "../components/NotificationRow";
 import { useMobileNotificationsRealtimeTick } from "../hooks/useMobileNotificationsRealtimeTick";
 import { useNotificationFacets } from "../hooks/useNotificationFacets";
 import { filterNotificationsForViewer } from "../lib/notification-visibility";
@@ -156,6 +156,8 @@ export default function NotificationsScreen() {
 
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
 
+  // One open swipe at a time across the list; see `OpenSwipeRegistry`.
+  const openSwipe = useRef<OpenSwipeRegistry["current"]>(null);
   const manualRefresh = useManualRefresh(async () => {
     await notificationsQuery.refetch();
   });
@@ -373,6 +375,7 @@ export default function NotificationsScreen() {
             <AnimatedListItem index={index} key={notification.id}>
               {index > 0 ? <View style={styles.divider} /> : null}
               <NotificationRow
+                openRegistry={openSwipe}
                 pending={pendingRowId === notification.id}
                 notification={notification}
                 onPress={() => handleRowPress(notification)}
