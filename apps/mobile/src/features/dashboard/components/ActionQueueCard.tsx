@@ -4,7 +4,7 @@ import type { MobileShiftRequest } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -63,26 +63,22 @@ export function ActionQueueCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
-      title="Pending approvals"
-      onSeeAll={onSeeAll}
-      detail={
-        requests.length > 0 ? (
-          <DashboardRowList
-            items={requests}
-            keyExtractor={(request) => request.id}
-            limit={3}
-            renderItem={(request) => <ActionQueueRow request={request} />}
-          />
-        ) : (
-          <EmptyStateCard
-            compact
-            iconName="checkmark-circle"
-            title="No requests are waiting on you"
-          />
-        )
-      }
-    />
+    <DashboardCard title="Pending approvals" tone={"warning"} onOpen={onSeeAll}>
+      {requests.length > 0 ? (
+        <DashboardRowList
+          items={requests}
+          keyExtractor={(request) => request.id}
+          limit={3}
+          renderItem={(request) => <ActionQueueRow request={request} />}
+        />
+      ) : (
+        <EmptyStateCard
+          compact
+          iconName="checkmark-circle"
+          title="No requests are waiting on you"
+        />
+      )}
+    </DashboardCard>
   );
 }
 

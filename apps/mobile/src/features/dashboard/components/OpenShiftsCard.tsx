@@ -4,7 +4,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -77,22 +77,22 @@ export function OpenShiftsCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
+    <DashboardCard
       title="Open shifts"
-      onSeeAll={onSeeAll}
-      detail={
-        openShifts.length > 0 ? (
-          <DashboardRowList
-            items={openShifts}
-            keyExtractor={(shift) => shift.id}
-            limit={3}
-            renderItem={(shift) => <OpenShiftRow shift={shift} />}
-          />
-        ) : (
-          <EmptyStateCard compact iconName="checkmark-circle" title="No open shifts right now" />
-        )
-      }
-    />
+      tone={openShifts.some((shift) => shift.urgency === "high") ? "danger" : "warning"}
+      onOpen={onSeeAll}
+    >
+      {openShifts.length > 0 ? (
+        <DashboardRowList
+          items={openShifts}
+          keyExtractor={(shift) => shift.id}
+          limit={3}
+          renderItem={(shift) => <OpenShiftRow shift={shift} />}
+        />
+      ) : (
+        <EmptyStateCard compact iconName="checkmark-circle" title="No open shifts right now" />
+      )}
+    </DashboardCard>
   );
 }
 

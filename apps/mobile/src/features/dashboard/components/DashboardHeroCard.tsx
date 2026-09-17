@@ -3,41 +3,50 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Pressable } from "../../../shared/components/Pressable";
-import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
-  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import type { CardIconTone } from "../../../shared/components/Screen";
-import { coverageColor } from "../lib/coverage";
+import { coverageColor, coverageToneForPct } from "../lib/coverage";
+import { createToneTextColors } from "../lib/tone-text";
+import { DashboardCard, type DashboardCardTone } from "./DashboardCard";
 
-// Text colour only: the hero carries no pills. A status word and a figure
-// read in their tone's colour, and the surface stays one white card.
-function createToneColors(mobileColors: MobileColors): Record<CardIconTone, string> {
-  return {
-    brand: mobileColors.brand,
-    warning: mobileColors.warningText,
-    danger: mobileColors.dangerText,
-    success: mobileColors.successText,
-  };
+/**
+ * The page's reading of the period, above the cards: a headline and one
+ * sentence, the way Apple Health opens Insights with "Stand Ring Looks Good"
+ * and a line under it. Nothing else lives up here; the status colour reaches
+ * the page through the cards below.
+ */
+export function DashboardHeadline({
+  summary,
+}: {
+  summary: MobileDashboardResponse["heroSummary"];
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  return (
+    <View style={styles.headline}>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.headlineTitle}>
+        {summary.title}
+      </Text>
+      {summary.description ? (
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.headlineBody}>
+          {summary.description}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
-
-const STATUS_TONE: Record<string, CardIconTone> = {
-  Attention: "danger",
-  Approval: "warning",
-  Setup: "warning",
-  Healthy: "success",
-};
 
 /**
  * A secondary figure under the coverage meter: the number in its tone's
- * colour, the label beneath, a chevron when it opens something. No fill and
- * no icon; the figure is the content.
+ * colour, the label beneath, a chevron when it opens something.
  */
 function MetricStat({
   label,
@@ -47,13 +56,12 @@ function MetricStat({
 }: {
   label: string;
   value: number;
-  tone: CardIconTone;
+  tone: Exclude<DashboardCardTone, "neutral">;
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const color = useMemo(() => createToneColors(mobileColors), [mobileColors])[tone];
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const color = useMemo(() => createToneTextColors(mobileColors), [mobileColors])[tone];
 
   return (
     <Pressable
@@ -79,44 +87,31 @@ function MetricStat({
   );
 }
 
+/**
+ * The coverage card: the period's one big figure over its meter, then the
+ * two counts that need a hand. Its tone follows the coverage percentage, so
+ * the card itself reads green, amber or red before a number is read.
+ */
 export function DashboardHeroCard({
-  summary,
   metrics,
+  onOpenCoverage,
   onOpenGaps,
   onOpenApprovals,
 }: {
-  summary: MobileDashboardResponse["heroSummary"];
   metrics: MobileDashboardResponse["metrics"];
+  onOpenCoverage?: () => void;
   onOpenGaps?: () => void;
   onOpenApprovals?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
-  const statusColor = useMemo(() => createToneColors(mobileColors), [mobileColors])[tone];
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const coverage = metrics.coveragePct;
+  const tone = coverageToneForPct(coverage);
   const meterColor =
     coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
 
   return (
-    <View style={styles.card}>
-      <View style={styles.headerCopy}>
-        <Text
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
-          style={[styles.status, { color: statusColor }]}
-        >
-          {summary.statusLabel}
-        </Text>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.title}>
-          {summary.title}
-        </Text>
-      </View>
-
-      {/* Coverage is the one figure that summarises the period, so it is the
-          only large number on the surface. When requirements are not
-          configured the headline already says so, and a dash over an empty
-          meter only repeated it. */}
+    <DashboardCard title="Coverage" tone={tone} onOpen={onOpenCoverage}>
       {coverage != null ? (
         <View style={styles.coverage}>
           <View style={styles.coverageFigureRow}>
@@ -128,7 +123,7 @@ export function DashboardHeroCard({
               {coverage}%
             </Text>
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.coverageLabel}>
-              coverage
+              covered
             </Text>
           </View>
           <View
@@ -145,10 +140,7 @@ export function DashboardHeroCard({
           </View>
         </View>
       ) : null}
-
-      {/* A hairline above the stats: without it the pair read as a third
-          line of the headline rather than as the card's figures. */}
-      <View style={styles.statRow}>
+      <View style={[styles.statRow, coverage != null ? styles.statRowDivided : null]}>
         <MetricStat
           label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
           onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
@@ -163,33 +155,22 @@ export function DashboardHeroCard({
           value={metrics.pendingApprovalsCount}
         />
       </View>
-    </View>
+    </DashboardCard>
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    card: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      // Borderless in light mode, hairline in dark: matches the shared Card.
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.cardBorder,
-      padding: mobileSpace.lg,
-      gap: mobileSpace.lg,
-      ...mobileElevation("card", isDark),
-    },
-    headerCopy: {
+    headline: {
       gap: mobileSpace.xs,
     },
-    status: {
-      ...mobileText.label,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-    },
-    title: {
-      ...mobileText.title,
+    headlineTitle: {
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
+    },
+    headlineBody: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
     },
     coverage: {
       gap: mobileSpace.sm,
@@ -222,12 +203,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "stretch",
       gap: mobileSpace.lg,
+    },
+    // A hairline above the stats when a figure sits above them, so they
+    // read as the card's second section rather than a third line of it.
+    statRowDivided: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
       paddingTop: mobileSpace.lg,
     },
-    // Centred in their half of the card: two left-aligned stats read as a
-    // list that stopped after one row.
     stat: {
       flex: 1,
       alignItems: "center",

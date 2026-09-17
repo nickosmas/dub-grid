@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -73,22 +73,18 @@ export function ActivityFeedCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
-      title="Recent activity"
-      onSeeAll={onSeeAll}
-      detail={
-        items.length > 0 ? (
-          <DashboardRowList
-            items={items}
-            keyExtractor={(item) => item.id}
-            limit={3}
-            renderItem={(item) => <ActivityRow item={item} />}
-          />
-        ) : (
-          <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
-        )
-      }
-    />
+    <DashboardCard title="Recent activity" tone={"neutral"} onOpen={onSeeAll}>
+      {items.length > 0 ? (
+        <DashboardRowList
+          items={items}
+          keyExtractor={(item) => item.id}
+          limit={3}
+          renderItem={(item) => <ActivityRow item={item} />}
+        />
+      ) : (
+        <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
+      )}
+    </DashboardCard>
   );
 }
 

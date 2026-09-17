@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
 import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
@@ -169,116 +169,112 @@ export function MyScheduleCard({
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
-    <Card
-      title="Your schedule"
-      onSeeAll={onExpand}
-      detail={
-        dates.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {dates.map((dateIso) => {
-              const entry = entryByDate.get(dateIso);
-              const { weekday, dayNumber } = formatDayHeader(dateIso);
-              const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
+    <DashboardCard title="Your schedule" tone={"brand"} onOpen={onExpand}>
+      {dates.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {dates.map((dateIso) => {
+            const entry = entryByDate.get(dateIso);
+            const { weekday, dayNumber } = formatDayHeader(dateIso);
+            const segmentPills = buildDaySegmentPills(entry, mobileColors, isDarkTheme);
 
-              return (
-                <View key={dateIso} style={styles.dayCard}>
-                  <Text style={styles.dayHeader}>
-                    {weekday} {dayNumber}
-                  </Text>
-                  {segmentPills.length > 0 ? (
-                    <View style={styles.shiftRow}>
-                      {segmentPills.map((segment) => (
-                        <View
-                          key={segment.key}
+            return (
+              <View key={dateIso} style={styles.dayCard}>
+                <Text style={styles.dayHeader}>
+                  {weekday} {dayNumber}
+                </Text>
+                {segmentPills.length > 0 ? (
+                  <View style={styles.shiftRow}>
+                    {segmentPills.map((segment) => (
+                      <View
+                        key={segment.key}
+                        style={[
+                          styles.shiftPill,
+                          segment.pill
+                            ? {
+                                backgroundColor: segment.pill.color,
+                                borderColor: segment.pill.border,
+                              }
+                            : null,
+                        ]}
+                      >
+                        <Text
+                          numberOfLines={1}
                           style={[
-                            styles.shiftPill,
-                            segment.pill
-                              ? {
-                                  backgroundColor: segment.pill.color,
-                                  borderColor: segment.pill.border,
-                                }
-                              : null,
+                            styles.shiftName,
+                            segment.pill ? { color: segment.pill.text } : null,
                           ]}
                         >
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftName,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.label}
-                          </Text>
-                          {/* Job name and time lines are always rendered (even
-                              when absent) so every pill has the same
-                              three-line height. */}
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftJobName,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.jobName ?? " "}
-                          </Text>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.shiftTime,
-                              segment.pill ? { color: segment.pill.text } : null,
-                            ]}
-                          >
-                            {segment.timeRangeLabel ?? " "}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    // Nothing scheduled at all. Absences no longer land here —
-                    // they render as their own coloured pill above.
-                    <View style={styles.emptyPill}>
-                      <Text style={styles.emptyText}>—</Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        ) : query.error ? (
-          // A failed fetch is not an empty week. This card owns its own query,
-          // and the dashboard's content state deliberately excludes its error,
-          // so without this branch a dropped request told the user they had no
-          // shifts — a wrong answer rather than a missing one, in a scheduling
-          // app where that is the whole question.
-          <StatusBanner
-            actionLabel="Try again"
-            body={getClientFriendlyErrorMessage(
-              query.error,
-              "We couldn't load your schedule right now.",
-            )}
-            title="Could not load your schedule"
-            onAction={() => {
-              void query.refetch();
-            }}
-          />
-        ) : (
-          <EmptyStateCard
-            actionLabel={onExpand ? "View full schedule" : undefined}
-            actionVariant="link"
-            compact
-            iconName="calendar-clear-outline"
-            onAction={onExpand}
-            title="You're not scheduled this week"
-          />
-        )
-      }
-    />
+                          {segment.label}
+                        </Text>
+                        {/* Job name and time lines are always rendered (even
+                            when absent) so every pill has the same
+                            three-line height. */}
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.shiftJobName,
+                            segment.pill ? { color: segment.pill.text } : null,
+                          ]}
+                        >
+                          {segment.jobName ?? " "}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.shiftTime,
+                            segment.pill ? { color: segment.pill.text } : null,
+                          ]}
+                        >
+                          {segment.timeRangeLabel ?? " "}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  // Nothing scheduled at all. Absences no longer land here —
+                  // they render as their own coloured pill above.
+                  <View style={styles.emptyPill}>
+                    <Text style={styles.emptyText}>—</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : query.error ? (
+        // A failed fetch is not an empty week. This card owns its own query,
+        // and the dashboard's content state deliberately excludes its error,
+        // so without this branch a dropped request told the user they had no
+        // shifts — a wrong answer rather than a missing one, in a scheduling
+        // app where that is the whole question.
+        <StatusBanner
+          actionLabel="Try again"
+          body={getClientFriendlyErrorMessage(
+            query.error,
+            "We couldn't load your schedule right now.",
+          )}
+          title="Could not load your schedule"
+          onAction={() => {
+            void query.refetch();
+          }}
+        />
+      ) : (
+        <EmptyStateCard
+          actionLabel={onExpand ? "View full schedule" : undefined}
+          actionVariant="link"
+          compact
+          iconName="calendar-clear-outline"
+          onAction={onExpand}
+          title="You're not scheduled this week"
+        />
+      )}
+    </DashboardCard>
   );
 }
 

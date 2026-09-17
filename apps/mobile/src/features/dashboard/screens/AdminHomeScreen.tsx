@@ -18,12 +18,12 @@ import {
   getDashboardPeriodRange,
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
-import { mobileMotion, mobileSpacing } from "../../../shared/theme/tokens";
+import { mobileMotion, mobileSpace } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
-import { DashboardHeroCard } from "../components/DashboardHeroCard";
+import { DashboardHeadline, DashboardHeroCard } from "../components/DashboardHeroCard";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
@@ -183,12 +183,14 @@ export function AdminHomeScreen() {
   // absent for this role or period does not leave a gap in the sequence.
   const sections: Array<{ key: string; node: ReactNode }> = [
     {
-      key: "hero",
+      key: "coverage-summary",
       node: (
         <DashboardHeroCard
           metrics={data.metrics}
-          summary={data.heroSummary}
           onOpenApprovals={openExpanded("/(tabs)/home/pending-approvals")}
+          onOpenCoverage={
+            data.coverageBySection.length > 0 ? openExpanded("/(tabs)/home/coverage") : undefined
+          }
           onOpenGaps={openExpanded("/(tabs)/home/open-shifts")}
         />
       ),
@@ -295,6 +297,7 @@ export function AdminHomeScreen() {
       }
     >
       <PeriodToggle mode={periodMode} onChange={setPeriodMode} />
+      <DashboardHeadline summary={data.heroSummary} />
       <Animated.View style={[styles.cards, dimStyle]}>
         {sections.map((section, index) => (
           <AnimatedListItem index={index} key={section.key}>
@@ -307,8 +310,9 @@ export function AdminHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  // The cards keep the page's own section rhythm inside the dimmable column.
+  // Tighter than the page's section gap: each card carries its own title
+  // inside now, so the column reads as one stack of tinted surfaces.
   cards: {
-    gap: mobileSpacing.sectionGap,
+    gap: mobileSpace.lg,
   },
 });

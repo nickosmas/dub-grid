@@ -9,6 +9,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { Screen } from "../../../shared/components/Screen";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import {
   ScrollableTabStrip,
   ScrollableTabStripSkeleton,
@@ -385,13 +386,15 @@ export default function NotificationsScreen() {
             </AnimatedListItem>
           ))}
           {notificationsQuery.hasNextPage ? (
-            <Button
-              compact
-              tone="secondary"
-              label="Load more"
-              loading={notificationsQuery.isFetchingNextPage}
-              onPress={() => notificationsQuery.fetchNextPage()}
-            />
+            <View style={styles.loadMore}>
+              <Button
+                compact
+                tone="secondary"
+                label="Load more"
+                loading={notificationsQuery.isFetchingNextPage}
+                onPress={() => notificationsQuery.fetchNextPage()}
+              />
+            </View>
           ) : null}
         </View>
       )}
@@ -432,12 +435,21 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     // Rows, not cards: the list is one column with a hairline between
     // alerts, the way a mailbox reads, and the row's actions sit behind a
-    // swipe rather than on a panel of their own.
+    // swipe rather than on a panel of their own. The column bleeds past the
+    // page gutter so a swiped row's actions reach the screen edge; each row
+    // pads itself back to the gutter.
     list: {
       gap: 0,
+      marginHorizontal: -getScreenGutter(),
+    },
+    // Back inside the gutter the bleeding list gave up.
+    loadMore: {
+      marginHorizontal: getScreenGutter(),
+      marginTop: mobileSpace.lg,
     },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: mobileColors.borderSubtle,
+      marginHorizontal: getScreenGutter(),
     },
   });

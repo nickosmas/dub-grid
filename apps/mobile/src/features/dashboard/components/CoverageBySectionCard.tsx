@@ -4,7 +4,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -15,7 +15,7 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { DashboardRowList } from "./DashboardRowList";
-import { coverageColor } from "../lib/coverage";
+import { coverageColor, coverageTone } from "../lib/coverage";
 
 export { coverageColor } from "../lib/coverage";
 
@@ -73,27 +73,23 @@ export function CoverageBySectionCard({
   const title = `Coverage by ${focusAreaLabel.toLowerCase()}`;
 
   return (
-    <Card
-      title={title}
-      onSeeAll={onSeeAll}
-      detail={
-        sections.length > 0 ? (
-          <DashboardRowList
-            items={sections}
-            keyExtractor={(section) => String(section.focusAreaId)}
-            limit={3}
-            renderItem={(section) => <CoverageSectionRow section={section} />}
-          />
-        ) : (
-          <EmptyStateCard
-            compact
-            body="Coverage appears here once staffing requirements are configured and the period is published."
-            iconName="stats-chart-outline"
-            title="No coverage to track yet"
-          />
-        )
-      }
-    />
+    <DashboardCard title={title} tone={coverageTone(sections)} onOpen={onSeeAll}>
+      {sections.length > 0 ? (
+        <DashboardRowList
+          items={sections}
+          keyExtractor={(section) => String(section.focusAreaId)}
+          limit={3}
+          renderItem={(section) => <CoverageSectionRow section={section} />}
+        />
+      ) : (
+        <EmptyStateCard
+          compact
+          body="Coverage appears here once staffing requirements are configured and the period is published."
+          iconName="stats-chart-outline"
+          title="No coverage to track yet"
+        />
+      )}
+    </DashboardCard>
   );
 }
 

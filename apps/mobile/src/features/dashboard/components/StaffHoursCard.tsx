@@ -4,7 +4,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -56,26 +56,22 @@ export function StaffHoursCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <Card
-      title="Overtime watch"
-      onSeeAll={onSeeAll}
-      detail={
-        entries.length > 0 ? (
-          <DashboardRowList
-            items={entries}
-            keyExtractor={(entry) => entry.employeeId}
-            limit={3}
-            renderItem={(entry) => <StaffHoursRow entry={entry} />}
-          />
-        ) : (
-          <EmptyStateCard
-            compact
-            iconName="checkmark-circle"
-            title={`No one is over ${thresholdHours}h this period`}
-          />
-        )
-      }
-    />
+    <DashboardCard title="Overtime watch" tone={"danger"} onOpen={onSeeAll}>
+      {entries.length > 0 ? (
+        <DashboardRowList
+          items={entries}
+          keyExtractor={(entry) => entry.employeeId}
+          limit={3}
+          renderItem={(entry) => <StaffHoursRow entry={entry} />}
+        />
+      ) : (
+        <EmptyStateCard
+          compact
+          iconName="checkmark-circle"
+          title={`No one is over ${thresholdHours}h this period`}
+        />
+      )}
+    </DashboardCard>
   );
 }
 

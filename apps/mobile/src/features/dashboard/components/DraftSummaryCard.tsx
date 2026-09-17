@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { Card } from "../../../shared/components/Screen";
+import { DashboardCard } from "./DashboardCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 
@@ -25,21 +25,18 @@ export function DraftSummaryCard({ summary }: { summary: DraftSummary }) {
   if (summary.total === 0 || changes.length === 0) return null;
 
   return (
-    <Card
-      title="Unpublished changes"
-      detail={
-        <View style={styles.detail}>
-          <Text style={styles.description}>These schedule changes are not published yet.</Text>
-          <View style={styles.rows}>
-            {changes.map(({ key, label }) => (
-              <View key={key} style={styles.row}>
-                <Text style={styles.label}>{formatChangeLabel(summary[key], label)}</Text>
-              </View>
-            ))}
-          </View>
+    <DashboardCard title="Unpublished changes" tone={"warning"}>
+      <View style={styles.detail}>
+        <Text style={styles.description}>These schedule changes are not published yet.</Text>
+        <View style={styles.rows}>
+          {changes.map(({ key, label }) => (
+            <View key={key} style={styles.row}>
+              <Text style={styles.label}>{formatChangeLabel(summary[key], label)}</Text>
+            </View>
+          ))}
         </View>
-      }
-    />
+      </View>
+    </DashboardCard>
   );
 }
 

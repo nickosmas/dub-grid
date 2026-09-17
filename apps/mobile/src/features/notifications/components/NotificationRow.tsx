@@ -17,6 +17,7 @@ import {
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { formatRelativeTime } from "../../dashboard/components/ActivityFeedCard";
 
 /** Width of one revealed swipe action. */
@@ -170,11 +171,15 @@ export function NotificationRow({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // The list bleeds to the screen edges (see the screen's `list` style) so
+    // a swiped row's actions meet the edge; the row keeps the gutter as its
+    // own padding so its text still lines up with the page.
     row: {
       flexDirection: "row",
       alignItems: "flex-start",
       gap: mobileSpace.sm,
       paddingVertical: mobileListRow.paddingVertical,
+      paddingHorizontal: getScreenGutter(),
       backgroundColor: mobileColors.background,
     },
     // A fixed column so read and unread titles line up; the dot sits on the
