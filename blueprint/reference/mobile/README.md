@@ -127,3 +127,7 @@ noted in the archive of the feature that captured them.
 - 2026-09-17, requests, Available (observation, open): "Evening Shift" wraps
   to two lines beside its time in the card header at default text size.
   Not changed in this pass.
+- 2026-09-17, alerts (observation, open): the list is a root stack screen
+  with its header hidden and draws no back control of its own, so leaving it
+  relies on the iOS edge swipe; the alert detail does draw one. Not changed
+  in this pass.
