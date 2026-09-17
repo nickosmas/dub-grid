@@ -152,6 +152,11 @@ glow on a black page.
   (`dashboard-states` "progress bar while the organization bootstrap is in
   flight", a 1.5 s timing assertion) passed alone on a rerun, so it was load
   from the concurrent hook run, not a regression.
-- Device pass: the simulator reset itself during the run and dropped the
-  session; the signed-in device checks are recorded in the matrix README as
-  they are re-taken.
+- Device pass (signed in, iPhone 17, light): dashboard drill-ins (Coverage,
+  Your schedule, Open shifts, an open-shift row to Requests, Available);
+  alerts swipe actions with Read applied and the row closing; shift detail
+  with Drop shift and Swap; the drop sheet's X closing in one tap; the Swap
+  page sheet opening from a clean state and after Drop, X. Captures in
+  `blueprint/reference/mobile/`, matrix rows updated. Two defects found and
+  fixed on the way (the strip's frame over See all, the empty sheet footer);
+  three observations left open in the matrix README.

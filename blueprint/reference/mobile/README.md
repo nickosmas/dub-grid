@@ -83,7 +83,8 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | request-sheet-ios-light-default-admin                                                        | captured | Drop shift: title, X outside the pan area, Offer for pickup and Call off, no footer band before a choice                                                                                                                                               |
 | shift-detail-ios-light-default-admin                                                         | captured | Your own upcoming shift: Drop shift and Swap as peer controls, Working with rows                                                                                                                                                                       |
 | request-sheet-\* (pickup, call-off confirmation, error)                                      | pending  | Needs the request flow driven past the first choice by hand                                                                                                                                                                                            |
-| swap-sheet-\* (open, target chosen, discard)                                                 | pending  | Open your own shift, Swap                                                                                                                                                                                                                              |
+| swap-sheet-ios-light-default-admin                                                           | captured | Swap as an iOS page sheet: title with X, Your shift panel, Eligible teammates with the week strip and counts, teammate rows                                                                                                                            |
+| swap-sheet-\* (target chosen, discard)                                                       | pending  | Needs a target chosen by hand, then X to see the discard guard                                                                                                                                                                                         |
 | dashboard empty; schedule-home (user role); person edit; confirmation; devices; tabs-android | pending  | As in the table below                                                                                                                                                                                                                                  |
 
 ## Defects found while capturing
@@ -136,3 +137,9 @@ noted in the archive of the feature that captured them.
 - 2026-09-17, shift detail (device pass): the drop and swap sheets showed a
   hairline over an empty band under the body before any choice was made.
   Fixed in place: the footer is passed only when it has content.
+- 2026-09-17, environment: after a Fast Refresh replaced ShiftDetailScreen
+  while the drop sheet was open, its modal host stayed presented and iOS
+  refused to present the Swap sheet ("already presenting" in the device
+  log). On a clean launch Drop, X, Swap and Swap, X, Drop both hand off
+  cleanly. Not a repository defect; relaunch after editing a screen whose
+  sheet is open.
