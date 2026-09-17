@@ -24,7 +24,7 @@ import {
 type DashboardRowVariant =
   /** ActionQueueCard: leading count badge, two stacked lines. */
   | "badgeLead"
-  /** CoverageBySectionCard: label row above a 6pt progress track. */
+  /** CoverageSectionRow: label row above a 6pt progress track. */
   | "meter"
   /** OpenShiftsCard and StaffHoursCard: copy left, badges right. */
   | "trailingBadges"
@@ -122,7 +122,7 @@ function DashboardCardSkeleton({
   );
 }
 
-/** The hero card: status pill, headline, the coverage figure over its meter, two chips. */
+/** The Coverage card: the figure over its meter, two stats, three focus-area meters. */
 function DashboardHeroSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -150,6 +150,14 @@ function DashboardHeroSkeleton() {
             <SkeletonLine variant="title" width={28} />
             <SkeletonLine variant="caption" width={110} />
           </View>
+        </View>
+        <View style={styles.heroBreakdown}>
+          {skeletonRows(3, (index) => (
+            <View key={`hero-section-${index}`}>
+              {index > 0 ? <View style={styles.rowDivider} /> : null}
+              <DashboardRow variant="meter" />
+            </View>
+          ))}
         </View>
       </SkeletonCardSurface>
     </View>
@@ -212,7 +220,6 @@ export function DashboardSkeleton({
       <DashboardHeroSkeleton />
       {showActionQueue ? <DashboardCardSkeleton rows={3} variant="badgeLead" /> : null}
       {showMySchedule ? <MyScheduleSkeleton /> : null}
-      <DashboardCardSkeleton rows={3} variant="meter" />
       <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="feed" />
@@ -312,6 +319,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       alignItems: "center",
       gap: mobileSpace.xs,
+    },
+    heroBreakdown: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.xs,
+      marginBottom: -mobileListRow.paddingVertical,
     },
     rowDivider: {
       height: StyleSheet.hairlineWidth,

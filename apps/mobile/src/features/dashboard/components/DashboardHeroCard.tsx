@@ -6,6 +6,7 @@ import { Pressable } from "../../../shared/components/Pressable";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
+  mobileListRow,
   mobileRadii,
   mobileSpace,
   mobileTabularText,
@@ -14,7 +15,9 @@ import {
 } from "../../../shared/theme/tokens";
 import { coverageColor } from "../lib/coverage";
 import { createToneTextColors } from "../lib/tone-text";
+import { CoverageSectionRow } from "./CoverageSectionRow";
 import { DashboardCard } from "./DashboardCard";
+import { DashboardRowList } from "./DashboardRowList";
 
 /**
  * The page's reading of the period, above the cards: a headline and one
@@ -90,17 +93,21 @@ function MetricStat({
 }
 
 /**
- * The coverage card: the period's one big figure over its meter, then the
- * two counts that need a hand. Its tone follows the coverage percentage, so
- * the card itself reads green, amber or red before a number is read.
+ * The coverage card: the period's one big figure over its meter, the two
+ * counts that need a hand, then the same figure broken down by focus area.
+ * One card for all of it; a second "Coverage by wings" card said the same
+ * thing twice, and "See all" opens the full breakdown.
  */
 export function DashboardHeroCard({
   metrics,
+  sections = [],
   onOpenCoverage,
   onOpenGaps,
   onOpenApprovals,
 }: {
   metrics: MobileDashboardResponse["metrics"];
+  /** Per-focus-area coverage; the card previews the first three. */
+  sections?: MobileDashboardResponse["coverageBySection"];
   onOpenCoverage?: () => void;
   onOpenGaps?: () => void;
   onOpenApprovals?: () => void;
@@ -156,6 +163,16 @@ export function DashboardHeroCard({
           value={metrics.pendingApprovalsCount}
         />
       </View>
+      {sections.length > 0 ? (
+        <View style={styles.breakdown}>
+          <DashboardRowList
+            items={sections}
+            keyExtractor={(section) => String(section.focusAreaId)}
+            limit={3}
+            renderItem={(section) => <CoverageSectionRow section={section} />}
+          />
+        </View>
+      ) : null}
     </DashboardCard>
   );
 }
@@ -239,5 +256,13 @@ const createStyles = (mobileColors: MobileColors) =>
     statDivider: {
       width: StyleSheet.hairlineWidth,
       backgroundColor: mobileColors.borderSubtle,
+    },
+    // The rows carry their own vertical padding, so the section only draws
+    // the hairline and gives back the last row's padding to the card edge.
+    breakdown: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.xs,
+      marginBottom: -mobileListRow.paddingVertical,
     },
   });

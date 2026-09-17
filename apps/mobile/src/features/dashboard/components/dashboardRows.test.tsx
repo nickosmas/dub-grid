@@ -11,13 +11,13 @@ vi.mock("../../../shared/lib/haptics", () => ({ hapticSelection: vi.fn() }));
 
 let ActionQueueRow: (typeof import("./ActionQueueCard"))["ActionQueueRow"];
 let OpenShiftRow: (typeof import("./OpenShiftsCard"))["OpenShiftRow"];
-let CoverageSectionRow: (typeof import("./CoverageBySectionCard"))["CoverageSectionRow"];
+let CoverageSectionRow: (typeof import("./CoverageSectionRow"))["CoverageSectionRow"];
 let StaffHoursRow: (typeof import("./StaffHoursCard"))["StaffHoursRow"];
 
 beforeAll(async () => {
   ActionQueueRow = (await import("./ActionQueueCard")).ActionQueueRow;
   OpenShiftRow = (await import("./OpenShiftsCard")).OpenShiftRow;
-  CoverageSectionRow = (await import("./CoverageBySectionCard")).CoverageSectionRow;
+  CoverageSectionRow = (await import("./CoverageSectionRow")).CoverageSectionRow;
   StaffHoursRow = (await import("./StaffHoursCard")).StaffHoursRow;
 });
 

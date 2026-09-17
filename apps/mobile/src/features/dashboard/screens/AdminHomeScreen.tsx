@@ -29,7 +29,6 @@ import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyScheduleCard } from "../components/MyScheduleCard";
-import { CoverageBySectionCard } from "../components/CoverageBySectionCard";
 import { OpenShiftsCard } from "../components/OpenShiftsCard";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { StaffHoursCard } from "../components/StaffHoursCard";
@@ -191,6 +190,7 @@ export function AdminHomeScreen() {
       node: (
         <DashboardHeroCard
           metrics={data.metrics}
+          sections={data.coverageBySection}
           onOpenApprovals={openExpanded("/(tabs)/home/pending-approvals")}
           onOpenCoverage={
             data.coverageBySection.length > 0 ? openExpanded("/(tabs)/home/coverage") : undefined
@@ -228,20 +228,6 @@ export function AdminHomeScreen() {
               <MyScheduleCard
                 accessToken={accessToken}
                 onExpand={() => router.push("/(tabs)/home/my-schedule")}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(data.coverageBySection.length > 0
-      ? [
-          {
-            key: "coverage",
-            node: (
-              <CoverageBySectionCard
-                sections={data.coverageBySection}
-                focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
-                onSeeAll={openExpanded("/(tabs)/home/coverage")}
               />
             ),
           },

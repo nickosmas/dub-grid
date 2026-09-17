@@ -4,6 +4,8 @@ import { createReactNativeModule } from "../../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
+vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
+vi.mock("../../../shared/lib/haptics", () => ({ hapticSelection: vi.fn() }));
 
 let DashboardHeroCard: (typeof import("./DashboardHeroCard"))["DashboardHeroCard"];
 let DashboardHeadline: (typeof import("./DashboardHeroCard"))["DashboardHeadline"];
@@ -81,6 +83,35 @@ describe("DashboardHeroCard", () => {
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.getByText("open gaps")).toBeInTheDocument();
+  });
+
+  it("previews the first three focus areas under the stats", () => {
+    const section = (id: number, name: string) =>
+      ({
+        focusAreaId: id,
+        focusAreaName: name,
+        filledTotal: 6,
+        requiredTotal: 8,
+        openSlots: 2,
+        pct: 75,
+      }) as never;
+    render(
+      <DashboardHeroCard
+        metrics={{ coveragePct: 75, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
+        sections={[
+          section(1, "East Wing"),
+          section(2, "West Wing"),
+          section(3, "Memory Care"),
+          section(4, "Rehab"),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("East Wing")).toBeInTheDocument();
+    expect(screen.getByText("Memory Care")).toBeInTheDocument();
+    expect(screen.queryByText("Rehab")).not.toBeInTheDocument();
+    // One card, one title: the breakdown no longer has a heading of its own.
+    expect(screen.queryByText(/Coverage by/)).not.toBeInTheDocument();
   });
 
   it("opens the coverage screen from the card title", () => {

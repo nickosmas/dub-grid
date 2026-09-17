@@ -9,7 +9,7 @@ import {
   SelectionRow,
   SelectionSection,
 } from "../../../src/shared/components/FilterSheet";
-import { CoverageSectionRow } from "../../../src/features/dashboard/components/CoverageBySectionCard";
+import { CoverageSectionRow } from "../../../src/features/dashboard/components/CoverageSectionRow";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";

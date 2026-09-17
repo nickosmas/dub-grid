@@ -4,8 +4,6 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { DashboardCard } from "./DashboardCard";
-import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -14,17 +12,15 @@ import {
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { DashboardRowList } from "./DashboardRowList";
 import { coverageColor } from "../lib/coverage";
-
-export { coverageColor } from "../lib/coverage";
 
 export type CoverageSection = MobileDashboardResponse["coverageBySection"][number];
 
-// Shared with the full-page expanded coverage screen
-// (apps/mobile/app/(tabs)/home/coverage.tsx) so the row layout never drifts
-// between the compact card preview and the full list. Opens the team
-// schedule on this focus area, where the gap can be filled.
+// One focus area's coverage: its name, filled over required, the percentage
+// in its tone, a 6pt meter. Shared by the Coverage card's breakdown and the
+// full-page coverage screen (apps/mobile/app/(tabs)/home/coverage.tsx) so
+// the two never drift. Opens the team schedule on this focus area, where the
+// gap can be filled.
 export function CoverageSectionRow({ section }: { section: CoverageSection }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -58,38 +54,6 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
       </View>
       <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
-  );
-}
-
-export function CoverageBySectionCard({
-  sections,
-  focusAreaLabel,
-  onSeeAll,
-}: {
-  sections: MobileDashboardResponse["coverageBySection"];
-  focusAreaLabel: string;
-  onSeeAll?: () => void;
-}) {
-  const title = `Coverage by ${focusAreaLabel.toLowerCase()}`;
-
-  return (
-    <DashboardCard title={title} onOpen={onSeeAll}>
-      {sections.length > 0 ? (
-        <DashboardRowList
-          items={sections}
-          keyExtractor={(section) => String(section.focusAreaId)}
-          limit={3}
-          renderItem={(section) => <CoverageSectionRow section={section} />}
-        />
-      ) : (
-        <EmptyStateCard
-          compact
-          body="Coverage appears here once staffing requirements are configured and the period is published."
-          iconName="stats-chart-outline"
-          title="No coverage to track yet"
-        />
-      )}
-    </DashboardCard>
   );
 }
 
