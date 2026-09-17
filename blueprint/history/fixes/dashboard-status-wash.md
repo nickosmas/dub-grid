@@ -119,3 +119,19 @@ glow on a black page.
   keeps `heroSummary` for the web.
 - `b2e8a8c0`: the Coverage card closes with open gaps and pending approvals;
   the focus-area breakdown sits between the figure and the stats.
+
+## Completion pass (2026-09-17, after the follow-up rounds)
+
+- Repo-wide pre-push hook on `ab275d62`: type-check clean; tests green in
+  every workspace (mobile 142 files / 1142 tests, web 437 / 3733, all
+  packages passing).
+- `npm run lint`: 0 errors, 5 pre-existing warnings in files this work did
+  not touch. `npm run lint:rules`: passing.
+- Web Playwright, chromium, against the local dev server and seeded local
+  Supabase: 70 of 71 passed in 17.7 minutes; the one miss
+  (`dashboard-states` "progress bar while the organization bootstrap is in
+  flight", a 1.5 s timing assertion) passed alone on a rerun, so it was load
+  from the concurrent hook run, not a regression.
+- Device pass: the simulator reset itself during the run and dropped the
+  session; the signed-in device checks are recorded in the matrix README as
+  they are re-taken.
