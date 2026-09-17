@@ -107,3 +107,5 @@ glow on a black page.
 - `dac8809f`: the schedule strip lost its card. `DashboardCard` gained
   `surface={false}` (title and See all, no box); the shift pills are the
   section's only shapes and the strip runs to the screen edges.
+- `ea5d929d`: the pills lifted by `mobileElevation("card")` instead of a
+  hairline, the edge every other dashboard surface has.
