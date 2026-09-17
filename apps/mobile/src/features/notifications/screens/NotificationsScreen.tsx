@@ -1,11 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "../../../shared/components/Pressable";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
-import { extractNotificationAction } from "@dubgrid/domain";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -19,12 +16,9 @@ import {
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { NotificationRow } from "../components/NotificationRow";
 import { useMobileNotificationsRealtimeTick } from "../hooks/useMobileNotificationsRealtimeTick";
 import { useNotificationFacets } from "../hooks/useNotificationFacets";
-import {
-  isNotificationActionSupportedOnMobile,
-  openNotificationAction,
-} from "../lib/openNotificationAction";
 import { filterNotificationsForViewer } from "../lib/notification-visibility";
 import {
   bulkUpdateNotifications,
@@ -42,7 +36,7 @@ import {
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
-import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileElevation,
@@ -90,44 +84,9 @@ function getNotificationsQueryKey(accessToken: string | null, filter: FilterKey,
   return mobileQueryKeys.notifications(accessToken, { filter, search, pageSize: PAGE_SIZE });
 }
 
-function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
-  if (type === "schedule_published" || type === "shift_change") {
-    return "calendar-outline";
-  }
-  if (
-    type === "shift_request_new" ||
-    type === "shift_request_approved" ||
-    type === "shift_request_rejected"
-  ) {
-    return "swap-horizontal-outline";
-  }
-  if (type === "impersonation_start" || type === "impersonation_end") {
-    return "shield-outline";
-  }
-  return "notifications-outline";
-}
-
-function formatRelativeTime(value: string): string {
-  const diff = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(Math.floor(diff / 60000), 0);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  // Over a week old — name the year, since "May 4" alone can't place it.
-  return new Date(value).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export default function NotificationsScreen() {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -291,6 +250,31 @@ export default function NotificationsScreen() {
     [accessToken, busy, facetsQuery, notificationsQuery, pushToast],
   );
 
+  const handleToggleRead = useCallback(
+    async (notification: MobileNotification) => {
+      if (!accessToken || busy) return;
+      setBusy(true);
+      try {
+        const action = notification.readAt ? "unread" : "read";
+        const response = await bulkUpdateNotifications(accessToken, {
+          ids: [notification.id],
+          action,
+        });
+        syncBootstrapUnread(response.unreadCount);
+        await Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
+      } catch (error) {
+        pushClientFriendlyErrorToast(pushToast, {
+          error,
+          title: "Could not update alerts",
+          fallbackMessage: "We couldn't update that alert.",
+        });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [accessToken, busy, facetsQuery, notificationsQuery, pushToast],
+  );
+
   const handleMarkAllRead = useCallback(async () => {
     if (!accessToken || unreadCount === 0 || busy) return;
     setBusy(true);
@@ -387,10 +371,12 @@ export default function NotificationsScreen() {
         <View style={styles.list}>
           {notifications.map((notification, index) => (
             <AnimatedListItem index={index} key={notification.id}>
-              <NotificationCard
+              {index > 0 ? <View style={styles.divider} /> : null}
+              <NotificationRow
                 pending={pendingRowId === notification.id}
                 notification={notification}
                 onPress={() => handleRowPress(notification)}
+                onToggleRead={() => handleToggleRead(notification)}
                 onArchive={() => handleArchive(notification)}
               />
             </AnimatedListItem>
@@ -425,117 +411,7 @@ export default function NotificationsScreen() {
   );
 }
 
-interface NotificationCardProps {
-  notification: MobileNotification;
-  pending: boolean;
-  onPress: () => void;
-  onArchive: () => void;
-}
-
-function NotificationCard({ notification, pending, onPress, onArchive }: NotificationCardProps) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const isUnread = !notification.readAt;
-  const isArchived = !!notification.archivedAt;
-  const action = extractNotificationAction(notification.metadata);
-  const actionSupported = action ? isNotificationActionSupportedOnMobile(action.href) : false;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-      onPress={onPress}
-      style={styles.alertCard}
-    >
-      <View style={styles.alertHeader}>
-        <View style={styles.alertTitleRow}>
-          <View style={[styles.alertIconFrame, !isUnread && styles.alertIconFrameMuted]}>
-            {pending ? (
-              <ActivityIndicator color={mobileColors.brand} size="small" />
-            ) : (
-              <Ionicons
-                color={isUnread ? mobileColors.brand : mobileColors.textMuted}
-                name={getNotificationIconName(notification.type)}
-                size={18}
-              />
-            )}
-          </View>
-          <View style={styles.titleColumn}>
-            <View style={styles.titleLine}>
-              {notification.priority === "critical" || notification.priority === "high" ? (
-                <Text
-                  style={[
-                    styles.priorityChip,
-                    notification.priority === "critical"
-                      ? styles.priorityCritical
-                      : styles.priorityHigh,
-                  ]}
-                >
-                  {notification.priority.toUpperCase()}
-                </Text>
-              ) : null}
-              <Text style={[styles.alertTitle, !isUnread && styles.alertTitleMuted]}>
-                {notification.title}
-              </Text>
-              {typeof notification.metadata?.groupCount === "number" &&
-              notification.metadata.groupCount > 1 ? (
-                <Text style={styles.groupBadge}>×{notification.metadata.groupCount as number}</Text>
-              ) : null}
-            </View>
-            <Text style={styles.alertMessage}>{notification.message}</Text>
-            <Text style={styles.alertMeta}>{formatRelativeTime(notification.createdAt)}</Text>
-          </View>
-        </View>
-        {isUnread ? <View style={styles.unreadDot} /> : null}
-      </View>
-      <View style={styles.cardActions}>
-        {/* The leading slot owns the space left of the archive button and
-            centres whatever sits in it. A `fullWidth={false}` button carries
-            `alignSelf: "flex-start"`, which beats any `alignItems` on the row
-            itself, so the action can only be centred by a wrapper it cannot
-            override. `flex: 1` is also what lets the archive button stay pinned
-            to the trailing edge, which is why this is not `justifyContent`. */}
-        <View style={styles.cardActionsLead}>
-          {action && actionSupported ? (
-            <Button
-              fullWidth={false}
-              icon="arrow-forward"
-              iconPosition="trailing"
-              label={action.label}
-              onPress={(event) => {
-                // Sits inside a pressable row; without this the row navigates too.
-                event.stopPropagation?.();
-                openNotificationAction(action.href);
-              }}
-              size="sm"
-              tone="secondary"
-            />
-          ) : action ? (
-            <View style={styles.webOnlyHint}>
-              <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
-              <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
-            </View>
-          ) : null}
-        </View>
-        <Button
-          accessibilityLabel={isArchived ? "Restore from archive" : "Archive"}
-          icon={isArchived ? "archive" : "archive-outline"}
-          iconOnly
-          onPress={(event) => {
-            // Sits inside a pressable row; without this the row navigates too.
-            event.stopPropagation?.();
-            onArchive();
-          }}
-          size="sm"
-          tone="ghost"
-        />
-      </View>
-    </Pressable>
-  );
-}
-
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     headerArea: {
       gap: mobileSpace.md,
@@ -551,120 +427,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.sectionTitle,
       color: mobileColors.textPrimary,
     },
+    // Rows, not cards: the list is one column with a hairline between
+    // alerts, the way a mailbox reads, and the row's actions sit behind a
+    // swipe rather than on a panel of their own.
     list: {
-      gap: mobileSpace.md,
+      gap: 0,
     },
-    alertCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      padding: 16,
-      gap: mobileSpace.md,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      ...mobileElevation("card", isDark),
-    },
-    alertHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    alertTitleRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: mobileSpace.md,
-      flex: 1,
-    },
-    titleColumn: {
-      flex: 1,
-      gap: 4,
-    },
-    titleLine: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: mobileSpace.sm,
-    },
-    alertIconFrame: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brandSoft,
-    },
-    // Read cards are `surface` like unread ones, so the frame can no longer be
-    // `surface` itself — it was only visible while the card behind it was
-    // tinted. A step up the neutral ramp keeps the circle readable on white
-    // while staying quieter than the unread `brandSoft`.
-    alertIconFrameMuted: {
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    unreadDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 999,
-      backgroundColor: mobileColors.brand,
-    },
-    alertTitle: {
-      ...mobileText.cardTitle,
-      color: mobileColors.textPrimary,
-    },
-    alertTitleMuted: {
-      color: mobileColors.textSecondary,
-    },
-    alertMessage: {
-      ...mobileText.body,
-      color: mobileColors.textSecondary,
-    },
-    alertMeta: {
-      ...mobileText.caption,
-      color: mobileColors.textSubtle,
-    },
-    priorityChip: {
-      ...mobileTextWeighted("caption", "bold"),
-      ...mobilePillOverflow.displayText,
-      color: mobileColors.danger,
-      letterSpacing: 0.5,
-    },
-    priorityCritical: {
-      color: mobileColors.danger,
-    },
-    priorityHigh: {
-      color: mobileColors.warning,
-    },
-    groupBadge: {
-      ...mobileText.caption,
-      ...mobilePillOverflow.displayText,
-      color: mobileColors.textMuted,
-      backgroundColor: mobileColors.surfaceSecondary,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-      borderRadius: 999,
-    },
-    cardActionsLead: {
-      flex: 1,
-      alignItems: "center",
-    },
-    cardActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginLeft: mobileSpace["4xl"],
-      paddingTop: mobileSpace.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    webOnlyHint: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surfaceMuted,
-    },
-    webOnlyHintLabel: {
-      ...mobileTextWeighted("label", "semibold"),
-      color: mobileColors.textMuted,
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
   });

@@ -313,6 +313,36 @@ describe("NotificationsScreen", () => {
     expect(queryResult.refetch).toHaveBeenCalled();
   });
 
+  it("archives and toggles read state from the row's swipe actions", async () => {
+    const queryResult = buildInfiniteQueryResult({
+      notifications: [SAMPLE_NOTIFICATION],
+      unreadCount: 1,
+    });
+    useInfiniteQuery.mockReturnValue(queryResult);
+    bulkUpdateNotifications.mockResolvedValue({ success: true, unreadCount: 0 });
+
+    render(<NotificationsScreen />);
+
+    // The row carries no buttons of its own; the actions sit behind a left
+    // swipe, which the test stub renders inline.
+    fireEvent.click(screen.getByRole("button", { name: "Mark as read" }));
+    await waitFor(() => {
+      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
+        ids: [SAMPLE_NOTIFICATION.id],
+        action: "read",
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => {
+      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
+        ids: [SAMPLE_NOTIFICATION.id],
+        action: "archive",
+      });
+    });
+    expect(queryResult.refetch).toHaveBeenCalled();
+  });
+
   it("does not navigate when marking the alert read fails", async () => {
     useInfiniteQuery.mockReturnValue(
       buildInfiniteQueryResult({

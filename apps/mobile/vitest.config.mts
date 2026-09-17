@@ -61,6 +61,12 @@ export default defineConfig(async () => {
           find: /^react-native-gesture-handler$/,
           replacement: path.resolve(__dirname, "./src/test/gesture-handler-stub.tsx"),
         },
+        {
+          // The swipeable row ships from a subpath the stub above does not
+          // cover; this one renders the revealed actions inline.
+          find: /^react-native-gesture-handler\/ReanimatedSwipeable$/,
+          replacement: path.resolve(__dirname, "./src/test/reanimated-swipeable-stub.tsx"),
+        },
         // react-native-keyboard-controller resolves its native module at import
         // time, so the root layout and every screen reading keyboard geometry
         // failed to collect. The stub reports a closed keyboard.
