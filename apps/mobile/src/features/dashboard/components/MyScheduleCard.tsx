@@ -32,6 +32,11 @@ const DAY_CARD_GAP = 10;
 // radius the strip reads at rather than a nested corner inside a bigger one.
 // The chip step of the shared ramp (card 20 / panel 12 / chip 8).
 const PILL_RADIUS = mobileRadius.md;
+// Room above and below the strip for the pills' card shadow: a ScrollView
+// clips at its bounds, and without it the cast ended in a hard line under
+// each pill. The same room is taken back as a negative margin so the
+// section's rhythm is unchanged.
+const SHADOW_ROOM = mobileSpace.sectionGap;
 // Explicit min-height, shared by the worked-shift pill and the empty-day
 // placeholder, sized for 3 stacked lines (name/job/time) so every pill is
 // the same height regardless of whether a given shift has a job name or a
@@ -285,10 +290,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // (visible while scrolling) is truly edge-to-edge.
     scrollView: {
       marginHorizontal: -getScreenGutter(),
+      marginVertical: -SHADOW_ROOM,
     },
     scrollContent: {
       gap: DAY_CARD_GAP,
       paddingHorizontal: getScreenGutter(),
+      paddingVertical: SHADOW_ROOM,
     },
     // No box. The shift pill below already carries its own fill and edge, so a
     // hairline around the day only drew a second container inside the card:
