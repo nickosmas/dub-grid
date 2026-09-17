@@ -19,6 +19,7 @@ interface UseSelfProfileDataOptions {
 interface UseSelfProfileDataResult {
   user: User | null;
   profile: SelfProfileRecord | null;
+  isOrgMember: boolean;
   employee: Employee | null;
   managementDepartmentIds: number[];
   shifts: ShiftMap;
@@ -47,6 +48,7 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
 
   const data: AccountSelfProfileData | null = user ? (selfQuery.data ?? null) : null;
   const profile = data?.profile ?? null;
+  const isOrgMember = data?.isOrgMember ?? false;
   const employee = data?.employee ?? null;
   const managementDepartmentIds = data?.managementDepartmentIds ?? [];
   const shifts = data?.shifts ?? {};
@@ -114,6 +116,7 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
   return {
     user,
     profile,
+    isOrgMember,
     employee,
     managementDepartmentIds,
     shifts,

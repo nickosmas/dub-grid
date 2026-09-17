@@ -288,7 +288,7 @@
               error, empty, and popovers (`/reports`); loading, error,
               dialogs, and resolving whether the "not found" claim is
               reachable at all (`/settings` has no `notFound()` call today).
-    - [ ] 25d2. **Qualify role and permission variance** - re-run 25d1's state
+    - [x] 25d2. **Qualify role and permission variance** - re-run 25d1's state
           matrix as Admin, User, and Gridmaster-impersonation roles (not only
           the current qa-super-admin baseline), confirming the same visual and
           interaction contract holds regardless of role, and closing any
@@ -303,7 +303,7 @@
             25d1 route-state matrix as `qa-regular` and `qa-management`,
             asserting each route's role-gated outcome (redirect, read-only
             variant, or the same state), and closing any contract violation.
-      - [ ] 25d2c. **Admin and Gridmaster-impersonation variance** - after
+      - [x] 25d2c. **Admin and Gridmaster-impersonation variance** - after
             25d2a, re-run the matrix as `qa-admin`, then as `qa-gridmaster`
             impersonating a Calm Haven member through the portal's
             impersonation flow, and close any contract violation.

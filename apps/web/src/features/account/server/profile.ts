@@ -49,6 +49,9 @@ export interface SelfProfileRecord {
 
 export interface SelfWorkProfileSnapshot {
   profile: SelfProfileRecord | null;
+  /** False when the caller holds no active membership in the requested org
+   *  (or no org was requested), so callers can skip org-scoped requests. */
+  isOrgMember: boolean;
   employee: Employee | null;
   /** Management department IDs from `organization_memberships.department_ids`.
    *  Distinct from `employee.departmentIds`, which is the employee's
@@ -282,6 +285,7 @@ export async function fetchSelfWorkProfileSnapshot(
   if (!orgId) {
     return {
       profile,
+      isOrgMember: false,
       employee: null,
       managementDepartmentIds: [],
       shifts: {},
@@ -289,9 +293,19 @@ export async function fetchSelfWorkProfileSnapshot(
     };
   }
 
+  // No membership is a legitimate answer, not a failure: a gridmaster viewing
+  // an organization through role-scoped impersonation holds none there, and
+  // the profile page already renders the no-work-section state for it.
   const membership = await fetchOwnMembership(userId, orgId);
   if (!membership) {
-    throw new Error("Organization membership not found.");
+    return {
+      profile,
+      isOrgMember: false,
+      employee: null,
+      managementDepartmentIds: [],
+      shifts: {},
+      recurringShifts: [],
+    };
   }
   const managementDepartmentIds = membership.departmentIds;
 
@@ -299,6 +313,7 @@ export async function fetchSelfWorkProfileSnapshot(
   if (!employee) {
     return {
       profile,
+      isOrgMember: true,
       employee: null,
       managementDepartmentIds,
       shifts: {},
@@ -366,6 +381,7 @@ export async function fetchSelfWorkProfileSnapshot(
   );
   return {
     profile,
+    isOrgMember: true,
     employee,
     managementDepartmentIds,
     shifts,

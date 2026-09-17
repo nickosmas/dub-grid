@@ -229,3 +229,43 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Why it matters:** A 5xx from `/api/organization/bootstrap` is retried up to three times with jittered backoff (worst case about 7s) before the query errors and `OrganizationBootstrapRecovery` appears. During that window `SetupGuard` returns null and no page-level progress bar is mounted, so every role sees a blank shell with no header and no loading affordance. The role-variance probe measured 4-5s of empty `body` on Firefox before the recovery copy rendered. Role-independent, so not a 25d2b contract violation.
 **Suggested fix:** Keep a loading affordance mounted while the bootstrap query is retrying (the shared progress bar above `SetupGuard`, or `AuthTransitionScreen` with its workspace phase), so a transient failure never reads as a hung page.
 **Resolution:**
+
+### F-69 [P3] open - Impersonation end accepts any reason, then answers a constraint violation with a 500
+
+**File:** apps/web/src/app/api/gridmaster/impersonation/route.ts:23-28,153-165; supabase/migrations/002_functions_triggers.sql (end_impersonation)
+**Found:** 2026-09-17 by feature 25d2c Step 4 (role variance, impersonation)
+**Why it matters:** `endSchema` validates `reason` as any non-empty string, but `impersonation_sessions.end_reason` is constrained to `manual | expired | navigation`. Any other value reaches the RPC, fails the check constraint, and the catch-all turns it into a generic 500 "We couldn't update that viewing session. Try again." The caller cannot tell it sent an invalid value. Reproduced by calling `end_impersonation(<own session>, 'probe')` as `qa-gridmaster` in a rolled-back transaction: `violates check constraint "impersonation_sessions_end_reason_check"`.
+**Suggested fix:** `reason: z.enum(["manual", "expired", "navigation"]).optional()` in `endSchema`, so an unknown value is a 400 `INVALID_INPUT` before the RPC.
+**Resolution:**
+
+### F-70 [P3] open - Starting an impersonation while one is active loses the RPC's message behind a 500
+
+**File:** apps/web/src/app/api/gridmaster/impersonation/route.ts:114-131,184-193; apps/web/src/components/gridmaster/EnhancedImpersonation.tsx:119-165
+**Found:** 2026-09-17 by feature 25d2c Step 4 (role variance, impersonation)
+**Why it matters:** `start_impersonation` raises "Cannot start a new impersonation while another session is active. End the current session first." The route's catch-all maps that to the same generic 500 as any unexpected failure, and the Start confirmation dialog stays open with only a transient toast, so a gridmaster with a stale session (for example after closing the tab without "End Session") sees an apparent outage instead of the instruction to end the previous session. Observed on Firefox/WebKit in the e2e run when Chromium's session was still open: POST answered 500 in 0.1s.
+**Suggested fix:** Recognise the known RPC errors (active session, self-impersonation, membership mismatch) and return 409/400 with the RPC message; let the dialog show it. Consider offering "End previous session" inline.
+**Resolution:**
+
+### F-71 [P3] open - Impersonation banner names the target while the shell greets the gridmaster
+
+**File:** apps/web/src/components/ImpersonationBanner.tsx:114; apps/web/src/components/dashboard/UserDashboard.tsx (greeting and "No linked staff profile" state); docs/authentication.md:416
+**Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
+**Why it matters:** Impersonation is role-scoped by design: the proxy verifies the target's membership, organization and role, while the gridmaster's own JWT keeps acting. The banner says "Impersonating qa-regular@dubgrid.test", but the dashboard beneath it says "Glad you're here, qa-gridmaster!" and "No linked staff profile", the schedule has no own row, and the profile has no Overview. A support engineer reading the banner expects to see what the target sees and instead sees the target's permission set around their own identity, with no copy explaining the difference.
+**Suggested fix:** Say what it is: "Viewing Calm Haven as user (qa-regular@dubgrid.test)" in the banner, and suppress or reword the personal greeting and no-linked-profile state while impersonating. Widening impersonation to act as the target would be a security design change, not a copy fix.
+**Resolution:**
+
+### F-72 [P3] open - The /gridmaster safety escape clears the cookie but leaves the impersonation row active
+
+**File:** apps/web/src/proxy.ts:441-446; supabase/migrations/002_functions_triggers.sql (start_impersonation active-session check)
+**Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
+**Why it matters:** Navigating to /gridmaster while impersonating clears `dubgrid-impersonation` server-side, so the portal renders and the banner is gone, but no `end_impersonation` call is made. The `impersonation_sessions` row stays active until its 30-minute expiry, the Security view keeps counting it, and `start_impersonation` refuses a new session for that gridmaster until then (surfaced as the generic 500 in [[F-70]]). The e2e spec ends the row through the API after taking the escape for that reason.
+**Suggested fix:** Have the escape end the session too: either the proxy calls `end_impersonation` with reason `navigation` (the constraint already allows it), or the portal ends any open session for the signed-in gridmaster on mount.
+**Resolution:**
+
+### F-73 [P2] open - Ending impersonation sometimes bounces the gridmaster to /login on Firefox
+
+**File:** apps/web/src/components/ImpersonationBanner.tsx:65-92; apps/web/src/components/AuthProvider.tsx:117-123; apps/web/src/components/RouteGuards.tsx:47-59
+**Found:** 2026-09-17 by feature 25d2c Step 5 (role variance, impersonation)
+**Why it matters:** After "End Session" the banner ends the DB session (POST answers 200), clears the cookie, clears the query cache and replaces the location with /dashboard. In roughly 1 of 7 cycles on Firefox (never yet on Chromium or WebKit) the page instead issues a direct document GET of /login with the Supabase auth cookie still present, and the portal login renders empty for a still-signed-in gridmaster. A probe captured the sequence twice: End POST 200, one console error with an object argument, then `DOC 200 GET /login` with no /dashboard document and no 3xx, so the navigation is client-initiated. The best-supported reading is that an auth event without an access token reaches AuthProvider (line 120 commits a null user) and ProtectedRoute's sign-out branch replaces the location with /login before the banner's own navigation wins; the emitter was not confirmed because the run that serialized the error's arguments did not reproduce it.
+**Suggested fix:** Reproduce with the auth listener instrumented (log every event and whether `nextSession.access_token` is set) around handleEnd; likely mitigations are navigating before `queryClient.clear()`, or having ProtectedRoute ignore a transient null session while an impersonation end is in flight. `e2e/role-variance-impersonation.spec.ts` currently accepts the bounce (annotated) so the suite stays deterministic; make the portal landing strict again once fixed.
+**Resolution:**
