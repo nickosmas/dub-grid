@@ -241,7 +241,10 @@ export function Button({
             {...(isLink ? undefined : SCALE_THEN_TRUNCATE)}
             ellipsizeMode="tail"
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            numberOfLines={1}
+            // A link is a sentence, and at accessibility sizes a one-line
+            // link ate its own question ("Need help with your subdom…").
+            // Filled buttons stay on one line by the app-wide rule.
+            numberOfLines={isLink ? 2 : 1}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}

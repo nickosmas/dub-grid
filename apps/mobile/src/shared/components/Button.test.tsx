@@ -57,7 +57,9 @@ describe("Button", () => {
     // A link is text: given a filled button's padding in a tight slot it
     // starved its own label, and iOS shrank "Skip" to a fraction of its size.
     const label = screen.getByText("Skip");
-    expect(label).toHaveAttribute("data-number-of-lines", "1");
+    // Two lines, not one: at accessibility sizes a one-line link truncated
+    // its own question, and a link is a sentence rather than a control label.
+    expect(label).toHaveAttribute("data-number-of-lines", "2");
     expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
     expect(label).not.toHaveAttribute("data-minimum-font-scale");
     expect(label).toHaveAttribute("data-ellipsize-mode", "tail");
