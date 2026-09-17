@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except items 26-27.
+Everything below is already shipped except item 27.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.

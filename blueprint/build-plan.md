@@ -418,7 +418,7 @@
       welcome-state query disabled until then, so it never paints a frame
       under or over the wizard), verify with the first-login flow as
       `qa-super-admin` on a fresh seed, and add a unit test for the gate.
-- [ ] 38. **Mobile UI consistency and interaction resilience** - bring the
+- [x] 38. **Mobile UI consistency and interaction resilience** - bring the
       Expo app to one visual, spacing, typography, and interaction contract
       after the 2026-09-17 mobile audit: a spacing and control scale every
       screen draws from, a legible type hierarchy, a redesigned admin dashboard
@@ -456,7 +456,7 @@
   - [x] 38e. **Sheet and popup polish** - `KeyboardDoneAccessory`,
         `ConfirmationModal` action row, and `ScrollableTabStrip` idle tabs on
         the 44pt control scale and the single-edge rule.
-  - [ ] 38f. **Mobile qualification matrix** - simulator and emulator
+  - [x] 38f. **Mobile qualification matrix** - simulator and emulator
         screenshots per role, theme, text scale, device class, and state
         (loading, empty, error, sheet, confirmation) saved under
         `blueprint/reference/mobile/`, with every defect fixed in place or
