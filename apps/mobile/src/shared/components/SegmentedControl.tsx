@@ -58,6 +58,7 @@ export function SegmentedControl<Value extends string>({
   onChange,
   size = "md",
   disabled = false,
+  track = "neutral",
   accessibilityLabel,
 }: {
   options: ReadonlyArray<SegmentedOption<Value>>;
@@ -65,6 +66,12 @@ export function SegmentedControl<Value extends string>({
   onChange: (value: Value) => void;
   size?: SegmentedControlSize;
   disabled?: boolean;
+  /**
+   * `"transparent"` drops the track's fill and lets the page show through
+   * its hairline, for a control sitting on a coloured wash where a grey box
+   * reads as a patch. The thumb is unchanged.
+   */
+  track?: "neutral" | "transparent";
   accessibilityLabel?: string;
 }) {
   const mobileColors = useMobileColors();
@@ -119,7 +126,12 @@ export function SegmentedControl<Value extends string>({
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="tablist"
-      style={[styles.track, { minHeight: metrics.height }, disabled && styles.trackDisabled]}
+      style={[
+        styles.track,
+        { minHeight: metrics.height },
+        track === "transparent" && styles.trackTransparent,
+        disabled && styles.trackDisabled,
+      ]}
     >
       {/* Hidden via opacity until the selected segment has been measured, so it
           never flashes at zero width on first layout. */}
@@ -186,6 +198,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: mobileColors.controlNeutralBorder,
       padding: TRACK_PADDING,
+    },
+    trackTransparent: {
+      backgroundColor: "transparent",
     },
     trackDisabled: {
       opacity: 0.4,

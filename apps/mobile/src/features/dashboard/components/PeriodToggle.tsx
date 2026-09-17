@@ -27,6 +27,9 @@ export function PeriodToggle({
       onChange={onChange}
       options={OPTIONS}
       size="sm"
+      // On the coverage wash a grey track read as a patch; the page shows
+      // through its hairline instead.
+      track="transparent"
       value={mode}
     />
   );
