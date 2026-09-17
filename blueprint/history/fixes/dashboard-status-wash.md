@@ -104,3 +104,6 @@ glow on a black page.
   the first three focus areas with their meters; See all opens the full
   breakdown. `CoverageSectionRow` has its own file; the second card is gone.
 - `d602e905`: Your schedule leads the dashboard, Coverage second.
+- `dac8809f`: the schedule strip lost its card. `DashboardCard` gained
+  `surface={false}` (title and See all, no box); the shift pills are the
+  section's only shapes and the strip runs to the screen edges.
