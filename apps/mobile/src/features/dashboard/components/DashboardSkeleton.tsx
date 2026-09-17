@@ -164,7 +164,7 @@ function DashboardHeroSkeleton() {
   );
 }
 
-/** The horizontally scrolling day strip inside "Your schedule". */
+/** The day strip under "Your schedule": pills straight on the page, no card. */
 function MyScheduleSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -176,16 +176,14 @@ function MyScheduleSkeleton() {
         <SkeletonLine variant="title" width="42%" />
         <SkeletonLine variant="label" width={52} />
       </View>
-      <SkeletonCardSurface>
-        <View style={styles.dayStrip}>
-          {skeletonRows(3, (index) => (
-            <View key={`schedule-day-${index}`} style={styles.dayCard}>
-              <SkeletonLine variant="label" width="70%" />
-              <View style={styles.shiftPill} />
-            </View>
-          ))}
-        </View>
-      </SkeletonCardSurface>
+      <View style={styles.dayStrip}>
+        {skeletonRows(3, (index) => (
+          <View key={`schedule-day-${index}`} style={styles.dayCard}>
+            <SkeletonLine variant="label" width="70%" />
+            <View style={styles.shiftPill} />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

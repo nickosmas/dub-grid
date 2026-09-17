@@ -13,20 +13,20 @@ import {
 } from "../../../shared/theme/tokens";
 
 /**
- * A dashboard card in the Apple Health idiom: a plain surface on the brand
- * wash the whole page sits on (the same `GradientBackdrop` the login page
- * opens with). The title sits above the
- * surface with "See all ›" beside it, as every dashboard card has read; the
- * figures inside are the content, and an optional sentence closes the card
- * under a hairline.
+ * A dashboard section in the Apple Health idiom: a title with "See all ›"
+ * beside it over a plain surface on the page's coverage wash. The figures
+ * inside are the content, and an optional sentence closes the card under a
+ * hairline.
  *
- * Neutral cards keep the ordinary card shadow; colour is reserved for a card
- * that has something to say.
+ * `surface={false}` keeps the header and drops the box, for content that is
+ * already made of its own shapes (the schedule's shift pills) and would only
+ * be boxed twice.
  */
 export function DashboardCard({
   title,
   onOpen,
   summary,
+  surface = true,
   children,
 }: {
   title: string;
@@ -34,6 +34,8 @@ export function DashboardCard({
   onOpen?: () => void;
   /** A one-sentence reading of the card's figures, under a hairline at the bottom. */
   summary?: string;
+  /** `false` lays the children straight on the page under the header. */
+  surface?: boolean;
   children: ReactNode;
 }) {
   const mobileColors = useMobileColors();
@@ -61,20 +63,24 @@ export function DashboardCard({
           </Pressable>
         ) : null}
       </View>
-      <View style={styles.frame}>
-        <View style={[styles.glow, mobileElevation("card", isDark)]}>
-          <View style={styles.surface}>
-            <View style={styles.body}>{children}</View>
-            {summary ? (
-              <View style={styles.summary}>
-                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.summaryText}>
-                  {summary}
-                </Text>
-              </View>
-            ) : null}
+      {surface ? (
+        <View style={styles.frame}>
+          <View style={[styles.glow, mobileElevation("card", isDark)]}>
+            <View style={styles.surface}>
+              <View style={styles.body}>{children}</View>
+              {summary ? (
+                <View style={styles.summary}>
+                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.summaryText}>
+                    {summary}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
-      </View>
+      ) : (
+        <View style={styles.body}>{children}</View>
+      )}
     </View>
   );
 }

@@ -17,6 +17,7 @@ import {
   mobileSpace,
 } from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 
 // Kept as narrow as possible while still fitting a full time range like
@@ -138,10 +139,12 @@ function buildDaySegmentPills(
   });
 }
 
-// One card per day in the period, matching web's MyScheduleRow.tsx DayBox
-// strip (apps/web/src/components/dashboard/MyScheduleRow.tsx) — spelled-out
-// shift names, swipeable, empty days shown as their own placeholder card
-// rather than dropped entirely.
+// One column per day in the period, matching web's MyScheduleRow.tsx DayBox
+// strip (apps/web/src/components/dashboard/MyScheduleRow.tsx): spelled-out
+// shift names, swipeable, empty days shown as their own placeholder rather
+// than dropped entirely. The strip sits straight on the page under its
+// title; the pills are the only boxes, so a card around them boxed them
+// twice.
 export function MyScheduleCard({
   accessToken,
   onExpand,
@@ -169,7 +172,7 @@ export function MyScheduleCard({
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
-    <DashboardCard title="Your schedule" onOpen={onExpand}>
+    <DashboardCard surface={false} title="Your schedule" onOpen={onExpand}>
       {dates.length > 0 ? (
         <ScrollView
           horizontal
@@ -280,18 +283,16 @@ export function MyScheduleCard({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
-    // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
-    // everything else in the card (title, icon) keeps the normal padding. The
-    // same 18px comes back as contentContainerStyle padding below, so the
-    // first/last day cards still sit inset at rest; only the track between
-    // them (visible while actively scrolling) is truly edge-to-edge.
+    // Cancels the screen gutter so the strip runs to the screen edges; the
+    // same gutter comes back as content padding, so the first and last day
+    // sit in line with the title at rest and only the track between them
+    // (visible while scrolling) is truly edge-to-edge.
     scrollView: {
-      marginHorizontal: -mobileSpace.lg,
+      marginHorizontal: -getScreenGutter(),
     },
     scrollContent: {
       gap: DAY_CARD_GAP,
-      paddingHorizontal: mobileSpace.lg,
+      paddingHorizontal: getScreenGutter(),
     },
     // No box. The shift pill below already carries its own fill and edge, so a
     // hairline around the day only drew a second container inside the card:
