@@ -320,15 +320,17 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: PILL_GAP,
     },
-    // The pill's own colour is the shape; the quiet `raised` lift keeps it
-    // legible when a shift colour lands close to the page behind it. No
-    // hairline: that boxed it twice.
+    // The pill's own colour is the shape; the quiet `raised` lift and a
+    // subtle edge keep it legible when a shift colour lands close to the
+    // page behind it.
     shiftPill: {
       width: PILL_WIDTH,
       gap: mobileSpace.xs,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
       borderRadius: PILL_RADIUS,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
       ...mobileElevation("raised", isDark),
       paddingHorizontal: mobileSpace.sm,
