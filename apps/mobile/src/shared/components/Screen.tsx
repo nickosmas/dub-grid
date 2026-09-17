@@ -550,13 +550,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     // Carries only the shadow, positioning, and stacking — see the JSX for
     // why this can't share a view with `stickyHeaderShell`'s `overflow:
     // "hidden"` on iOS.
+    // No shadow over a page background: the wash runs through the header,
+    // and a shadow band under the shell read as a hard seam in it.
     stickyHeaderShadow: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       zIndex: 10,
-      ...mobileElevation("header", isDark),
+      ...(hasPageBackground ? null : mobileElevation("header", isDark)),
     },
     stickyHeaderShell: {
       // The fill has to stay opaque: content scrolls under this shell and must
@@ -589,7 +591,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // passes beneath it) shadow directly rather than needing the floating
       // case's separate unclipped wrapper.
       position: "relative",
-      ...mobileElevation("header", isDark),
+      ...(hasPageBackground ? null : mobileElevation("header", isDark)),
     },
     overlayLayer: {
       ...StyleSheet.absoluteFillObject,

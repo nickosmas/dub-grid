@@ -5,13 +5,14 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import { buildStatusGradient, type GradientStop } from "../lib/status-gradient";
 
 /**
- * The dashboard's page wash: one vertical gradient the height of the
- * viewport, fixed behind everything from the status bar to the bottom edge,
- * its stops following the sections in order. The sticky header renders the
- * same gradient at the same height inside its own clipped shell, so it
- * paints exactly the slice the page shows behind it and content sliding
- * under the header stays legible. Renders nothing on a healthy day. See
- * `buildStatusGradient` for how the stops are placed.
+ * The dashboard's page wash: one diagonal gradient the size of the viewport,
+ * fixed behind everything from the status bar to the bottom edge, its stops
+ * following the sections in order down the page. Diagonal rather than
+ * straight down, so no stop ever reads as a horizontal band. The sticky
+ * header renders the same gradient at the same size and origin inside its
+ * own clipped shell, so it paints exactly the slice the page shows behind it
+ * and content sliding under the header stays legible. Renders nothing on a
+ * healthy day. See `buildStatusGradient` for how the stops are placed.
  */
 export function StatusGradient({
   sections,
@@ -39,8 +40,9 @@ export function StatusGradient({
   return (
     <LinearGradient
       colors={gradient.colors as [string, string, ...string[]]}
+      end={{ x: 1, y: 1 }}
       locations={gradient.locations as [number, number, ...number[]]}
-      pointerEvents="none"
+      start={{ x: 0, y: 0 }}
       style={[styles.wash, { height }, style]}
     />
   );
@@ -52,5 +54,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    pointerEvents: "none",
   },
 });
