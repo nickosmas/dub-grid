@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSoftGradient } from "../../../shared/theme/tokens";
 import { buildCoverageWash } from "../lib/coverage-wash";
 
@@ -13,12 +13,8 @@ import { buildCoverageWash } from "../lib/coverage-wash";
  * it. Renders nothing when coverage is not configured.
  */
 export function CoverageWash({ pct, height }: { pct: number | null; height: number }) {
-  const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const colors = useMemo(
-    () => buildCoverageWash(pct, mobileColors, isDark),
-    [isDark, mobileColors, pct],
-  );
+  const colors = useMemo(() => buildCoverageWash(pct, isDark), [isDark, pct]);
 
   if (!colors || height <= 0) return null;
 
