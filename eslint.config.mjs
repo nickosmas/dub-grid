@@ -270,6 +270,33 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/web/src/**/*.test.ts",
+      "apps/web/src/**/*.test.tsx",
+      "apps/web/src/**/__tests__/**",
+    ],
+    rules: {
+      // Native browser dialogs are unstyled, block the thread, and cannot be
+      // themed or tested; every confirmation goes through the in-app dialog.
+      "no-restricted-globals": [
+        "error",
+        ...["alert", "confirm", "prompt"].map((name) => ({
+          name,
+          message: `Use ConfirmDialog from "@/components/ConfirmDialog" instead of window.${name}().`,
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["alert", "confirm", "prompt"].map((property) => ({
+          object: "window",
+          property,
+          message: `Use ConfirmDialog from "@/components/ConfirmDialog" instead of window.${property}().`,
+        })),
+      ],
+    },
+  },
+  {
     files: ["apps/web/src/features/mobile/server/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [

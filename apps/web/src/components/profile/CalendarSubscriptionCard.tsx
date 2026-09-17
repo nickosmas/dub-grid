@@ -5,6 +5,7 @@ import { Calendar, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/Button";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   createCalendarSubscription,
   fetchCalendarSubscriptionStatus,
@@ -19,6 +20,7 @@ export function CalendarSubscriptionCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<"replace" | "disable" | null>(null);
 
   const loadStatus = useCallback(async () => {
     setIsLoading(true);
@@ -55,14 +57,6 @@ export function CalendarSubscriptionCard() {
   }
 
   async function replaceLink() {
-    if (
-      !window.confirm(
-        "Replace this private link? The previous URL will stop working and must be updated in every calendar app.",
-      )
-    ) {
-      return;
-    }
-
     setIsWorking(true);
     try {
       const issued = await rotateCalendarSubscription();
@@ -79,10 +73,6 @@ export function CalendarSubscriptionCard() {
   }
 
   async function disableSubscription() {
-    if (!window.confirm("Disable this subscription? Calendar apps will stop receiving updates.")) {
-      return;
-    }
-
     setIsWorking(true);
     try {
       const nextStatus = await revokeCalendarSubscription();
@@ -94,6 +84,12 @@ export function CalendarSubscriptionCard() {
     } finally {
       setIsWorking(false);
     }
+  }
+
+  async function confirmPendingAction() {
+    if (pendingAction === "replace") await replaceLink();
+    if (pendingAction === "disable") await disableSubscription();
+    setPendingAction(null);
   }
 
   return (
@@ -169,7 +165,7 @@ export function CalendarSubscriptionCard() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() => replaceLink()}
+                onClick={() => setPendingAction("replace")}
                 disabled={isWorking}
                 className="dg-btn dg-btn-secondary"
               >
@@ -177,7 +173,7 @@ export function CalendarSubscriptionCard() {
               </Button>
               <Button
                 type="button"
-                onClick={() => disableSubscription()}
+                onClick={() => setPendingAction("disable")}
                 disabled={isWorking}
                 className="dg-btn dg-btn-danger"
               >
@@ -187,6 +183,26 @@ export function CalendarSubscriptionCard() {
           </div>
         )}
       </div>
+      {pendingAction === "replace" && (
+        <ConfirmDialog
+          title="Replace private link?"
+          message="The previous URL stops working immediately and must be updated in every calendar app that uses it."
+          confirmLabel="Replace link"
+          variant="warning"
+          onConfirm={confirmPendingAction}
+          onCancel={() => setPendingAction(null)}
+        />
+      )}
+      {pendingAction === "disable" && (
+        <ConfirmDialog
+          title="Disable calendar subscription?"
+          message="Calendar apps will stop receiving updates until you create a new link."
+          confirmLabel="Disable subscription"
+          variant="danger"
+          onConfirm={confirmPendingAction}
+          onCancel={() => setPendingAction(null)}
+        />
+      )}
     </div>
   );
 }
