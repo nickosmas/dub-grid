@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except the unchecked work in items 25-26.
+Everything below is already shipped except items 26-27.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -183,7 +183,17 @@ Everything below is already shipped except the unchecked work in items 25-26.
     references guide review and do not authorize a new dependency or wholesale
     visual rewrite.
 
-26. **Production migration safety** - the final release gate after all product
+26. **Mobile UI consistency and interaction resilience** - bring the Expo app
+    to one spacing, typography, control-scale, and interaction contract: a
+    `display`/`title` type ramp and a 36/44/52 control scale, fill-only badges,
+    a redesigned admin dashboard with pressable drill-in rows and purposeful
+    motion, request flows that exit on one tap (swap target selection on a
+    full-page modal, confirmation for call-off only), a mechanical token
+    migration of the schedule and requests screens, and a screenshot-qualified
+    role, theme, text-scale, and device matrix. No new dependency; preserve the
+    `mobile*` tokens and reduced-motion behavior.
+
+27. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,

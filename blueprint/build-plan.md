@@ -418,6 +418,49 @@
       welcome-state query disabled until then, so it never paints a frame
       under or over the wizard), verify with the first-login flow as
       `qa-super-admin` on a fresh seed, and add a unit test for the gate.
+- [ ] 38. **Mobile UI consistency and interaction resilience** - bring the
+      Expo app to one visual, spacing, typography, and interaction contract
+      after the 2026-09-17 mobile audit: a spacing and control scale every
+      screen draws from, a legible type hierarchy, a redesigned admin dashboard
+      with drill-ins and purposeful motion, request flows that exit without
+      friction, and a screenshot-qualified role, theme, text-scale, and device
+      matrix. Preserve the `mobile*` tokens, platform motion, and reduced-motion
+      behavior; no new dependency. The three hotfixes that preceded it
+      (skeleton safe area, request-sheet exit, link-button shrink) are archived
+      under `blueprint/history/fixes/`. Build the sub-features in the order
+      listed: a, b, d, c, e, f.
+  - [x] 38a. **Spacing, type, and control scale foundation** - add `display`
+        (28/34) and `title` (20/26) type steps; one control scale of 36/44/52
+        for buttons, fields, search and segmented controls; list-row metrics;
+        fill-only badges; `Card` titles at `title` with 16pt padding and 24pt
+        section gaps; sheet footer symmetry; a lint rule that warns on raw
+        `fontSize` and off-ramp `padding`/`margin`/`gap` literals outside
+        `tokens.ts`; the contract recorded in `apps/mobile/AGENTS.md`.
+  - [ ] 38b. **Admin dashboard redesign** - greeting at `display`, a single
+        hero surface with coverage as the dominant metric, section cards with
+        header-right "See all" and three pressable rows each, drill-ins to the
+        Requests tab (`?tab=available|approval`), team schedule, and person
+        schedule, first-paint stagger and period crossfade through
+        `useMotionPreference`, haptics on the period toggle, and a skeleton that
+        reuses the new styles.
+  - [ ] 38c. **Request flows without friction** - swap target selection moves
+        to a full-page modal route (`presentation: "modal"`) with its own
+        header and native swipe-down; the sheet keeps drop and pickup; the
+        confirmation step remains for call-off only; the Requests tab uses the
+        shared request-type badge map.
+  - [ ] 38d. **Schedule and requests screen token migration** - replace every
+        raw spacing and font-size literal in `scheduleScreenStyles.ts`,
+        `shiftDetailScreenStyles.ts`, `requestsScreenStyles.ts`,
+        `ProfilePrimitives.tsx`, and `SplitShift.tsx` with tokens, recording each
+        rounding decision; flip the 38a lint rule from warn to error.
+  - [ ] 38e. **Sheet and popup polish** - `KeyboardDoneAccessory`,
+        `ConfirmationModal` action row, and `ScrollableTabStrip` idle tabs on
+        the 44pt control scale and the single-edge rule.
+  - [ ] 38f. **Mobile qualification matrix** - simulator and emulator
+        screenshots per role, theme, text scale, device class, and state
+        (loading, empty, error, sheet, confirmation) saved under
+        `blueprint/reference/mobile/`, with every defect fixed in place or
+        logged in `blueprint/context/findings.md`.
 - [ ] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
