@@ -9,6 +9,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileElevation,
   mobileRadius,
   mobileText,
   mobileTabularText,
@@ -31,6 +32,11 @@ const DAY_CARD_GAP = 10;
 // radius the strip reads at rather than a nested corner inside a bigger one.
 // The chip step of the shared ramp (card 20 / panel 12 / chip 8).
 const PILL_RADIUS = mobileRadius.md;
+// Room above and below the strip for the pills' shadow. A ScrollView clips
+// at its bounds, so without it the cast ends in a hard line under each
+// pill; the same room is taken back as a negative margin so the section's
+// rhythm is unchanged.
+const SHADOW_ROOM = mobileSpace["2xl"];
 // Explicit min-height, shared by the worked-shift pill and the empty-day
 // placeholder, sized for 3 stacked lines (name/job/time) so every pill is
 // the same height regardless of whether a given shift has a job name or a
@@ -284,10 +290,12 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // (visible while scrolling) is truly edge-to-edge.
     scrollView: {
       marginHorizontal: -getScreenGutter(),
+      marginVertical: -SHADOW_ROOM,
     },
     scrollContent: {
       gap: DAY_CARD_GAP,
       paddingHorizontal: getScreenGutter(),
+      paddingVertical: SHADOW_ROOM,
     },
     // No box. The shift pill below already carries its own fill and edge, so a
     // hairline around the day only drew a second container inside the card:
@@ -307,9 +315,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: PILL_GAP,
     },
-    // A flat fill, no edge and no cast: on the page with no card around it,
-    // the pill's own colour is the shape. A shadow was clipped by the strip
-    // and a hairline boxed it twice.
+    // The pill's own colour is the shape; the quiet `raised` lift keeps it
+    // legible when a shift colour lands close to the page behind it. No
+    // hairline: that boxed it twice.
     shiftPill: {
       width: PILL_WIDTH,
       gap: mobileSpace.xs,
@@ -317,6 +325,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       borderRadius: PILL_RADIUS,
       backgroundColor: mobileColors.surface,
+      ...mobileElevation("raised", isDark),
       paddingHorizontal: mobileSpace.sm,
       paddingVertical: mobileSpace.sm,
     },
