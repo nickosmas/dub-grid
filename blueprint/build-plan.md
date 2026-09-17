@@ -436,7 +436,7 @@
         section gaps; sheet footer symmetry; a lint rule that warns on raw
         `fontSize` and off-ramp `padding`/`margin`/`gap` literals outside
         `tokens.ts`; the contract recorded in `apps/mobile/AGENTS.md`.
-  - [ ] 38b. **Admin dashboard redesign** - greeting at `display`, a single
+  - [x] 38b. **Admin dashboard redesign** - greeting at `display`, a single
         hero surface with coverage as the dominant metric, section cards with
         header-right "See all" and three pressable rows each, drill-ins to the
         Requests tab (`?tab=available|approval`), team schedule, and person
