@@ -391,7 +391,7 @@
       trade-off, not a hidden bug, but worth promoting to a shared,
       reference-counted provider-level subscription to cut the socket/refetch
       overhead.
-- [ ] 36. **Fix trial welcome appearing before onboarding completes** - on a
+- [x] 36. **Fix trial welcome appearing before onboarding completes** - on a
       super admin's first login the "Welcome to <org>!" trial-welcome modal
       opens while the onboarding wizard is still up. `AppShell.tsx` renders
       `TrialWelcomeModal` as a sibling outside `OnboardingGate`, and the

@@ -7,7 +7,7 @@ import { CalendarClock, CheckCircle2, Hourglass } from "lucide-react";
 import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { usePermissions, useTermsAcceptanceStatus } from "@/hooks";
+import { useOrganizationData, usePermissions, useTermsAcceptanceStatus } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchTrialWelcomeState, dismissTrialWelcome } from "@/features/billing/client";
 
@@ -46,12 +46,29 @@ export default function TrialWelcomeModal() {
   // it, which read as a flash.
   const termsAccepted = terms.data?.acceptedCurrentTerms === true;
 
-  const enabled =
+  // Nor until onboarding is actually finished. The trial starts on the super
+  // admin's first sign-in, which is the same sign-in that walks them through
+  // onboarding, so without this the welcome opened over the wizard. The
+  // server's completion flag is the authority here, not the session latch that
+  // lets the app paint early: the header's trial pill is held back by the same
+  // condition (AppShell's hideForSetupLock).
+  // This component is mounted by AppShell on every route, public ones
+  // included, so the lookup stays disabled until the caller is actually a
+  // candidate for the welcome. Otherwise it would put org queries on the
+  // sign-in page.
+  const isWelcomeCandidate =
     Boolean(perms.orgId) &&
     perms.isSuperAdmin &&
     !perms.isGridmaster &&
     !perms.isImpersonating &&
     termsAccepted;
+
+  const { entryGate } = useOrganizationData({
+    includeAssignmentDefinitionCompatibility: false,
+    enabled: isWelcomeCandidate,
+  });
+
+  const enabled = isWelcomeCandidate && entryGate?.onboardingCompleted === true;
 
   const { data } = useQuery({
     queryKey: queryKeys.org.trialWelcome(perms.orgId ?? "none"),
