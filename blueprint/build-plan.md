@@ -343,7 +343,7 @@
       helper was built to fix. Fold the activity-feed fetch into
       `useShiftRequests`'s result (or expose an unfiltered variant), and move
       its invalidation onto the shared channel.
-- [ ] 30. **Fix Reports page duplicate operations-report fetch** - whenever a
+- [x] 30. **Fix Reports page duplicate operations-report fetch** - whenever a
       report is generated with any non-empty filter, `ReportsPageContent`
       fetches the full operations report twice for the same org/date range:
       once via `targetOptionsQuery` (meant only to populate filter-option

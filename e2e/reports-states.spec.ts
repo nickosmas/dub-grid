@@ -97,8 +97,14 @@ test.describe("reports states", () => {
     await page.waitForLoadState("networkidle");
 
     // Keep the real payload shape (features/reports/server/operations.ts:
-    // OperationsReportPayload) and blank only the default report's rows.
+    // OperationsReportPayload) and blank only the default report's rows. The
+    // page's first call is the options-only one (optionsOnly=1), which
+    // carries no reports at all; let it through untouched.
     await page.route(`**${OPERATIONS_GLOB}`, async (route) => {
+      if (new URL(route.request().url()).searchParams.get("optionsOnly") === "1") {
+        await route.continue();
+        return;
+      }
       const response = await route.fetch();
       const body = (await response.json()) as { reports: { staffHours: unknown[] } };
       body.reports.staffHours = [];
