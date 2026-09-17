@@ -109,4 +109,6 @@ noted in the archive of the feature that captured them.
 - 2026-09-17, dashboard (design review on device): grey toggle track read as
   a patch on the wash; two coverage cards said the same thing. Track filled
   with the theme ground; one Coverage card with the focus-area breakdown
-  inside; Your schedule moved to the top and its strip taken out of its card.
+  inside; Your schedule moved to the top and its strip taken out of its card,
+  the pills flat; the headline under the toggle dropped as a repeat of the
+  Coverage card.

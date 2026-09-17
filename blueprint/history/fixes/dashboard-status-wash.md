@@ -113,3 +113,7 @@ glow on a black page.
   the pills ended as flat fills with no edge and no cast. (`3883c75a` named
   a spacing key that does not exist; the hook refused the push and
   `747d454b` corrected it.)
+- `fc781b3b`: the headline under the toggle ("21 urgent coverage gaps" and
+  its sentence) removed; the Coverage card says it with the figure, meter
+  and stats. `DashboardHeadline` and its skeleton block are gone; the API
+  keeps `heroSummary` for the web.
