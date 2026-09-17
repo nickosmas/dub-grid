@@ -59,27 +59,26 @@ and are unaffected.
 an uninstall; `xcrun simctl keychain booted reset` (or the dev-only
 long-press on the login wordmark) brings onboarding back.
 
-### Authenticated (pending a signed-in session)
+### Authenticated
 
-For each role, sign in, then run `scripts/mobile-matrix.sh <screen>-<role>`
-on each screen. The skeleton cell is the same screen captured during a
-cold start or pull-to-refresh; the sheet cells need the sheet opened first.
+Captured on 2026-09-17 from a signed-in session on the iPhone 17 Pro
+simulator (light, default text; the local debug build cannot reach dark
+mode, see above). The remaining cells are listed with the roles and checks
+they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 
-| Screen        | Role(s)            | Cells per role                                 | What to check                                                                                                                                            |
-| ------------- | ------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| dashboard     | admin, super_admin | loaded ×4 appearance, skeleton, empty          | Greeting at `display`; hero figure + meter + two chips; cards with header-right See all, 3 rows, chevrons; skeleton starts below the Dynamic Island (A1) |
-| schedule-home | user               | loaded ×4, skeleton                            | Hero card, upcoming rows at `title`/`cardTitle`; skeleton below the status bar                                                                           |
-| schedule-team | admin, user        | loaded ×4, skeleton, focus-area-from-dashboard | Tab strip pills at 36pt; opening from a coverage row selects that focus area                                                                             |
-| shift-detail  | user               | loaded ×4                                      | Drop/Swap actions; request pills on the ramp                                                                                                             |
-| request-sheet | user               | drop, pickup, call-off confirmation, error     | Bottom sheet; Close visible while pending; inline error; call-off is the only confirmation                                                               |
-| swap-sheet    | user               | open, target chosen, discard confirmation      | Full-page card sheet; swipe-down; Discard question only after a target is chosen                                                                         |
-| requests      | user, admin        | available, approval, history                   | Pickup/Swap/Time off badges match Home                                                                                                                   |
-| people        | admin              | loaded ×4, search focused                      | Search bar at 44pt beside a 44pt filter control                                                                                                          |
-| person        | admin              | loaded ×4, edit                                | Inputs at the `input` type step                                                                                                                          |
-| profile       | user               | loaded ×4                                      | Card titles at `title`; badges fill-only                                                                                                                 |
-| confirmation  | any                | one, light and dark                            | Icon badge without stroke; equal space above and below the buttons                                                                                       |
-| tabs-android  | any                | home, schedule                                 | FloatingTabBar clearance with gesture navigation                                                                                                         |
-| devices       | admin              | dashboard on SE-class and Pro Max              | Nothing clips at either width                                                                                                                            |
+| Cell                                                                                                   | Status   | Shows                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dashboard-ios-light-default-admin                                                                      | captured | Two-word greeting and period; hero with status word, centred stats under a hairline (coverage figure only when configured); See all on every card; rows as text, no pills |
+| schedule-team-ios-light-default-admin                                                                  | captured | Date title at `screenTitle` beside Today and the bell; 36pt tab pills; avatar initials sized to their circle                                                              |
+| shift-detail-ios-light-default-user                                                                    | captured | Drop shift / Swap actions; Working with rows                                                                                                                              |
+| requests-ios-light-default-admin                                                                       | captured | Empty Available list                                                                                                                                                      |
+| people-ios-light-default-admin                                                                         | captured | 44pt search, filter and add controls on one baseline; initials no longer shrink                                                                                           |
+| profile-ios-light-default-admin                                                                        | captured | Hero, grouped rows with outline glyphs                                                                                                                                    |
+| alerts-ios-light-default-admin                                                                         | captured | Mailbox rows: unread dot, filled alert glyph for high priority, time, two-line message                                                                                    |
+| alerts-swipe-ios-light-default-admin                                                                   | captured | A row swiped left revealing Read and Archive                                                                                                                              |
+| request-sheet-\* (drop, pickup, call-off confirmation, error)                                          | pending  | Open your own shift, Drop shift; needs the request flow driven by hand                                                                                                    |
+| swap-sheet-\* (open, target chosen, discard)                                                           | pending  | Open your own shift, Swap                                                                                                                                                 |
+| dashboard skeleton, empty; schedule-home (user role); person edit; confirmation; devices; tabs-android | pending  | As in the table below                                                                                                                                                     |
 
 ## Defects found while capturing
 
@@ -91,3 +90,14 @@ noted in the archive of the feature that captured them.
   `Button` labels wrap to two lines (filled buttons stay on one).
 - 2026-09-17, environment: the local iOS native project pins light mode (see
   above). Not a repository defect; documented rather than logged.
+- 2026-09-17, schedule-team: "Tomorrow, Sep 18" truncated to "Tomorrow, Se…"
+  at `display` size beside the Today button. Fixed in place: schedule date
+  titles use `screenTitle`.
+- 2026-09-17, people and schedule: avatar initials rendered at a fraction of
+  their circle ("CH" in a 48pt circle). Fixed in place: initials no longer
+  `adjustsFontSizeToFit`.
+- 2026-09-17, dashboard (design review on device): header overloaded, pills
+  everywhere, expand glyph on Your schedule. Fixed in place, see the
+  minimalist-dashboard fix archive.
+- 2026-09-17, alerts (design review on device): cards with inline buttons.
+  Replaced by mailbox rows with swipe actions.
