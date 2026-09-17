@@ -17,11 +17,29 @@ describe("buildStatusGradient", () => {
     ).toBeNull();
   });
 
-  it("spaces one stop per section from the top edge to the bottom, in that section's tone", () => {
+  it("runs from the first attention tone on the page to the second", () => {
     const gradient = buildStatusGradient(
       [
         { key: "coverage", tone: "neutral" },
         { key: "approvals", tone: "warning" },
+        { key: "overtime", tone: "danger" },
+        { key: "open-shifts", tone: "danger" },
+        { key: "activity", tone: "neutral" },
+      ],
+      HEX,
+      0.2,
+    );
+
+    // Two stops and only two, whatever the page holds.
+    expect(gradient).toEqual({
+      colors: ["rgba(245, 158, 11, 0.2)", "rgba(239, 68, 68, 0.2)"],
+      locations: [0, 1],
+    });
+  });
+
+  it("fades a single tone to clear in its own RGB, never to transparent", () => {
+    const gradient = buildStatusGradient(
+      [
         { key: "overtime", tone: "danger" },
         { key: "activity", tone: "neutral" },
       ],
@@ -29,20 +47,9 @@ describe("buildStatusGradient", () => {
       0.2,
     );
 
-    expect(gradient?.locations.map((l) => Number(l.toFixed(3)))).toEqual([0, 0.333, 0.667, 1]);
-    // Neutral runs take the neighbour's RGB at zero alpha, never "transparent".
-    expect(gradient?.colors).toEqual([
-      "rgba(245, 158, 11, 0)",
-      "rgba(245, 158, 11, 0.2)",
-      "rgba(239, 68, 68, 0.2)",
-      "rgba(239, 68, 68, 0)",
-    ]);
-  });
-
-  it("still makes a gradient from a single coloured section", () => {
-    const gradient = buildStatusGradient([{ key: "overtime", tone: "danger" }], HEX, 0.2);
-
-    expect(gradient?.locations).toEqual([0, 1]);
-    expect(gradient?.colors).toHaveLength(2);
+    expect(gradient).toEqual({
+      colors: ["rgba(239, 68, 68, 0.2)", "rgba(239, 68, 68, 0)"],
+      locations: [0, 1],
+    });
   });
 });

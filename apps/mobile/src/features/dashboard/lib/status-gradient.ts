@@ -19,42 +19,31 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 /**
- * One vertical wash for the whole dashboard page, top edge to bottom edge,
- * whose colour follows the sections in the order they appear: one stop per
- * section, evenly spaced, in that section's tone, with neutral sections
- * fading the wash to clear. Adjacent attention sections blend into each
- * other, so the page reads top to bottom as one state story.
+ * The dashboard's wash, always a gradient of exactly two colours. The
+ * sections are read in page order for the attention tones they carry: with
+ * two distinct tones on the page (amber waiting, red broken) the wash runs
+ * from the one that appears first to the other; with one tone it runs from
+ * that colour to clear; with none there is no wash, so a healthy day is a
+ * plain page. Two stops, never a run of them: a multi-stop wash read as a
+ * rainbow even when every stop had a reason.
  *
- * Neutral stops take the RGB of the nearest coloured neighbour at zero
- * alpha rather than `transparent`: iOS interpolates gradients un-premultiplied
- * and greys the run-out otherwise. Returns null when nothing needs a hand,
- * so a healthy day is a plain page.
+ * "Clear" is the same RGB at zero alpha rather than `transparent`: iOS
+ * interpolates gradients un-premultiplied and greys the run-out otherwise.
  */
 export function buildStatusGradient(
   sections: readonly GradientStop[],
   toneHex: Record<Exclude<DashboardCardTone, "neutral">, string>,
   alpha: number,
 ): StatusGradient | null {
-  if (sections.length === 0 || !sections.some((s) => s.tone !== "neutral")) return null;
+  const tones: Array<Exclude<DashboardCardTone, "neutral">> = [];
+  for (const section of sections) {
+    if (section.tone !== "neutral" && !tones.includes(section.tone)) tones.push(section.tone);
+  }
+  if (tones.length === 0) return null;
 
-  const nearestHex = (index: number): string => {
-    for (let distance = 1; distance < sections.length; distance += 1) {
-      const before = sections[index - distance];
-      if (before && before.tone !== "neutral") return toneHex[before.tone];
-      const after = sections[index + distance];
-      if (after && after.tone !== "neutral") return toneHex[after.tone];
-    }
-    return toneHex.warning;
-  };
+  const [first, second] = tones;
+  const from = withAlpha(toneHex[first], alpha);
+  const to = second ? withAlpha(toneHex[second], alpha) : withAlpha(toneHex[first], 0);
 
-  // A single section still needs two stops to be a gradient at all.
-  const stops = sections.length === 1 ? [sections[0], sections[0]] : [...sections];
-  const colors = stops.map((section, index) =>
-    section.tone === "neutral"
-      ? withAlpha(nearestHex(index), 0)
-      : withAlpha(toneHex[section.tone], alpha),
-  );
-  const locations = stops.map((_, index) => index / (stops.length - 1));
-
-  return { colors, locations };
+  return { colors: [from, to], locations: [0, 1] };
 }

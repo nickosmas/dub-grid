@@ -5,10 +5,11 @@ import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeM
 import { buildStatusGradient, type GradientStop } from "../lib/status-gradient";
 
 /**
- * The dashboard's page wash: one diagonal gradient the size of the viewport,
- * fixed behind everything from the status bar to the bottom edge, its stops
- * following the sections in order down the page. Diagonal rather than
- * straight down, so no stop ever reads as a horizontal band. The sticky
+ * The dashboard's page wash: one diagonal two-colour gradient the size of
+ * the viewport, fixed behind everything from the status bar to the bottom
+ * edge, its two colours chosen from the attention tones on the page (see
+ * `buildStatusGradient`). Diagonal rather than straight down, so the blend
+ * never reads as a horizontal band. The sticky
  * header renders the same gradient at the same size and origin inside its
  * own clipped shell, so it paints exactly the slice the page shows behind it
  * and content sliding under the header stays legible. Renders nothing on a
