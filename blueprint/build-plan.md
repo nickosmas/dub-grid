@@ -173,7 +173,7 @@
       the wordmark and every landing or marketing title and heading, preserve
       the existing semantic type scale, use tabular numerals for scheduling
       data, and verify fallbacks, layout, browser zoom, and native text scaling.
-- [ ] 25. **Web UI consistency and interaction resilience** - audit and repair
+- [x] 25. **Web UI consistency and interaction resilience** - audit and repair
       every project-owned web route, component, primitive, and rendered state so
       equivalent elements share one visual and interaction contract and no known
       clipping, overlap, reflow, first-paint, loading, error, empty-state,
@@ -254,7 +254,7 @@
         (`npx playwright test e2e/typography.spec.ts`) and is already wired
         into `e2e.yml`'s CI job - no missing tooling for 25d to build
         against. No fix needed.
-  - [ ] 25d. **Full qualification matrix pass** - route, role, theme, viewport,
+  - [x] 25d. **Full qualification matrix pass** - route, role, theme, viewport,
         zoom, permission, and loading/empty/error/overlay states, with
         reproducible evidence. The closing verification sweep once 25a-25c are
         done.
@@ -307,7 +307,7 @@
             25d2a, re-run the matrix as `qa-admin`, then as `qa-gridmaster`
             impersonating a Calm Haven member through the portal's
             impersonation flow, and close any contract violation.
-    - [ ] 25d3. **Qualify the Gridmaster portal live** - the manifest's
+    - [x] 25d3. **Qualify the Gridmaster portal live** - the manifest's
           `/gridmaster` entry has browser evidence only for its
           authorization-gate redirect; the portal's own views (dashboard, org
           list, security, audit log, etc.) are source-reviewed only. Add live

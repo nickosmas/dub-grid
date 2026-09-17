@@ -186,8 +186,22 @@ export const typographyRouteAuditManifest = [
     source: "apps/web/src/app/(app)/gridmaster/page.tsx",
     browserExpectation: "route-redirect",
     expectedPath: "/schedule",
-    browserStates: ["authorization gate"],
-    sourceReviewedStates: ["portal", "loading", "error", "not found"],
+    // The typography matrix visits as qa-super-admin, so the redirect is the
+    // expectation here. "portal": e2e/gridmaster-portal-states.spec.ts signs
+    // in as qa-gridmaster and opens every sidebar view and the org detail.
+    // "loading": the same spec delays /api/gridmaster/dashboard and asserts
+    // the progress bar before the dashboard renders.
+    // "error": the same spec fails /api/gridmaster/dashboard and asserts the
+    // portal's inline failure message. error.tsx (RouteBoundary) is not what
+    // renders: dashboardQuery's failure is formatted into that inline state
+    // (GridmasterPortal.tsx:455, :1052) and nothing in the portal throws to
+    // the boundary, so the inline state carries the evidence.
+    browserStates: ["authorization gate", "portal", "loading", "error"],
+    // "not found": (app)/gridmaster/not-found.tsx exists but is unreachable.
+    // Nothing under the route calls notFound() and there is no dynamic
+    // segment, so /gridmaster/<unknown> never enters the segment and the
+    // app root's 404 renders instead (evidenced in the same spec; F-74).
+    sourceReviewedStates: ["not found"],
   },
   {
     route: "/schedule",

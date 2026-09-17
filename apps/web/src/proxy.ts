@@ -150,6 +150,11 @@ export async function proxy(req: NextRequest) {
     ? ""
     : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
   const analyticsSrc = "https://va.vercel-scripts.com";
+  // Google Places for OrganizationLocationFields (google-maps.ts appends the
+  // loader script itself). Listed explicitly so the address autocomplete works
+  // under both policies rather than only where 'strict-dynamic' happens to
+  // extend trust to a bundle-created script tag.
+  const mapsSrc = "https://maps.googleapis.com https://maps.gstatic.com";
   // @vercel/analytics/next injects its own bootstrap inline script (not via
   // next/script), so it never picks up the per-request nonce and its trust
   // never chains from strict-dynamic — the browser blocks it outright on
@@ -179,7 +184,7 @@ export async function proxy(req: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${devConnectExtras};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://maps.googleapis.com ${devConnectExtras};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
@@ -191,14 +196,14 @@ export async function proxy(req: NextRequest) {
 
   // Static/public pages keep 'unsafe-inline'.
   const contentSecurityPolicyHeaderValue = buildCsp(
-    `'self' 'unsafe-inline' ${devScriptExtras} ${analyticsSrc}`,
+    `'self' 'unsafe-inline' ${devScriptExtras} ${analyticsSrc} ${mapsSrc}`,
   );
   // Authenticated app: nonce + 'strict-dynamic' in production (its pages are
   // force-dynamic, so Next can stamp the nonce); 'unsafe-inline' in dev.
   const dynamicCspHeaderValue = isDev
     ? contentSecurityPolicyHeaderValue
     : buildCsp(
-        `'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc} ${analyticsInlineScriptHash}`,
+        `'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc} ${mapsSrc} ${analyticsInlineScriptHash}`,
       );
 
   const requestHeaders = new Headers(req.headers);
