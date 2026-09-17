@@ -6,7 +6,6 @@ import { Pressable } from "../../../shared/components/Pressable";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
-  mobileListRow,
   mobileRadii,
   mobileSpace,
   mobileTabularText,
@@ -65,10 +64,10 @@ function MetricStat({
 }
 
 /**
- * The coverage card: the period's one big figure over its meter, the two
- * counts that need a hand, then the same figure broken down by focus area.
- * One card for all of it; a second "Coverage by wings" card said the same
- * thing twice, and "See all" opens the full breakdown.
+ * The coverage card: the period's one big figure over its meter, the same
+ * figure broken down by focus area, and at the foot the two counts that
+ * need a hand. One card for all of it; a second "Coverage by wings" card
+ * said the same thing twice, and "See all" opens the full breakdown.
  */
 export function DashboardHeroCard({
   metrics,
@@ -120,7 +119,22 @@ export function DashboardHeroCard({
           </View>
         </View>
       ) : null}
-      <View style={[styles.statRow, coverage != null ? styles.statRowDivided : null]}>
+      {sections.length > 0 ? (
+        <View style={[styles.breakdown, coverage != null ? styles.breakdownDivided : null]}>
+          <DashboardRowList
+            items={sections}
+            keyExtractor={(section) => String(section.focusAreaId)}
+            limit={3}
+            renderItem={(section) => <CoverageSectionRow section={section} />}
+          />
+        </View>
+      ) : null}
+      <View
+        style={[
+          styles.statRow,
+          coverage != null || sections.length > 0 ? styles.statRowDivided : null,
+        ]}
+      >
         <MetricStat
           label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
           onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
@@ -135,16 +149,6 @@ export function DashboardHeroCard({
           value={metrics.pendingApprovalsCount}
         />
       </View>
-      {sections.length > 0 ? (
-        <View style={styles.breakdown}>
-          <DashboardRowList
-            items={sections}
-            keyExtractor={(section) => String(section.focusAreaId)}
-            limit={3}
-            renderItem={(section) => <CoverageSectionRow section={section} />}
-          />
-        </View>
-      ) : null}
     </DashboardCard>
   );
 }
@@ -183,8 +187,8 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "stretch",
       gap: mobileSpace.lg,
     },
-    // A hairline above the stats when a figure sits above them, so they
-    // read as the card's second section rather than a third line of it.
+    // A hairline above the stats when anything sits above them, so they
+    // read as the card's closing section rather than another line of it.
     statRowDivided: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
@@ -218,12 +222,15 @@ const createStyles = (mobileColors: MobileColors) =>
       width: StyleSheet.hairlineWidth,
       backgroundColor: mobileColors.borderSubtle,
     },
-    // The rows carry their own vertical padding, so the section only draws
-    // the hairline and gives back the last row's padding to the card edge.
+    // The rows carry their own vertical padding, so the section only pads
+    // the first row off the hairline and gives back part of the last row's
+    // padding, leaving the stats' hairline 16pt below the last row's text.
     breakdown: {
+      paddingTop: mobileSpace.xs,
+      marginBottom: -mobileSpace.sm,
+    },
+    breakdownDivided: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
-      paddingTop: mobileSpace.xs,
-      marginBottom: -mobileListRow.paddingVertical,
     },
   });

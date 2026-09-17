@@ -122,7 +122,7 @@ function DashboardCardSkeleton({
   );
 }
 
-/** The Coverage card: the figure over its meter, two stats, three focus-area meters. */
+/** The Coverage card: the figure over its meter, three focus-area meters, two stats. */
 function DashboardHeroSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -141,6 +141,14 @@ function DashboardHeroSkeleton() {
           </View>
           <View style={styles.heroTrack} />
         </View>
+        <View style={styles.heroBreakdown}>
+          {skeletonRows(3, (index) => (
+            <View key={`hero-section-${index}`}>
+              {index > 0 ? <View style={styles.rowDivider} /> : null}
+              <DashboardRow variant="meter" />
+            </View>
+          ))}
+        </View>
         <View style={styles.heroStatRow}>
           <View style={styles.heroStat}>
             <SkeletonLine variant="title" width={28} />
@@ -150,14 +158,6 @@ function DashboardHeroSkeleton() {
             <SkeletonLine variant="title" width={28} />
             <SkeletonLine variant="caption" width={110} />
           </View>
-        </View>
-        <View style={styles.heroBreakdown}>
-          {skeletonRows(3, (index) => (
-            <View key={`hero-section-${index}`}>
-              {index > 0 ? <View style={styles.rowDivider} /> : null}
-              <DashboardRow variant="meter" />
-            </View>
-          ))}
         </View>
       </SkeletonCardSurface>
     </View>
@@ -314,7 +314,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
       paddingTop: mobileSpace.xs,
-      marginBottom: -mobileListRow.paddingVertical,
+      marginBottom: -mobileSpace.sm,
     },
     rowDivider: {
       height: StyleSheet.hairlineWidth,

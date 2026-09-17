@@ -64,7 +64,7 @@ describe("DashboardHeroCard", () => {
     expect(screen.getByText("open gaps")).toBeInTheDocument();
   });
 
-  it("previews the first three focus areas under the stats", () => {
+  it("previews the first three focus areas above the stats", () => {
     const section = (id: number, name: string) =>
       ({
         focusAreaId: id,
@@ -89,6 +89,12 @@ describe("DashboardHeroCard", () => {
     expect(screen.getByText("East Wing")).toBeInTheDocument();
     expect(screen.getByText("Memory Care")).toBeInTheDocument();
     expect(screen.queryByText("Rehab")).not.toBeInTheDocument();
+    // The breakdown sits between the figure and the stats; the stats close the card.
+    const memoryCare = screen.getByText("Memory Care");
+    const openGaps = screen.getByText("open gaps");
+    expect(memoryCare.compareDocumentPosition(openGaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     // One card, one title: the breakdown no longer has a heading of its own.
     expect(screen.queryByText(/Coverage by/)).not.toBeInTheDocument();
   });
