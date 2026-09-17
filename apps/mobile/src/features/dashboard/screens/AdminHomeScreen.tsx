@@ -24,7 +24,7 @@ import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeadline, DashboardHeroCard } from "../components/DashboardHeroCard";
-import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
+import { CoverageWash } from "../components/CoverageWash";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
@@ -97,8 +97,8 @@ export function AdminHomeScreen() {
     );
   }, [contentOpacity, isRefetching, timing]);
   const dimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
-  // The same brand wash the login page opens on, the viewport's height and
-  // fixed behind everything: status bar, sticky header and content alike.
+  // The login page's aurora in the period's coverage colour, the viewport's
+  // height and fixed behind everything: status bar, sticky header and content.
   const { height: windowHeight } = useWindowDimensions();
 
   if (contentState.kind === "loading") {
@@ -292,10 +292,10 @@ export function AdminHomeScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      pageBackground={<GradientBackdrop height={windowHeight} kind="aurora" />}
+      pageBackground={<CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={<GradientBackdrop height={windowHeight} kind="aurora" />}
+      stickyHeaderBackground={<CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />}
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
