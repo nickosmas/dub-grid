@@ -100,4 +100,8 @@ noted in the archive of the feature that captured them.
   everywhere, expand glyph on Your schedule. Fixed in place, see the
   minimalist-dashboard fix archive.
 - 2026-09-17, alerts (design review on device): cards with inline buttons.
-  Replaced by mailbox rows with swipe actions.
+  Replaced by mailbox rows with swipe actions; then one open swipe at a
+  time, a gap before the actions, and rows bleeding to the screen edge.
+- 2026-09-17, dashboard (design review on device, four rounds): tinted cards
+  read as borders, coloured halos as a rainbow. Settled on one subtle
+  diagonal page wash keyed to the sections, two hues only.
