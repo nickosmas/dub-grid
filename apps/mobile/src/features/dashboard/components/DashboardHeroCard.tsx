@@ -14,7 +14,7 @@ import {
 } from "../../../shared/theme/tokens";
 import { coverageColor } from "../lib/coverage";
 import { createToneTextColors } from "../lib/tone-text";
-import { DashboardCard, type DashboardCardTone } from "./DashboardCard";
+import { DashboardCard } from "./DashboardCard";
 
 /**
  * The page's reading of the period, above the cards: a headline and one
@@ -57,7 +57,7 @@ function MetricStat({
   label: string;
   value: number;
   /** Colours the figure only when it is non-zero; a zero is plain, not green. */
-  tone: Exclude<DashboardCardTone, "neutral">;
+  tone: "warning" | "danger";
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();

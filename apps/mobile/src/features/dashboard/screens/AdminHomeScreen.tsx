@@ -24,11 +24,7 @@ import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeadline, DashboardHeroCard } from "../components/DashboardHeroCard";
-import type { DashboardCardTone } from "../components/DashboardCard";
-import { StatusGradient } from "../components/StatusGradient";
-import { coverageTone, coverageToneForPct } from "../lib/coverage";
-import { openShiftsTone } from "../components/OpenShiftsCard";
-import type { GradientStop } from "../lib/status-gradient";
+import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
@@ -101,7 +97,8 @@ export function AdminHomeScreen() {
     );
   }, [contentOpacity, isRefetching, timing]);
   const dimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
-  // The page wash is the viewport's height, fixed behind everything.
+  // The same brand wash the login page opens on, the viewport's height and
+  // fixed behind everything: status bar, sticky header and content alike.
   const { height: windowHeight } = useWindowDimensions();
 
   if (contentState.kind === "loading") {
@@ -188,10 +185,9 @@ export function AdminHomeScreen() {
 
   // Keyed so the stagger indexes the cards actually shown; a card that is
   // absent for this role or period does not leave a gap in the sequence.
-  const sections: Array<{ key: string; tone: DashboardCardTone; node: ReactNode }> = [
+  const sections: Array<{ key: string; node: ReactNode }> = [
     {
       key: "coverage-summary",
-      tone: coverageToneForPct(data.metrics.coveragePct),
       node: (
         <DashboardHeroCard
           metrics={data.metrics}
@@ -207,7 +203,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "drafts",
-            tone: "warning" as const,
             node: <DraftSummaryCard summary={draftSummary} />,
           },
         ]
@@ -216,7 +211,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "approvals",
-            tone: "warning" as const,
             node: (
               <ActionQueueCard
                 requests={data.actionQueue}
@@ -230,7 +224,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "my-schedule",
-            tone: "neutral" as const,
             node: (
               <MyScheduleCard
                 accessToken={accessToken}
@@ -244,7 +237,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "coverage",
-            tone: coverageTone(data.coverageBySection),
             node: (
               <CoverageBySectionCard
                 sections={data.coverageBySection}
@@ -259,7 +251,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "open-shifts",
-            tone: openShiftsTone(data.openShifts),
             node: (
               <OpenShiftsCard
                 openShifts={data.openShifts}
@@ -273,7 +264,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "staff-hours",
-            tone: "danger" as const,
             node: (
               <StaffHoursCard
                 entries={data.staffHours}
@@ -288,7 +278,6 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "activity",
-            tone: "neutral" as const,
             node: (
               <ActivityFeedCard
                 items={data.activity}
@@ -300,15 +289,13 @@ export function AdminHomeScreen() {
       : []),
   ];
 
-  const gradientStops: GradientStop[] = sections.map(({ key, tone }) => ({ key, tone }));
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      pageBackground={<StatusGradient height={windowHeight} sections={gradientStops} />}
+      pageBackground={<GradientBackdrop height={windowHeight} kind="aurora" />}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={<StatusGradient height={windowHeight} sections={gradientStops} />}
+      stickyHeaderBackground={<GradientBackdrop height={windowHeight} kind="aurora" />}
       stickyHeader={
         <DashboardHeader
           firstName={firstName}

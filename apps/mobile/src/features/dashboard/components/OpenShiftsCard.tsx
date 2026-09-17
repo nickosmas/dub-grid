@@ -4,7 +4,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { DashboardCard, type DashboardCardTone } from "./DashboardCard";
+import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -67,13 +67,6 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
       <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
   );
-}
-
-/** Red with an urgent shift on the board, amber otherwise. */
-export function openShiftsTone(
-  openShifts: ReadonlyArray<{ urgency: string | null }>,
-): DashboardCardTone {
-  return openShifts.some((shift) => shift.urgency === "high") ? "danger" : "warning";
 }
 
 export function OpenShiftsCard({

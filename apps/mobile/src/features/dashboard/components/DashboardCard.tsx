@@ -13,20 +13,9 @@ import {
 } from "../../../shared/theme/tokens";
 
 /**
- * Whether a section needs a hand, which is the only thing that colours the
- * page: red for something broken, amber for something waiting on a decision.
- * Healthy and informational sections stay neutral, so the absence of colour
- * is the good news and the page never reads as a rainbow. There is
- * deliberately no green and no blue. Read by `StatusGradient`, not by the
- * card itself.
- */
-export type DashboardCardTone = "neutral" | "warning" | "danger";
-
-/**
- * A dashboard card in the Apple Health idiom: a plain surface on a page whose
- * colour says what needs a hand. The colour is not the card's: it is one
- * vertical wash behind the whole column (`StatusGradient`), which passes
- * through each card's tone at that card's height. The title sits above the
+ * A dashboard card in the Apple Health idiom: a plain surface on the brand
+ * wash the whole page sits on (the same `GradientBackdrop` the login page
+ * opens with). The title sits above the
  * surface with "See all ›" beside it, as every dashboard card has read; the
  * figures inside are the content, and an optional sentence closes the card
  * under a hairline.
