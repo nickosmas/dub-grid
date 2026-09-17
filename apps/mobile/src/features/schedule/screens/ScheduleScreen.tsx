@@ -41,6 +41,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import { PageWash } from "../../../shared/components/PageWash";
 import {
   ScrollableTabStrip,
   ScrollableTabStripSkeleton,
@@ -73,6 +74,7 @@ import {
   mobileSpacing,
   mobileText,
   type MobileColors,
+  mobileSoftGradientStops,
 } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
@@ -1679,9 +1681,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
+  const homeWash = isTeamScope ? undefined : (
+    <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
+  );
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      // The staff home sits on the brand aurora, the login page's wash, and
+      // keeps it whatever the schedule says; the team schedule stays plain.
+      pageBackground={homeWash}
+      stickyHeaderBackground={homeWash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
