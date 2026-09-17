@@ -71,7 +71,13 @@ rows; a filtered generate now costs one full report instead of two.
 - `reports-states.spec.ts`: the empty-state case's intercept now lets the
   options-only call through untouched (it has no `reports` to blank); 4/4
   in three consecutive runs.
-- `tsc --noEmit` clean, eslint clean, prettier clean.
+- `ReportsPageContent.test.tsx`: its module mock for the reports client
+  now provides `fetchOperationsReportFilterOptions` (the page's dropdowns
+  came back empty without it, failing five scoping cases in the full
+  suite), plus an entry assertion that only the options call is made and
+  the full report waits for Generate (16/16).
+- `tsc --noEmit` clean, eslint clean, prettier clean; full web unit suite
+  3737/3737 after that mock fix.
 
 ## Files / areas
 
@@ -84,3 +90,4 @@ rows; a filtered generate now costs one full report instead of two.
 - `apps/web/src/lib/query-keys.ts`
 - `apps/web/src/app/(app)/reports/ReportsPageContent.tsx`
 - `e2e/reports-states.spec.ts`
+- `apps/web/src/app/(app)/reports/ReportsPageContent.test.tsx`

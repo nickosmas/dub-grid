@@ -7,6 +7,7 @@ const usePermissions = vi.fn();
 const useOrganizationData = vi.fn();
 const useClientFeatureFlags = vi.fn();
 const fetchOperationsReport = vi.fn();
+const fetchOperationsReportFilterOptions = vi.fn();
 const exportOperationsReportCsv = vi.fn();
 const exportOperationsReportPdf = vi.fn();
 const toastInfo = vi.fn();
@@ -103,6 +104,8 @@ vi.mock("@/features/reports/client/api", () => ({
     { value: "shift-notes", label: "Shift notes" },
   ],
   fetchOperationsReport: (...args: unknown[]) => fetchOperationsReport(...args),
+  fetchOperationsReportFilterOptions: (...args: unknown[]) =>
+    fetchOperationsReportFilterOptions(...args),
   exportOperationsReportCsv: (...args: unknown[]) => exportOperationsReportCsv(...args),
   exportOperationsReportPdf: (...args: unknown[]) => exportOperationsReportPdf(...args),
 }));
@@ -320,6 +323,7 @@ describe("ReportsPageContent", () => {
       printing: true,
     });
     fetchOperationsReport.mockResolvedValue(payload);
+    fetchOperationsReportFilterOptions.mockResolvedValue({ filterOptions: payload.filterOptions });
     exportOperationsReportCsv.mockResolvedValue(undefined);
     exportOperationsReportPdf.mockResolvedValue(undefined);
   });
@@ -339,6 +343,10 @@ describe("ReportsPageContent", () => {
     });
     expect(screen.queryByRole("heading", { name: "Configure report" })).not.toBeInTheDocument();
     expect(screen.queryByText("Acme")).not.toBeInTheDocument();
+    // Entry fills the dropdowns from the options-only call; the full report
+    // is only ever requested by Generate (build plan item 30).
+    await waitFor(() => expect(fetchOperationsReportFilterOptions).toHaveBeenCalled());
+    expect(fetchOperationsReport).not.toHaveBeenCalled();
     expect(screen.queryByText("2026-05-03 to 2026-05-09")).not.toBeInTheDocument();
     expect(screen.getByTestId("reports-content")).toHaveStyle({
       maxWidth: "none",
