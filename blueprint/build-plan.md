@@ -453,7 +453,7 @@
         `shiftDetailScreenStyles.ts`, `requestsScreenStyles.ts`,
         `ProfilePrimitives.tsx`, and `SplitShift.tsx` with tokens, recording each
         rounding decision; flip the 38a lint rule from warn to error.
-  - [ ] 38e. **Sheet and popup polish** - `KeyboardDoneAccessory`,
+  - [x] 38e. **Sheet and popup polish** - `KeyboardDoneAccessory`,
         `ConfirmationModal` action row, and `ScrollableTabStrip` idle tabs on
         the 44pt control scale and the single-edge rule.
   - [ ] 38f. **Mobile qualification matrix** - simulator and emulator
