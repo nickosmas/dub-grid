@@ -136,6 +136,9 @@ glow on a black page.
   percentage-wide `SkeletonLine` inside a row was a percentage of nothing
   and vanished, so titles and labels beside fixed-width neighbours rendered
   as blank space.
+- `ef6e7fd2`: the request sheets drew their footer shell (hairline, padding)
+  around an always-truthy empty fragment until a choice was made; the footer
+  is passed only when it has an error or actions to show.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 
