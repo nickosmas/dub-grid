@@ -169,7 +169,7 @@ export function MyScheduleCard({
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
-    <DashboardCard title="Your schedule" tone={"brand"} onOpen={onExpand}>
+    <DashboardCard title="Your schedule" onOpen={onExpand}>
       {dates.length > 0 ? (
         <ScrollView
           horizontal

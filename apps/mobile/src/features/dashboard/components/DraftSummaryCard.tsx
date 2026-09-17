@@ -25,7 +25,7 @@ export function DraftSummaryCard({ summary }: { summary: DraftSummary }) {
   if (summary.total === 0 || changes.length === 0) return null;
 
   return (
-    <DashboardCard title="Unpublished changes" tone={"warning"}>
+    <DashboardCard title="Unpublished changes">
       <View style={styles.detail}>
         <Text style={styles.description}>These schedule changes are not published yet.</Text>
         <View style={styles.rows}>

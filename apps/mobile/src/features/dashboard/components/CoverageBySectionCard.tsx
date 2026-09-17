@@ -15,7 +15,7 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { DashboardRowList } from "./DashboardRowList";
-import { coverageColor, coverageTone } from "../lib/coverage";
+import { coverageColor } from "../lib/coverage";
 
 export { coverageColor } from "../lib/coverage";
 
@@ -73,7 +73,7 @@ export function CoverageBySectionCard({
   const title = `Coverage by ${focusAreaLabel.toLowerCase()}`;
 
   return (
-    <DashboardCard title={title} tone={coverageTone(sections)} onOpen={onSeeAll}>
+    <DashboardCard title={title} onOpen={onSeeAll}>
       {sections.length > 0 ? (
         <DashboardRowList
           items={sections}

@@ -15,7 +15,7 @@ describe("DashboardCard", () => {
   it("puts the title inside the card as the link to the full screen", () => {
     const onOpen = vi.fn();
     render(
-      <DashboardCard title="Overtime watch" tone="danger" onOpen={onOpen}>
+      <DashboardCard title="Overtime watch" onOpen={onOpen}>
         <span>Rows</span>
       </DashboardCard>,
     );

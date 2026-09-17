@@ -10,10 +10,10 @@ export function coverageColor(mobileColors: MobileColors, pct: number): string {
   return mobileColors.danger;
 }
 
-/** The same thresholds as a card tone: green ahead, amber close, red behind. */
+/** The same thresholds as a card tone: amber when close, red when behind, plain when fine. */
 export function coverageToneForPct(pct: number | null): DashboardCardTone {
   if (pct == null) return "neutral";
-  if (pct >= 90) return "success";
+  if (pct >= 90) return "neutral";
   if (pct >= 70) return "warning";
   return "danger";
 }

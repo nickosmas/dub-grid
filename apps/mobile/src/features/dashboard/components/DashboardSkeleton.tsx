@@ -13,6 +13,7 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpace,
+  mobileSpacing,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -101,21 +102,23 @@ function DashboardCardSkeleton({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
-  // The title sits inside the surface, as `DashboardCard` draws it.
+  // The heading over its surface with See all beside it, as `DashboardCard`
+  // draws it.
   return (
-    <SkeletonCardSurface>
+    <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="bodyStrong" width={titleWidth} />
+        <SkeletonLine variant="title" width={titleWidth} />
+        <SkeletonLine variant="label" width={52} />
       </View>
-      <View>
+      <SkeletonCardSurface>
         {skeletonRows(rows, (index) => (
           <View key={`dashboard-row-${index}`}>
             {index > 0 ? <View style={styles.rowDivider} /> : null}
             <DashboardRow variant={variant} />
           </View>
         ))}
-      </View>
-    </SkeletonCardSurface>
+      </SkeletonCardSurface>
+    </View>
   );
 }
 
@@ -126,28 +129,30 @@ function DashboardHeroSkeleton() {
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <SkeletonCardSurface>
+    <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="bodyStrong" width={88} />
+        <SkeletonLine variant="title" width={88} />
       </View>
-      <View style={styles.heroCoverage}>
-        <View style={styles.heroFigureRow}>
-          <SkeletonLine variant="display" width={84} />
-          <SkeletonLine variant="meta" width={56} />
+      <SkeletonCardSurface>
+        <View style={styles.heroCoverage}>
+          <View style={styles.heroFigureRow}>
+            <SkeletonLine variant="display" width={84} />
+            <SkeletonLine variant="meta" width={56} />
+          </View>
+          <View style={styles.heroTrack} />
         </View>
-        <View style={styles.heroTrack} />
-      </View>
-      <View style={styles.heroStatRow}>
-        <View style={styles.heroStat}>
-          <SkeletonLine variant="title" width={28} />
-          <SkeletonLine variant="caption" width={72} />
+        <View style={styles.heroStatRow}>
+          <View style={styles.heroStat}>
+            <SkeletonLine variant="title" width={28} />
+            <SkeletonLine variant="caption" width={72} />
+          </View>
+          <View style={styles.heroStat}>
+            <SkeletonLine variant="title" width={28} />
+            <SkeletonLine variant="caption" width={110} />
+          </View>
         </View>
-        <View style={styles.heroStat}>
-          <SkeletonLine variant="title" width={28} />
-          <SkeletonLine variant="caption" width={110} />
-        </View>
-      </View>
-    </SkeletonCardSurface>
+      </SkeletonCardSurface>
+    </View>
   );
 }
 
@@ -158,11 +163,12 @@ function MyScheduleSkeleton() {
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <SkeletonCardSurface>
+    <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="bodyStrong" width="42%" />
+        <SkeletonLine variant="title" width="42%" />
+        <SkeletonLine variant="label" width={52} />
       </View>
-      <View>
+      <SkeletonCardSurface>
         <View style={styles.dayStrip}>
           {skeletonRows(3, (index) => (
             <View key={`schedule-day-${index}`} style={styles.dayCard}>
@@ -171,8 +177,8 @@ function MyScheduleSkeleton() {
             </View>
           ))}
         </View>
-      </View>
-    </SkeletonCardSurface>
+      </SkeletonCardSurface>
+    </View>
   );
 }
 
@@ -264,15 +270,20 @@ export function DashboardListSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    // Cards carry their own titles now, so the column is a tight stack.
     page: {
-      gap: mobileSpace.lg,
+      gap: mobileSpacing.sectionGap,
     },
     headline: {
       gap: mobileSpace.xs,
     },
+    cardGroup: {
+      gap: mobileSpace.sm,
+    },
     cardTitleRow: {
-      marginBottom: mobileSpace.sm,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: mobileSpace.md,
     },
     header: {
       gap: mobileSpace.xs,

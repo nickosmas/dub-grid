@@ -63,7 +63,7 @@ export function ActionQueueCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Pending approvals" tone={"warning"} onOpen={onSeeAll}>
+    <DashboardCard title="Pending approvals" onOpen={onSeeAll}>
       {requests.length > 0 ? (
         <DashboardRowList
           items={requests}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
@@ -18,12 +18,17 @@ import {
   getDashboardPeriodRange,
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
-import { mobileMotion, mobileSpace } from "../../../shared/theme/tokens";
+import { mobileMotion, mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeadline, DashboardHeroCard } from "../components/DashboardHeroCard";
+import type { DashboardCardTone } from "../components/DashboardCard";
+import { StatusGradient } from "../components/StatusGradient";
+import { coverageTone, coverageToneForPct } from "../lib/coverage";
+import { openShiftsTone } from "../components/OpenShiftsCard";
+import type { GradientStop } from "../lib/status-gradient";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
@@ -96,6 +101,8 @@ export function AdminHomeScreen() {
     );
   }, [contentOpacity, isRefetching, timing]);
   const dimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+  // The page wash is the viewport's height, fixed behind everything.
+  const { height: windowHeight } = useWindowDimensions();
 
   if (contentState.kind === "loading") {
     return (
@@ -181,9 +188,10 @@ export function AdminHomeScreen() {
 
   // Keyed so the stagger indexes the cards actually shown; a card that is
   // absent for this role or period does not leave a gap in the sequence.
-  const sections: Array<{ key: string; node: ReactNode }> = [
+  const sections: Array<{ key: string; tone: DashboardCardTone; node: ReactNode }> = [
     {
       key: "coverage-summary",
+      tone: coverageToneForPct(data.metrics.coveragePct),
       node: (
         <DashboardHeroCard
           metrics={data.metrics}
@@ -196,12 +204,19 @@ export function AdminHomeScreen() {
       ),
     },
     ...(draftSummary && draftSummary.total > 0
-      ? [{ key: "drafts", node: <DraftSummaryCard summary={draftSummary} /> }]
+      ? [
+          {
+            key: "drafts",
+            tone: "warning" as const,
+            node: <DraftSummaryCard summary={draftSummary} />,
+          },
+        ]
       : []),
     ...(role === "admin" && data.actionQueue.length > 0
       ? [
           {
             key: "approvals",
+            tone: "warning" as const,
             node: (
               <ActionQueueCard
                 requests={data.actionQueue}
@@ -215,6 +230,7 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "my-schedule",
+            tone: "neutral" as const,
             node: (
               <MyScheduleCard
                 accessToken={accessToken}
@@ -228,6 +244,7 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "coverage",
+            tone: coverageTone(data.coverageBySection),
             node: (
               <CoverageBySectionCard
                 sections={data.coverageBySection}
@@ -242,6 +259,7 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "open-shifts",
+            tone: openShiftsTone(data.openShifts),
             node: (
               <OpenShiftsCard
                 openShifts={data.openShifts}
@@ -255,6 +273,7 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "staff-hours",
+            tone: "danger" as const,
             node: (
               <StaffHoursCard
                 entries={data.staffHours}
@@ -269,6 +288,7 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "activity",
+            tone: "neutral" as const,
             node: (
               <ActivityFeedCard
                 items={data.activity}
@@ -280,11 +300,15 @@ export function AdminHomeScreen() {
       : []),
   ];
 
+  const gradientStops: GradientStop[] = sections.map(({ key, tone }) => ({ key, tone }));
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      pageBackground={<StatusGradient height={windowHeight} sections={gradientStops} />}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      stickyHeaderBackground={<StatusGradient height={windowHeight} sections={gradientStops} />}
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
@@ -310,9 +334,9 @@ export function AdminHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Tighter than the page's section gap: each card carries its own title
-  // inside now, so the column reads as one stack of tinted surfaces.
+  // The page's own section rhythm: each card is a titled section again, and
+  // the coloured halos want air between them.
   cards: {
-    gap: mobileSpace.lg,
+    gap: mobileSpacing.sectionGap,
   },
 });

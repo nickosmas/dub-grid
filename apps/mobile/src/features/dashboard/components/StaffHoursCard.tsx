@@ -56,7 +56,7 @@ export function StaffHoursCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Overtime watch" tone={"danger"} onOpen={onSeeAll}>
+    <DashboardCard title="Overtime watch" onOpen={onSeeAll}>
       {entries.length > 0 ? (
         <DashboardRowList
           items={entries}

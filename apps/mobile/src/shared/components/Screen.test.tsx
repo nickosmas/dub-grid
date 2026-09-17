@@ -341,6 +341,25 @@ describe("Screen", () => {
     expect(container.firstElementChild?.contains(scrollView)).toBe(true);
   });
 
+  it("renders a page background behind everything and lets the sticky header paint its own slice", () => {
+    render(
+      <Screen
+        pageBackground={<span>Page wash</span>}
+        stickyHeader={<span>Header</span>}
+        stickyHeaderBackground={<span>Header wash</span>}
+      >
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(screen.getByText("Page wash")).toBeInTheDocument();
+    // The header's wash lives inside the header's shell, next to its content,
+    // so content scrolling under the header never shows through.
+    expect(screen.getByText("Header wash").parentElement).toBe(
+      screen.getByText("Header").parentElement,
+    );
+  });
+
   it("pads a non-scrolling sticky header by the top safe-area inset, the same as the floating one", () => {
     safeAreaInsets.top = 59;
 

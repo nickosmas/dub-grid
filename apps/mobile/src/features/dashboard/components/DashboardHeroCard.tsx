@@ -12,7 +12,7 @@ import {
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { coverageColor, coverageToneForPct } from "../lib/coverage";
+import { coverageColor } from "../lib/coverage";
 import { createToneTextColors } from "../lib/tone-text";
 import { DashboardCard, type DashboardCardTone } from "./DashboardCard";
 
@@ -56,12 +56,14 @@ function MetricStat({
 }: {
   label: string;
   value: number;
+  /** Colours the figure only when it is non-zero; a zero is plain, not green. */
   tone: Exclude<DashboardCardTone, "neutral">;
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const color = useMemo(() => createToneTextColors(mobileColors), [mobileColors])[tone];
+  const toneColors = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
+  const color = value > 0 ? toneColors[tone] : mobileColors.textPrimary;
 
   return (
     <Pressable
@@ -106,12 +108,11 @@ export function DashboardHeroCard({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const coverage = metrics.coveragePct;
-  const tone = coverageToneForPct(coverage);
   const meterColor =
     coverage == null ? mobileColors.textMuted : coverageColor(mobileColors, coverage);
 
   return (
-    <DashboardCard title="Coverage" tone={tone} onOpen={onOpenCoverage}>
+    <DashboardCard title="Coverage" onOpen={onOpenCoverage}>
       {coverage != null ? (
         <View style={styles.coverage}>
           <View style={styles.coverageFigureRow}>
@@ -144,14 +145,14 @@ export function DashboardHeroCard({
         <MetricStat
           label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
           onPress={metrics.openGapCount > 0 ? onOpenGaps : undefined}
-          tone={metrics.openGapCount > 0 ? "danger" : "success"}
+          tone="danger"
           value={metrics.openGapCount}
         />
         <View style={styles.statDivider} />
         <MetricStat
           label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
           onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
-          tone={metrics.pendingApprovalsCount > 0 ? "warning" : "success"}
+          tone="warning"
           value={metrics.pendingApprovalsCount}
         />
       </View>

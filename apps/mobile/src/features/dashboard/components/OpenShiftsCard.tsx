@@ -4,7 +4,7 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { DashboardCard } from "./DashboardCard";
+import { DashboardCard, type DashboardCardTone } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -69,6 +69,13 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
   );
 }
 
+/** Red with an urgent shift on the board, amber otherwise. */
+export function openShiftsTone(
+  openShifts: ReadonlyArray<{ urgency: string | null }>,
+): DashboardCardTone {
+  return openShifts.some((shift) => shift.urgency === "high") ? "danger" : "warning";
+}
+
 export function OpenShiftsCard({
   openShifts,
   onSeeAll,
@@ -77,11 +84,7 @@ export function OpenShiftsCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard
-      title="Open shifts"
-      tone={openShifts.some((shift) => shift.urgency === "high") ? "danger" : "warning"}
-      onOpen={onSeeAll}
-    >
+    <DashboardCard title="Open shifts" onOpen={onSeeAll}>
       {openShifts.length > 0 ? (
         <DashboardRowList
           items={openShifts}

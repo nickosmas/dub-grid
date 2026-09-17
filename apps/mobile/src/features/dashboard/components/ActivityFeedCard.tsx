@@ -73,7 +73,7 @@ export function ActivityFeedCard({
   onSeeAll?: () => void;
 }) {
   return (
-    <DashboardCard title="Recent activity" tone={"neutral"} onOpen={onSeeAll}>
+    <DashboardCard title="Recent activity" onOpen={onSeeAll}>
       {items.length > 0 ? (
         <DashboardRowList
           items={items}

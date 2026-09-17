@@ -89,6 +89,8 @@ export function Screen({
   stickyHeader,
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
+  stickyHeaderBackground,
+  pageBackground,
   renderOverlay,
   footer,
   scrollViewRef,
@@ -109,6 +111,20 @@ export function Screen({
   stickyHeader?: ReactNode;
   stickyHeaderShellStyle?: StyleProp<ViewStyle>;
   stickyHeaderTopPadding?: number;
+  /**
+   * Painted inside the sticky header's clipped shell, behind its content.
+   * Pair it with `pageBackground`: the shell goes transparent so the page's
+   * wash shows through the header region, and this node is what keeps
+   * content from showing through as it scrolls under. Render the same wash
+   * at the same height and the header paints exactly the slice behind it.
+   */
+  stickyHeaderBackground?: ReactNode;
+  /**
+   * A layer fixed behind everything, status bar to bottom edge: the scroll
+   * view and the sticky header shell both go transparent over it. For a page
+   * whose ground carries meaning (the dashboard's status wash).
+   */
+  pageBackground?: ReactNode;
   renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactNode;
   /**
    * A non-scrolling region pinned below the content, in normal flow rather
@@ -151,7 +167,11 @@ export function Screen({
 }>) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const hasPageBackground = pageBackground != null;
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDark, hasPageBackground),
+    [mobileColors, isDark, hasPageBackground],
+  );
   const insets = useSafeAreaInsets();
   const nativeTabBarVisible = useNativeTabBarPresence();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
@@ -327,6 +347,7 @@ export function Screen({
     // need a sticky header, or `stickyHeaderTopPadding`, to clear the status bar.
     return (
       <View style={styles.root}>
+        {pageBackground}
         {stickyHeader ? (
           // Nothing scrolls under it here, so it needs none of the floating
           // shell's `position: absolute` and scroll-under chrome — just the
@@ -339,6 +360,7 @@ export function Screen({
               { paddingTop: resolvedStickyHeaderTopPadding },
             ]}
           >
+            {stickyHeaderBackground}
             {stickyHeader}
           </View>
         ) : null}
@@ -378,6 +400,7 @@ export function Screen({
 
   return (
     <View style={styles.root}>
+      {pageBackground}
       {stickyHeader ? (
         // The shadow lives on this outer wrapper, not the clipped shell
         // below: `overflow: "hidden"` on the same view as a shadow clips the
@@ -415,6 +438,7 @@ export function Screen({
               { paddingTop: resolvedStickyHeaderTopPadding },
             ]}
           >
+            {stickyHeaderBackground}
             {stickyHeader}
           </View>
         </View>
@@ -448,7 +472,7 @@ export function Card({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors, isDark, false), [mobileColors, isDark]);
 
   return (
     <View style={styles.cardGroup}>
@@ -491,15 +515,17 @@ export function Card({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackground: boolean) =>
   StyleSheet.create({
     root: {
       flex: 1,
       backgroundColor: mobileColors.background,
     },
+    // Transparent over a page background, so the wash behind shows through;
+    // the root above still carries the theme's ground under it.
     scrollView: {
       flex: 1,
-      backgroundColor: mobileColors.background,
+      backgroundColor: hasPageBackground ? "transparent" : mobileColors.background,
     },
     content: {
       paddingHorizontal: getScreenGutter(),
@@ -540,6 +566,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Match native-stack headers and the page ground. This shell is visible
       // behind an interactive back swipe from a child route; using `surface`
       // here made that strip flash white while the destination was revealed.
+      // Over a page background the shell keeps this ground and paints
+      // `stickyHeaderBackground` on top of it, so the header shows the same
+      // ground-plus-wash the page shows behind it while staying opaque.
       backgroundColor: mobileColors.background,
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
