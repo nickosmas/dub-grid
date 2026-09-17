@@ -27,9 +27,9 @@ export function PeriodToggle({
       onChange={onChange}
       options={OPTIONS}
       size="sm"
-      // On the coverage wash a grey track read as a patch; the page shows
-      // through its hairline instead.
-      track="transparent"
+      // On the coverage wash a grey track read as a patch; the theme's own
+      // ground (white or black) sits cleanly on it.
+      track="background"
       value={mode}
     />
   );

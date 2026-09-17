@@ -67,11 +67,11 @@ export function SegmentedControl<Value extends string>({
   size?: SegmentedControlSize;
   disabled?: boolean;
   /**
-   * `"transparent"` drops the track's fill and lets the page show through
-   * its hairline, for a control sitting on a coloured wash where a grey box
-   * reads as a patch. The thumb is unchanged.
+   * `"background"` fills the track with the theme's ground (white in light,
+   * black in dark) instead of the neutral grey, for a control sitting on a
+   * coloured wash where a grey box reads as a patch. The thumb is unchanged.
    */
-  track?: "neutral" | "transparent";
+  track?: "neutral" | "background";
   accessibilityLabel?: string;
 }) {
   const mobileColors = useMobileColors();
@@ -129,7 +129,7 @@ export function SegmentedControl<Value extends string>({
       style={[
         styles.track,
         { minHeight: metrics.height },
-        track === "transparent" && styles.trackTransparent,
+        track === "background" && styles.trackBackground,
         disabled && styles.trackDisabled,
       ]}
     >
@@ -199,8 +199,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.controlNeutralBorder,
       padding: TRACK_PADDING,
     },
-    trackTransparent: {
-      backgroundColor: "transparent",
+    trackBackground: {
+      backgroundColor: mobileColors.background,
     },
     trackDisabled: {
       opacity: 0.4,
