@@ -24,13 +24,23 @@ as well, reading it from `useOrganizationData` - the same server-side
 completion flag the pill uses, deliberately not the session latch that lets
 the app paint before the server has recorded completion.
 
-The hook is gated on `isWelcomeCandidate` (the pre-existing conditions).
-That matters: `AppShell` mounts this modal on **every** route, public ones
-included, so an ungated `useOrganizationData` put org-context and bootstrap
-queries on the sign-in page. That regression was caught by the e2e run -
-`login.spec.ts` and `dashboard-states.spec.ts` timed out filling the login
-form - and fixed before commit. Afterwards the same two specs run in 21.5s
-where the broken version took 2.2m.
+The hook is gated on `isWelcomeCandidate` (the pre-existing conditions),
+and `AppShell` now mounts the modal only on authenticated app routes.
+
+Both of those were needed, and the e2e suite found each in turn:
+
+1. An ungated `useOrganizationData` put bootstrap queries on the sign-in
+   page; `login.spec.ts` and `dashboard-states.spec.ts` timed out filling
+   the login form. Gating the hook fixed it (those two specs went from
+   2.2m to 21.5s).
+2. `enabled` only covers the bootstrap query _inside_
+   `useOrganizationData` - its `useOrgContext` lookup is not gated by it -
+   so `/api/account/org-context` still fired on public routes and logged a
+   401 for signed-out visitors. `auth-release-qualification.spec.ts`
+   caught that through its runtime-failure collector (7 failures, all
+   401s). Mounting the modal only for an authenticated app route removes
+   the mount entirely, which is also stricter than the previous
+   behavior.
 
 ## Build steps
 
@@ -52,10 +62,12 @@ where the broken version took 2.2m.
 ## Files / areas
 
 - `apps/web/src/components/TrialWelcomeModal.tsx` - the guard
+- `apps/web/src/components/AppShell.tsx` - mount only on authenticated app routes
 - `apps/web/src/__tests__/TrialWelcomeModal.test.tsx` - new
 
 ## Notes
 
-The modal being mounted on public routes at all is pre-existing and left
-alone; gating the hook is enough to keep the sign-in page clean, and moving
-the mount is a larger change to `AppShell`'s layout contract.
+Worth remembering beyond this item: `useOrganizationData({ enabled })`
+gates only its bootstrap query, not the org-context lookup it composes. Any
+component that calls it on a route an unauthenticated visitor can reach
+will still issue that request.
