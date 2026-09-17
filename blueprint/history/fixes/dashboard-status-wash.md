@@ -119,6 +119,23 @@ glow on a black page.
   keeps `heroSummary` for the web.
 - `b2e8a8c0`: the Coverage card closes with open gaps and pending approvals;
   the focus-area breakdown sits between the figure and the stats.
+- `6608457a`, `c59355f6`, `5d84f147`: the shift pills took the quiet
+  `raised` lift with room in the strip for its cast, then a subtle edge. The
+  room first grew the strip's ScrollView 24pt upward over the "See all" row
+  and swallowed its taps; it is 8pt above and 20pt below now.
+- `1c810add`: blue means normal. Coverage at or above 90% paints the brand
+  aurora itself, the login page's wash, so a calm page says nothing is wrong
+  and only amber and red carry news. The wash moved into a shared
+  `PageWash`, and the staff home (`HomeScheduleScreen`) carries the same
+  aurora through its sticky header, always blue.
+- `afe63cb3`, `f0509e2b`: every skeleton redrawn to the screen it stands in
+  for (alerts as mailbox rows, request cards without the icon, people rows
+  with two lines and a chevron, team rows with the 48pt avatar and a badge,
+  the staff home's open-shifts strip, md controls on shift detail, dashboard
+  rows as text with a figure and a chevron), and a shared defect fixed: a
+  percentage-wide `SkeletonLine` inside a row was a percentage of nothing
+  and vanished, so titles and labels beside fixed-width neighbours rendered
+  as blank space.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 
