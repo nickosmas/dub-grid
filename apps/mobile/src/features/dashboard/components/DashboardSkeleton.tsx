@@ -208,13 +208,8 @@ export function DashboardSkeleton({
 
   return (
     <SkeletonGroup style={styles.page}>
-      {/* The headline block under the toggle: a title and one sentence. */}
       {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
       <SkeletonPill height={36} width={180} />
-      <View style={styles.headline}>
-        <SkeletonLine variant="screenTitle" width="70%" />
-        <SkeletonLine variant="body" width="88%" />
-      </View>
       {showMySchedule ? <MyScheduleSkeleton /> : null}
       <DashboardHeroSkeleton />
       {showActionQueue ? <DashboardCardSkeleton rows={3} variant="badgeLead" /> : null}
@@ -277,9 +272,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     page: {
       gap: mobileSpacing.sectionGap,
-    },
-    headline: {
-      gap: mobileSpace.xs,
     },
     cardGroup: {
       gap: mobileSpace.sm,

@@ -20,34 +20,6 @@ import { DashboardCard } from "./DashboardCard";
 import { DashboardRowList } from "./DashboardRowList";
 
 /**
- * The page's reading of the period, above the cards: a headline and one
- * sentence, the way Apple Health opens Insights with "Stand Ring Looks Good"
- * and a line under it. Nothing else lives up here; the status colour reaches
- * the page through the cards below.
- */
-export function DashboardHeadline({
-  summary,
-}: {
-  summary: MobileDashboardResponse["heroSummary"];
-}) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
-  return (
-    <View style={styles.headline}>
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.headlineTitle}>
-        {summary.title}
-      </Text>
-      {summary.description ? (
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.headlineBody}>
-          {summary.description}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-/**
  * A secondary figure under the coverage meter: the number in its tone's
  * colour, the label beneath, a chevron when it opens something.
  */
@@ -179,17 +151,6 @@ export function DashboardHeroCard({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    headline: {
-      gap: mobileSpace.xs,
-    },
-    headlineTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    headlineBody: {
-      ...mobileText.body,
-      color: mobileColors.textSecondary,
-    },
     coverage: {
       gap: mobileSpace.sm,
     },

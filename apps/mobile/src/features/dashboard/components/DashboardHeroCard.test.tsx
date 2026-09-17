@@ -8,31 +8,10 @@ vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("../../../shared/lib/haptics", () => ({ hapticSelection: vi.fn() }));
 
 let DashboardHeroCard: (typeof import("./DashboardHeroCard"))["DashboardHeroCard"];
-let DashboardHeadline: (typeof import("./DashboardHeroCard"))["DashboardHeadline"];
 
 beforeAll(async () => {
   const module = await import("./DashboardHeroCard");
   DashboardHeroCard = module.DashboardHeroCard;
-  DashboardHeadline = module.DashboardHeadline;
-});
-
-describe("DashboardHeadline", () => {
-  it("renders the period's headline and sentence above the cards", () => {
-    render(
-      <DashboardHeadline
-        summary={{
-          statusLabel: "Attention",
-          title: "2 coverage gaps",
-          description: "Resolve staffing gaps.",
-        }}
-      />,
-    );
-
-    expect(screen.getByText("2 coverage gaps")).toBeInTheDocument();
-    expect(screen.getByText("Resolve staffing gaps.")).toBeInTheDocument();
-    // The status word left with the pill; the card tones carry it now.
-    expect(screen.queryByText("Attention")).not.toBeInTheDocument();
-  });
 });
 
 describe("DashboardHeroCard", () => {

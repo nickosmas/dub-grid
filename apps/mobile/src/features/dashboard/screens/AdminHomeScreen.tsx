@@ -23,7 +23,7 @@ import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
-import { DashboardHeadline, DashboardHeroCard } from "../components/DashboardHeroCard";
+import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { CoverageWash } from "../components/CoverageWash";
 import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodToggle } from "../components/PeriodToggle";
@@ -296,7 +296,6 @@ export function AdminHomeScreen() {
       }
     >
       <PeriodToggle mode={periodMode} onChange={setPeriodMode} />
-      <DashboardHeadline summary={data.heroSummary} />
       <Animated.View style={[styles.cards, dimStyle]}>
         {sections.map((section, index) => (
           <AnimatedListItem index={index} key={section.key}>
