@@ -92,7 +92,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
     },
     meWeekNavigatorTitle: {
-      ...mobileText.display,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
     meWeekNavigatorRangeLabel: {
@@ -1148,14 +1148,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     meSelectedDateTitle: {
-      ...mobileText.display,
+      ...mobileText.screenTitle,
       ...mobileTabularText,
       flex: 1,
       color: mobileColors.textPrimary,
       textAlign: "left",
     },
+    // `screenTitle`, not `display`: this title shares its row with the Today
+    // button and the alerts bell, and at 28pt "Tomorrow, Sep 18" truncated to
+    // "Tomorrow, Se…" the moment the Today button appeared.
     teamHeaderTitle: {
-      ...mobileText.display,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
       textAlign: "left",
       flexShrink: 1,

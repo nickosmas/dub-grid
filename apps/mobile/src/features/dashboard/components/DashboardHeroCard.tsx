@@ -146,6 +146,8 @@ export function DashboardHeroCard({
         </View>
       ) : null}
 
+      {/* A hairline above the stats: without it the pair read as a third
+          line of the headline rather than as the card's figures. */}
       <View style={styles.statRow}>
         <MetricStat
           label={metrics.openGapCount === 1 ? "open gap" : "open gaps"}
@@ -220,6 +222,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       alignItems: "stretch",
       gap: mobileSpace.lg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: mobileSpace.lg,
     },
     // Centred in their half of the card: two left-aligned stats read as a
     // list that stopped after one row.
