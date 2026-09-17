@@ -19,7 +19,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { Pressable } from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
@@ -429,11 +431,20 @@ export function Card({
   body,
   detail,
   headerAccessory,
+  onSeeAll,
+  seeAllLabel = "See all",
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
   headerAccessory?: ReactNode;
+  /**
+   * Opens the full version of what the card previews. Renders as a link in
+   * the header's trailing slot, where a reader looks for it, rather than as a
+   * button under the list, where it used to sit below three rows of content.
+   */
+  onSeeAll?: () => void;
+  seeAllLabel?: string;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -450,6 +461,23 @@ export function Card({
           </Text>
         </View>
         {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
+        {onSeeAll ? (
+          // A plain pressable rather than a link `Button`: the header is one
+          // line of hierarchy and a 36pt control beside the title competed with
+          // it. The slop keeps the target at the platform minimum.
+          <Pressable
+            accessibilityLabel={`${seeAllLabel}: ${title}`}
+            accessibilityRole="button"
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            onPress={onSeeAll}
+            style={({ pressed }) => [styles.cardSeeAll, pressed && styles.cardSeeAllPressed]}
+          >
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardSeeAllLabel}>
+              {seeAllLabel}
+            </Text>
+            <Ionicons color={mobileColors.brand} name="chevron-forward" size={14} />
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.card}>
         {body ? (
@@ -555,6 +583,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     cardHeaderAccessory: {
       justifyContent: "center",
+    },
+    cardSeeAll: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.xs,
+      paddingVertical: mobileSpace.xs,
+    },
+    cardSeeAllPressed: {
+      opacity: 0.6,
+    },
+    cardSeeAllLabel: {
+      ...mobileText.label,
+      color: mobileColors.brand,
     },
     // `title`, one step under the screen's own heading: at `screenTitle` a
     // dashboard of six cards read as six page titles down one scroll.

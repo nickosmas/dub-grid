@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
@@ -15,6 +15,7 @@ import {
   type ActivityType,
 } from "../../../src/features/dashboard/components/ActivityFeedCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
+import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
@@ -121,14 +122,11 @@ export default function ActivityExpandedScreen() {
       {filtered.length === 0 ? (
         <EmptyStateCard iconName="options-outline" title="No activity matches this filter" />
       ) : (
-        <View style={styles.list}>
-          {filtered.map((item, index) => (
-            <Fragment key={item.id}>
-              {index > 0 ? <View style={styles.divider} /> : null}
-              <ActivityRow item={item} />
-            </Fragment>
-          ))}
-        </View>
+        <DashboardRowList
+          items={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={(item) => <ActivityRow item={item} />}
+        />
       )}
     </Screen>
   );
@@ -146,12 +144,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     count: {
       ...mobileText.label,
-    },
-    list: {
-      gap: 10,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: mobileColors.borderSubtle,
     },
   });

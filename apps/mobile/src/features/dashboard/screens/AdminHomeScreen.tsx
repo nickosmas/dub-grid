@@ -1,5 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { StyleSheet } from "react-native";
 import { router } from "expo-router";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
+import { useMotionPreference } from "../../../shared/motion/useMotionPreference";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -14,6 +18,7 @@ import {
   getDashboardPeriodRange,
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
+import { mobileMotion, mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
@@ -28,8 +33,12 @@ import { OpenShiftsCard } from "../components/OpenShiftsCard";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { StaffHoursCard } from "../components/StaffHoursCard";
 
+/** Opacity of the card column while a period change is still fetching. */
+const REFETCH_DIM = 0.6;
+
 export function AdminHomeScreen() {
   const { accessToken } = useSessionState();
+  const { timing } = useMotionPreference();
   const bootstrapQuery = useBootstrap(accessToken);
   // One global toggle (at the top of the screen) drives the whole dashboard —
   // a single fetch, one consistent period across every card.
@@ -75,6 +84,18 @@ export function AdminHomeScreen() {
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || myScheduleQuery.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
   });
+  // A period change keeps the previous period's cards on screen and dims
+  // them until the next one lands, instead of locking the toggle: the page
+  // stays readable and the change is visible as a change, not a freeze.
+  const isRefetching = dashboardQuery.isFetching && !dashboardQuery.isLoading;
+  const contentOpacity = useSharedValue(1);
+  useEffect(() => {
+    contentOpacity.value = withTiming(
+      isRefetching ? REFETCH_DIM : 1,
+      timing("standard", mobileMotion.duration.base),
+    );
+  }, [contentOpacity, isRefetching, timing]);
+  const dimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
   if (contentState.kind === "loading") {
     return (
@@ -155,6 +176,107 @@ export function AdminHomeScreen() {
     bootstrapQuery.data?.user.firstName?.trim() ||
     bootstrapQuery.data?.user.email?.split("@")[0] ||
     null;
+  const openExpanded = (pathname: `/(tabs)/home/${string}`) => () =>
+    router.push({ pathname, params: { periodMode } });
+
+  // Keyed so the stagger indexes the cards actually shown; a card that is
+  // absent for this role or period does not leave a gap in the sequence.
+  const sections: Array<{ key: string; node: ReactNode }> = [
+    {
+      key: "hero",
+      node: (
+        <DashboardHeroCard
+          metrics={data.metrics}
+          summary={data.heroSummary}
+          onOpenApprovals={openExpanded("/(tabs)/home/pending-approvals")}
+          onOpenGaps={openExpanded("/(tabs)/home/open-shifts")}
+        />
+      ),
+    },
+    ...(draftSummary && draftSummary.total > 0
+      ? [{ key: "drafts", node: <DraftSummaryCard summary={draftSummary} /> }]
+      : []),
+    ...(role === "admin" && data.actionQueue.length > 0
+      ? [
+          {
+            key: "approvals",
+            node: (
+              <ActionQueueCard
+                requests={data.actionQueue}
+                onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(!managementOnly && hasPersonalSchedule
+      ? [
+          {
+            key: "my-schedule",
+            node: (
+              <MyScheduleCard
+                accessToken={accessToken}
+                onExpand={() => router.push("/(tabs)/home/my-schedule")}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(data.coverageBySection.length > 0
+      ? [
+          {
+            key: "coverage",
+            node: (
+              <CoverageBySectionCard
+                sections={data.coverageBySection}
+                focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
+                onSeeAll={openExpanded("/(tabs)/home/coverage")}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(data.openShifts.length > 0
+      ? [
+          {
+            key: "open-shifts",
+            node: (
+              <OpenShiftsCard
+                openShifts={data.openShifts}
+                onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(data.staffHours.length > 0
+      ? [
+          {
+            key: "staff-hours",
+            node: (
+              <StaffHoursCard
+                entries={data.staffHours}
+                thresholdHours={data.overtimeThresholdHours}
+                onSeeAll={openExpanded("/(tabs)/home/staff-hours")}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(data.activity.length > 0
+      ? [
+          {
+            key: "activity",
+            node: (
+              <ActivityFeedCard
+                items={data.activity}
+                onSeeAll={openExpanded("/(tabs)/home/activity")}
+              />
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Screen
@@ -174,61 +296,21 @@ export function AdminHomeScreen() {
         />
       }
     >
-      <PeriodToggle
-        mode={periodMode}
-        onChange={setPeriodMode}
-        loading={dashboardQuery.isFetching}
-      />
-      <DashboardHeroCard summary={data.heroSummary} metrics={data.metrics} />
-      {draftSummary && draftSummary.total > 0 ? <DraftSummaryCard summary={draftSummary} /> : null}
-      {role === "admin" && data.actionQueue.length > 0 ? (
-        <ActionQueueCard
-          requests={data.actionQueue}
-          onSeeAll={() =>
-            router.push({ pathname: "/(tabs)/home/pending-approvals", params: { periodMode } })
-          }
-        />
-      ) : null}
-      {!managementOnly && hasPersonalSchedule ? (
-        <MyScheduleCard
-          accessToken={accessToken}
-          onExpand={() => router.push("/(tabs)/home/my-schedule")}
-        />
-      ) : null}
-      {data.coverageBySection.length > 0 ? (
-        <CoverageBySectionCard
-          sections={data.coverageBySection}
-          focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
-          onSeeAll={() =>
-            router.push({ pathname: "/(tabs)/home/coverage", params: { periodMode } })
-          }
-        />
-      ) : null}
-      {data.openShifts.length > 0 ? (
-        <OpenShiftsCard
-          openShifts={data.openShifts}
-          onSeeAll={() =>
-            router.push({ pathname: "/(tabs)/home/open-shifts", params: { periodMode } })
-          }
-        />
-      ) : null}
-      {data.staffHours.length > 0 ? (
-        <StaffHoursCard
-          entries={data.staffHours}
-          thresholdHours={data.overtimeThresholdHours}
-          onSeeAll={() =>
-            router.push({ pathname: "/(tabs)/home/staff-hours", params: { periodMode } })
-          }
-        />
-      ) : null}
-      {data.activity.length > 0 ? (
-        <ActivityFeedCard
-          items={data.activity}
-          onSeeAll={() =>
-            router.push({ pathname: "/(tabs)/home/activity", params: { periodMode } })
-          }
-        />
-      ) : null}
+      <PeriodToggle mode={periodMode} onChange={setPeriodMode} />
+      <Animated.View style={[styles.cards, dimStyle]}>
+        {sections.map((section, index) => (
+          <AnimatedListItem index={index} key={section.key}>
+            {section.node}
+          </AnimatedListItem>
+        ))}
+      </Animated.View>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  // The cards keep the page's own section rhythm inside the dimmable column.
+  cards: {
+    gap: mobileSpacing.sectionGap,
+  },
+});

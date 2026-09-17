@@ -4,9 +4,14 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileListRow,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import { DashboardRowList } from "./DashboardRowList";
 
 export type ActivityItem = MobileDashboardResponse["activity"][number];
 export type ActivityType = ActivityItem["type"];
@@ -62,19 +67,16 @@ export function ActivityFeedCard({
   items: MobileDashboardResponse["activity"];
   onSeeAll?: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Card
       title="Recent activity"
+      onSeeAll={onSeeAll}
       detail={
         items.length > 0 ? (
-          <ExpandableList
-            title="Recent activity"
+          <DashboardRowList
             items={items}
             keyExtractor={(item) => item.id}
-            onSeeAll={onSeeAll}
-            renderDivider={() => <View style={styles.divider} />}
+            limit={3}
             renderItem={(item) => <ActivityRow item={item} />}
           />
         ) : (
@@ -87,18 +89,17 @@ export function ActivityFeedCard({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    divider: {
-      height: 1,
-      backgroundColor: mobileColors.borderSubtle,
-    },
+    // Static, unlike the other dashboard rows: the feed carries only a
+    // description, so there is nothing to open. Same rhythm as the rows that do.
     row: {
-      gap: 4,
+      gap: mobileListRow.titleGap,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     rowHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 8,
+      gap: mobileSpace.sm,
     },
     label: {
       ...mobileText.body,

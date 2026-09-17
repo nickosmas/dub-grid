@@ -39,10 +39,13 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient,
 }));
 
+const useLocalSearchParams = vi.fn(() => ({}));
+
 vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
   },
+  useLocalSearchParams: () => useLocalSearchParams(),
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
@@ -225,6 +228,8 @@ describe("ScheduleScreen", () => {
   let openShifts: any[];
 
   beforeEach(() => {
+    useLocalSearchParams.mockReset();
+    useLocalSearchParams.mockReturnValue({});
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
 
     mutationSpy = vi.fn();
@@ -2281,6 +2286,16 @@ describe("ScheduleScreen", () => {
       }),
     );
     springSpy.mockRestore();
+  });
+
+  it("opens on the focus area a dashboard coverage row asked for", () => {
+    // Emergency is not the linked employee's home focus area, so the default
+    // tab would be Skilled Nursing; the param has to win.
+    useLocalSearchParams.mockReturnValue({ focusAreaId: "1" });
+
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByRole("tab", { name: "Emergency" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps the Schedule tab pill flow working with focus-area filtering", () => {

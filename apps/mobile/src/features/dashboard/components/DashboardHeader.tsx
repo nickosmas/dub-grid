@@ -4,7 +4,12 @@ import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButto
 import { TimeZoneClocks } from "../../../shared/components/TimeZoneClocks";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileTabularText, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileSpace,
+  mobileTabularText,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type GreetingBucket = "morning" | "afternoon" | "evening";
 
@@ -101,18 +106,20 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
-      gap: 12,
+      gap: mobileSpace.md,
     },
     copy: {
       flex: 1,
-      gap: 4,
+      gap: mobileSpace.xs,
     },
+    // The one headline on a headerless screen, a step above the card titles
+    // beneath it so the page reads top-down rather than as a column of equals.
     greeting: {
-      ...mobileText.screenTitle,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
     },
     meta: {
-      ...mobileText.body,
+      ...mobileText.meta,
       color: mobileColors.textSecondary,
     },
     timeZoneClock: {

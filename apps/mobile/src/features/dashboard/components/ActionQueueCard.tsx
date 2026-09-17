@@ -1,13 +1,21 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileShiftRequest } from "@dubgrid/contracts";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileListRow,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { formatUsDate } from "../../../shared/lib/dates";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import { DashboardRowList } from "./DashboardRowList";
 
 export const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
   pickup: "Pickup",
@@ -22,12 +30,23 @@ export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTon
 };
 
 // Shared with the full-page expanded pending-approvals screen
-// (apps/mobile/app/(tabs)/home/pending-approvals.tsx).
+// (apps/mobile/app/(tabs)/home/pending-approvals.tsx). Owns its navigation so
+// the card preview and the full list land in the same place: the Requests
+// tab's Approval list, which is where the request is acted on.
 export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
-    <View style={styles.row}>
+    <PressableRow
+      accessibilityLabel={`${request.requesterName}, ${REQUEST_TYPE_LABEL[request.type]} request`}
+      onPress={() =>
+        router.push({
+          pathname: "/(tabs)/requests",
+          params: { tab: "approval", requestId: request.id },
+        })
+      }
+      style={styles.row}
+    >
       <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
       <View style={styles.copy}>
         <Text style={styles.label}>{request.requesterName}</Text>
@@ -35,7 +54,8 @@ export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
           {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
         </Text>
       </View>
-    </View>
+      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+    </PressableRow>
   );
 }
 
@@ -49,6 +69,7 @@ export function ActionQueueCard({
   return (
     <Card
       title="Pending approvals"
+      onSeeAll={onSeeAll}
       headerAccessory={
         requests.length > 0 ? (
           <CountBadge label={String(requests.length)} tone="brand" />
@@ -56,11 +77,10 @@ export function ActionQueueCard({
       }
       detail={
         requests.length > 0 ? (
-          <ExpandableList
-            title="Pending approvals"
+          <DashboardRowList
             items={requests}
             keyExtractor={(request) => request.id}
-            onSeeAll={onSeeAll}
+            limit={3}
             renderItem={(request) => <ActionQueueRow request={request} />}
           />
         ) : (
@@ -80,11 +100,12 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     copy: {
-      flexShrink: 1,
-      gap: 2,
+      flex: 1,
+      gap: mobileListRow.titleGap,
     },
     label: {
       ...mobileText.body,

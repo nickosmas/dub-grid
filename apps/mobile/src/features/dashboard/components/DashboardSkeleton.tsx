@@ -11,6 +11,7 @@ import {
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileElevation,
+  mobileListRow,
   mobileRadii,
   mobileRadius,
   mobileSpace,
@@ -107,13 +108,17 @@ function DashboardCardSkeleton({
     <View style={styles.cardGroup}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="screenTitle" width={titleWidth} />
+          <SkeletonLine variant="title" width={titleWidth} />
         </View>
+        <SkeletonLine variant="label" width={52} />
       </View>
       <SkeletonCardSurface>
-        <View style={styles.cardList}>
+        <View>
           {skeletonRows(rows, (index) => (
-            <DashboardRow key={`dashboard-row-${index}`} variant={variant} />
+            <View key={`dashboard-row-${index}`}>
+              {index > 0 ? <View style={styles.rowDivider} /> : null}
+              <DashboardRow variant={variant} />
+            </View>
           ))}
         </View>
       </SkeletonCardSurface>
@@ -121,7 +126,7 @@ function DashboardCardSkeleton({
   );
 }
 
-/** The hero card: period toggle, headline, and the three metric tiles. */
+/** The hero card: status pill, headline, the coverage figure over its meter, two chips. */
 function DashboardHeroSkeleton() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -130,20 +135,22 @@ function DashboardHeroSkeleton() {
   return (
     <View style={styles.heroCard}>
       <View style={styles.heroCopy}>
-        <SkeletonPill height={22} width={92} />
-        <SkeletonLine variant="sectionTitle" width={180} />
+        <SkeletonPill height={24} width={92} />
+        <SkeletonLine variant="title" width={200} />
       </View>
-      <View style={styles.tileRow}>
-        {skeletonRows(3, (index) => (
-          <View key={`hero-tile-${index}`} style={styles.tile}>
-            <View style={styles.tileHeader}>
-              <SkeletonLine variant="caption" width="64%" />
-              <SkeletonCircle size={26} style={styles.tileIcon} />
-            </View>
-            <SkeletonLine variant="heroMetric" width="52%" />
-            <SkeletonLine variant="caption" width="80%" />
+      <View style={styles.heroCoverage}>
+        <View style={styles.heroFigureRow}>
+          <SkeletonLine variant="display" width={84} />
+          <View style={styles.rowCopy}>
+            <SkeletonLine variant="label" width={72} />
+            <SkeletonLine variant="caption" width={140} />
           </View>
-        ))}
+        </View>
+        <View style={styles.heroTrack} />
+      </View>
+      <View style={styles.heroChipRow}>
+        <SkeletonPill height={36} width={128} />
+        <SkeletonPill height={36} width={160} />
       </View>
     </View>
   );
@@ -159,7 +166,7 @@ function MyScheduleSkeleton() {
     <View style={styles.cardGroup}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderCopy}>
-          <SkeletonLine variant="screenTitle" width="42%" />
+          <SkeletonLine variant="title" width="42%" />
         </View>
         {/* ExpandButton: iconOnly Button at size="sm" — 36pt circle. */}
         <SkeletonCircle size={36} />
@@ -201,10 +208,10 @@ export function DashboardSkeleton({
       {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
       <SkeletonPill height={36} width={180} />
       <DashboardHeroSkeleton />
-      {showActionQueue ? <DashboardCardSkeleton rows={2} variant="badgeLead" /> : null}
+      {showActionQueue ? <DashboardCardSkeleton rows={3} variant="badgeLead" /> : null}
       {showMySchedule ? <MyScheduleSkeleton /> : null}
       <DashboardCardSkeleton rows={3} variant="meter" />
-      <DashboardCardSkeleton rows={2} variant="trailingBadges" />
+      <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="trailingBadges" />
       <DashboardCardSkeleton rows={3} variant="feed" />
     </SkeletonGroup>
@@ -219,8 +226,8 @@ export function DashboardHeaderSkeleton() {
 
   return (
     <View style={styles.header}>
-      <SkeletonLine variant="screenTitle" width="58%" />
-      <SkeletonLine variant="body" width="74%" />
+      <SkeletonLine variant="display" width="58%" />
+      <SkeletonLine variant="meta" width="74%" />
     </View>
   );
 }
@@ -265,49 +272,45 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpacing.sectionGap,
     },
     header: {
-      gap: 4,
+      gap: mobileSpace.xs,
     },
+    // Same geometry as DashboardHeroCard's own surface.
     heroCard: {
       backgroundColor: isDark ? mobileColors.surfaceSecondary : mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? 1 : 0,
       gap: mobileSpace.lg,
-      padding: mobileSpace.xl,
+      padding: mobileSpace.lg,
       ...mobileElevation("card", isDark),
     },
     heroCopy: {
-      gap: 6,
+      gap: mobileSpace.sm,
     },
-    tileRow: {
+    heroCoverage: {
+      gap: mobileSpace.sm,
+    },
+    heroFigureRow: {
+      alignItems: "flex-end",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+    },
+    heroTrack: {
+      height: 8,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.skeletonBase,
+    },
+    heroChipRow: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 10,
-    },
-    // Boxed, matching DashboardHeroCard's tiles.
-    tile: {
-      flexBasis: "30%",
-      flexGrow: 1,
-      gap: 6,
-      minWidth: 0,
-      overflow: "hidden",
-      padding: 12,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-    },
-    tileHeader: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: 6,
-      justifyContent: "space-between",
-    },
-    tileIcon: {
-      marginRight: -4,
-      marginTop: -4,
+      gap: mobileSpace.sm,
     },
     cardGroup: {
-      gap: mobileSpace.md,
+      gap: mobileSpace.sm,
+    },
+    rowDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
     cardHeader: {
       alignItems: "center",
@@ -318,45 +321,48 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       justifyContent: "center",
     },
-    cardList: {
-      gap: 10,
-    },
     rowCopy: {
       flex: 1,
-      gap: 2,
+      gap: mobileListRow.titleGap,
     },
+    // Every row variant sits at the real rows' vertical padding, so the
+    // placeholder list is as tall as the list it stands in for.
     badgeLeadRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     trailingBadgesRow: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
       justifyContent: "space-between",
+      paddingVertical: mobileListRow.paddingVertical,
     },
     meterRow: {
-      gap: 6,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     meterHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
       justifyContent: "space-between",
     },
     meterTrack: {
       backgroundColor: mobileColors.skeletonBase,
-      borderRadius: 3,
+      borderRadius: mobileRadii.pill,
       height: 6,
     },
     feedRow: {
-      gap: 4,
+      gap: mobileListRow.titleGap,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     feedHeader: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
+      gap: mobileSpace.sm,
       justifyContent: "space-between",
     },
     dayStrip: {

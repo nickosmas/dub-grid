@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 
 let DashboardHeroCard: (typeof import("./DashboardHeroCard"))["DashboardHeroCard"];
 
@@ -36,6 +37,28 @@ describe("DashboardHeroCard", () => {
     );
 
     expect(screen.getByText("86%")).toBeInTheDocument();
+  });
+
+  it("routes the gap and approval chips only when there is something to open", () => {
+    const onOpenGaps = vi.fn();
+    const onOpenApprovals = vi.fn();
+    render(
+      <DashboardHeroCard
+        summary={{ statusLabel: "Attention", title: "2 coverage gaps", description: "" }}
+        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
+        onOpenApprovals={onOpenApprovals}
+        onOpenGaps={onOpenGaps}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2 open gaps" }));
+    expect(onOpenGaps).toHaveBeenCalledTimes(1);
+
+    // Nothing pending, so the chip is a plain figure that does not respond.
+    const approvals = screen.getByRole("button", { name: "0 pending approvals" });
+    expect(approvals).toBeDisabled();
+    fireEvent.click(approvals);
+    expect(onOpenApprovals).not.toHaveBeenCalled();
   });
 
   it("shows a dash and 'Not configured' when coveragePct is null", () => {

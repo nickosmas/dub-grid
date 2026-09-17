@@ -129,10 +129,26 @@ vi.mock("react-native", async () => {
       );
     },
   );
+  const Pressable = ({ children, onPress, disabled, style, ...props }: Record<string, any>) =>
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        disabled,
+        onClick: onPress as (() => void) | undefined,
+        ...pickDomProps(props),
+        "data-style": JSON.stringify(
+          typeof style === "function" ? style({ pressed: false }) : (style ?? null),
+        ),
+      },
+      children as React.ReactNode,
+    );
+
   return {
     Platform: {
       OS: "ios",
     },
+    Pressable,
     RefreshControl: () => null,
     ScrollView,
     StyleSheet: {
@@ -149,6 +165,10 @@ vi.mock("react-native", async () => {
     View,
   };
 });
+
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
 
 vi.mock("react-native-safe-area-context", async () => {
   const React = await import("react");
@@ -437,6 +457,15 @@ describe("Screen", () => {
 });
 
 describe("Card", () => {
+  it("renders a header-right See all control that calls back", () => {
+    const onSeeAll = vi.fn();
+    render(<Card title="Open shifts" onSeeAll={onSeeAll} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "See all: Open shifts" }));
+
+    expect(onSeeAll).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the title and body", () => {
     render(<Card title="Plain card" body="Some body text" />);
 

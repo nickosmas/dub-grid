@@ -11,6 +11,7 @@ import {
 } from "../../../src/shared/components/FilterSheet";
 import { OpenShiftRow } from "../../../src/features/dashboard/components/OpenShiftsCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
+import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
@@ -153,11 +154,11 @@ export default function OpenShiftsExpandedScreen() {
           title="No open shifts match this filter"
         />
       ) : (
-        <View style={styles.list}>
-          {filtered.map((shift) => (
-            <OpenShiftRow key={shift.id} shift={shift} />
-          ))}
-        </View>
+        <DashboardRowList
+          items={filtered}
+          keyExtractor={(shift) => shift.id}
+          renderItem={(shift) => <OpenShiftRow shift={shift} />}
+        />
       )}
     </Screen>
   );
@@ -175,8 +176,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     count: {
       ...mobileText.label,
-    },
-    list: {
-      gap: 16,
     },
   });

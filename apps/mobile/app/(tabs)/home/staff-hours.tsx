@@ -11,6 +11,7 @@ import {
 } from "../../../src/shared/components/FilterSheet";
 import { StaffHoursRow } from "../../../src/features/dashboard/components/StaffHoursCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
+import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
@@ -151,11 +152,11 @@ export default function StaffHoursExpandedScreen() {
           title={`No one is over ${dashboardQuery.data.overtimeThresholdHours}h this period`}
         />
       ) : (
-        <View style={styles.list}>
-          {sorted.map((entry) => (
-            <StaffHoursRow key={entry.employeeId} entry={entry} />
-          ))}
-        </View>
+        <DashboardRowList
+          items={sorted}
+          keyExtractor={(entry) => entry.employeeId}
+          renderItem={(entry) => <StaffHoursRow entry={entry} />}
+        />
       )}
     </Screen>
   );
@@ -173,8 +174,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     count: {
       ...mobileText.label,
-    },
-    list: {
-      gap: 16,
     },
   });

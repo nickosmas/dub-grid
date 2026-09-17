@@ -24,7 +24,7 @@ import {
 import { Pressable } from "../../../shared/components/Pressable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
@@ -660,7 +660,19 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
   const now = useRealtimeNow();
+  // A dashboard coverage row opens the team schedule on its focus area. Read
+  // as an effect rather than as the state's initial value: the tab screen stays
+  // mounted between visits, so a second drill-in arrives as a param change.
+  const params = useLocalSearchParams<{ focusAreaId?: string | string[] }>();
+  const requestedFocusAreaId = Array.isArray(params.focusAreaId)
+    ? params.focusAreaId[0]
+    : params.focusAreaId;
   const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (scope === "team" && requestedFocusAreaId) {
+      setSelectedTeamFocusAreaKey(`focus-area:${requestedFocusAreaId}`);
+    }
+  }, [requestedFocusAreaId, scope]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
   const [weekStripWidth, setWeekStripWidth] = useState(0);

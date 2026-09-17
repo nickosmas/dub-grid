@@ -11,6 +11,7 @@ import {
 } from "../../../src/shared/components/FilterSheet";
 import { CoverageSectionRow } from "../../../src/features/dashboard/components/CoverageBySectionCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
+import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
@@ -122,11 +123,11 @@ export default function CoverageExpandedScreen() {
           title="No coverage to track yet"
         />
       ) : (
-        <View style={styles.list}>
-          {filtered.map((section) => (
-            <CoverageSectionRow key={section.focusAreaId} section={section} />
-          ))}
-        </View>
+        <DashboardRowList
+          items={filtered}
+          keyExtractor={(section) => String(section.focusAreaId)}
+          renderItem={(section) => <CoverageSectionRow section={section} />}
+        />
       )}
     </Screen>
   );
@@ -144,8 +145,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     count: {
       ...mobileText.label,
-    },
-    list: {
-      gap: 16,
     },
   });

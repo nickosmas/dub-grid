@@ -1,23 +1,36 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileListRow,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { CountBadge } from "./CountBadge";
-import { ExpandableList } from "./ExpandableList";
+import { DashboardRowList } from "./DashboardRowList";
 
 export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
 
 // Shared with the full-page expanded staff-hours screen
-// (apps/mobile/app/(tabs)/home/staff-hours.tsx).
+// (apps/mobile/app/(tabs)/home/staff-hours.tsx). Opens the person, whose
+// schedule is where an overtime week gets rebalanced.
 export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <View style={styles.row}>
+    <PressableRow
+      accessibilityLabel={`${entry.employeeName}, ${entry.overtimeHours} hours overtime`}
+      onPress={() => router.push({ pathname: "/person/[id]", params: { id: entry.employeeId } })}
+      style={styles.row}
+    >
       <View style={styles.copy}>
         <Text style={styles.label}>{entry.employeeName}</Text>
         <Text style={styles.value}>
@@ -25,7 +38,8 @@ export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
         </Text>
       </View>
       <CountBadge label={`+${entry.overtimeHours}h OT`} tone="danger" />
-    </View>
+      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+    </PressableRow>
   );
 }
 
@@ -41,16 +55,16 @@ export function StaffHoursCard({
   return (
     <Card
       title="Overtime watch"
+      onSeeAll={onSeeAll}
       headerAccessory={
         entries.length > 0 ? <CountBadge label={String(entries.length)} tone="danger" /> : undefined
       }
       detail={
         entries.length > 0 ? (
-          <ExpandableList
-            title="Overtime watch"
+          <DashboardRowList
             items={entries}
             keyExtractor={(entry) => entry.employeeId}
-            onSeeAll={onSeeAll}
+            limit={3}
             renderItem={(entry) => <StaffHoursRow entry={entry} />}
           />
         ) : (
@@ -69,12 +83,13 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     row: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      gap: 8,
+      gap: mobileSpace.sm,
+      paddingVertical: mobileListRow.paddingVertical,
     },
     copy: {
-      gap: 2,
+      flex: 1,
+      gap: mobileListRow.titleGap,
     },
     label: {
       ...mobileText.body,

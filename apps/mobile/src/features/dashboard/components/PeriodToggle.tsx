@@ -15,16 +15,15 @@ const OPTIONS = [
 export function PeriodToggle({
   mode,
   onChange,
-  loading = false,
 }: {
   mode: DashboardPeriodMode;
   onChange: (mode: DashboardPeriodMode) => void;
-  loading?: boolean;
 }) {
+  // Never disabled while a period loads: the cards dim to say so, and a
+  // second tap simply moves the query on. Locking the control read as a hang.
   return (
     <SegmentedControl
       accessibilityLabel="Dashboard period"
-      disabled={loading}
       onChange={onChange}
       options={OPTIONS}
       size="sm"
