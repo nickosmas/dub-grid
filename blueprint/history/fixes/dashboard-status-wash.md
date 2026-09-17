@@ -117,3 +117,5 @@ glow on a black page.
   its sentence) removed; the Coverage card says it with the figure, meter
   and stats. `DashboardHeadline` and its skeleton block are gone; the API
   keeps `heroSummary` for the web.
+- `b2e8a8c0`: the Coverage card closes with open gaps and pending approvals;
+  the focus-area breakdown sits between the figure and the stats.
