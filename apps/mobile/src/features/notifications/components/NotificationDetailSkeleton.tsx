@@ -55,8 +55,8 @@ export function NotificationDetailSkeleton({
       <View style={styles.metadataCard}>
         {skeletonRows(metadataRows, (index) => (
           <View key={`alert-metadata-${index}`} style={styles.metadataRow}>
-            <SkeletonLine variant="caption" width="32%" />
-            <SkeletonLine variant="caption" width="42%" />
+            <SkeletonLine variant="caption" width="32%" style={styles.grow} />
+            <SkeletonLine variant="caption" width="42%" style={styles.grow} />
           </View>
         ))}
       </View>
@@ -70,6 +70,11 @@ export function NotificationDetailSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     container: {
       gap: mobileSpace.md,
       paddingBottom: 24,

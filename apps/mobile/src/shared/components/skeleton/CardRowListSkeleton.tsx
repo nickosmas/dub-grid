@@ -32,7 +32,11 @@ export function CardRowListSkeleton({
       {skeletonRows(rows, (index) => (
         <View key={`card-row-skeleton-${index}`} style={styles.card}>
           <View style={styles.header}>
-            <SkeletonLine variant="cardTitle" width={index % 2 === 0 ? "44%" : "56%"} />
+            <SkeletonLine
+              variant="cardTitle"
+              width={index % 2 === 0 ? "44%" : "56%"}
+              style={styles.grow}
+            />
             <SkeletonPill height={24} width={88} />
           </View>
           <SkeletonLine variant="body" width="46%" />
@@ -50,6 +54,11 @@ export function CardRowListSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     list: {
       gap: mobileSpace.md,
     },

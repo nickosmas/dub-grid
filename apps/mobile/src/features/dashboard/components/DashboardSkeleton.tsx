@@ -41,7 +41,7 @@ function DashboardRow({ variant }: { variant: DashboardRowVariant }) {
     return (
       <View style={styles.meterRow}>
         <View style={styles.meterHeader}>
-          <SkeletonLine variant="body" width="46%" />
+          <SkeletonLine variant="body" width="46%" style={styles.grow} />
           <SkeletonLine variant="caption" width={52} />
         </View>
         <View style={styles.meterTrack} />
@@ -103,7 +103,7 @@ function DashboardCardSkeleton({
   return (
     <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="title" width={titleWidth} />
+        <SkeletonLine variant="title" width={titleWidth} style={styles.grow} />
         <SkeletonLine variant="label" width={52} />
       </View>
       <SkeletonCardSurface>
@@ -169,7 +169,7 @@ function MyScheduleSkeleton() {
   return (
     <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="title" width="42%" />
+        <SkeletonLine variant="title" width="42%" style={styles.grow} />
         <SkeletonLine variant="label" width={52} />
       </View>
       <View style={styles.dayStrip}>
@@ -266,6 +266,11 @@ export function DashboardListSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     page: {
       gap: mobileSpacing.sectionGap,
     },

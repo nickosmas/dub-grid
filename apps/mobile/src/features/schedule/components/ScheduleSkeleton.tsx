@@ -57,7 +57,7 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
-          <SkeletonLine variant="sectionTitle" width="40%" />
+          <SkeletonLine variant="sectionTitle" width="40%" style={styles.grow} />
           <SkeletonLine variant="label" width={52} />
         </View>
         <View style={styles.openShiftStrip}>
@@ -78,7 +78,7 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
-          <SkeletonLine variant="sectionTitle" width="46%" />
+          <SkeletonLine variant="sectionTitle" width="46%" style={styles.grow} />
           <SkeletonPill height={mobileControl.sm} width={132} />
         </View>
         <View style={scheduleStyles.upcomingShiftsCard}>
@@ -128,7 +128,7 @@ export function ScheduleTeamSkeleton({
       {skeletonRows(groups, (groupIndex) => (
         <View key={`shift-group-skeleton-${groupIndex}`} style={scheduleStyles.shiftGroupBlock}>
           <View style={scheduleStyles.shiftGroupHeader}>
-            <SkeletonLine variant="sectionTitle" width="44%" />
+            <SkeletonLine variant="sectionTitle" width="44%" style={styles.grow} />
             <SkeletonLine variant="bodyStrong" width={84} />
           </View>
           <View style={scheduleStyles.teamGroupCard}>
@@ -156,6 +156,11 @@ export function ScheduleTeamSkeleton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     // The real hero paints a brand gradient; a placeholder for it has to be
     // neutral, so it takes the skeleton fill and drops the coloured shadow.
     heroFill: {

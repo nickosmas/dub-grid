@@ -105,7 +105,7 @@ function ProfileHeroSkeleton({
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.heroCopy}>
             <View style={styles.heroTitleRow}>
-              <SkeletonLine variant="screenTitle" width="52%" />
+              <SkeletonLine variant="screenTitle" width="52%" style={styles.grow} />
               <SkeletonPill height={26} width={62} />
             </View>
             <SkeletonLine variant="body" width="64%" />
@@ -216,6 +216,11 @@ export function ProfileSkeleton({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     page: {
       gap: mobileSpacing.sectionGap,
     },

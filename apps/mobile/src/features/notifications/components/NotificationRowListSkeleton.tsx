@@ -36,7 +36,11 @@ export function NotificationRowListSkeleton({ rows = 5 }: { rows?: number }) {
           </View>
           <View style={styles.copy}>
             <View style={styles.titleLine}>
-              <SkeletonLine variant="body" width={index % 2 === 0 ? "62%" : "48%"} />
+              <SkeletonLine
+                variant="body"
+                width={index % 2 === 0 ? "62%" : "48%"}
+                style={styles.grow}
+              />
               <SkeletonLine variant="caption" width={52} />
             </View>
             <SkeletonLine variant="meta" width="96%" />
@@ -50,6 +54,11 @@ export function NotificationRowListSkeleton({ rows = 5 }: { rows?: number }) {
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // A percentage-wide line inside a row has no width of its own to take a
+    // percentage of; growing the wrapper gives it the row's free space.
+    grow: {
+      flex: 1,
+    },
     row: {
       flexDirection: "row",
       alignItems: "flex-start",
