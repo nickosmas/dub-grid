@@ -18,6 +18,7 @@ import {
   mobileMotion,
   mobileRadius,
   mobileRadii,
+  mobileControl,
   mobileSpace,
   mobileText,
   type MobileColors,
@@ -51,10 +52,31 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 /** The platform minimum for anything tappable. */
 const MIN_TOUCH_TARGET = 44;
 
+// Heights come from the shared control scale so a button beside a field, the
+// search bar or a segmented control shares its baseline; each size's icon-only
+// square is that same height.
 const SIZE = {
-  sm: { minHeight: 36, paddingHorizontal: 14, gap: 6, icon: 16, iconOnly: 36 },
-  md: { minHeight: 48, paddingHorizontal: 20, gap: 8, icon: 18, iconOnly: 44 },
-  lg: { minHeight: 56, paddingHorizontal: 24, gap: 10, icon: 20, iconOnly: 52 },
+  sm: {
+    minHeight: mobileControl.sm,
+    paddingHorizontal: mobileSpace.md,
+    gap: mobileSpace.xs,
+    icon: 16,
+    iconOnly: mobileControl.sm,
+  },
+  md: {
+    minHeight: mobileControl.md,
+    paddingHorizontal: mobileSpace.xl,
+    gap: mobileSpace.sm,
+    icon: 18,
+    iconOnly: mobileControl.md,
+  },
+  lg: {
+    minHeight: mobileControl.lg,
+    paddingHorizontal: mobileSpace["2xl"],
+    gap: mobileSpace.sm,
+    icon: 20,
+    iconOnly: mobileControl.lg,
+  },
 } as const;
 
 /**

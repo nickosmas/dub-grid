@@ -54,7 +54,10 @@ export function getCardSurfaceStyle(mobileColors: MobileColors, isDark: boolean)
   return {
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,
-    padding: mobileSpace.xl,
+    // 16, not the 20 the page gutter uses: text inside a card already sits a
+    // gutter in from the screen edge, and 40pt of combined inset on the iOS
+    // gutter pushed every row's text past where a grouped list would start.
+    padding: mobileSpace.lg,
     gap: mobileSpace.md,
     // Light mode carries depth with the shadow alone; a border on top of it
     // reads as an outline sticker. Dark mode keeps the hairline, because a
@@ -537,7 +540,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       elevation: 20,
     },
     cardGroup: {
-      gap: mobileSpace.md,
+      gap: mobileSpace.sm,
     },
     card: getCardSurfaceStyle(mobileColors, isDark),
     cardHeader: {
@@ -553,8 +556,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardHeaderAccessory: {
       justifyContent: "center",
     },
+    // `title`, one step under the screen's own heading: at `screenTitle` a
+    // dashboard of six cards read as six page titles down one scroll.
     cardTitle: {
-      ...mobileText.screenTitle,
+      ...mobileText.title,
       color: mobileColors.textPrimary,
     },
     cardBody: {

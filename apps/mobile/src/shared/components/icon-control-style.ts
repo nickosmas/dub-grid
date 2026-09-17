@@ -1,5 +1,5 @@
 import type { ViewStyle } from "react-native";
-import { mobileElevation, mobileRadii, type MobileColors } from "../theme/tokens";
+import { mobileRadii, type MobileColors } from "../theme/tokens";
 
 /** Every icon-only chrome control is this size, and it is a real 44pt target. */
 export const ICON_CONTROL_SIZE = 44;
@@ -14,12 +14,11 @@ export const ICON_CONTROL_SIZE = 44;
  *
  * `border` rather than `borderSubtle`: the button is the same `surface` as the
  * bar or sheet it sits on, so the edge is the whole control, and at 1.23:1 the
- * subtle one leaves a 44pt target reading as a floating icon. `raised` rather
- * than `card` for the same reason in reverse: a 12pt blur under a white pill on
- * a white ground reads as a smudge, and with the outline there are already two
- * separators doing one job.
+ * subtle one leaves a 44pt target reading as a floating icon. No shadow: the
+ * stroke is the edge, and a blur under it was a second separator doing the
+ * same job, which is the double-edge the badges also shed.
  */
-export function createIconControlStyle(mobileColors: MobileColors, isDark: boolean): ViewStyle {
+export function createIconControlStyle(mobileColors: MobileColors, _isDark: boolean): ViewStyle {
   return {
     width: ICON_CONTROL_SIZE,
     height: ICON_CONTROL_SIZE,
@@ -29,6 +28,5 @@ export function createIconControlStyle(mobileColors: MobileColors, isDark: boole
     backgroundColor: mobileColors.surface,
     alignItems: "center",
     justifyContent: "center",
-    ...mobileElevation("raised", isDark),
   };
 }

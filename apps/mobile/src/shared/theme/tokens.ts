@@ -10,6 +10,8 @@ import {
   mobileMotionTokens,
   mobileNavigationTheme,
   mobileBrandTypographyTokens,
+  mobileControlTokens,
+  mobileListRowTokens,
   mobileRadiusTokens,
   mobileSpacingTokens,
   mobileTypographyTokens,
@@ -263,6 +265,10 @@ export type MobileColors = Record<keyof typeof mobileColors, string>;
 export const mobileSpacing = spacingTokens;
 /** The 4/8/12/16/20/24/32/40/48 ramp — reach for this for ad-hoc spacing. */
 export const mobileSpace = mobileSpacingTokens;
+/** Control heights, 36/44/52: every button, field, search and segmented control. */
+export const mobileControl = mobileControlTokens;
+/** A pressable list row's minimum height, vertical padding and title-to-caption gap. */
+export const mobileListRow = mobileListRowTokens;
 /** Named radii for the three surface roles (card, control, pill). */
 export const mobileRadii = radiusTokens;
 /** Small-surface radius ramp for chips, inputs and inline badges. */

@@ -464,7 +464,7 @@ const createStyles = (
       flexShrink: 1,
     },
     body: {
-      paddingHorizontal: 20,
+      paddingHorizontal: mobileSpace.xl,
       paddingBottom: bottomPadding,
       gap: mobileSpace.lg,
     },
@@ -473,11 +473,13 @@ const createStyles = (
     },
     footer: {
       // Keep supporting errors and the action group at the full sheet width.
-      gap: 12,
+      gap: mobileSpace.md,
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
-      paddingHorizontal: 20,
-      paddingTop: 14,
+      paddingHorizontal: mobileSpace.xl,
+      // The same step as the gap between the footer's own rows, so the divider
+      // sits as far from the first button as the buttons sit from each other.
+      paddingTop: mobileSpace.md,
       paddingBottom: bottomPadding,
     },
   });

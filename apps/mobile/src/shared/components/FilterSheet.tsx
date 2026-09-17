@@ -16,6 +16,7 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
   mobileRadii,
+  mobileSpace,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -257,13 +258,13 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       borderRadius: mobileRadii.control,
       flexDirection: "row",
-      gap: 12,
+      gap: mobileSpace.md,
       margin: SELECTION_ROW_INSET,
       overflow: "hidden",
       // The inset taken back out of the padding, so the label sits on the same
       // vertical line it did when the rows were flush.
-      paddingHorizontal: 16 - SELECTION_ROW_INSET,
-      paddingVertical: 12,
+      paddingHorizontal: mobileSpace.lg - SELECTION_ROW_INSET,
+      paddingVertical: mobileSpace.md,
     },
     selectionRowSelected: {
       // The same control fill the organization picker uses for its current row,

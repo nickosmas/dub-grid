@@ -5,6 +5,7 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
   mobileInputText,
+  mobileControl,
   mobileRadii,
   mobileSpace,
   type MobileColors,
@@ -94,14 +95,16 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       flexDirection: "row",
       alignItems: "center",
-      minHeight: 54,
+      minHeight: mobileControl.lg,
       borderRadius: mobileRadii.control,
       borderWidth: 1.5,
       borderColor: mobileColors.inputBorder,
       backgroundColor: mobileColors.surface,
     },
     rowCode: {
-      minHeight: 62,
+      // The code's 32pt line plus its padding already clears the floor; this
+      // only keeps an empty field on the same scale as the text variant.
+      minHeight: mobileControl.lg,
     },
     rowFocused: {
       borderColor: mobileColors.inputBorderFocused,

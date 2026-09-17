@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-nat
 import { hapticSelection } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import type { MobileColors } from "../theme/tokens";
+import { mobileListRow, type MobileColors } from "../theme/tokens";
 
 /**
  * A pressable list row.
@@ -58,6 +58,7 @@ export function PressableRow({
       disabled={isDisabled}
       onPress={action.run}
       style={({ pressed }) => [
+        styles.row,
         style,
         // Android draws its ripple over the row, so a highlight on top of it
         // would double up.
@@ -74,6 +75,11 @@ export function PressableRow({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // A row is a target in its own right, so it is never shorter than one.
+    // Callers add their own padding on top; this is only the floor.
+    row: {
+      minHeight: mobileListRow.minHeight,
+    },
     pressed: {
       backgroundColor: mobileColors.navActiveBg,
     },

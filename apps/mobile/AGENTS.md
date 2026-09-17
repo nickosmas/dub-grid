@@ -211,6 +211,25 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
 | Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`     |
 
+### The metric contract
+
+Every number on a mobile screen comes from a token, and the tokens are the
+whole vocabulary. `design/no-raw-mobile-metrics` warns on what drifts (it
+becomes an error once build plan 38d has migrated the schedule and requests
+screens).
+
+| Metric         | Rule                                                                                                                                                                                                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spacing        | `mobileSpace`: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48. The 2 / 6 / 10 / 14 sub-grid is banned; round, don't add                                                                                                                                                                                          |
+| Type           | `mobileText` only: `display` 28 (one headline on a headerless screen), `screenTitle` 22, `title` 20 (card and section headings over their own surface), `sectionTitle` 16, `cardTitle` 16, `rowTitle` 15, `body` 14, `meta` 13, `label`/`caption` 12, `badge` 11, `micro` 10 (non-interactive badges only) |
+| Control height | `mobileControl`: `sm` 36 (pads its target with `hitSlop`), `md` 44, `lg` 52. Buttons, fields, search, segmented and icon controls share it                                                                                                                                                                 |
+| List row       | `mobileListRow`: min 44, 12 vertical padding, 4 between title and caption; `PressableRow` carries the floor                                                                                                                                                                                                |
+| Page gutter    | `getScreenGutter()`: 20 on iOS (the large-title inset), 16 on Android                                                                                                                                                                                                                                      |
+| Section rhythm | `mobileSpacing.sectionGap` 24 between sections; a card heading sits 8 above its surface                                                                                                                                                                                                                    |
+| Card surface   | `getCardSurfaceStyle`: 16 padding, 12 internal gap, `card` radius; the shadow is the only edge in light mode                                                                                                                                                                                               |
+| Badge / chip   | Fill only, never a stroke; 8 × 4 padding; one badge per row, secondary facts go in `caption`                                                                                                                                                                                                               |
+| Edges          | One separator per surface: a stroke _or_ a shadow, never both (icon controls, badges, cards all follow this)                                                                                                                                                                                               |
+
 ### Double-tap
 
 An action that fires a request must not run twice when the control is

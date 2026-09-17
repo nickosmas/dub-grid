@@ -8,6 +8,7 @@ import { noDecorativeAiIcons } from "./eslint-rules/no-decorative-ai-icons.mjs";
 import { requireBusyButton } from "./eslint-rules/require-busy-button.mjs";
 import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler.mjs";
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
+import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 
 const tooltipPlugin = {
@@ -23,6 +24,7 @@ const designPlugin = {
     "require-busy-button": requireBusyButton,
     "no-floating-async-handler": noFloatingAsyncHandler,
     "no-misplaced-use-client": noMisplacedUseClient,
+    "no-raw-mobile-metrics": noRawMobileMetrics,
   },
 };
 
@@ -180,6 +182,23 @@ const eslintConfig = defineConfig([
       "design/require-busy-button": "error",
       "design/no-floating-async-handler": "error",
       "design/no-misplaced-use-client": "error",
+    },
+  },
+  {
+    // Mobile styles draw from the token ramps. A warning until the schedule
+    // and requests screens are migrated (build plan 38d), whose per-file
+    // counts this rule reports; then it becomes an error. The illustration
+    // files are drawings, not layout, and the token module is the ramp itself.
+    files: ["apps/mobile/src/**/*.{ts,tsx}", "apps/mobile/app/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/mobile/src/**/*.test.{ts,tsx}",
+      "apps/mobile/src/test/**",
+      "apps/mobile/src/shared/theme/tokens.ts",
+      "apps/mobile/src/features/onboarding/components/illustrations/**",
+    ],
+    plugins: { design: designPlugin },
+    rules: {
+      "design/no-raw-mobile-metrics": "warn",
     },
   },
   {

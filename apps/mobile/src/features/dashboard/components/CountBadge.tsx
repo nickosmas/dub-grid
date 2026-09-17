@@ -1,32 +1,37 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobilePillOverflow, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobilePillOverflow,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 export type CountBadgeTone = "brand" | "warning" | "danger" | "success";
 
+// Fill only, like `Chip`: a badge is a label, and a stroke around a soft fill
+// read as an outline sticker next to the card's own edge. The fills already
+// separate from both grounds (`contrast.test.ts` holds them there).
 function createToneStyles(
   mobileColors: MobileColors,
-): Record<CountBadgeTone, { backgroundColor: string; borderColor: string; color: string }> {
+): Record<CountBadgeTone, { backgroundColor: string; color: string }> {
   return {
     brand: {
       backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
       color: mobileColors.brand,
     },
     warning: {
       backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
       color: mobileColors.warningText,
     },
     danger: {
       backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
       color: mobileColors.dangerText,
     },
     success: {
       backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
       color: mobileColors.successText,
     },
   };
@@ -37,12 +42,7 @@ export function CountBadge({ label, tone = "brand" }: { label: string; tone?: Co
   const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
 
   return (
-    <View
-      style={[
-        styles.badge,
-        { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
-      ]}
-    >
+    <View style={[styles.badge, { backgroundColor: toneStyle.backgroundColor }]}>
       <Text style={[styles.label, { color: toneStyle.color }]}>{label}</Text>
     </View>
   );
@@ -51,10 +51,9 @@ export function CountBadge({ label, tone = "brand" }: { label: string; tone?: Co
 const styles = StyleSheet.create({
   badge: {
     ...mobilePillOverflow.displayContainer,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: mobileRadii.pill,
+    paddingHorizontal: mobileSpace.sm,
+    paddingVertical: mobileSpace.xs,
     alignSelf: "flex-start",
   },
   label: {

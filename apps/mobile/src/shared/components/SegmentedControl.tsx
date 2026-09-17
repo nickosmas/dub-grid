@@ -9,6 +9,7 @@ import {
   mobileElevation,
   mobileMotion,
   mobilePillOverflow,
+  mobileControl,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -30,8 +31,8 @@ export type SegmentedOption<Value extends string> = {
 };
 
 const SIZE = {
-  sm: { height: 36, paddingHorizontal: 12, labelVariant: "body" },
-  md: { height: 44, paddingHorizontal: 16, labelVariant: "bodyStrong" },
+  sm: { height: mobileControl.sm, paddingHorizontal: mobileSpace.md, labelVariant: "body" },
+  md: { height: mobileControl.md, paddingHorizontal: mobileSpace.lg, labelVariant: "bodyStrong" },
 } as const satisfies Record<
   SegmentedControlSize,
   { height: number; paddingHorizontal: number; labelVariant: keyof typeof mobileText }

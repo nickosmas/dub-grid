@@ -8,6 +8,7 @@ import {
   MAX_FONT_SCALE,
   mobileInputText,
   mobileMotion,
+  mobileControl,
   mobileRadii,
   type MobileColors,
 } from "../theme/tokens";
@@ -127,7 +128,7 @@ function ClearButton({ onPress }: { onPress: () => unknown }) {
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     field: {
-      minHeight: 46,
+      minHeight: mobileControl.md,
       alignItems: "center",
       // White, like every other enterable surface. `surfaceSecondary` made the
       // field a *recessed* gray, which is the older iOS search idiom and reads
