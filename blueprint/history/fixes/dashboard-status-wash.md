@@ -96,3 +96,11 @@ glow on a black page.
   than pink at the aurora's alphas.
 - Device check: 92% (green) and 47% (red) coverage captured in dark mode; the
   wash runs unbroken through the sticky header.
+- `211e47e9`, then `c259f36e`: the period toggle's track off the neutral grey
+  that read as a patch on the wash; see-through first, then filled with the
+  theme's ground (white in light, black in dark) at the user's call.
+- `0c840776`: the Coverage card and the Coverage by wings card said the same
+  thing twice. One Coverage card now: figure and meter, the two stats, then
+  the first three focus areas with their meters; See all opens the full
+  breakdown. `CoverageSectionRow` has its own file; the second card is gone.
+- `d602e905`: Your schedule leads the dashboard, Coverage second.
