@@ -1,17 +1,23 @@
-import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import {
+  STARTUP_MIN_SPLASH_MS,
+  STARTUP_STATUS_DELAY_MS,
+  STARTUP_TIMEOUT_MS,
+} from "@dubgrid/design-tokens";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
-import { AppSplashScreen } from "./AppSplashScreen";
+import { useOptionalNetworkStatus } from "../providers/NetworkStateProvider";
+import { AppSplashScreen, type StartupPhase } from "./AppSplashScreen";
 
 /**
- * Long enough for the logo to read as a deliberate brand moment rather than a
- * flicker, short enough that it is usually over before startup resolves.
+ * Last-resort release. The timeout phase hands the user a Retry well before
+ * this, but a bootstrap that never settles must not own the launch forever:
+ * releasing lets the tab gate render its own locked state instead.
  */
-const MIN_SPLASH_MS = 900;
 const MAX_BOOTSTRAP_SPLASH_MS = 15_000;
 
 /**
@@ -20,21 +26,29 @@ const MAX_BOOTSTRAP_SPLASH_MS = 15_000;
  * It lives above the router and holds a single `<AppSplashScreen />` instance
  * from launch until the first screen the user can actually act on is ready.
  * Screens must never render their own: two instances in sequence read as the
- * splash showing twice, because the second one restarts the wordmark fade from
- * zero and re-randomizes the logo cell timings. The router renders *underneath*
- * this overlay rather than being replaced by it, so the index route can resolve
- * its destination and hand off while the splash still covers the seam.
+ * splash showing twice. The router renders *underneath* this overlay rather
+ * than being replaced by it, so the index route can resolve its destination and
+ * hand off while the splash still covers the seam.
  *
- * The completion latch is one-way. Nothing that happens later in the session —
- * a bootstrap refetch, a realtime invalidation, a sign-in on a fresh token —
+ * The completion latch is one-way. Nothing that happens later in the session,
+ * a bootstrap refetch, a realtime invalidation, a sign-in on a fresh token,
  * can bring the splash back.
+ *
+ * The splash carries a static mark, so it holds only long enough to avoid a
+ * flicker (`STARTUP_MIN_SPLASH_MS`) rather than long enough to play an
+ * animation. What keeps a slow launch legible is the progress indicator, the
+ * status copy at `STARTUP_STATUS_DELAY_MS`, and the Retry at
+ * `STARTUP_TIMEOUT_MS`, not time spent on the brand.
  */
 export function StartupSplashGate({ children }: PropsWithChildren) {
   const { accessToken, isLoading: isSessionLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const onboardingQuery = useHasSeenOnboarding();
+  const { isOffline } = useOptionalNetworkStatus();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [bootstrapBudgetElapsed, setBootstrapBudgetElapsed] = useState(false);
+  const [phase, setPhase] = useState<StartupPhase>("quiet");
+  const [retrying, setRetrying] = useState(false);
 
   // Owned here, not by a route: the native splash has to come down on every
   // launch, including deep links that mount a screen without passing through
@@ -63,12 +77,35 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   useEffect(() => {
     const timeout = setTimeout(() => {
       setMinimumElapsed(true);
-    }, MIN_SPLASH_MS);
+    }, STARTUP_MIN_SPLASH_MS);
 
     return () => {
       clearTimeout(timeout);
     };
   }, []);
+
+  // Silence, then an explanation, then a way out. A launch that resolves before
+  // the first of these never shows copy at all, which is the common case.
+  useEffect(() => {
+    const toStatus = setTimeout(() => {
+      setPhase((current) => (current === "quiet" ? "status" : current));
+    }, STARTUP_STATUS_DELAY_MS);
+    const toTimeout = setTimeout(() => {
+      setPhase("timeout");
+    }, STARTUP_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(toStatus);
+      clearTimeout(toTimeout);
+    };
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRetrying(true);
+    void Promise.resolve(bootstrapQuery.refetch?.()).finally(() => {
+      setRetrying(false);
+    });
+  }, [bootstrapQuery]);
 
   // Bootstrap is part of startup, not part of the tab tree: the tab bar's
   // shape and the Home tab's choice of screen both depend on it, so releasing
@@ -108,7 +145,12 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
       {children}
       {hasCompletedRef.current ? null : (
         <View style={styles.overlay}>
-          <AppSplashScreen />
+          <AppSplashScreen
+            offline={isOffline}
+            onRetry={handleRetry}
+            phase={phase}
+            retrying={retrying}
+          />
         </View>
       )}
     </View>

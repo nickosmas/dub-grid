@@ -461,6 +461,13 @@
         (loading, empty, error, sheet, confirmation) saved under
         `blueprint/reference/mobile/`, with every defect fixed in place or
         logged in `blueprint/context/findings.md`.
+- [x] 39. **Static branded startup loading and recovery** - keep the approved
+      DubGrid logo unchanged and static while the app initializes. Hand off
+      from the native splash to a branded loading screen with an accessible
+      progress indicator, delayed status copy after 2-3 seconds, and a timeout
+      state with Retry and offline recovery after roughly 8-10 seconds. Respect
+      reduced-motion settings and verify slow, failed, offline, resumed, and
+      successful startup paths on web and mobile. No logo animation or redesign.
 - [ ] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase
