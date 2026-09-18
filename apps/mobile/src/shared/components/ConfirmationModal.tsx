@@ -99,6 +99,7 @@ export function ConfirmationModal({
   loading,
   onCancel,
   onConfirm,
+  presentation = "modal",
 }: {
   visible: boolean;
   title: string;
@@ -125,6 +126,13 @@ export function ConfirmationModal({
   loading?: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<unknown>;
+  /**
+   * `"inline"` draws the same backdrop and card as an absolute overlay in
+   * the parent instead of its own Modal, for a confirmation raised inside
+   * an iOS page sheet: UIKit refuses a second presentation while the sheet
+   * is up, so a nested Modal never appears.
+   */
+  presentation?: "modal" | "inline";
 }) {
   const isDestructive = confirmTone === "danger";
   const mobileColors = useMobileColors();
@@ -188,6 +196,84 @@ export function ConfirmationModal({
     onCancel();
   };
 
+  const surface = (
+    <InsideSheetContext.Provider value>
+      <View style={styles.root}>
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop]} />
+        {/* Tapping outside dismisses, so there is nothing to tap when the
+              confirmation is busy. */}
+        {isBusy ? null : (
+          <Pressable
+            accessibilityLabel="Dismiss"
+            accessibilityRole="button"
+            style={StyleSheet.absoluteFill}
+            onPress={handleDismiss}
+          />
+        )}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          pointerEvents="box-none"
+          style={styles.avoider}
+        >
+          <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
+            <View style={styles.header}>
+              <View style={[styles.iconBadge, { backgroundColor: iconColors.background }]}>
+                <Ionicons
+                  color={iconColors.icon}
+                  name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
+                  size={24}
+                />
+              </View>
+              <AppText align="center" variant="sectionTitle">
+                {title}
+              </AppText>
+            </View>
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.body}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.scrollArea}
+            >
+              {body ? (
+                <AppText align="center" tone="secondary" variant="body">
+                  {body}
+                </AppText>
+              ) : null}
+              {children}
+              {error ? <InlineError message={error} /> : null}
+            </ScrollView>
+            {/* Keep actions visible while the body scrolls. */}
+            <View style={styles.footer}>
+              <ActionButtons
+                primaryAction={
+                  <Button
+                    label={confirmLabel}
+                    loading={isBusy}
+                    onPress={confirm.run}
+                    tone={confirmTone}
+                  />
+                }
+              >
+                <Button
+                  disabled={isBusy}
+                  label={cancelLabel}
+                  onPress={handleDismiss}
+                  tone="plain"
+                />
+              </ActionButtons>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </InsideSheetContext.Provider>
+  );
+
+  if (presentation === "inline") {
+    if (!visible) return null;
+    return <View style={StyleSheet.absoluteFill}>{surface}</View>;
+  }
+
   return (
     <Modal
       animationType="fade"
@@ -198,76 +284,7 @@ export function ConfirmationModal({
       transparent
       visible={visible}
     >
-      <InsideSheetContext.Provider value>
-        <View style={styles.root}>
-          <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop]} />
-          {/* Tapping outside dismisses, so there is nothing to tap when the
-              confirmation is busy. */}
-          {isBusy ? null : (
-            <Pressable
-              accessibilityLabel="Dismiss"
-              accessibilityRole="button"
-              style={StyleSheet.absoluteFill}
-              onPress={handleDismiss}
-            />
-          )}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            pointerEvents="box-none"
-            style={styles.avoider}
-          >
-            <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
-              <View style={styles.header}>
-                <View style={[styles.iconBadge, { backgroundColor: iconColors.background }]}>
-                  <Ionicons
-                    color={iconColors.icon}
-                    name={iconName ?? CONFIRMATION_ICON_NAME[confirmTone]}
-                    size={24}
-                  />
-                </View>
-                <AppText align="center" variant="sectionTitle">
-                  {title}
-                </AppText>
-              </View>
-              <ScrollView
-                bounces={false}
-                contentContainerStyle={styles.body}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                style={styles.scrollArea}
-              >
-                {body ? (
-                  <AppText align="center" tone="secondary" variant="body">
-                    {body}
-                  </AppText>
-                ) : null}
-                {children}
-                {error ? <InlineError message={error} /> : null}
-              </ScrollView>
-              {/* Keep actions visible while the body scrolls. */}
-              <View style={styles.footer}>
-                <ActionButtons
-                  primaryAction={
-                    <Button
-                      label={confirmLabel}
-                      loading={isBusy}
-                      onPress={confirm.run}
-                      tone={confirmTone}
-                    />
-                  }
-                >
-                  <Button
-                    disabled={isBusy}
-                    label={cancelLabel}
-                    onPress={handleDismiss}
-                    tone="plain"
-                  />
-                </ActionButtons>
-              </View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-        </View>
-      </InsideSheetContext.Provider>
+      {surface}
     </Modal>
   );
 }

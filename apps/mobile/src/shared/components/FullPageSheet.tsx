@@ -32,6 +32,7 @@ export function FullPageSheet({
   subtitle,
   dismissDisabled = false,
   footer,
+  overlay,
   children,
 }: {
   visible: boolean;
@@ -42,6 +43,12 @@ export function FullPageSheet({
   /** A request in flight: Close disables and the swipe is refused. */
   dismissDisabled?: boolean;
   footer?: ReactNode;
+  /**
+   * Drawn over the whole card, header and footer included: a confirmation
+   * raised from inside the sheet. It cannot be a Modal of its own, because
+   * UIKit will not present a second controller while the page sheet is up.
+   */
+  overlay?: ReactNode;
   children: ReactNode;
 }) {
   const mobileColors = useMobileColors();
@@ -133,6 +140,7 @@ export function FullPageSheet({
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
+          {overlay}
         </View>
       </InsideSheetContext.Provider>
     </Modal>

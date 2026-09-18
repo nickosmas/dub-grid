@@ -1576,14 +1576,13 @@ export default function ShiftDetailScreen() {
         title={getRequestModeTitle("swap")}
         visible={requestMode === "swap"}
         onDismiss={requestGuard.requestClose}
+        // Inside the page sheet on purpose, and not as a Modal: a Modal beside
+        // the sheet is a second root-level presentation, which iOS refuses
+        // while the sheet is up ("already presenting"), so the discard
+        // question never appeared and Close did nothing.
+        overlay={<ConfirmationModal presentation="inline" {...requestGuard.confirmationProps} />}
       >
         {requestSheetBody}
-        {/* Inside the page sheet on purpose. A Modal rendered beside it is a
-            second root-level presentation, and iOS refuses to present one
-            while the page sheet is up ("already presenting"), so the discard
-            question never appeared and Close did nothing. Nested here it
-            presents from the sheet's own controller, on top of it. */}
-        <ConfirmationModal {...requestGuard.confirmationProps} />
       </FullPageSheet>
       <BottomSheetModal
         // A request in flight can't be dragged, tapped or backed away from —
