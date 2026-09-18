@@ -1412,6 +1412,9 @@ function OpenShiftCard({
                 compact
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
                 label="Volunteer"
+                leadingAccessory={
+                  <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
+                }
                 loading={isLoading}
                 onPress={() => {
                   if (openShift.canVolunteer === false) {

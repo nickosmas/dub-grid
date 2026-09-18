@@ -105,16 +105,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
       color: mobileColors.textPrimary,
     },
-    // Wraps so a long shift name keeps its line and the time drops under it,
-    // rather than the two sharing one line and the name breaking mid-word.
+    // The time always sits under the shift name. Sharing a row made a short
+    // name like "Evening Shift" break into two lines beside its time.
     shiftTitleTimeRow: {
       flex: 1,
       minWidth: 0,
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "baseline",
-      justifyContent: "space-between",
-      gap: 12,
+      gap: mobileSpace.xs,
     },
     shiftTitleTimeText: {
       ...mobileTextWeighted("rowTitle", "medium"),

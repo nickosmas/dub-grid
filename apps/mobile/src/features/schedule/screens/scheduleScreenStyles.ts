@@ -31,7 +31,18 @@ export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
  */
 export const OPEN_SHIFT_CARD_SIDE_BLEED = 18;
 export const OPEN_SHIFT_CARD_FOOTROOM = 36;
-export const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
+/**
+ * The hero's collaborator stack: each avatar sits in a frame painted the
+ * block's own navy, and the frame is exactly the avatar plus the ring, so
+ * where frames overlap the ring reads as a clean cut-out of the neighbour.
+ * The old 42pt frame held a 38pt avatar behind 4pt of padding, which left
+ * 34pt of room: every avatar spilled out of its own ring off-centre and the
+ * cut-outs became uneven crescents.
+ */
+export const ME_HERO_AVATAR_SIZE = 38;
+export const ME_HERO_AVATAR_RING = 3;
+export const ME_HERO_AVATAR_FRAME_SIZE = ME_HERO_AVATAR_SIZE + ME_HERO_AVATAR_RING * 2;
+export const ME_HERO_AVATAR_FRAME_OVERLAP = -12;
 /**
  * Height of every control in the header row — the week chevrons, Today and the
  * alerts bell. One constant because they sit side by side and read as one set:
@@ -498,32 +509,32 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
     },
     meHeroCollaboratorAvatarFrame: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      padding: mobileSpace.xs,
+      width: ME_HERO_AVATAR_FRAME_SIZE,
+      height: ME_HERO_AVATAR_FRAME_SIZE,
+      borderRadius: ME_HERO_AVATAR_FRAME_SIZE / 2,
+      padding: ME_HERO_AVATAR_RING,
     },
     meHeroCollaboratorAvatarFrameOverlap: {
       marginLeft: ME_HERO_AVATAR_FRAME_OVERLAP,
     },
     meHeroCollaboratorAvatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: ME_HERO_AVATAR_SIZE,
+      height: ME_HERO_AVATAR_SIZE,
+      borderRadius: ME_HERO_AVATAR_SIZE / 2,
       borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
     },
     meHeroCollaboratorAvatarText: {
-      ...mobileAvatarText(38),
+      ...mobileAvatarText(ME_HERO_AVATAR_SIZE),
     },
     // A pale disc reads on the light navy block, but the same grey vanished
     // against the dark theme's deeper navy, so dark mode lightens the block
     // like the hero's other chips instead.
     meHeroCollaboratorOverflow: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: ME_HERO_AVATAR_SIZE,
+      height: ME_HERO_AVATAR_SIZE,
+      borderRadius: ME_HERO_AVATAR_SIZE / 2,
       borderWidth: 1,
       borderColor: isDark ? HERO_INVERSE_CHIP_BORDER : mobileColors.borderSubtle,
       backgroundColor: isDark ? HERO_INVERSE_CHIP_FILL : mobileColors.surfaceSecondary,
