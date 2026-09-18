@@ -132,13 +132,6 @@ vi.mock("../providers/NetworkStateProvider", async () => {
   return {
     NetworkStateProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "network-provider" }, children),
-    // The startup splash gate reads connectivity so it can say "you are
-    // offline" rather than just spinning.
-    useOptionalNetworkStatus: () => ({
-      hasResolvedState: true,
-      isOnline: true,
-      isOffline: false,
-    }),
   };
 });
 

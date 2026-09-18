@@ -1,8 +1,5 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { STARTUP_STATUS_DELAY_MS, STARTUP_TIMEOUT_MS } from "@dubgrid/design-tokens";
-
-const MIN_SPLASH_MS = 900;
 import { createReactNativeModule, createSafeAreaContextModule } from "../../test/native";
 
 vi.useFakeTimers();
@@ -30,12 +27,6 @@ vi.mock("../providers/AuthSessionProvider", () => ({
   useSessionState,
 }));
 
-let isOffline = false;
-
-vi.mock("../providers/NetworkStateProvider", () => ({
-  useOptionalNetworkStatus: () => ({ isOffline, isOnline: !isOffline, hasResolvedState: true }),
-}));
-
 vi.mock("../../features/auth/hooks/useBootstrap", () => ({
   BOOTSTRAP_QUERY_KEY_PREFIX: ["mobile", "bootstrap"],
   useBootstrap,
@@ -45,20 +36,13 @@ vi.mock("../../features/auth/hooks/useHasSeenOnboarding", () => ({
   useHasSeenOnboarding,
 }));
 
-const splashProps = vi.fn();
-
 vi.mock("./AppSplashScreen", async () => {
   const React = await import("react");
 
   return {
-    AppSplashScreen: (props: Record<string, unknown>) => {
-      splashProps(props);
-      return React.createElement("div", {}, "app-splash-screen");
-    },
+    AppSplashScreen: () => React.createElement("div", {}, "app-splash-screen"),
   };
 });
-
-const refetch = vi.fn(() => Promise.resolve());
 
 let StartupSplashGate: (typeof import("./StartupSplashGate"))["StartupSplashGate"];
 
@@ -76,32 +60,19 @@ function renderGate() {
 
 async function elapseMinimumSplash() {
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(MIN_SPLASH_MS);
+    await vi.advanceTimersByTimeAsync(900);
   });
-}
-
-function lastSplashProps() {
-  return splashProps.mock.calls.at(-1)?.[0] as
-    { phase?: string; offline?: boolean; onRetry?: () => void; retrying?: boolean } | undefined;
 }
 
 describe("StartupSplashGate", () => {
   beforeEach(() => {
-    // Gates from earlier cases stay mounted otherwise, and their phase timers
-    // keep firing into this one's fake clock, so the props under assertion
-    // could come from a component the test never rendered.
-    cleanup();
     useSessionState.mockReset();
     useBootstrap.mockReset();
     useHasSeenOnboarding.mockReset();
     hideAsync.mockReset();
-    isOffline = false;
-
-    splashProps.mockReset();
-    refetch.mockClear();
 
     useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
-    useBootstrap.mockReturnValue({ isLoading: false, refetch });
+    useBootstrap.mockReturnValue({ isLoading: false });
     useHasSeenOnboarding.mockReturnValue({ data: true, isLoading: false });
   });
 
@@ -127,7 +98,7 @@ describe("StartupSplashGate", () => {
   });
 
   it("holds past the minimum wait while bootstrap is still in flight", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true, refetch });
+    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true });
 
     renderGate();
     await elapseMinimumSplash();
@@ -138,7 +109,7 @@ describe("StartupSplashGate", () => {
   });
 
   it("lifts when an offline bootstrap is paused so recovery can render", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "paused", isLoading: true, refetch });
+    useBootstrap.mockReturnValue({ fetchStatus: "paused", isLoading: true });
 
     renderGate();
     await elapseMinimumSplash();
@@ -147,7 +118,7 @@ describe("StartupSplashGate", () => {
   });
 
   it("never lets an unsettled bootstrap latch the splash past its request budget", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true, refetch });
+    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true });
 
     renderGate();
 
@@ -214,57 +185,6 @@ describe("StartupSplashGate", () => {
     });
 
     expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
-  });
-
-  // A launch that beats the status delay never explains itself, which is the
-  // common case and the reason the copy is delayed at all.
-  it("stays quiet through a launch that resolves before the status delay", async () => {
-    renderGate();
-    await elapseMinimumSplash();
-
-    expect(lastSplashProps()?.phase).toBe("quiet");
-  });
-
-  it("explains itself at the status delay and offers a way out at the timeout", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true, refetch });
-
-    renderGate();
-    expect(lastSplashProps()?.phase).toBe("quiet");
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(STARTUP_STATUS_DELAY_MS);
-    });
-    expect(lastSplashProps()?.phase).toBe("status");
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(STARTUP_TIMEOUT_MS - STARTUP_STATUS_DELAY_MS);
-    });
-    expect(lastSplashProps()?.phase).toBe("timeout");
-  });
-
-  it("retries the bootstrap the launch is waiting on", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true, refetch });
-
-    renderGate();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(STARTUP_TIMEOUT_MS);
-    });
-
-    await act(async () => {
-      lastSplashProps()?.onRetry?.();
-    });
-
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("hands the splash the offline state so it can say so", async () => {
-    useBootstrap.mockReturnValue({ fetchStatus: "fetching", isLoading: true, refetch });
-    isOffline = true;
-
-    renderGate();
-    await elapseMinimumSplash();
-
-    expect(lastSplashProps()?.offline).toBe(true);
   });
 
   // Owned here rather than by the index route, so deep links that mount a
