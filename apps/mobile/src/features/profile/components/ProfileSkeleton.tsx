@@ -32,7 +32,9 @@ type ProfileRowVariant =
   /** ProfileNavRow: icon badge, single label, trailing chevron. */
   | "nav"
   /** A settings toggle: title and caption with a switch on the right. */
-  | "toggle";
+  | "toggle"
+  /** A signed-in device: round platform badge, a title over three lines, a chevron. */
+  | "session";
 
 function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   const mobileColors = useMobileColors();
@@ -48,6 +50,21 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
         </View>
         {/* The Switch primitive's track. */}
         <SkeletonPill height={31} width={51} />
+      </View>
+    );
+  }
+
+  if (variant === "session") {
+    return (
+      <View style={[styles.row, styles.sessionRow]}>
+        <SkeletonCircle size={36} />
+        <View style={styles.rowCopy}>
+          <SkeletonLine variant="rowTitle" width="48%" />
+          <SkeletonLine variant="caption" width="40%" />
+          <SkeletonLine variant="caption" width="34%" />
+          <SkeletonLine variant="caption" width="44%" />
+        </View>
+        <SkeletonLine variant="body" width={12} />
       </View>
     );
   }
@@ -275,6 +292,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     heroMetaItemCentered: {
       alignItems: "center",
+    },
+    // The real row's 112pt floor, so a device list stands in at full height.
+    sessionRow: {
+      minHeight: 112,
+      alignItems: "flex-start",
     },
     quickActions: {
       flexDirection: "row",

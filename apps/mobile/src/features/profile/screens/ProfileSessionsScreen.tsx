@@ -208,7 +208,7 @@ export default function ProfileSessionsScreen() {
     >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowVariant="nav" rowsPerSection={3} sections={1} showHero={false} />
+          <ProfileSkeleton rowVariant="session" rowsPerSection={3} sections={1} showHero={false} />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
