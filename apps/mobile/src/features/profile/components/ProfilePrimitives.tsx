@@ -7,7 +7,6 @@ import {
   useMemo,
   type ComponentProps,
   type ReactNode,
-  useState,
 } from "react";
 import {
   Pressable,
@@ -22,12 +21,7 @@ import {
 } from "react-native";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import {
-  BottomSheetModal,
-  SheetHeader,
-  useIsInsideSheet,
-} from "../../../shared/components/BottomSheetModal";
-import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
+import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -465,11 +459,11 @@ export function ProfileTextInput({
 }
 
 /**
- * A group of choices in the Settings idiom. Pick-many: a caption over a
- * framed list of full-width rows, a ring at each row's end that fills when
- * the row is chosen; rows wrap long names where a chip cloud ragged and
- * truncated them. Pick-one (`selection="single"`): a dropdown, one value
- * row that opens the options in a sheet.
+ * A group of choices as a framed list, the Settings idiom: a caption over
+ * full-width rows, a trailing mark that fills when a row is chosen. Rows
+ * wrap long names where a chip cloud ragged and truncated them, and the
+ * idle mark says which kind of group this is: a ring on every row for
+ * pick-many, nothing until the chosen row for pick-one.
  */
 export function ProfileChoiceGroup<TId extends string | number>({
   label,
@@ -496,60 +490,6 @@ export function ProfileChoiceGroup<TId extends string | number>({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  if (selection === "single") {
-    // A dropdown: one value row that opens the options in a sheet, and a
-    // pick closes it. Six certifications as rows on the page said as much
-    // as one row saying "Staff".
-    const chosen = items.find((item) => selectedIds.includes(item.id));
-    return (
-      <View style={styles.choiceGroup}>
-        <View style={styles.list}>
-          <PressableRow
-            accessibilityLabel={`${label}, ${chosen?.name ?? "not set"}`}
-            onPress={() => setPickerOpen(true)}
-            style={styles.selectRow}
-          >
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.selectLabel}>
-              {label}
-            </Text>
-            <Text
-              maxFontSizeMultiplier={MAX_FONT_SCALE}
-              numberOfLines={1}
-              style={styles.selectValue}
-            >
-              {chosen?.name ?? "Select"}
-            </Text>
-            <Ionicons color={mobileColors.textMuted} name="chevron-expand-outline" size={18} />
-          </PressableRow>
-        </View>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <BottomSheetModal
-          header={<SheetHeader title={label} />}
-          scrollable
-          visible={pickerOpen}
-          onDismiss={() => setPickerOpen(false)}
-        >
-          <SelectionSection label={label}>
-            {items.map((item) => (
-              <SelectionRow
-                detail={item.disabledReason}
-                disabled={item.disabled}
-                key={item.id}
-                label={item.name}
-                selected={selectedIds.includes(item.id)}
-                onPress={() => {
-                  onToggle(item.id);
-                  setPickerOpen(false);
-                }}
-              />
-            ))}
-          </SelectionSection>
-        </BottomSheetModal>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.choiceGroup}>
@@ -562,7 +502,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
               accessibilityLabel={
                 item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
               }
-              accessibilityRole="checkbox"
+              accessibilityRole={selection === "single" ? "radio" : "checkbox"}
               checked={selected}
               disabled={item.disabled}
               key={item.id}
@@ -578,7 +518,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
               <View
                 style={[
                   styles.choiceMark,
-                  !selected && styles.choiceMarkRing,
+                  selection === "multiple" && !selected && styles.choiceMarkRing,
                   selected && styles.choiceMarkSelected,
                 ]}
               >
@@ -1043,26 +983,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
       flex: 1,
       minWidth: 0,
-    },
-    selectRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: mobileSpace.md,
-      paddingHorizontal: 16,
-      paddingVertical: mobileListRow.paddingVertical,
-    },
-    selectLabel: {
-      ...mobileText.body,
-      color: mobileColors.textPrimary,
-    },
-    // The value takes what is left and ends first, so a long certification
-    // name gives way before the label does.
-    selectValue: {
-      ...mobileText.body,
-      color: mobileColors.textSecondary,
-      flex: 1,
-      minWidth: 0,
-      textAlign: "right",
     },
     choiceLabelSelected: {
       ...mobileTextWeighted("body", "medium"),
