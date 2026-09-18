@@ -1578,6 +1578,12 @@ export default function ShiftDetailScreen() {
         onDismiss={requestGuard.requestClose}
       >
         {requestSheetBody}
+        {/* Inside the page sheet on purpose. A Modal rendered beside it is a
+            second root-level presentation, and iOS refuses to present one
+            while the page sheet is up ("already presenting"), so the discard
+            question never appeared and Close did nothing. Nested here it
+            presents from the sheet's own controller, on top of it. */}
+        <ConfirmationModal {...requestGuard.confirmationProps} />
       </FullPageSheet>
       <BottomSheetModal
         // A request in flight can't be dragged, tapped or backed away from —
@@ -1607,8 +1613,10 @@ export default function ShiftDetailScreen() {
       />
       {/* Separate from the descriptor modal above, which routes the request
           sheet's own buttons. The two are never visible together: this one is
-          only ever raised by a dismissal, which the buttons don't perform. */}
-      <ConfirmationModal {...requestGuard.confirmationProps} />
+          only ever raised by a dismissal, which the buttons don't perform.
+          While the swap page sheet is up, the same confirmation renders
+          inside it instead (see FullPageSheet above). */}
+      {requestMode === "swap" ? null : <ConfirmationModal {...requestGuard.confirmationProps} />}
     </Screen>
   );
 }
