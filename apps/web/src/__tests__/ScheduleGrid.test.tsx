@@ -2323,6 +2323,54 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
+  it("badges a published mentored toggle instead of tinting a cell with no marker", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: null, jobId: 101, position: 0, isMentored: true }],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        from: [1],
+        to: [1],
+        fromState: {
+          kind: "worked",
+          segments: [{ shiftId: null, jobId: 101, position: 0, isMentored: false }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        toState: {
+          kind: "worked",
+          segments: [{ shiftId: null, jobId: 101, position: 0, isMentored: true }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
+
+    // The compact grid marker reads "Edited" for every published edit; the
+    // tooltip is what names the mentored change. Before this, the overlay
+    // dropped the mentored flags and painted a tinted cell with no badge.
+    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.getAttribute("aria-label")).toContain("Marked mentored.");
+  });
+
   it("keeps draft new historical cross-focus cells on the white shift surface", () => {
     observedWidth = 1600;
 

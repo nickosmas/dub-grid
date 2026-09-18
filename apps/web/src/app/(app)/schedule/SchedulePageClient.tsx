@@ -147,7 +147,11 @@ import {
   type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
-import { computeDraftBreakdown, computeOutOfWindowDraftGroups } from "@/lib/draft-utils";
+import {
+  computeDraftBreakdown,
+  computeOutOfWindowDraftGroups,
+  countShiftsAddedToPublishedCell,
+} from "@/lib/draft-utils";
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
@@ -1599,9 +1603,24 @@ function SchedulerContent() {
     for (const change of publishChangesMap.values()) {
       // A period's first publication has no prior published schedule for the
       // viewer to compare against. Only later additions are meaningful "New"
-      // changes; the API marks initial-publication entries explicitly.
-      if (change.kind === "new" && change.isNewAddition !== false) counts.newShifts += 1;
-      else if (change.kind === "deleted") counts.deletedShifts += 1;
+      // changes; the API marks initial-publication entries explicitly, and the
+      // grid paints nothing for them, so they must not be counted either (they
+      // used to fall through and read as "edited").
+      if (change.kind === "new") {
+        if (change.isNewAddition !== false) counts.newShifts += 1;
+        continue;
+      }
+      if (change.kind === "deleted") {
+        counts.deletedShifts += 1;
+        continue;
+      }
+      // A shift added beside a published one is a double shift, which the
+      // overlay rings green as new; count it the way the grid shows it.
+      const added =
+        change.fromState && change.toState
+          ? countShiftsAddedToPublishedCell(change.fromState, change.toState)
+          : 0;
+      if (added > 0) counts.newShifts += added;
       else counts.modifiedShifts += 1;
     }
     return counts;

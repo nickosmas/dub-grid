@@ -129,6 +129,7 @@ import {
   splitShiftLabelParts,
   assignmentIdsFromPublishState,
   absenceTypeIdFromPublishState,
+  mentoredFlagsFromPublishState,
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
   MULTI_SHIFT_PILL_RADIUS,
@@ -2241,20 +2242,6 @@ const SectionBlock = memo(function SectionBlock({
                                     publishDiff.isNewAddition !== false;
                                   const isPubDiff =
                                     showsPublishDiff && isMeaningfulPublishNew ? publishDiff : null;
-                                  const publishFrom =
-                                    publishDiff?.from ??
-                                    assignmentIdsFromPublishState(
-                                      publishDiff?.fromState,
-                                      publishedAssignmentIdByPair,
-                                    );
-                                  const publishTo =
-                                    publishDiff?.to ??
-                                    assignmentIdsFromPublishState(
-                                      publishDiff?.toState,
-                                      publishedAssignmentIdByPair,
-                                    );
-                                  const currentShiftLabels = splitShiftLabelParts(shiftLabel);
-                                  const publishedShiftLabels = splitShiftLabelParts(publishedLabel);
                                   // Persisted segment snapshots carry stable IDs, not presentation
                                   // labels. Treat an absent label as absent — passing `?` here masks
                                   // the current/published label fallback and produced `Added ?`.
@@ -2318,10 +2305,6 @@ const SectionBlock = memo(function SectionBlock({
                                       ? `${shiftName} · ${job.name}`
                                       : shiftName;
                                   };
-                                  const currentHistoryLabels =
-                                    cellCodeIds.map(resolveHistoryShiftLabel);
-                                  const publishedHistoryLabels =
-                                    publishFrom.map(resolveHistoryShiftLabel);
                                   const draftDiff = shouldComputeDraftDiff
                                     ? buildShiftDiffDescriptors({
                                         before: {
@@ -2346,50 +2329,74 @@ const SectionBlock = memo(function SectionBlock({
                                             count: cellCodeIds.length,
                                           }),
                                         },
-                                        beforeShiftLabels: publishedShiftLabels,
-                                        afterShiftLabels: currentShiftLabels,
+                                        beforeShiftLabels: splitShiftLabelParts(publishedLabel),
+                                        afterShiftLabels: splitShiftLabelParts(shiftLabel),
                                         resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
                                         resolveAbsenceLabel: resolveGridAbsenceLabel,
                                       })
                                     : null;
+                                  // Only a cell with a published change to
+                                  // paint pays for resolving its before and
+                                  // after states; every other cell used to
+                                  // derive both id lists and both history
+                                  // label lists on every render for nothing.
                                   const publishDiffSummary = isPubDiff
-                                    ? buildShiftDiffDescriptors({
-                                        before: {
-                                          assignmentIds: publishFrom,
-                                          absenceTypeId:
-                                            publishDiff!.fromAbsenceTypeId ??
-                                            absenceTypeIdFromPublishState(publishDiff?.fromState),
-                                          timeRanges: timeRangesFromPublishState(
-                                            publishDiff?.fromState,
-                                            publishDiff?.fromCustomStart,
-                                            publishDiff?.fromCustomEnd,
-                                            publishFrom.length,
-                                          ),
-                                        },
-                                        after: {
-                                          assignmentIds: publishTo,
-                                          absenceTypeId:
-                                            publishDiff!.toAbsenceTypeId ??
-                                            absenceTypeIdFromPublishState(publishDiff?.toState),
-                                          timeRanges: timeRangesFromPublishState(
-                                            publishDiff?.toState,
-                                            publishDiff?.toCustomStart,
-                                            publishDiff?.toCustomEnd,
-                                            publishTo.length,
-                                          ),
-                                        },
-                                        beforeShiftLabels:
-                                          snapshotLabels(publishDiff?.fromSegments) ??
-                                          publishedHistoryLabels ??
-                                          publishedShiftLabels,
-                                        afterShiftLabels:
-                                          snapshotLabels(publishDiff?.toSegments) ??
-                                          currentHistoryLabels ??
-                                          currentShiftLabels,
-                                        resolveAssignmentDefinitionLabel: resolveHistoryShiftLabel,
-                                        resolveAbsenceLabel: (absenceTypeId) =>
-                                          absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
-                                      })
+                                    ? (() => {
+                                        const publishFrom =
+                                          isPubDiff.from ??
+                                          assignmentIdsFromPublishState(
+                                            isPubDiff.fromState,
+                                            publishedAssignmentIdByPair,
+                                          );
+                                        const publishTo =
+                                          isPubDiff.to ??
+                                          assignmentIdsFromPublishState(
+                                            isPubDiff.toState,
+                                            publishedAssignmentIdByPair,
+                                          );
+                                        return buildShiftDiffDescriptors({
+                                          before: {
+                                            assignmentIds: publishFrom,
+                                            absenceTypeId:
+                                              isPubDiff.fromAbsenceTypeId ??
+                                              absenceTypeIdFromPublishState(isPubDiff.fromState),
+                                            timeRanges: timeRangesFromPublishState(
+                                              isPubDiff.fromState,
+                                              isPubDiff.fromCustomStart,
+                                              isPubDiff.fromCustomEnd,
+                                              publishFrom.length,
+                                            ),
+                                            isMentoredFlags: mentoredFlagsFromPublishState(
+                                              isPubDiff.fromState,
+                                            ),
+                                          },
+                                          after: {
+                                            assignmentIds: publishTo,
+                                            absenceTypeId:
+                                              isPubDiff.toAbsenceTypeId ??
+                                              absenceTypeIdFromPublishState(isPubDiff.toState),
+                                            timeRanges: timeRangesFromPublishState(
+                                              isPubDiff.toState,
+                                              isPubDiff.toCustomStart,
+                                              isPubDiff.toCustomEnd,
+                                              publishTo.length,
+                                            ),
+                                            isMentoredFlags: mentoredFlagsFromPublishState(
+                                              isPubDiff.toState,
+                                            ),
+                                          },
+                                          beforeShiftLabels:
+                                            snapshotLabels(isPubDiff.fromSegments) ??
+                                            publishFrom.map(resolveHistoryShiftLabel),
+                                          afterShiftLabels:
+                                            snapshotLabels(isPubDiff.toSegments) ??
+                                            cellCodeIds.map(resolveHistoryShiftLabel),
+                                          resolveAssignmentDefinitionLabel:
+                                            resolveHistoryShiftLabel,
+                                          resolveAbsenceLabel: (absenceTypeId) =>
+                                            absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
+                                        });
+                                      })()
                                     : null;
 
                                   const publishCellBadge = isPubDiff

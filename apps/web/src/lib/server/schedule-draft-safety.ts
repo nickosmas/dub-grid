@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotePublishChangeState } from "@dubgrid/contracts";
-import type { DraftBreakdown } from "@/lib/draft-utils";
+import { countShiftsAddedToPublishedEntry, type DraftBreakdown } from "@/lib/draft-utils";
 import type { DbScheduleCell } from "@/lib/db/types";
 import { fetchAllRows, type PagedQueryResult } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -55,14 +55,19 @@ export async function fetchScheduleDraftBreakdown(input: {
   let deletedShifts = 0;
 
   for (const row of (scheduleCellRows ?? []) as DbScheduleCell[]) {
-    const kind =
-      mapNormalizedScheduleCellRowToScheduleEntry(row, {
-        isScheduler: true,
-        assignmentLabelMap: new Map<number, string>(),
-        absenceTypeMap: new Map<number, string>(),
-      })?.draftKind ?? null;
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
+      isScheduler: true,
+      assignmentLabelMap: new Map<number, string>(),
+      absenceTypeMap: new Map<number, string>(),
+    });
+    const kind = entry?.draftKind ?? null;
     if (kind === "new") newShifts += 1;
-    if (kind === "modified") modifiedShifts += 1;
+    if (kind === "modified" && entry) {
+      // Same rule as the banner: shifts added beside a published one are new.
+      const added = countShiftsAddedToPublishedEntry(entry);
+      if (added > 0) newShifts += added;
+      else modifiedShifts += 1;
+    }
     if (kind === "deleted") deletedShifts += 1;
   }
 

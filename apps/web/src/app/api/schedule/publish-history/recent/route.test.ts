@@ -6,6 +6,8 @@ const requireOrgPermissions = vi.fn();
 const organizationsSingle = vi.fn();
 const publishHistoryOrder = vi.fn();
 const publishHistoryLimit = vi.fn();
+/** The second, baseline query: publications older than the result for the dates in question. */
+const priorPeriodsLimit = vi.fn();
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
@@ -35,14 +37,27 @@ function createServiceClient() {
       }
       if (table === "publish_history") {
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              gte: vi.fn(() => ({ order: publishHistoryOrder })),
-              lte: vi.fn(() => ({
+          select: vi.fn((columns: string) => {
+            if (columns === "start_date, end_date, published_at") {
+              const builder = {
+                eq: () => builder,
+                lte: () => builder,
+                gte: () => builder,
+                lt: () => builder,
+                order: () => builder,
+                limit: priorPeriodsLimit,
+              };
+              return builder;
+            }
+            return {
+              eq: vi.fn(() => ({
                 gte: vi.fn(() => ({ order: publishHistoryOrder })),
+                lte: vi.fn(() => ({
+                  gte: vi.fn(() => ({ order: publishHistoryOrder })),
+                })),
               })),
-            })),
-          })),
+            };
+          }),
         };
       }
       throw new Error(`Unexpected table: ${table}`);
@@ -51,6 +66,7 @@ function createServiceClient() {
 
   organizationsSingle.mockResolvedValue({ data: { timezone: "UTC" } });
   publishHistoryOrder.mockReturnValue({ limit: publishHistoryLimit });
+  priorPeriodsLimit.mockResolvedValue({ data: [], error: null });
   publishHistoryLimit.mockResolvedValue({
     data: [
       {
@@ -281,6 +297,122 @@ describe("GET /api/schedule/publish-history/recent", () => {
     const body = await response.json();
 
     expect(body.entries[0].noteChanges[0].isNewAddition).toBe(true);
+  });
+
+  it("marks a cell added to a week first published before the last visit as an addition", async () => {
+    const serviceClient = createServiceClient();
+    publishHistoryLimit.mockResolvedValue({
+      data: [
+        {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: "emp-1",
+              date: "2026-05-06",
+              kind: "new",
+              from_state: null,
+              to_state: { kind: "worked", segments: [{ shiftId: 1, jobId: 10, position: 0 }] },
+              from_absence_type_id: null,
+              to_absence_type_id: null,
+              updated_by: null,
+              from_custom_start: null,
+              from_custom_end: null,
+              to_custom_start: null,
+              to_custom_end: null,
+            },
+          ],
+          published_at: "2026-05-07T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    // The week's first publication predates `since`, so it is not in the
+    // result; the baseline query is what knows about it.
+    priorPeriodsLimit.mockResolvedValue({
+      data: [
+        {
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          published_at: "2026-05-01T09:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const body = await response.json();
+
+    expect(body.entries[0].changes[0].isNewAddition).toBe(true);
+    expect(priorPeriodsLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the baseline query when every new change already has an older covering row", async () => {
+    const serviceClient = createServiceClient();
+    publishHistoryLimit.mockResolvedValue({
+      data: [
+        {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: "emp-1",
+              date: "2026-05-06",
+              kind: "new",
+              from_state: null,
+              to_state: { kind: "worked", segments: [{ shiftId: 1, jobId: 10, position: 0 }] },
+              from_absence_type_id: null,
+              to_absence_type_id: null,
+              updated_by: null,
+              from_custom_start: null,
+              from_custom_end: null,
+              to_custom_start: null,
+              to_custom_end: null,
+            },
+          ],
+          published_at: "2026-05-07T17:00:00.000Z",
+        },
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          org_id: ORG_ID,
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 0,
+          schedule_publish_changes: [],
+          published_at: "2026-05-06T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const body = await response.json();
+
+    expect(body.entries[0].changes[0].isNewAddition).toBe(true);
+    expect(priorPeriodsLimit).not.toHaveBeenCalled();
   });
 
   it("does not authorize invalid queries", async () => {

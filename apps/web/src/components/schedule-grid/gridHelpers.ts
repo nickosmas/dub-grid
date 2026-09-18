@@ -271,6 +271,16 @@ export function absenceTypeIdFromPublishState(
   return state?.kind === "absence" ? state.absenceTypeId : null;
 }
 
+/** Per-segment mentored flags in pill order, so a published mentored toggle gets its badge. */
+export function mentoredFlagsFromPublishState(
+  state: ScheduleCellState | null | undefined,
+): boolean[] {
+  if (state?.kind !== "worked") return [];
+  return [...state.segments]
+    .sort((left, right) => left.position - right.position)
+    .map((segment) => segment.isMentored ?? false);
+}
+
 export function timeRangesFromPublishState(
   state: ScheduleCellState | null | undefined,
   fallbackStart: string | null | undefined,

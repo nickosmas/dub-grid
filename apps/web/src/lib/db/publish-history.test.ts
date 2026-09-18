@@ -38,6 +38,30 @@ const cellRow = makeRow({
 });
 
 describe("publish change rows", () => {
+  it("drops a modified row whose before and after states are the same schedule", () => {
+    const segments = [{ shiftId: 1, jobId: 2, position: 0, isMentored: false }];
+    const changes = toPublishChanges([
+      makeRow({
+        kind: "modified",
+        from_state: { kind: "worked", segments, customStartTime: "07:00", customEndTime: null },
+        to_state: { kind: "worked", segments, customStartTime: "07:00", customEndTime: null },
+      }),
+      makeRow({
+        kind: "modified",
+        from_state: { kind: "worked", segments },
+        to_state: { kind: "worked", segments: [{ ...segments[0], isMentored: true }] },
+      }),
+      makeRow({
+        kind: "modified",
+        from_state: { kind: "absence", segments: [], absenceTypeId: 4 },
+        to_state: { kind: "absence", segments: [], absenceTypeId: 4 },
+      }),
+    ]);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0].toState?.segments[0].isMentored).toBe(true);
+  });
+
   it("keeps note rows out of the cell changes", () => {
     const changes = toPublishChanges([
       cellRow,

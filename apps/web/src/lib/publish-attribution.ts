@@ -1,5 +1,6 @@
 import type { ShiftMap } from "@/types";
 import {
+  countShiftsAddedToPublishedEntry,
   extractDateKeyFromCellKey,
   type DateRangeFilter,
   type DraftBreakdown,
@@ -82,9 +83,16 @@ export function computeEditorDraftBreakdowns(
       case "new":
         bucket.newShifts += 1;
         break;
-      case "modified":
+      case "modified": {
+        const added = countShiftsAddedToPublishedEntry(entry);
+        if (added > 0) {
+          bucket.newShifts += added;
+          bucket.totalChanges += added;
+          continue;
+        }
         bucket.modifiedShifts += 1;
         break;
+      }
       case "deleted":
         bucket.deletedShifts += 1;
         break;
