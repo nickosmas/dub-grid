@@ -198,7 +198,7 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getAllByText("Supervisor").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "RN" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "RN" })).toBeInTheDocument();
     expect(screen.getByLabelText("Contact notes")).toBeInTheDocument();
     // No Edit/view toggle: the screen opens straight into the editor, with no
     // separate "start editing" step. Its "Cancel" (asserted elsewhere) leaves
@@ -265,7 +265,7 @@ describe("ProfileWorkScreen", () => {
     // once there is something to throw away.
     expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
 
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
 
@@ -312,7 +312,7 @@ describe("ProfileWorkScreen", () => {
   it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
     render(<ProfileWorkScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
     expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
@@ -344,9 +344,9 @@ describe("ProfileWorkScreen", () => {
 
     render(<ProfileWorkScreen />);
 
-    const selectedRole = screen.getByRole("button", { name: "SUP" });
+    const selectedRole = screen.getByRole("checkbox", { name: "SUP" });
     expect(selectedRole).not.toBeDisabled();
-    expect(screen.queryByRole("button", { name: "CL" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "CL" })).not.toBeInTheDocument();
 
     fireEvent.click(selectedRole);
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
@@ -365,7 +365,7 @@ describe("ProfileWorkScreen", () => {
 
   it("asks before a back press throws away an edit, and leaves once discarded", async () => {
     render(<ProfileWorkScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
 
     act(() => {
       expect(pressBack()).toBe(true);
@@ -387,7 +387,7 @@ describe("ProfileWorkScreen", () => {
 
   it("keeps the edit when the back press is called off", () => {
     render(<ProfileWorkScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
 
     act(() => {
       pressBack();

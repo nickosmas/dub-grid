@@ -20,12 +20,12 @@ import {
   type ViewStyle,
 } from "react-native";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
-import { Chip } from "../../../shared/components/Chip";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  mobileListRow,
   mobileAvatarText,
   MAX_FONT_SCALE,
   mobileElevation,
@@ -458,10 +458,18 @@ export function ProfileTextInput({
   );
 }
 
+/**
+ * A group of choices as a framed list, the Settings idiom: a caption over
+ * full-width rows, a trailing mark that fills when a row is chosen. Rows
+ * wrap long names where a chip cloud ragged and truncated them, and the
+ * idle mark says which kind of group this is: a ring on every row for
+ * pick-many, nothing until the chosen row for pick-one.
+ */
 export function ProfileChoiceGroup<TId extends string | number>({
   label,
   items,
   selectedIds,
+  selection = "multiple",
   error,
   onToggle,
 }: {
@@ -474,6 +482,8 @@ export function ProfileChoiceGroup<TId extends string | number>({
     disabledReason?: string;
   }>;
   selectedIds: TId[];
+  /** `"single"` for a group where choosing one row replaces the last. */
+  selection?: "single" | "multiple";
   error?: string | null;
   onToggle: (id: TId) => void;
 }) {
@@ -482,21 +492,43 @@ export function ProfileChoiceGroup<TId extends string | number>({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <View style={styles.chipGroup}>
+    <View style={styles.choiceGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.chipRow}>
-        {items.map((item) => (
-          <Chip
-            accessibilityLabel={
-              item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
-            }
-            disabled={item.disabled}
-            key={item.id}
-            label={item.name}
-            onPress={() => onToggle(item.id)}
-            selected={selectedIds.includes(item.id)}
-          />
-        ))}
+      <View style={styles.list}>
+        {items.map((item, index) => {
+          const selected = selectedIds.includes(item.id);
+          return (
+            <PressableRow
+              accessibilityLabel={
+                item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
+              }
+              accessibilityRole={selection === "single" ? "radio" : "checkbox"}
+              checked={selected}
+              disabled={item.disabled}
+              key={item.id}
+              onPress={() => onToggle(item.id)}
+              style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
+            >
+              <Text
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+              >
+                {item.name}
+              </Text>
+              <View
+                style={[
+                  styles.choiceMark,
+                  selection === "multiple" && !selected && styles.choiceMarkRing,
+                  selected && styles.choiceMarkSelected,
+                ]}
+              >
+                {selected ? (
+                  <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
+                ) : null}
+              </View>
+            </PressableRow>
+          );
+        })}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -936,13 +968,40 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.caption,
       color: mobileColors.dangerText,
     },
-    chipGroup: {
-      gap: 8,
+    choiceGroup: {
+      gap: mobileSpace.sm,
     },
-    chipRow: {
+    choiceRow: {
+      alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
+      gap: mobileSpace.md,
+      paddingHorizontal: 16,
+      paddingVertical: mobileListRow.paddingVertical,
+    },
+    choiceLabel: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      flex: 1,
+      minWidth: 0,
+    },
+    choiceLabelSelected: {
+      ...mobileTextWeighted("body", "medium"),
+    },
+    // The 22pt mark at the row's end. A ring is the pick-many group's idle
+    // state; the fill is the chosen row in either kind of group.
+    choiceMark: {
+      alignItems: "center",
+      borderRadius: 11,
+      height: 22,
+      justifyContent: "center",
+      width: 22,
+    },
+    choiceMarkRing: {
+      borderColor: mobileColors.border,
+      borderWidth: 1.5,
+    },
+    choiceMarkSelected: {
+      backgroundColor: mobileColors.brand,
     },
     iconBadge: {
       alignItems: "center",

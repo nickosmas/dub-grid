@@ -1669,29 +1669,29 @@ function EditPanel({
       </ProfileSection>
 
       <ProfileSection title="Staffing">
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            items={[
-              { id: 0, name: "Full-time" },
-              { id: 1, name: "Part-time" },
-            ]}
-            label="Employment"
-            selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-            onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
-          />
-          <ProfileChoiceGroup
-            items={[
-              { id: -1, name: "None" },
-              ...certifications.map((item) => ({
-                id: item.id,
-                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-              })),
-            ]}
-            label={certificationLabel}
-            selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
-            onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
-          />
-        </ProfilePanel>
+        <ProfileChoiceGroup
+          items={[
+            { id: 0, name: "Full-time" },
+            { id: 1, name: "Part-time" },
+          ]}
+          label="Employment"
+          selection="single"
+          selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
+          onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
+        />
+        <ProfileChoiceGroup
+          items={[
+            { id: -1, name: "None" },
+            ...certifications.map((item) => ({
+              id: item.id,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+            })),
+          ]}
+          label={certificationLabel}
+          selection="single"
+          selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+          onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
+        />
       </ProfileSection>
 
       <ProfileSection title="Assignments">
@@ -1700,37 +1700,35 @@ function EditPanel({
             all - for anyone else an empty set is the group's own validation
             error, which stays where it is. */}
         <SectionNotice messages={assignmentNotices} />
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            error={fieldErrors.focusAreaIds}
-            items={focusAreas.map((item) => ({
+        <ProfileChoiceGroup
+          error={fieldErrors.focusAreaIds}
+          items={focusAreas.map((item) => ({
+            id: item.id,
+            name: item.name,
+          }))}
+          label={focusAreaLabel}
+          selectedIds={draft.focusAreaIds}
+          onToggle={(id) => toggle("focusAreaIds", id)}
+        />
+        <ProfileChoiceGroup
+          items={roles
+            .filter(
+              (item) =>
+                !isRoleCertificationBlocked({
+                  role: item,
+                  certificationId: draft.certificationId,
+                  selectedRoleIds: draft.roleIds,
+                  roleId: item.id,
+                }),
+            )
+            .map((item) => ({
               id: item.id,
-              name: item.name,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
             }))}
-            label={focusAreaLabel}
-            selectedIds={draft.focusAreaIds}
-            onToggle={(id) => toggle("focusAreaIds", id)}
-          />
-          <ProfileChoiceGroup
-            items={roles
-              .filter(
-                (item) =>
-                  !isRoleCertificationBlocked({
-                    role: item,
-                    certificationId: draft.certificationId,
-                    selectedRoleIds: draft.roleIds,
-                    roleId: item.id,
-                  }),
-              )
-              .map((item) => ({
-                id: item.id,
-                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-              }))}
-            label={roleLabel}
-            selectedIds={draft.roleIds}
-            onToggle={(id) => toggle("roleIds", id)}
-          />
-        </ProfilePanel>
+          label={roleLabel}
+          selectedIds={draft.roleIds}
+          onToggle={(id) => toggle("roleIds", id)}
+        />
       </ProfileSection>
 
       <ProfileSection title="Notes">

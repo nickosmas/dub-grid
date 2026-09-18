@@ -382,41 +382,39 @@ export default function AddPersonScreen() {
       </ProfileSection>
 
       <ProfileSection title="Staffing">
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            items={[
-              { id: 0, name: "Full-time" },
-              { id: 1, name: "Part-time" },
-            ]}
-            label="Employment"
-            selectedIds={[employmentType === "part_time" ? 1 : 0]}
-            onToggle={(id) => setEmploymentType(id === 1 ? "part_time" : "full_time")}
-          />
-          <ProfileChoiceGroup
-            items={[
-              { id: -1, name: "None" },
-              ...certifications.map((item) => ({
-                id: item.id,
-                name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
-              })),
-            ]}
-            label={certificationLabel}
-            selectedIds={certificationId == null ? [-1] : [certificationId]}
-            onToggle={(id) => setCertificationId(id === -1 ? null : id)}
-          />
-        </ProfilePanel>
+        <ProfileChoiceGroup
+          items={[
+            { id: 0, name: "Full-time" },
+            { id: 1, name: "Part-time" },
+          ]}
+          label="Employment"
+          selection="single"
+          selectedIds={[employmentType === "part_time" ? 1 : 0]}
+          onToggle={(id) => setEmploymentType(id === 1 ? "part_time" : "full_time")}
+        />
+        <ProfileChoiceGroup
+          items={[
+            { id: -1, name: "None" },
+            ...certifications.map((item) => ({
+              id: item.id,
+              name: useCompactRoleCertificationLabels ? item.abbr || item.name : item.name,
+            })),
+          ]}
+          label={certificationLabel}
+          selection="single"
+          selectedIds={certificationId == null ? [-1] : [certificationId]}
+          onToggle={(id) => setCertificationId(id === -1 ? null : id)}
+        />
       </ProfileSection>
 
       <ProfileSection title="Assignments">
-        <ProfilePanel>
-          <ProfileChoiceGroup
-            error={fieldErrors.focusAreaIds}
-            items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
-            label={focusAreaLabel}
-            selectedIds={focusAreaIds}
-            onToggle={toggleFocusArea}
-          />
-        </ProfilePanel>
+        <ProfileChoiceGroup
+          error={fieldErrors.focusAreaIds}
+          items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}
+          label={focusAreaLabel}
+          selectedIds={focusAreaIds}
+          onToggle={toggleFocusArea}
+        />
       </ProfileSection>
 
       <ConfirmationModal {...guard.confirmationProps} />

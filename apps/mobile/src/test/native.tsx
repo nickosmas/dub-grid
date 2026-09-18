@@ -88,10 +88,14 @@ function pickDomProps(input: Record<string, any>) {
       }
       const state = value as {
         busy?: boolean;
+        checked?: boolean;
         disabled?: boolean;
         expanded?: boolean;
         selected?: boolean;
       };
+      if (state.checked !== undefined) {
+        output["aria-checked"] = String(state.checked);
+      }
       if (state.busy !== undefined) {
         output["aria-busy"] = String(state.busy);
       }

@@ -183,7 +183,7 @@ describe("AddToScheduleScreen", () => {
   it("sends the picked assignments", () => {
     const mutationCalls = renderScreen({});
 
-    fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
     fireEvent.click(screen.getByRole("button", { name: "Add to Schedule" }));
 
     expect(allMutatePayloads(mutationCalls)).toContainEqual(

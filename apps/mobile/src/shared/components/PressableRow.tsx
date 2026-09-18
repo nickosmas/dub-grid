@@ -22,6 +22,7 @@ export function PressableRow({
   accessibilityLabel,
   accessibilityRole = "button",
   selected,
+  checked,
   disabled = false,
   haptic = true,
   style,
@@ -29,8 +30,10 @@ export function PressableRow({
 }: {
   children: ReactNode;
   accessibilityLabel?: string;
-  accessibilityRole?: "button" | "link";
+  accessibilityRole?: "button" | "link" | "checkbox" | "radio";
   selected?: boolean;
+  /** For a checkbox or radio row: whether it is on. */
+  checked?: boolean;
   disabled?: boolean;
   haptic?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -53,7 +56,7 @@ export function PressableRow({
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected }}
+      accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected, checked }}
       android_ripple={isDisabled ? undefined : { color: mobileColors.rippleNeutral }}
       disabled={isDisabled}
       onPress={action.run}

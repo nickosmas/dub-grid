@@ -831,8 +831,8 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
     fireEvent.click(screen.getByText("Edit"));
 
-    expect(screen.getByRole("button", { name: "CN" })).not.toBeDisabled();
-    expect(screen.queryByRole("button", { name: "CL" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "CN" })).not.toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: "CL" })).not.toBeInTheDocument();
   });
 
   it("shows account found before asking to reconcile a different-name existing account", async () => {
@@ -1412,7 +1412,7 @@ describe("PersonDetailScreen", () => {
       renderForSchedule({ managementDepartmentIds: [9] });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
 
       expect(
         screen.getByText(
@@ -1428,7 +1428,7 @@ describe("PersonDetailScreen", () => {
       const mutationCalls = renderForSchedule({ managementDepartmentIds: [9] });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
       fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -1444,7 +1444,7 @@ describe("PersonDetailScreen", () => {
       renderForSchedule({ managementDepartmentIds: [] });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Skilled Nursing" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
 
       expect(
         screen.queryByText(

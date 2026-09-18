@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   SkeletonBlock,
+  SkeletonCircle,
   SkeletonGroup,
   SkeletonLine,
-  SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -14,6 +14,7 @@ import {
   mobileSpacing,
   type MobileColors,
   mobileSpace,
+  mobileListRow,
 } from "../../../shared/theme/tokens";
 
 /** `ProfileTextInput`'s field height. */
@@ -55,15 +56,27 @@ export function PersonFormSkeleton({
           </View>
         </View>
       ))}
+      {/* A choice group: its caption over a framed list of rows, each with
+          the 22pt mark at its end, as ProfileChoiceGroup draws it. */}
       {skeletonRows(chipGroups, (index) => (
-        <View key={`form-chip-group-${index}`} style={styles.section}>
+        <View key={`form-choice-group-${index}`} style={styles.section}>
           <SkeletonLine variant="label" width="34%" />
-          <View style={styles.panel}>
+          <View style={styles.field}>
             <SkeletonLine variant="caption" width="28%" />
-            <View style={styles.chipRow}>
-              <SkeletonPill height={36} width={96} />
-              <SkeletonPill height={36} width={124} />
-              <SkeletonPill height={36} width={82} />
+            <View style={styles.list}>
+              {skeletonRows(3, (row) => (
+                <View
+                  key={`form-choice-row-${index}-${row}`}
+                  style={[styles.choiceRow, row < 2 && styles.rowDivider]}
+                >
+                  <SkeletonLine
+                    variant="body"
+                    width={row === 1 ? "58%" : "40%"}
+                    style={styles.grow}
+                  />
+                  <SkeletonCircle size={22} />
+                </View>
+              ))}
             </View>
           </View>
         </View>
@@ -92,9 +105,26 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     field: {
       gap: mobileSpace.sm,
     },
-    chipRow: {
+    list: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.cardBorder,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    choiceRow: {
+      alignItems: "center",
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
+      gap: mobileSpace.md,
+      minHeight: mobileListRow.minHeight,
+      paddingHorizontal: 16,
+      paddingVertical: mobileListRow.paddingVertical,
+    },
+    rowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    grow: {
+      flex: 1,
     },
   });
