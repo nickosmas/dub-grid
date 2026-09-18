@@ -120,6 +120,13 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   references only: preserve DubGrid's tokens, density, platform-specific
   motion, and existing accessibility contracts, and do not add a dependency
   solely to satisfy either checklist.
+- Alerts go to their subject: tapping an alert on web or mobile marks it read
+  and navigates to what it is about through one shared destination resolver,
+  instead of opening a detail view that repeats the sentence. Organization
+  users get no detail modal or screen; gridmasters keep a Details disclosure
+  for platform rows. The web alerts page is a list under one toolbar (no
+  sidebar), mobile rows show the full message and any human note inline, and
+  every alert row has a clear title-versus-content hierarchy.
 - Production migration safety: the final release gate only after product work
   and release hardening are complete. Inventory linked production state,
   reconcile the migration ledger, rehearse against a production-shaped
@@ -133,11 +140,12 @@ hardening in item 19, explicit schedule-indicator removal in item 20, and
 production display-mode layout resilience in item 21. Scheduler open-shift
 staffing is item 22, app-wide pill overflow resilience is item 23, and Inter
 product typography is item 24. Web UI consistency and interaction resilience is
-item 25, and production migration safety remains last as item 26. Item 18 is
+item 25, mobile UI consistency is item 26, alerts go to their subject is item
+27, and production migration safety remains last as item 28. Item 18 is
 deliberately split into role eligibility, the shared dashboard model, and native
 dashboard presentation so each can be reviewed independently. Item 19 is split
 into state correctness, full journey coverage, performance and resilience,
-security, and release qualification. Item 26 must remain last.
+security, and release qualification. Item 28 must remain last.
 
 ## 4. Data - What are we storing?
 

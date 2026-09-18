@@ -1,4 +1,5 @@
 export * from "./account-status";
+export * from "./alert-destination";
 export * from "./audience";
 export * from "./billing";
 export * from "./credential-requirements";

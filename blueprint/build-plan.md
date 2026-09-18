@@ -469,6 +469,44 @@
         (loading, empty, error, sheet, confirmation) saved under
         `blueprint/reference/mobile/`, with every defect fixed in place or
         logged in `blueprint/context/findings.md`.
+- [ ] 39. **Alerts go to their subject** - an alert is one sentence about
+      something else, so tapping it anywhere (web bell popup, web /alerts
+      rows, mobile alerts list) marks it read and goes to what it is about
+      through one shared destination resolver in `@dubgrid/domain`: requests
+      to the request board, schedule changes to that date, people changes to
+      the person, invitations to People > Invitations, billing to Settings >
+      Subscription, role and permission changes to the person's own profile,
+      profile-change requests to their existing action, and web-only
+      destinations shown as such on mobile. The web detail modal and the
+      mobile detail screen go away for organization users; gridmasters keep a
+      Details disclosure for platform rows. The web alerts page loses its
+      sidebar: Inbox / Archived, the read filter, search, category, priority,
+      sort, select-all with bulk actions, and Mark all read live in one
+      toolbar above the list. Mobile rows stop truncating and show a human
+      note inline, and every alert row on web and mobile gets a clear
+      title-versus-content text hierarchy.
+  - [x] 39a. **Alert destination contract** - `resolveAlertDestination` in
+        `@dubgrid/domain` turns an alert's type and metadata into one web href
+        and a verb label (or none), with `actionUrl` winning when present and
+        every produced type covered by a test; the query parameters the
+        destinations rely on are locked here. No UI change.
+  - [ ] 39b. **Web alerts go to their subject** - `/schedule` honors `date`
+        and `requests`, `/people` honors `section`; bell popup rows and
+        `/alerts` rows link to the destination and mark read on the way; the
+        detail modal goes for organization users and gridmasters get a
+        Details disclosure in the row; `?open=` redirects to the destination;
+        web rows get the title-versus-content hierarchy.
+  - [ ] 39c. **Web alerts page single toolbar** - the sidebar, the read tabs,
+        and the header button fold into one toolbar above the list: Inbox /
+        Archived, All / Unread / Read, search, category, priority, sort,
+        select-all with bulk actions, and Mark all read, at every supported
+        width and zoom.
+  - [ ] 39d. **Mobile alerts go to their subject** - list rows resolve
+        through the same contract (the href prefix map extended for a date or
+        a person), mark read then navigate, web-only destinations keep the
+        existing hint, the detail route goes for organization users and push
+        deep links follow the destination; rows show the full message and any
+        human note inline, with the title-versus-content hierarchy.
 - [ ] 37. **Production migration safety** - final release gate only after all
       product work and hardening are complete: inventory linked production,
       reconcile migration history, rehearse on a production-shaped Supabase

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash e6ae039bd8f7388a0ffb083183b8a7b24927fcfb27f9cf6955ceda9fc7287381 -->
+<!-- blueprint:source-hash 60849baa54b454a5e7b19f42eba055711294dd536310facdd0d2cda6e01a1d8c -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ facilities.
 
 ## Features
 
-Everything below is already shipped except item 27.
+Everything below is already shipped except item 27 and item 28.
 
 1. **Multi-tenant organizations** - subdomain-isolated tenants with their
    own settings and terminology overrides.
@@ -197,7 +197,23 @@ Everything below is already shipped except item 27.
     role, theme, text-scale, and device matrix. No new dependency; preserve the
     `mobile*` tokens and reduced-motion behavior.
 
-27. **Production migration safety** - the final release gate after all product
+27. **Alerts go to their subject** - an alert is one sentence about something
+    else, so tapping it anywhere (web bell popup, web `/alerts` rows, mobile
+    alerts list) marks it read and navigates to what it is about through one
+    shared destination resolver in `@dubgrid/domain`: requests to the request
+    board, schedule changes to that date, people changes to the person,
+    invitations to People > Invitations, billing to Settings > Subscription,
+    role and permission changes to the person's own profile, profile-change
+    requests to their existing action, and web-only destinations shown as such
+    on mobile. The web detail modal and the mobile detail screen go away for
+    organization users; gridmasters keep a Details disclosure for platform
+    rows. The web alerts page loses its sidebar: Inbox / Archived, the read
+    filter, search, category, priority, sort, select-all with bulk actions,
+    and Mark all read live in one toolbar above the list. Mobile rows stop
+    truncating and show a human note inline, and every alert row on web and
+    mobile gets a clear title-versus-content text hierarchy.
+
+28. **Production migration safety** - the final release gate after all product
     work and hardening: inventory linked production, reconcile migration
     history, rehearse on a production-shaped Supabase branch, apply only
     reviewed forward migrations, and verify health, schema, tenant isolation,
@@ -328,6 +344,11 @@ and ordinary copy. Web uses Inter Variable with optical sizing; mobile uses
 native Inter 400/500/600/700 faces. The existing semantic size hierarchy stays
 in place, and schedules, dates, times, durations, and totals use tabular
 numerals.
+
+Alerts are one sentence about something else: tapping one marks it read and
+goes to its subject rather than opening a detail view that repeats the
+sentence. The web alerts page is a list under one toolbar, and every alert
+row keeps a clear title-versus-content hierarchy.
 
 For future web UI consistency work, `better-ui` is a reference for surfaces,
 radii, optical alignment, icon state, explicit transitions, and theme-switch
