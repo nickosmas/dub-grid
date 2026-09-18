@@ -95,10 +95,13 @@ function ProfileHeroSkeleton({
   return (
     <View style={[styles.hero, isCentered && styles.heroCentered]}>
       {isCentered ? (
+        // Fixed widths here: the centred column is content-sized, so a
+        // percentage line has nothing to be a percentage of and collapsed to
+        // a stub beside the avatar.
         <>
           <SkeletonCircle size={CENTERED_AVATAR_SIZE} />
-          <SkeletonLine variant="screenTitle" width="54%" />
-          {subtitle ? <SkeletonLine variant="body" width="46%" /> : null}
+          <SkeletonLine variant="screenTitle" width={168} />
+          {subtitle ? <SkeletonLine variant="body" width={208} /> : null}
         </>
       ) : (
         <View style={styles.heroTop}>
@@ -123,6 +126,8 @@ function ProfileHeroSkeleton({
           ))}
         </View>
       ) : null}
+      {/* The profile's "Joined" line under its badge. */}
+      {isCentered && subtitle ? <SkeletonLine variant="caption" width={128} /> : null}
       {metaItems > 0 ? (
         <View style={[styles.heroDetail, isCentered && styles.heroDetailCentered]}>
           {skeletonRows(metaItems, (index) => (
@@ -130,8 +135,8 @@ function ProfileHeroSkeleton({
               key={`profile-meta-${index}`}
               style={[styles.heroMetaItem, isCentered && styles.heroMetaItemCentered]}
             >
-              <SkeletonLine variant="caption" width="56%" />
-              <SkeletonLine variant="rowTitle" width="78%" />
+              <SkeletonLine variant="caption" width={isCentered ? 72 : "56%"} />
+              <SkeletonLine variant="rowTitle" width={isCentered ? 112 : "78%"} />
             </View>
           ))}
         </View>

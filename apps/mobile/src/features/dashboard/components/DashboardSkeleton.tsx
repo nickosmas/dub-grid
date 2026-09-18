@@ -7,6 +7,7 @@ import {
   SkeletonPill,
   skeletonRows,
 } from "../../../shared/components/skeleton";
+import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -222,10 +223,15 @@ export function DashboardHeaderSkeleton() {
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
+  // The bell is the real control: it needs no dashboard data, and drawing it
+  // now means it does not pop in beside the greeting when the page resolves.
   return (
-    <View style={styles.header}>
-      <SkeletonLine variant="display" width="58%" />
-      <SkeletonLine variant="meta" width="74%" />
+    <View style={styles.headerRow}>
+      <View style={styles.header}>
+        <SkeletonLine variant="display" width="58%" />
+        <SkeletonLine variant="meta" width="74%" />
+      </View>
+      <AlertsHeaderButton />
     </View>
   );
 }
@@ -283,7 +289,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "space-between",
       gap: mobileSpace.md,
     },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: mobileSpace.md,
+    },
     header: {
+      flex: 1,
       gap: mobileSpace.xs,
     },
     heroCoverage: {
