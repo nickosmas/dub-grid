@@ -102,6 +102,7 @@ export function BottomSheetModal({
   presentationKind = "sheet",
   header,
   footer,
+  overlay,
   children,
 }: {
   visible: boolean;
@@ -139,6 +140,12 @@ export function BottomSheetModal({
    */
   header?: ReactNode;
   footer?: ReactNode;
+  /**
+   * Drawn over the whole sheet, backdrop included: a confirmation raised
+   * from inside it. It cannot be a Modal of its own, because UIKit will not
+   * present a second controller while this one is up.
+   */
+  overlay?: ReactNode;
   children: ReactNode;
 }) {
   const mobileColors = useMobileColors();
@@ -347,6 +354,7 @@ export function BottomSheetModal({
                 </Pressable>
               ) : null}
             </Animated.View>
+            {overlay}
           </View>
         </GestureHandlerRootView>
       </InsideSheetContext.Provider>

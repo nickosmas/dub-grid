@@ -968,6 +968,34 @@ export default function ShiftDetailScreen() {
       !!shiftEntry &&
       ((coverageRequestType === "pickup" && !!selectedTargetedPickupEntry) ||
         (coverageRequestType === "calloff" && !!selectedCalloffAbsenceType)));
+  // Both confirmations a request sheet can raise: the descriptor one from
+  // its Submit (call-off), the guard one from Close with a choice made. As
+  // an overlay inside the sheet's own Modal, because UIKit refuses to
+  // present a second controller while the sheet is up ("already
+  // presenting"), so a root-level Modal never appeared and the button did
+  // nothing.
+  const requestConfirmations = (presentation: "modal" | "inline") => (
+    <>
+      <ConfirmationModal
+        body={pendingConfirmation?.body}
+        confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
+        confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
+        loading={createRequestMutation.isPending}
+        onCancel={() => setPendingConfirmation(null)}
+        onConfirm={() => {
+          const action = pendingConfirmation?.onConfirm;
+          setPendingConfirmation(null);
+          action?.();
+        }}
+        presentation={presentation}
+        title={pendingConfirmation?.title ?? "Confirm action?"}
+        visible={pendingConfirmation != null}
+      />
+      <ConfirmationModal presentation={presentation} {...requestGuard.confirmationProps} />
+    </>
+  );
+  const requestSheetOverlay = requestConfirmations("inline");
+
   const requestSheetFooter = hasRequestSheetFooter ? (
     <>
       {createRequestError ? <InlineError message={createRequestError} /> : null}
@@ -1576,11 +1604,7 @@ export default function ShiftDetailScreen() {
         title={getRequestModeTitle("swap")}
         visible={requestMode === "swap"}
         onDismiss={requestGuard.requestClose}
-        // Inside the page sheet on purpose, and not as a Modal: a Modal beside
-        // the sheet is a second root-level presentation, which iOS refuses
-        // while the sheet is up ("already presenting"), so the discard
-        // question never appeared and Close did nothing.
-        overlay={<ConfirmationModal presentation="inline" {...requestGuard.confirmationProps} />}
+        overlay={requestSheetOverlay}
       >
         {requestSheetBody}
       </FullPageSheet>
@@ -1590,32 +1614,18 @@ export default function ShiftDetailScreen() {
         dismissDisabled={createRequestMutation.isPending}
         footer={requestSheetFooter}
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
+        overlay={requestSheetOverlay}
         scrollable
         visible={requestMode === "coverage"}
         onDismiss={requestGuard.requestClose}
       >
         {requestSheetBody}
       </BottomSheetModal>
-      <ConfirmationModal
-        body={pendingConfirmation?.body}
-        confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
-        confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
-        loading={createRequestMutation.isPending}
-        onCancel={() => setPendingConfirmation(null)}
-        onConfirm={() => {
-          const action = pendingConfirmation?.onConfirm;
-          setPendingConfirmation(null);
-          action?.();
-        }}
-        title={pendingConfirmation?.title ?? "Confirm action?"}
-        visible={pendingConfirmation != null}
-      />
-      {/* Separate from the descriptor modal above, which routes the request
-          sheet's own buttons. The two are never visible together: this one is
-          only ever raised by a dismissal, which the buttons don't perform.
-          While the swap page sheet is up, the same confirmation renders
-          inside it instead (see FullPageSheet above). */}
-      {requestMode === "swap" ? null : <ConfirmationModal {...requestGuard.confirmationProps} />}
+      {/* With no sheet up, the two confirmations are ordinary modals: the
+          descriptor one routes the request list's own buttons, the guard one
+          is only ever raised by a dismissal. While a sheet is up they ride
+          inside it as overlays (see `requestSheetOverlay`). */}
+      {requestMode == null ? requestConfirmations("modal") : null}
     </Screen>
   );
 }
