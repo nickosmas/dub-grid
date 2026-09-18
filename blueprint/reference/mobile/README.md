@@ -180,6 +180,15 @@ presentation="inline"`, `FullPageSheet overlay`), and Close no longer
 - 2026-09-18, dashboard, Your schedule: shift and absence cards read
   borderless (the hairline was tuned against white). Fixed in place: a
   coloured card takes the faint text-derived border its colours carry.
+- 2026-09-18, skeletons (cold-route audit with fetches delayed on device):
+  pushed pages sat blank before the placeholder faded in; list placeholders
+  stopped halfway down the page; the profile hero's name collapsed to a
+  stub; Devices stood in with nav rows; the alert detail drew a Details
+  card most alerts do not have; the staff home drew an open-shifts strip
+  that then vanished. All fixed in place, see the dashboard-status-wash
+  archive. Technique: `scripts/`-free, a `Runtime.evaluate` over Metro's
+  `/json` inspector target wrapping `globalThis.fetch`, then
+  `expo-router`'s imperative `router.navigate` from the same channel.
 - 2026-09-18, dashboard at accessibility extra-large: the greeting cut to
   "Morni...", the shift pills to "Day..." and their hour, a coverage row's
   name to its first letter beside its figures. Fixed in place: the strip

@@ -176,6 +176,31 @@ glow on a black page.
   The `borderSubtle` hairline is tuned against white and vanished on a
   coloured fill; a coloured pill takes the text-derived border its colours
   already carry, the same edge every other pill in the app wears.
+- `7b637144`, `91bc7711`: that edge fainter, 0.2 then 0.12 of the text
+  colour, at the user's call.
+- Skeleton audit (`0f6076cd`, `fddc480e`, `363c698a`, `9141cfc4`,
+  `870cb453`), every route opened cold on device with `/api/mobile/` fetches
+  delayed 12 s through Metro's inspector (`Runtime.evaluate` wrapping
+  `globalThis.fetch`), then compared against the loaded screen:
+  - The skeleton root's fade-in dropped: a Reanimated entering animation on
+    a view mounted mid-push waits for the transition, and a pushed page sat
+    blank for half a second or more before its placeholder faded up.
+  - List placeholders fill the viewport (`useSkeletonFillCount`, rows from
+    the window height below the screen's chrome) instead of stopping halfway.
+  - Dashboard header placeholder draws the real bell; the header skeleton
+    moved to its own file so the expanded routes do not import expo-router.
+  - Profile hero: fixed-width lines in the centred column (percentages
+    collapsed beside the avatar) and a Joined line; Devices gets a session
+    row variant at the real 112pt floor.
+  - Alerts: a placeholder for the unread row; the alert detail's Details
+    card off by default (most alerts carry none).
+  - Staff home: no open-shifts strip in the placeholder (it appears only
+    with shifts to offer); shift detail teammate rows one line.
+  - Verified clean: dashboard, Schedule (team), Requests, People, Profile,
+    Alerts, alert detail, Coverage, Open shifts, Overtime watch, Recent
+    activity, Pending approvals, staff home, shift detail, person detail,
+    Profile details, Notifications, Devices, Add person (no placeholder
+    needed, the form paints from cache).
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 
