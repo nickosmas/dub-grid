@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useLocalSearchParams = vi.fn();
 const routerBack = vi.fn();
+const routerReplace = vi.fn();
 const useQuery = vi.fn();
 const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
@@ -23,7 +24,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("expo-router", () => ({
-  router: { back: routerBack },
+  router: { back: routerBack, replace: routerReplace },
   useLocalSearchParams: () => useLocalSearchParams(),
 }));
 
@@ -47,8 +48,11 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 }));
 
 vi.mock("../lib/openNotificationAction", () => ({
+  WEB_ONLY_ALERT_MESSAGE: "Open this on the web to see more.",
   isNotificationActionSupportedOnMobile: (...args: unknown[]) =>
     isNotificationActionSupportedOnMobile(...args),
+  resolveNativeRoute: (href: string) =>
+    isNotificationActionSupportedOnMobile(href) ? { pathname: "/(tabs)/requests" } : null,
   openNotificationAction: (...args: unknown[]) => openNotificationAction(...args),
 }));
 
@@ -65,7 +69,10 @@ const SAMPLE_NOTIFICATION = {
   type: "shift_request_new",
   title: "Pickup available",
   message: "A shift is waiting for response.",
-  metadata: { actionUrl: "/requests?id=req-1", actionLabel: "Review request" },
+  metadata: { actionUrl: "/requests?id=req-1", actionLabel: "Review request" } as Record<
+    string,
+    unknown
+  >,
   priority: "high",
   readAt: null as string | null,
   archivedAt: null as string | null,
@@ -87,6 +94,7 @@ describe("NotificationDetailScreen", () => {
   beforeEach(() => {
     useLocalSearchParams.mockReset();
     routerBack.mockReset();
+    routerReplace.mockReset();
     useQuery.mockReset();
     useQueryClient.mockReset();
     useAccessToken.mockReset();
@@ -105,143 +113,99 @@ describe("NotificationDetailScreen", () => {
   });
 
   it("shows an alert-not-found banner when the id param is missing", () => {
-    useLocalSearchParams.mockReturnValue({ id: undefined });
+    useLocalSearchParams.mockReturnValue({});
     useQueryClient.mockReturnValue(mockQueryClient());
 
     render(<NotificationDetailScreen />);
 
-    expect(screen.getByText("Alert not found")).toBeInTheDocument();
+    expect(screen.getByText("Alert not available")).toBeTruthy();
+    expect(openNotificationAction).not.toHaveBeenCalled();
   });
 
   it("says the fetch failed rather than declaring the alert gone", () => {
-    // "That alert is no longer accessible" is a definitive answer, and a
-    // transient 500 does not earn one. It also offered no way to try again.
-    const refetch = vi.fn();
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
     useQueryClient.mockReturnValue(mockQueryClient());
     useQuery.mockReturnValue({
       data: null,
       isLoading: false,
-      error: new Error("boom"),
-      refetch,
+      error: new Error("Network request failed"),
+      refetch: vi.fn(),
     });
 
     render(<NotificationDetailScreen />);
 
-    expect(screen.queryByText("Alert not available")).not.toBeInTheDocument();
-    expect(screen.getByText("Could not load this alert")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Could not load this alert")).toBeTruthy();
+    expect(screen.queryByText("Alert not available")).toBeNull();
+    expect(openNotificationAction).not.toHaveBeenCalled();
   });
 
   it("shows an empty state when the notification isn't cached or fetched", () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
     useQueryClient.mockReturnValue(mockQueryClient());
-    useQuery.mockReturnValue({ data: null, isLoading: false });
 
     render(<NotificationDetailScreen />);
 
-    expect(screen.getByText("Alert not available")).toBeInTheDocument();
+    expect(screen.getByText("Alert not available")).toBeTruthy();
   });
 
-  it("renders a cached notification and auto-marks it read once", async () => {
+  it("forwards a cached alert to its subject and marks it read once", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    const queryClient = mockQueryClient([SAMPLE_NOTIFICATION]);
-    useQueryClient.mockReturnValue(queryClient);
+    useQueryClient.mockReturnValue(mockQueryClient([SAMPLE_NOTIFICATION]));
+    markNotificationRead.mockResolvedValue({ success: true, unreadCount: 0 });
 
-    render(<NotificationDetailScreen />);
-
-    expect(queryClient.getQueriesData).toHaveBeenCalledWith({
-      queryKey: ["mobile", "notifications-infinite", ["unreadable", null, null]],
-    });
-    expect(screen.getByText("Pickup available")).toBeInTheDocument();
-    expect(screen.getByText("A shift is waiting for response.")).toBeInTheDocument();
-    expect(screen.getByText("HIGH")).toBeInTheDocument();
+    const { rerender } = render(<NotificationDetailScreen />);
 
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith("token-123", NOTIFICATION_ID);
     });
+    expect(openNotificationAction).toHaveBeenCalledWith("/requests?id=req-1", "replace");
+    expect(screen.queryByText("Pickup available")).toBeNull();
+
+    rerender(<NotificationDetailScreen />);
+    expect(markNotificationRead).toHaveBeenCalledTimes(1);
+    expect(openNotificationAction).toHaveBeenCalledTimes(1);
   });
 
-  it("does not mark an already-read notification as read again", async () => {
+  it("forwards a fetched alert without marking a read one read again", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    useQueryClient.mockReturnValue(
-      mockQueryClient([{ ...SAMPLE_NOTIFICATION, readAt: "2026-04-24T13:00:00.000Z" }]),
+    useQueryClient.mockReturnValue(mockQueryClient());
+    // The same mocked useQuery serves the bootstrap; only the detail key gets the alert.
+    useQuery.mockImplementation((options: { queryKey?: unknown[] }) =>
+      JSON.stringify(options.queryKey ?? []).includes("notification-detail")
+        ? { data: { ...SAMPLE_NOTIFICATION, readAt: "2026-04-24T13:00:00.000Z" }, isLoading: false }
+        : { data: undefined, isLoading: false },
     );
 
     render(<NotificationDetailScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText("Pickup available")).toBeInTheDocument();
+      expect(openNotificationAction).toHaveBeenCalledWith("/requests?id=req-1", "replace");
     });
     expect(markNotificationRead).not.toHaveBeenCalled();
   });
 
-  it("shows the action button and opens it when the action is mobile-supported", () => {
+  it("falls back to the inbox with a hint when the subject is web-only", async () => {
     useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    useQueryClient.mockReturnValue(mockQueryClient([SAMPLE_NOTIFICATION]));
-    isNotificationActionSupportedOnMobile.mockReturnValue(true);
-
-    render(<NotificationDetailScreen />);
-
-    fireEvent.click(screen.getByText("Review request"));
-
-    expect(openNotificationAction).toHaveBeenCalledWith("/requests?id=req-1");
-  });
-
-  it("shows a web-only hint instead of a button when the action isn't mobile-supported", () => {
-    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    useQueryClient.mockReturnValue(mockQueryClient([SAMPLE_NOTIFICATION]));
     isNotificationActionSupportedOnMobile.mockReturnValue(false);
+    useQueryClient.mockReturnValue(
+      mockQueryClient([
+        {
+          ...SAMPLE_NOTIFICATION,
+          type: "billing_payment_failed",
+          metadata: {} as Record<string, unknown>,
+          readAt: "2026-04-24T13:00:00.000Z",
+        },
+      ]),
+    );
 
     render(<NotificationDetailScreen />);
 
-    expect(
-      screen.getByText(
-        "This action isn't available in the mobile app. Sign in on the web to complete it.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Review request")).not.toBeInTheDocument();
-  });
-
-  it("archives the notification and navigates back", async () => {
-    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    const queryClient = mockQueryClient([SAMPLE_NOTIFICATION]);
-    useQueryClient.mockReturnValue(queryClient);
-
-    render(<NotificationDetailScreen />);
-
-    fireEvent.click(screen.getByLabelText("Archive"));
-
     await waitFor(() => {
-      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
-        ids: [NOTIFICATION_ID],
-        action: "archive",
-      });
+      expect(routerReplace).toHaveBeenCalledWith("/alerts");
     });
-    await waitFor(() => {
-      expect(routerBack).toHaveBeenCalled();
-    });
-  });
-
-  it("marks the notification unread without navigating away", async () => {
-    useLocalSearchParams.mockReturnValue({ id: NOTIFICATION_ID });
-    const queryClient = mockQueryClient([
-      { ...SAMPLE_NOTIFICATION, readAt: "2026-04-24T13:00:00.000Z" },
-    ]);
-    useQueryClient.mockReturnValue(queryClient);
-
-    render(<NotificationDetailScreen />);
-
-    fireEvent.click(screen.getByLabelText("Mark unread"));
-
-    await waitFor(() => {
-      expect(bulkUpdateNotifications).toHaveBeenCalledWith("token-123", {
-        ids: [NOTIFICATION_ID],
-        action: "unread",
-      });
-    });
-    expect(routerBack).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Open this on the web to see more." }),
+    );
+    expect(openNotificationAction).not.toHaveBeenCalled();
   });
 });

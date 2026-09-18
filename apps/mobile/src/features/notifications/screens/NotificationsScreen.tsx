@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
+import { resolveAlertDestination } from "@dubgrid/domain";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -35,6 +35,11 @@ import {
   mobileQueryKeys,
 } from "../../../shared/lib/mobile-query-keys";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
+import {
+  WEB_ONLY_ALERT_MESSAGE,
+  openNotificationAction,
+  resolveNativeRoute,
+} from "../lib/openNotificationAction";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
 import { SkeletonLine, SkeletonPill } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
@@ -218,10 +223,13 @@ export default function NotificationsScreen() {
           setPendingRowId(null);
         }
       }
-      router.push({
-        pathname: "/alerts/[id]",
-        params: { id: notification.id },
-      });
+      // The alert is one sentence about something else; go there.
+      const destination = resolveAlertDestination(notification);
+      if (destination && resolveNativeRoute(destination.href)) {
+        openNotificationAction(destination.href);
+        return;
+      }
+      pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
     },
     [accessToken, facetsQuery, notificationsQuery, pushToast],
   );

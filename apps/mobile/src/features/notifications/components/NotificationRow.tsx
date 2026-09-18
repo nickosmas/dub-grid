@@ -14,6 +14,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import type { MobileNotification } from "@dubgrid/contracts";
+import { formatNotificationMetadata } from "@dubgrid/domain";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -76,6 +77,9 @@ export function NotificationRow({
   const isUrgent = notification.priority === "critical" || notification.priority === "high";
   const groupCount =
     typeof notification.metadata?.groupCount === "number" ? notification.metadata.groupCount : 0;
+  // The rare human note (a request's reason, a reviewer's note) reads under
+  // the message; the mobile app has no platform surfaces, so org audience.
+  const notes = formatNotificationMetadata(notification.metadata, { audience: "org" });
 
   // Close the reveal before acting: the row is about to change under it, and
   // an open swipe over a refetched list reads as a stuck gesture.
@@ -162,9 +166,15 @@ export function NotificationRow({
                 {formatRelativeTime(notification.createdAt)}
               </Text>
             </View>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={2} style={styles.message}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.message}>
               {notification.message}
             </Text>
+            {notes.map((note) => (
+              <Text key={note.label} maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.note}>
+                <Text style={styles.noteLabel}>{note.label}: </Text>
+                {note.value}
+              </Text>
+            ))}
           </View>
         </PressableRow>
       </Animated.View>
@@ -291,13 +301,15 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       gap: mobileSpace.xs,
     },
+    // Title over content: a semibold row title, the message a step down in
+    // size and color, the time a step further. Unread only adds weight.
     title: {
-      ...mobileText.body,
+      ...mobileTextWeighted("rowTitle", "semibold"),
       color: mobileColors.textPrimary,
       flex: 1,
     },
     titleUnread: {
-      ...mobileTextWeighted("body", "semibold"),
+      ...mobileTextWeighted("rowTitle", "bold"),
     },
     groupCount: {
       ...mobileText.caption,
@@ -309,8 +321,15 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textMuted,
     },
     message: {
-      ...mobileText.meta,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
+    },
+    note: {
+      ...mobileText.caption,
+      color: mobileColors.textSecondary,
+    },
+    noteLabel: {
+      color: mobileColors.textMuted,
     },
     // The actions sit on the page showing through behind the card, one round
     // button per slot with its label underneath, as iOS Mail lays them out.

@@ -663,10 +663,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // A dashboard coverage row opens the team schedule on its focus area. Read
   // as an effect rather than as the state's initial value: the tab screen stays
   // mounted between visits, so a second drill-in arrives as a param change.
-  const params = useLocalSearchParams<{ focusAreaId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    focusAreaId?: string | string[];
+    date?: string | string[];
+  }>();
   const requestedFocusAreaId = Array.isArray(params.focusAreaId)
     ? params.focusAreaId[0]
     : params.focusAreaId;
+  // An alert about a day lands here with that day; the same rule as the
+  // focus area above, since the tab stays mounted between visits.
+  const requestedDateParam = Array.isArray(params.date) ? params.date[0] : params.date;
+  const requestedDate =
+    requestedDateParam && /^\d{4}-\d{2}-\d{2}$/.test(requestedDateParam)
+      ? requestedDateParam
+      : null;
   const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<string | null>(null);
   useEffect(() => {
     if (scope === "team" && requestedFocusAreaId) {
@@ -674,7 +684,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     }
   }, [requestedFocusAreaId, scope]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(requestedDate);
+  useEffect(() => {
+    if (requestedDate) setSelectedDateOverride(requestedDate);
+  }, [requestedDate]);
   const [weekStripWidth, setWeekStripWidth] = useState(0);
   const [weekStripRowHeight, setWeekStripRowHeight] = useState(WEEK_STRIP_ROW_HEIGHT);
   const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<string | null>(null);

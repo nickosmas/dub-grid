@@ -469,7 +469,7 @@
         (loading, empty, error, sheet, confirmation) saved under
         `blueprint/reference/mobile/`, with every defect fixed in place or
         logged in `blueprint/context/findings.md`.
-- [ ] 39. **Alerts go to their subject** - an alert is one sentence about
+- [x] 39. **Alerts go to their subject** - an alert is one sentence about
       something else, so tapping it anywhere (web bell popup, web /alerts
       rows, mobile alerts list) marks it read and goes to what it is about
       through one shared destination resolver in `@dubgrid/domain`: requests
@@ -501,7 +501,7 @@
         Archived, All / Unread / Read, search, category, priority, sort,
         select-all with bulk actions, and Mark all read, at every supported
         width and zoom.
-  - [ ] 39d. **Mobile alerts go to their subject** - list rows resolve
+  - [x] 39d. **Mobile alerts go to their subject** - list rows resolve
         through the same contract (the href prefix map extended for a date or
         a person), mark read then navigate, web-only destinations keep the
         existing hint, the detail route goes for organization users and push
