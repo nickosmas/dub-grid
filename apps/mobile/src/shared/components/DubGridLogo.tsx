@@ -2,11 +2,12 @@ import { View } from "react-native";
 import { BRAND_ANIMATED_LOGO_SIZE } from "@dubgrid/design-tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 
-const ROWS = [0, 1, 2, 3] as const;
-const COLS = [0, 1, 2, 3] as const;
+/** The tint of the mark's recessive diagonal. Mirrors the web mark exactly. */
+export const RECESSIVE_CELL_OPACITY = 0.3;
 
 /**
- * The approved dubgrid mark, native twin of the web `DubGridLogo`.
+ * The dubgrid mark, native twin of the web `DubGridLogo`: four rounded squares
+ * in a pinwheel, one diagonal solid and the other tinted.
  *
  * Cells are plain <View>s rather than SVG rects: visually identical at this
  * size, and `react-native-svg` is deliberately absent from this app.
@@ -24,10 +25,10 @@ export function DubGridLogo({
 }) {
   const mobileColors = useMobileColors();
   const resolvedColor = color ?? mobileColors.brand;
-  const cell = size / 4;
-  const gap = cell * 0.1;
-  const inner = cell - gap * 2;
+  const gap = size * 0.045;
+  const cell = (size - gap) / 2;
   const radius = cell * 0.2;
+  const offset = cell + gap;
 
   return (
     <View
@@ -36,30 +37,31 @@ export function DubGridLogo({
       style={{ width: size, height: size }}
       testID="dubgrid-logo"
     >
-      {ROWS.map((row) =>
-        COLS.map((col) => (
-          <View
-            key={`${row}-${col}`}
-            style={{
-              position: "absolute",
-              left: col * cell + gap,
-              top: row * cell + gap,
-              width: inner,
-              height: inner,
-              borderRadius: radius,
-              backgroundColor: resolvedColor,
-              opacity: staticOpacity(row, col),
-            }}
-          />
-        )),
-      )}
+      {cellPositions(offset).map(({ x, y, opacity }) => (
+        <View
+          key={`${x}-${y}`}
+          style={{
+            position: "absolute",
+            left: x,
+            top: y,
+            width: cell,
+            height: cell,
+            borderRadius: radius,
+            backgroundColor: resolvedColor,
+            opacity,
+          }}
+        />
+      ))}
     </View>
   );
 }
 
-/** The mark's fixed depth ramp: solid top row and left column, fading inward. */
-export function staticOpacity(row: number, col: number): number {
-  if (row === 0 || col === 0) return 1;
-  if (row + col <= 4) return 0.75;
-  return 0.3;
+/** Solid on the top-right to bottom-left diagonal, tinted on the other. */
+export function cellPositions(offset: number) {
+  return [
+    { x: 0, y: 0, opacity: RECESSIVE_CELL_OPACITY },
+    { x: offset, y: 0, opacity: 1 },
+    { x: 0, y: offset, opacity: 1 },
+    { x: offset, y: offset, opacity: RECESSIVE_CELL_OPACITY },
+  ];
 }

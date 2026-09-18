@@ -101,6 +101,25 @@ artwork, no image asset.
       and after step 5. **Done when:** every path is evidenced and the
       before/after startup measurement is written into this spec.
 
+## Follow-ups after first review
+
+Two gaps the first pass left, both fixed in the same feature.
+
+**The web startup path was untouched.** `AuthTransitionScreen` only renders on
+a post-login handoff, which needs a transition marker an ordinary cold load
+never sets. `ProtectedRoute` rendered `null` while the session restored, so the
+web app opened on a blank frame, which is the one thing a startup surface
+exists to prevent. It now shows the branded surface once a restore outlasts
+`STARTUP_MIN_SPLASH_MS`, and stays blank while redirecting a signed-out visitor
+rather than claiming to load a workspace that does not exist.
+
+**The mark itself was the old one.** The approved mark is now four rounded
+squares in a pinwheel, not the sixteen-cell ramp every surface still drew. Every
+definition of it moved together, listed in `blueprint/reference/dubgrid-mark.md`,
+and `scripts/generate-logo-assets.ts` renders all eleven raster assets from that
+one geometry so the native splash, app icons and favicon cannot drift from the
+components again.
+
 ## Verification
 
 _Mobile, on the iPhone 17 simulator against the real app:_ the quiet phase (static mark, wordmark, sweeping bar), the status phase ("Still getting things ready."), and the timeout phase ("This is taking longer than it should." with Try again) were each screenshotted. The status and timeout phases were reached by temporarily shortening the two thresholds and, for the timeout, by pinning the phase; both probes were reverted and the constants rebuilt and re-verified at 2500/9000/150.

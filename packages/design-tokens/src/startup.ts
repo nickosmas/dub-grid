@@ -25,12 +25,18 @@ export const STARTUP_STATUS_DELAY_MS = 2_500;
 export const STARTUP_TIMEOUT_MS = 9_000;
 
 /**
- * The only reason to hold a resolved splash at all: a launch that resolves in
- * two frames would otherwise paint the mark and tear it away inside 30ms,
- * which reads as a glitch.
+ * The flicker threshold: how long a startup surface must be involved for
+ * painting it to be worth it at all.
  *
- * This used to be 900ms, to give the animated mark time to play. The mark is
- * static now, so there is nothing to play and nothing to protect but the
- * flicker. The other 750ms were latency the user could feel.
+ * The two platforms apply it from opposite ends, for the same reason. Mobile
+ * already has the splash up at launch, so this is the minimum it stays; a
+ * launch resolving in two frames would otherwise paint the mark and tear it
+ * away inside 30ms. Web starts with nothing, so this is how long it waits
+ * before painting; a session that restores instantly should go straight to the
+ * app rather than flash a brand surface on the way.
+ *
+ * On mobile this used to be 900ms, to give the animated mark time to play. The
+ * mark is static now, so there is nothing to play and nothing to protect but
+ * the flicker. The other 750ms were latency the user could feel.
  */
 export const STARTUP_MIN_SPLASH_MS = 150;

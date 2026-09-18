@@ -11,8 +11,10 @@ import {
 import { DubGridLogo } from "./Logo";
 
 /**
- * Animated dubgrid mark — every cell pulses on its own random [duration,
- * delay] pair so the grid feels alive AND looks different every mount.
+ * Animated dubgrid mark: each of the four cells pulses on its own random
+ * [duration, delay] pair, so the mark feels alive and looks different every
+ * mount. Reserved for route-level data loading; startup surfaces show the
+ * static mark and put their motion in a progress indicator beside it.
  *
  * Timings are generated post-mount via useEffect so SSR + first client
  * render emit the same (static) HTML; once mounted, the random table is
@@ -36,9 +38,16 @@ export function AnimatedDubGridLogo({
     return <DubGridLogo size={size} color={color} />;
   }
 
-  const cell = size / 4;
-  const gap = cell * 0.1;
-  const r = cell * 0.2;
+  const gap = size * 0.045;
+  const cell = (size - gap) / 2;
+  const radius = cell * 0.2;
+  const offset = cell + gap;
+  const cells = [
+    { x: 0, y: 0 },
+    { x: offset, y: 0 },
+    { x: 0, y: offset },
+    { x: offset, y: offset },
+  ];
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
@@ -54,26 +63,24 @@ export function AnimatedDubGridLogo({
           }
         }
       `}</style>
-      {[0, 1, 2, 3].map((row) =>
-        [0, 1, 2, 3].map((col) => {
-          const [dur, del] = timings[row * 4 + col];
-          return (
-            <rect
-              key={`${row}-${col}`}
-              className="dg-cell-pulse"
-              x={col * cell + gap}
-              y={row * cell + gap}
-              width={cell - gap * 2}
-              height={cell - gap * 2}
-              rx={r}
-              fill={color}
-              style={{
-                animation: `dg-cell-pulse ${dur}s ease-in-out ${del}s infinite`,
-              }}
-            />
-          );
-        }),
-      )}
+      {cells.map((rect, index) => {
+        const [duration, delay] = timings[index];
+        return (
+          <rect
+            key={`${rect.x}-${rect.y}`}
+            className="dg-cell-pulse"
+            x={rect.x}
+            y={rect.y}
+            width={cell}
+            height={cell}
+            rx={radius}
+            fill={color}
+            style={{
+              animation: `dg-cell-pulse ${duration}s ease-in-out ${delay}s infinite`,
+            }}
+          />
+        );
+      })}
     </svg>
   );
 }

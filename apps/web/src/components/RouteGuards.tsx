@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { STARTUP_MIN_SPLASH_MS } from "@dubgrid/design-tokens";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import {
   isAuthTransitionPending,
@@ -27,6 +28,23 @@ export function PublicRoute({ children }: { children: React.ReactNode }) {
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const authTransitionPending = useAuthTransitionPending();
+  // A session that restores in a couple of frames should go straight to the
+  // app. Past the flicker threshold the wait is real, and a blank frame is the
+  // one thing a startup surface exists to prevent.
+  const [restoreIsVisible, setRestoreIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setRestoreIsVisible(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setRestoreIsVisible(true);
+    }, STARTUP_MIN_SPLASH_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [isLoading]);
   // Wall-clock deadline for the "session never materialized" bounce (L-5).
   // Stored in a ref so auth state flapping ([isLoading,user]) during the settle
   // doesn't keep resetting the timeout past the intended 6s hard cap.
@@ -59,11 +77,20 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.replace("/login");
   }, [isLoading, user]);
 
-  // A post-login session handoff is a real wait, not decorative chrome. Give
-  // the user progress text and, after 30 seconds, a safe exit rather than an
-  // unlabeled blank frame.
+  // A session handoff is a real wait, not decorative chrome. Give the user the
+  // brand mark, a progress indicator and, once the wait is long enough, an
+  // explanation and a safe exit rather than an unlabeled blank frame.
+  //
+  // Restoring a session is the ordinary cold load and used to render `null`,
+  // so the web app opened on nothing at all while it worked. A redirect to
+  // /login keeps rendering nothing: it is about to leave, and "Loading your
+  // workspace" would be a claim about a session this branch just established
+  // does not exist.
   if (isLoading || !user) {
-    return authTransitionPending ? <AuthTransitionScreen phase="signing-in" /> : null;
+    if (authTransitionPending) {
+      return <AuthTransitionScreen phase="signing-in" />;
+    }
+    return isLoading && restoreIsVisible ? <AuthTransitionScreen phase="workspace" /> : null;
   }
 
   return <>{children}</>;

@@ -1,26 +1,37 @@
+/** The tint of the mark's recessive diagonal. */
+export const RECESSIVE_CELL_OPACITY = 0.3;
+
+/**
+ * The dubgrid mark: four rounded squares in a pinwheel, one diagonal solid and
+ * the other at the same 0.3 tint the brand has always used for its recessive
+ * cells. Deriving the light pair from `color` rather than a fixed hex is what
+ * lets the mark sit on any surface and follow the theme.
+ */
 export function DubGridLogo({ size = 48, color = "#2563EB" }: { size?: number; color?: string }) {
-  const cell = size / 4;
-  const gap = cell * 0.1;
-  const r = cell * 0.2;
-  const cols = [0, 1, 2, 3];
-  const rows = [0, 1, 2, 3];
-  // Filled cells forming a simple grid mark (all 16)
+  const gap = size * 0.045;
+  const cell = (size - gap) / 2;
+  const radius = cell * 0.2;
+  const cells = [
+    { x: 0, y: 0, opacity: RECESSIVE_CELL_OPACITY },
+    { x: cell + gap, y: 0, opacity: 1 },
+    { x: 0, y: cell + gap, opacity: 1 },
+    { x: cell + gap, y: cell + gap, opacity: RECESSIVE_CELL_OPACITY },
+  ];
+
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
-      {rows.map((row) =>
-        cols.map((col) => (
-          <rect
-            key={`${row}-${col}`}
-            x={col * cell + gap}
-            y={row * cell + gap}
-            width={cell - gap * 2}
-            height={cell - gap * 2}
-            rx={r}
-            fill={color}
-            opacity={row === 0 || col === 0 ? "1" : row + col <= 4 ? "0.75" : "0.3"}
-          />
-        )),
-      )}
+      {cells.map((rect) => (
+        <rect
+          key={`${rect.x}-${rect.y}`}
+          x={rect.x}
+          y={rect.y}
+          width={cell}
+          height={cell}
+          rx={radius}
+          fill={color}
+          opacity={rect.opacity}
+        />
+      ))}
     </svg>
   );
 }

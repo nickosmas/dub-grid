@@ -5,12 +5,14 @@ import { createReactNativeModule } from "../../test/native";
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 let DubGridLogo: (typeof import("./DubGridLogo"))["DubGridLogo"];
-let staticOpacity: (typeof import("./DubGridLogo"))["staticOpacity"];
+let cellPositions: (typeof import("./DubGridLogo"))["cellPositions"];
+let RECESSIVE_CELL_OPACITY: (typeof import("./DubGridLogo"))["RECESSIVE_CELL_OPACITY"];
 
 beforeAll(async () => {
   const mod = await import("./DubGridLogo");
   DubGridLogo = mod.DubGridLogo;
-  staticOpacity = mod.staticOpacity;
+  cellPositions = mod.cellPositions;
+  RECESSIVE_CELL_OPACITY = mod.RECESSIVE_CELL_OPACITY;
 });
 
 describe("DubGridLogo", () => {
@@ -22,14 +24,19 @@ describe("DubGridLogo", () => {
     expect(logo.getAttribute("aria-label")).toBe("DubGrid logo");
   });
 
-  // The ramp is the mark's identity, and it matches the web `DubGridLogo`
+  // The pinwheel is the mark's identity, and it matches the web `DubGridLogo`
   // rect opacities exactly. Drift here means the two platforms stop agreeing
   // on what the approved logo looks like.
-  it("keeps the approved depth ramp", () => {
-    expect(staticOpacity(0, 0)).toBe(1);
-    expect(staticOpacity(0, 3)).toBe(1);
-    expect(staticOpacity(3, 0)).toBe(1);
-    expect(staticOpacity(2, 2)).toBe(0.75);
-    expect(staticOpacity(3, 3)).toBe(0.3);
+  it("keeps the approved pinwheel: solid top-right to bottom-left", () => {
+    const [topLeft, topRight, bottomLeft, bottomRight] = cellPositions(10);
+
+    expect(topLeft).toEqual({ x: 0, y: 0, opacity: RECESSIVE_CELL_OPACITY });
+    expect(topRight).toEqual({ x: 10, y: 0, opacity: 1 });
+    expect(bottomLeft).toEqual({ x: 0, y: 10, opacity: 1 });
+    expect(bottomRight).toEqual({ x: 10, y: 10, opacity: RECESSIVE_CELL_OPACITY });
+  });
+
+  it("renders exactly four cells", () => {
+    expect(cellPositions(10)).toHaveLength(4);
   });
 });
