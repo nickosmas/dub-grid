@@ -59,6 +59,7 @@ export function SegmentedControl<Value extends string>({
   size = "md",
   disabled = false,
   track = "neutral",
+  stretch = false,
   accessibilityLabel,
 }: {
   options: ReadonlyArray<SegmentedOption<Value>>;
@@ -72,6 +73,13 @@ export function SegmentedControl<Value extends string>({
    * coloured wash where a grey box reads as a patch. The thumb is unchanged.
    */
   track?: "neutral" | "background";
+  /**
+   * Spreads the track across its row and gives every segment an equal
+   * share, for a label set that no longer fits a content-sized pill (the
+   * larger accessibility text sizes). The thumb still follows the measured
+   * segment, so nothing else changes.
+   */
+  stretch?: boolean;
   accessibilityLabel?: string;
 }) {
   const mobileColors = useMobileColors();
@@ -130,6 +138,7 @@ export function SegmentedControl<Value extends string>({
         styles.track,
         { minHeight: metrics.height },
         track === "background" && styles.trackBackground,
+        stretch && styles.trackStretch,
         disabled && styles.trackDisabled,
       ]}
     >
@@ -154,7 +163,11 @@ export function SegmentedControl<Value extends string>({
               onChange(option.value);
             }}
             onLayout={(event) => handleSegmentLayout(option.value, event)}
-            style={[styles.segment, { paddingHorizontal: metrics.paddingHorizontal }]}
+            style={[
+              styles.segment,
+              stretch && styles.segmentStretch,
+              { paddingHorizontal: metrics.paddingHorizontal },
+            ]}
           >
             <Text
               ellipsizeMode="tail"
@@ -201,6 +214,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     trackBackground: {
       backgroundColor: mobileColors.background,
+    },
+    trackStretch: {
+      alignSelf: "stretch",
+    },
+    // Only under `trackStretch`: the row then has a width of its own, so
+    // `flex: 1` shares it out instead of collapsing to zero.
+    segmentStretch: {
+      flex: 1,
     },
     trackDisabled: {
       opacity: 0.4,
