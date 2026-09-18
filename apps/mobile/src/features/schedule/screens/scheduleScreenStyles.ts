@@ -872,22 +872,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
       position: "relative",
     },
-    openShiftCountBadge: {
-      minWidth: 28,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    openShiftCountBadgeText: {
-      ...mobileText.badge,
-      ...mobileTabularText,
-      color: mobileColors.brand,
-    },
     openShiftCard: {
       minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
       gap: 12,
@@ -1271,17 +1255,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // -2 on both axes) rather than tucking it inside the circle.
       top: -2,
       right: -2,
-      minWidth: 16,
-      minHeight: 16,
-      borderRadius: 999,
-      paddingHorizontal: 4,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.danger,
-    },
-    alertBadgeText: {
-      ...mobileText.micro,
-      color: mobileColors.textInverse,
     },
     groupsList: {
       gap: mobileSpacing.sectionGap,

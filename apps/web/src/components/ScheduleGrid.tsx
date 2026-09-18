@@ -1724,14 +1724,11 @@ const SectionBlock = memo(function SectionBlock({
                                 ) : null}
                               </span>
                               <NumericBadge
-                                aria-label={`${needed} needed`}
-                                value={needed}
+                                label={`${needed} needed`}
+                                count={needed}
                                 style={{
                                   background: scPill?.text ?? "var(--dg-color-warning)",
                                   color: scPill?.color ?? "var(--dg-color-text-inverse)",
-                                  fontSize: "var(--dg-type-badge-size)",
-                                  fontWeight: 600,
-                                  lineHeight: 1,
                                 }}
                               />
                             </Button>

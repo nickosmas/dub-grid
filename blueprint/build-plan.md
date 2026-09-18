@@ -167,6 +167,14 @@
       consistent combination of wrapping, intrinsic sizing, truncation, or a
       full-value affordance appropriate to the component, without colliding
       with adjacent content or breaking narrow layouts.
+  - [x] 23a. **Numeric badge shape consistency** - use one pill-shaped number
+        badge contract for equivalent counts across web and mobile, including
+        one- and two-digit values, notification counts, tab counts, open-shift
+        counts, and staffing-needed counts. Remove the current digit-length
+        switch that makes some two-digit values circles, centralize sizing,
+        padding, typography, color, overflow, and accessible labeling, and
+        qualify representative values 1, 2, 9, 10, 26, 50, 99, 99+, and 100
+        in light/dark themes and supported text scales.
 - [x] 24. **Inter product typography** - use Inter for all product UI and
       ordinary copy across web and mobile, with Inter Variable optical sizing
       on web and native Inter 400/500/600/700 faces on mobile. Keep DM Sans for

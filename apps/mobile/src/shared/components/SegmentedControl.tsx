@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import { hapticSelection } from "../lib/haptics";
@@ -156,6 +157,9 @@ export function SegmentedControl<Value extends string>({
             accessibilityRole="button"
             accessibilityLabel={option.label}
             accessibilityState={{ selected, disabled }}
+            // The badge is a sibling the explicit label hides from assistive
+            // tech; the value slot reads the count right after the name.
+            accessibilityValue={option.count ? { text: String(option.count) } : undefined}
             disabled={disabled}
             hitSlop={4}
             onPress={() => {
@@ -182,16 +186,7 @@ export function SegmentedControl<Value extends string>({
             >
               {option.label}
             </Text>
-            {option.count !== undefined && option.count > 0 ? (
-              <View style={[styles.badge, selected && styles.badgeSelected]}>
-                <Text
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
-                  style={[styles.badgeText, selected && styles.badgeTextSelected]}
-                >
-                  {option.count}
-                </Text>
-              </View>
-            ) : null}
+            <NumericBadge count={option.count ?? 0} tone={selected ? "onAccent" : "neutral"} />
           </Pressable>
         );
       })}
@@ -258,26 +253,5 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     labelSelected: {
       color: mobileColors.onBrandText,
-    },
-    badge: {
-      minWidth: 20,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surface,
-    },
-    // Sits on the blue thumb, so it needs a translucent-on-color treatment
-    // rather than the idle badge's opaque surface fill.
-    badgeSelected: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    badgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    badgeTextSelected: {
-      color: mobileColors.textInverse,
     },
   });

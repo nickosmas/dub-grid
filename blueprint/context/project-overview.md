@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 25304129495ef215832d359e5ac6d37218827c9e01fe607de39eeb29b159fca8 -->
+<!-- blueprint:source-hash e6ae039bd8f7388a0ffb083183b8a7b24927fcfb27f9cf6955ceda9fc7287381 -->
 
 > Multi-tenant employee scheduling platform for care facilities, replacing
 > spreadsheet scheduling with a connected Next.js web app and Expo mobile app.
@@ -157,6 +157,10 @@ Everything below is already shipped except item 27.
     segmented-choice text within its visual bounds on web and mobile. Display
     values may wrap and grow; interactive controls remain one line and truncate
     safely while retaining the full accessible value.
+    - **23a. Numeric badge shape consistency** - equivalent number counts use
+      one pill-shaped contract across web and mobile, including one- and
+      two-digit values, notification/tab/open-shift/staffing counts, with
+      shared sizing, padding, typography, overflow, and accessible labeling.
 
 24. **Inter product typography** - use Inter for all product UI and ordinary
     copy across web and mobile, with Inter Variable optical sizing on web and

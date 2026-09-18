@@ -98,6 +98,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   segmented-choice label inside its visual bounds on web and mobile. Display
   values may wrap and grow; interactive controls remain one line and truncate
   safely while preserving the full accessible value.
+  - Numeric badge shape consistency: equivalent number counts use one
+    pill-shaped contract across web and mobile, including one- and two-digit
+    values, notification/tab/open-shift/staffing counts, with shared sizing,
+    padding, typography, overflow, and accessible labeling.
 - Inter product typography: use Inter for all product UI and ordinary copy on
   web and mobile. Use Inter Variable with optical sizing on web and native
   Inter 400/500/600/700 faces on mobile. Keep DM Sans for the wordmark and every

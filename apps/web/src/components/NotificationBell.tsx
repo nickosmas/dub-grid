@@ -305,9 +305,6 @@ export default function NotificationBell({
     }
   }
 
-  const unreadCountLabel = unreadCount > 9 ? "9+" : String(unreadCount);
-  const unreadCountFontSize = unreadCount > 9 ? 8 : 9;
-
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
       <Button
@@ -355,24 +352,14 @@ export default function NotificationBell({
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unreadCount > 0 && (
-          <NumericBadge
-            aria-label={`${unreadCount} unread alerts`}
-            size="sm"
-            value={unreadCountLabel}
-            style={{
-              position: "absolute",
-              top: -1,
-              right: 1,
-              background: "var(--dg-color-danger)",
-              color: "var(--dg-color-text-inverse)",
-              fontSize: unreadCountFontSize,
-              fontWeight: 700,
-              lineHeight: 1,
-              zIndex: 1,
-            }}
-          />
-        )}
+        <NumericBadge
+          label={`${unreadCount} unread alerts`}
+          size="sm"
+          tone="danger"
+          count={unreadCount}
+          max={9}
+          style={{ position: "absolute", top: -1, right: 1, zIndex: 1 }}
+        />
       </Button>
 
       {open && (

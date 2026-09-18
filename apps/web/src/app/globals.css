@@ -3827,28 +3827,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     0 1px 0 0 var(--dg-color-border-focus);
 }
 
-/* ── Notification Badge ────────────────────────────────── */
-.dg-notification-badge {
-  background: var(--dg-color-danger);
-  color: var(--dg-color-text-inverse);
-  font-size: var(--dg-fs-badge);
-  font-weight: 700;
-  border-radius: 9999px;
-  min-width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  line-height: 1;
-}
-
-.dg-notification-badge--absolute {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-}
-
 /* ── Open Shift Button ────────────────────────────────── */
 .dg-open-shift-btn {
   transition:

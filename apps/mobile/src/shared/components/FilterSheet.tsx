@@ -10,11 +10,11 @@ import {
 import { StyleSheet, Text, View } from "react-native";
 import { BottomSheetModal, SheetHeader } from "./BottomSheetModal";
 import { Button } from "./Button";
+import { NumericBadge } from "./NumericBadge";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
-  MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -169,9 +169,6 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
   return (
     <Button
       // Recreate the native button when its tone changes: Android can retain
@@ -186,15 +183,7 @@ export function FilterButton({
       fullWidth
       icon="options-outline"
       label="Filter"
-      trailingAccessory={
-        activeCount > 0 ? (
-          <View style={styles.filterCountBadge}>
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.filterCountText}>
-              {activeCount}
-            </Text>
-          </View>
-        ) : null
-      }
+      trailingAccessory={<NumericBadge count={activeCount} tone="onAccent" />}
       onPress={onPress}
       size="sm"
       // Promotes to a solid brand fill once any filter is on, so an active
@@ -206,21 +195,6 @@ export function FilterButton({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    filterCountBadge: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      flexShrink: 0,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    filterCountText: {
-      ...mobileText.badge,
-      color: mobileColors.onBrandText,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
     section: {
       gap: mobileSpace.md,
     },

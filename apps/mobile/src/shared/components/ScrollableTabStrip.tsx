@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import { hapticSelection } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
@@ -150,6 +151,9 @@ export function ScrollableTabStrip({
             key={tab.key}
             accessibilityLabel={tab.label}
             accessibilityRole="tab"
+            // The badge is a sibling the explicit label hides from assistive
+            // tech; the value slot reads the count right after the name.
+            accessibilityValue={tab.count ? { text: String(tab.count) } : undefined}
             accessibilityState={{ selected: isActive }}
             android_ripple={{ color: mobileColors.rippleNeutral }}
             // The pill is 36pt tall by design; pad the touch area out to the
@@ -170,13 +174,7 @@ export function ScrollableTabStrip({
             >
               {tab.label}
             </Text>
-            {tab.count !== undefined && tab.count > 0 ? (
-              <View style={[styles.badge, isActive && styles.badgeActive]}>
-                <Text style={[styles.badgeText, isActive && styles.badgeTextActive]}>
-                  {tab.count}
-                </Text>
-              </View>
-            ) : null}
+            <NumericBadge count={tab.count ?? 0} tone={isActive ? "onAccent" : "neutral"} />
           </Pressable>
         );
       })}
@@ -273,24 +271,5 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     labelActive: {
       color: mobileColors.onBrandText,
-    },
-    badge: {
-      minWidth: 20,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surface,
-    },
-    badgeActive: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    badgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    badgeTextActive: {
-      color: mobileColors.textInverse,
     },
   });

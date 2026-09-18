@@ -736,20 +736,11 @@ export default function ShiftRequestBoard({
                       className={`dg-span-tab${isActive ? " active" : ""}`}
                     >
                       {tab.label}
-                      {tab.count > 0 && (
-                        <NumericBadge
-                          value={tab.count}
-                          size="sm"
-                          style={{
-                            marginLeft: 6,
-                            background: isActive
-                              ? "rgba(255,255,255,0.25)"
-                              : "var(--dg-color-border-light)",
-                            color: isActive ? "inherit" : "var(--dg-color-text-muted)",
-                            fontWeight: 700,
-                          }}
-                        />
-                      )}
+                      <NumericBadge
+                        count={tab.count}
+                        tone={isActive ? "onAccent" : "neutral"}
+                        style={{ marginLeft: 6 }}
+                      />
                     </Button>
                   </Fragment>
                 );

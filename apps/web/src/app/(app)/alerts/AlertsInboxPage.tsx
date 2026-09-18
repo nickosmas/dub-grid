@@ -13,6 +13,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   Archive,
   ArchiveRestore,
@@ -927,27 +928,11 @@ function ReadFilterTabs({
               className={`dg-span-tab${active ? " active" : ""}`}
             >
               {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    padding: "0 4px",
-                    fontSize: "var(--dg-fs-micro)",
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    background: active ? "rgba(255,255,255,0.25)" : "var(--dg-color-border-light)",
-                    color: active ? "inherit" : "var(--dg-color-text-muted)",
-                    marginLeft: 3,
-                  }}
-                >
-                  {tab.count}
-                </span>
-              )}
+              <NumericBadge
+                count={tab.count ?? 0}
+                tone={active ? "onAccent" : "neutral"}
+                style={{ marginLeft: 6 }}
+              />
             </Button>
           </Fragment>
         );

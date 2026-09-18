@@ -94,6 +94,29 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | swap-sheet-discard-ios-light-default-admin                                                   | captured | Close with a target chosen: the discard question drawn inside the sheet (Keep Editing / Discard)                                                                                                                                                       |
 | dashboard empty; schedule-home (user role); person edit; confirmation; devices; tabs-android | pending  | As in the table below                                                                                                                                                                                                                                  |
 
+### Numeric badges (feature 23a)
+
+Captured on 2026-09-18 after every count badge moved onto the shared
+`NumericBadge` (16pt `sm` floating dot, 20pt `md` inline pill, both growing
+with text). iOS cells are the iPhone 17 simulator with `UIUserInterfaceStyle`
+regenerated to Automatic, so dark mode is the simulator's own switch; the
+Android cells are the Pixel 10 Pro XL emulator as the seeded regular user
+(the open-shift carousel is a staff Home surface), dark via
+`cmd uimode night yes` and 1.5x font scale via `settings put system font_scale`.
+
+| Cell                                   | Status   | Shows                                                                                                        |
+| -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| alerts-header-badge-ios-light-default  | captured | Admin Home: the bell's `9+` danger dot centred on the button ring                                            |
+| alerts-header-badge-ios-dark-ax        | captured | Same dot at accessibility extra-large, capped at the fixed scale so it still points at the bell              |
+| requests-tabs-ios-light-default        | captured | Requests tab strip: `99+` as an on-accent pill inside the active tab                                         |
+| requests-tabs-ios-dark-ax              | captured | The pill grown with the text; the tab label truncates by the feature 23 rule, the count stays whole          |
+| filter-segments-ios-light-default      | captured | Filter staff sheet: `38` on the selected segment, `8` neutral on the idle one, one shape                     |
+| filter-segments-ios-dark-ax            | captured | Same segments at large text, both pills grown together                                                       |
+| people-filter-button-ios-light-default | captured | People: one active filter, `1` as an on-accent pill inside the brand Filter button (was a fixed 22pt circle) |
+| people-filter-button-ios-dark-ax       | captured | The button and its count at large text                                                                       |
+| open-shift-count-android-light-default | captured | Staff Home: the open-shift day card's `2` as a brand-soft pill with no border, beside the bell's `9+`        |
+| open-shift-count-android-dark-ax       | captured | Same at 1.5x font scale in dark mode                                                                         |
+
 ## Defects found while capturing
 
 Recorded in `blueprint/context/findings.md` with an ID, or fixed in place and

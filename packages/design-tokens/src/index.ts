@@ -10,6 +10,12 @@ export {
 } from "./animated-logo";
 
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
+export {
+  NUMERIC_BADGE_MAX,
+  formatBadgeCount,
+  numericBadgeSize,
+  type NumericBadgeSize,
+} from "./numeric-badge";
 export { getAvatarTypography } from "./avatar-typography";
 export {
   EDITOR_ACTION_LABELS,

@@ -59,6 +59,7 @@ import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
@@ -1431,14 +1432,13 @@ export function MembersSection({
                 {isMobile ? "" : "Filter"}
                 {/* Counts the half you're looking at, so it never reports
                     filters the visible list isn't being narrowed by. */}
-                {(showManagement ? managementActiveFilterCount : activeFilterCount) > 0 && (
-                  <span
-                    className="dg-notification-badge dg-notification-badge--absolute"
-                    style={{ background: "var(--dg-color-brand)" }}
-                  >
-                    {showManagement ? managementActiveFilterCount : activeFilterCount}
-                  </span>
-                )}
+                <NumericBadge
+                  count={showManagement ? managementActiveFilterCount : activeFilterCount}
+                  label={`${showManagement ? managementActiveFilterCount : activeFilterCount} active filters`}
+                  size="sm"
+                  tone="brand"
+                  style={{ position: "absolute", top: -6, right: -6 }}
+                />
               </Button>
 
               {canShowReorder && (

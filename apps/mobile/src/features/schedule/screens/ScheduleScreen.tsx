@@ -39,6 +39,7 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
 import { PageWash } from "../../../shared/components/PageWash";
@@ -2010,11 +2011,14 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
       ]}
     >
       <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
-      {unreadCount > 0 ? (
-        <View style={styles.alertBadge}>
-          <Text style={styles.alertBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
-        </View>
-      ) : null}
+      <NumericBadge
+        count={unreadCount}
+        label={`${unreadCount} unread alerts`}
+        max={9}
+        size="sm"
+        style={styles.alertBadge}
+        tone="danger"
+      />
     </Pressable>
   );
 }
@@ -3288,12 +3292,11 @@ function OpenShiftsSection({
             <View key={group.date} style={styles.openShiftDateCard}>
               <View style={styles.openShiftDateHeader}>
                 <Text style={styles.scheduleRowDate}>{dateLabel}</Text>
-                <View
-                  accessibilityLabel={formatOpenShiftCardCountLabel(group.itemCount)}
-                  style={styles.openShiftCountBadge}
-                >
-                  <Text style={styles.openShiftCountBadgeText}>{group.itemCount}</Text>
-                </View>
+                <NumericBadge
+                  count={group.itemCount}
+                  label={formatOpenShiftCardCountLabel(group.itemCount)}
+                  tone="brandSoft"
+                />
               </View>
               <View
                 style={[
