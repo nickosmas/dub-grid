@@ -84,7 +84,8 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | shift-detail-ios-light-default-admin                                                         | captured | Your own upcoming shift: Drop shift and Swap as peer controls, Working with rows                                                                                                                                                                       |
 | request-sheet-\* (pickup, call-off confirmation, error)                                      | pending  | Needs the request flow driven past the first choice by hand                                                                                                                                                                                            |
 | swap-sheet-ios-light-default-admin                                                           | captured | Swap as an iOS page sheet: title with X, Your shift panel, Eligible teammates with the week strip and counts, teammate rows                                                                                                                            |
-| swap-sheet-\* (target chosen, discard)                                                       | pending  | Needs a target chosen by hand, then X to see the discard guard                                                                                                                                                                                         |
+| swap-sheet-target-ios-light-default-admin                                                    | captured | A target chosen: You give / You get panels, the selection sentence, Back and Submit in the footer                                                                                                                                                      |
+| swap-sheet-discard-ios-light-default-admin                                                   | captured | Close with a target chosen: the discard question drawn inside the sheet (Keep Editing / Discard)                                                                                                                                                       |
 | dashboard empty; schedule-home (user role); person edit; confirmation; devices; tabs-android | pending  | As in the table below                                                                                                                                                                                                                                  |
 
 ## Defects found while capturing
@@ -143,3 +144,15 @@ noted in the archive of the feature that captured them.
   log). On a clean launch Drop, X, Swap and Swap, X, Drop both hand off
   cleanly. Not a repository defect; relaunch after editing a screen whose
   sheet is open.
+- 2026-09-18, swap sheet (device pass): with a target chosen, Close did
+  nothing. The discard confirmation was a second root-level Modal, which
+  UIKit refuses while the page sheet is up ("already presenting"); nesting
+  a Modal inside the sheet was no better, and the sheet's swipe-veto remount
+  also ran on Close and tore the card down. Fixed in place: the confirmation
+  draws as an overlay inside the sheet (`ConfirmationModal
+presentation="inline"`, `FullPageSheet overlay`), and Close no longer
+  remounts the card.
+- 2026-09-18, environment: on this dev build the request buttons can take
+  several seconds to respond right after the shift detail opens (its queries
+  settle first); a tap that lands earlier is dropped. The app console (via
+  Metro's inspector) showed no warning or error from the sheets themselves.

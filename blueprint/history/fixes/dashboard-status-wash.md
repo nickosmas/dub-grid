@@ -139,6 +139,15 @@ glow on a black page.
 - `ef6e7fd2`: the request sheets drew their footer shell (hairline, padding)
   around an always-truthy empty fragment until a choice was made; the footer
   is passed only when it has an error or actions to show.
+- `b8a03895`, `8cdee3d4`, `510474b5`: the swap sheet's discard question
+  never appeared on device. It was a root-level Modal, which UIKit refuses
+  while the page sheet is presented; nested inside the sheet it was no
+  better, and the sheet's swipe-veto remount (a key bump so iOS re-presents
+  a card it has already dismissed) also ran on Close and tore the card down
+  mid-presentation. Settled on an in-sheet overlay: `ConfirmationModal`
+  gained `presentation="inline"`, `FullPageSheet` an `overlay` slot above
+  its header and footer, and Close only calls `onDismiss`. Verified on
+  device: pick a target, Close, "Discard this request?" over the sheet.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 
