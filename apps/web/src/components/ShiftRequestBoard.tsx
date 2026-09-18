@@ -24,6 +24,8 @@ import { NumericBadge } from "@/components/ui/numeric-badge";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ShiftRequestBoardProps {
+  /** The tab to open on; a deep link from an alert names it. */
+  initialTab?: Tab;
   openPickups: ShiftRequest[];
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
@@ -82,6 +84,7 @@ const STATUS_TONES: Record<ShiftRequestStatus, StatusPillTone> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ShiftRequestBoard({
+  initialTab,
   openPickups,
   myRequests,
   pendingApproval,
@@ -102,7 +105,13 @@ export default function ShiftRequestBoard({
   const { closing, close } = useSlideoverClose(onClose);
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
-  const [activeTab, setActiveTab] = useState<Tab>("available");
+  // A deep link may name the approval tab for someone who cannot see it;
+  // their own requests are the nearest tab that exists for them.
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (!initialTab) return "available";
+    if (initialTab === "approval" && !(canApprove || canViewAllRequests)) return "mine";
+    return initialTab;
+  });
   const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
   const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);

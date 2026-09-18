@@ -490,7 +490,7 @@
         and a verb label (or none), with `actionUrl` winning when present and
         every produced type covered by a test; the query parameters the
         destinations rely on are locked here. No UI change.
-  - [ ] 39b. **Web alerts go to their subject** - `/schedule` honors `date`
+  - [x] 39b. **Web alerts go to their subject** - `/schedule` honors `date`
         and `requests`, `/people` honors `section`; bell popup rows and
         `/alerts` rows link to the destination and mark read on the way; the
         detail modal goes for organization users and gridmasters get a

@@ -18,10 +18,12 @@ vi.mock("@/hooks", () => ({
 const fetchNotifications = vi.fn();
 const fetchUnreadNotificationCount = vi.fn();
 const markAllNotificationsRead = vi.fn();
+const markNotificationRead = vi.fn();
 vi.mock("@/features/notifications/client", () => ({
   fetchNotifications: (...args: unknown[]) => fetchNotifications(...args),
   fetchUnreadNotificationCount: (...args: unknown[]) => fetchUnreadNotificationCount(...args),
   markAllNotificationsRead: (...args: unknown[]) => markAllNotificationsRead(...args),
+  markNotificationRead: (...args: unknown[]) => markNotificationRead(...args),
 }));
 
 vi.mock("next/link", () => ({
@@ -54,7 +56,7 @@ const alerts: Notification[] = [
     priority: "normal",
     title: "New swap request",
     message: LONG_MESSAGE,
-    metadata: {},
+    metadata: { tab: "approval", requestId: "r-1" },
     readAt: null,
     archivedAt: null,
     createdAt: new Date().toISOString(),
@@ -67,7 +69,7 @@ const alerts: Notification[] = [
     priority: "normal",
     title: "Schedule updated",
     message: "A short one.",
-    metadata: {},
+    metadata: { startDate: "2026-09-21", endDate: "2026-10-04" },
     readAt: new Date().toISOString(),
     archivedAt: null,
     createdAt: new Date().toISOString(),
@@ -94,25 +96,36 @@ describe("NotificationBell rows", () => {
     vi.clearAllMocks();
     fetchUnreadNotificationCount.mockResolvedValue(1);
     fetchNotifications.mockResolvedValue(alerts);
+    markNotificationRead.mockResolvedValue(undefined);
   });
 
-  it("links every row to the alerts page with the alert to open", async () => {
+  it("links every row to the alert's subject", async () => {
     renderBell();
     await openPopover();
     const unread = screen.getByRole("link", { name: /^New swap request/ });
     const read = screen.getByRole("link", { name: /^Schedule updated/ });
-    expect(unread.getAttribute("href")).toBe("/alerts?open=n-unread");
-    expect(read.getAttribute("href")).toBe("/alerts?open=n-read");
-    expect(unread.getAttribute("aria-label")).toMatch(/\(unread\)$/);
+    expect(unread.getAttribute("href")).toBe("/schedule?requests=approval");
+    expect(read.getAttribute("href")).toBe("/schedule?date=2026-09-21");
+    expect(unread.getAttribute("aria-label")).toMatch(/\(unread\)\. Open requests$/);
+    expect(read.getAttribute("aria-label")).toMatch(/\. Open schedule$/);
     expect(read.getAttribute("aria-label")).not.toMatch(/unread/);
     expect(screen.queryByRole("button", { name: /^New swap request/ })).toBeNull();
   });
 
-  it("closes the popover when a row is followed", async () => {
+  it("closes the popover and marks an unread row read when it is followed", async () => {
+    renderBell();
+    await openPopover();
+    fireEvent.click(screen.getByRole("link", { name: /^New swap request/ }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Alerts" })).toBeNull());
+    expect(markNotificationRead).toHaveBeenCalledWith("n-unread");
+  });
+
+  it("leaves a read row alone when it is followed", async () => {
     renderBell();
     await openPopover();
     fireEvent.click(screen.getByRole("link", { name: /^Schedule updated/ }));
     await waitFor(() => expect(screen.queryByRole("region", { name: "Alerts" })).toBeNull());
+    expect(markNotificationRead).not.toHaveBeenCalled();
   });
 
   it("hands the id to onOpenItem instead of linking when the portal provides it", async () => {

@@ -33,7 +33,6 @@ export const ALERT_TYPES_WITHOUT_DESTINATION: ReadonlySet<string> = new Set([
 const SCHEDULE = { href: "/schedule", label: "Open schedule" };
 const REQUESTS_MINE = { href: "/schedule?requests=mine", label: "Open requests" };
 const PEOPLE = { href: "/people", label: "Open people" };
-const INVITATIONS = { href: "/people?section=invitations", label: "Open invitations" };
 const PROFILE = { href: "/profile", label: "Open profile" };
 const SECURITY = { href: "/profile?section=security", label: "Open security" };
 const SETTINGS = { href: "/settings", label: "Open settings" };
@@ -46,11 +45,12 @@ const FIXED_DESTINATIONS: Record<string, AlertDestination> = {
   recurring_shift_updated: SCHEDULE,
   shift_series_updated: SCHEDULE,
   recurring_schedules_applied: SCHEDULE,
+  // An invited member is a row of the directory; there is no invitations page.
   invitation_accepted: PEOPLE,
-  invitation_received: INVITATIONS,
-  invitation_resent: INVITATIONS,
-  invitation_revoked: INVITATIONS,
-  invitation_expired: INVITATIONS,
+  invitation_received: PEOPLE,
+  invitation_resent: PEOPLE,
+  invitation_revoked: PEOPLE,
+  invitation_expired: PEOPLE,
   membership_removed: PEOPLE,
   admin_permissions_changed: PROFILE,
   member_dept_changed: PROFILE,

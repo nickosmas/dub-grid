@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Notification } from "@/types";
@@ -15,11 +15,9 @@ vi.mock("@/components/AuthProvider", () => ({
   }),
 }));
 
+const permissions = { isGridmaster: false, isSuperAdmin: false };
 vi.mock("@/hooks", () => ({
-  usePermissions: () => ({
-    isGridmaster: false,
-    isSuperAdmin: false,
-  }),
+  usePermissions: () => permissions,
 }));
 
 const toastError = vi.fn();
@@ -68,7 +66,12 @@ const EMPTY_FACETS = {
   byPriority: {},
 };
 
-function alert(id: string, title: string, readAt: string | null = null): Notification {
+function alert(
+  id: string,
+  title: string,
+  readAt: string | null = null,
+  overrides: Partial<Notification> = {},
+): Notification {
   return {
     id,
     type: "schedule_published",
@@ -81,6 +84,7 @@ function alert(id: string, title: string, readAt: string | null = null): Notific
     readAt,
     archivedAt: null,
     createdAt: "2026-09-18T10:00:00.000Z",
+    ...overrides,
   };
 }
 
@@ -90,6 +94,7 @@ const ARCHIVED = alert("archived-one", "An older alert you archived", "2026-09-0
 async function renderInbox(props: {
   openNotificationId?: string | null;
   onOpenHandled?: () => void;
+  navigate?: (href: string) => void;
 }) {
   const { InboxView } = await import("@/app/(app)/alerts/AlertsInboxPage");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -111,6 +116,7 @@ async function renderInbox(props: {
 describe("InboxView openNotificationId", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissions.isGridmaster = false;
     fetchNotificationFacets.mockResolvedValue(EMPTY_FACETS);
     searchNotifications.mockResolvedValue({
       notifications: [ON_PAGE],
@@ -120,22 +126,25 @@ describe("InboxView openNotificationId", () => {
     markNotificationsRead.mockResolvedValue(undefined);
   });
 
-  it("opens an alert from the loaded page, marks it read, and reports back", async () => {
+  it("goes to the alert's subject from the loaded page, marks it read, and reports back", async () => {
     const onOpenHandled = vi.fn();
-    await renderInbox({ openNotificationId: "on-page", onOpenHandled });
+    const navigate = vi.fn();
+    await renderInbox({ openNotificationId: "on-page", onOpenHandled, navigate });
 
-    await waitFor(() => expect(screen.getByRole("dialog", { name: ON_PAGE.title })).toBeTruthy());
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/schedule"));
     expect(markNotificationsRead).toHaveBeenCalledWith(["on-page"]);
     expect(fetchNotificationById).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(onOpenHandled).toHaveBeenCalledTimes(1));
   });
 
   it("looks the alert up by id when the loaded page does not hold it", async () => {
     fetchNotificationById.mockResolvedValue(ARCHIVED);
     const onOpenHandled = vi.fn();
-    await renderInbox({ openNotificationId: "archived-one", onOpenHandled });
+    const navigate = vi.fn();
+    await renderInbox({ openNotificationId: "archived-one", onOpenHandled, navigate });
 
-    await waitFor(() => expect(screen.getByRole("dialog", { name: ARCHIVED.title })).toBeTruthy());
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/schedule"));
     expect(fetchNotificationById).toHaveBeenCalledWith("archived-one");
     expect(markNotificationsRead).not.toHaveBeenCalled();
     await waitFor(() => expect(onOpenHandled).toHaveBeenCalledTimes(1));
@@ -144,22 +153,115 @@ describe("InboxView openNotificationId", () => {
   it("reports a missing alert and still hands the param back", async () => {
     fetchNotificationById.mockResolvedValue(null);
     const onOpenHandled = vi.fn();
-    await renderInbox({ openNotificationId: "gone", onOpenHandled });
+    const navigate = vi.fn();
+    await renderInbox({ openNotificationId: "gone", onOpenHandled, navigate });
 
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith("That alert is no longer available"),
     );
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
     await waitFor(() => expect(onOpenHandled).toHaveBeenCalledTimes(1));
   });
 
   it("opens the same alert again after the param was cleared", async () => {
     const onOpenHandled = vi.fn();
-    const { rerender } = await renderInbox({ openNotificationId: "on-page", onOpenHandled });
+    const navigate = vi.fn();
+    const { rerender } = await renderInbox({
+      openNotificationId: "on-page",
+      onOpenHandled,
+      navigate,
+    });
     await waitFor(() => expect(onOpenHandled).toHaveBeenCalledTimes(1));
 
-    rerender({ openNotificationId: null, onOpenHandled });
-    rerender({ openNotificationId: "on-page", onOpenHandled });
+    rerender({ openNotificationId: null, onOpenHandled, navigate });
+    rerender({ openNotificationId: "on-page", onOpenHandled, navigate });
     await waitFor(() => expect(onOpenHandled).toHaveBeenCalledTimes(2));
+    expect(navigate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("InboxView rows", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permissions.isGridmaster = false;
+    fetchNotificationFacets.mockResolvedValue(EMPTY_FACETS);
+    markNotificationsRead.mockResolvedValue(undefined);
+  });
+
+  it("goes to the subject and marks read when an organization user clicks a row", async () => {
+    searchNotifications.mockResolvedValue({
+      notifications: [
+        alert("req", "New swap request", null, {
+          type: "shift_request_new",
+          metadata: { tab: "approval", requestId: "r-1" },
+        }),
+      ],
+      nextCursor: null,
+      facets: EMPTY_FACETS,
+    });
+    const navigate = vi.fn();
+    await renderInbox({ navigate });
+    const row = await screen.findByRole("button", { name: /^New swap request/ });
+    expect(row.getAttribute("aria-label")).toMatch(/Open requests$/);
+    fireEvent.click(row);
+
+    expect(navigate).toHaveBeenCalledWith("/schedule?requests=approval");
+    await waitFor(() => expect(markNotificationsRead).toHaveBeenCalledWith(["req"]));
+    expect(screen.queryByRole("link", { name: "Review request" })).toBeNull();
+  });
+
+  it("shows an organization user's note inline and never the platform keys", async () => {
+    searchNotifications.mockResolvedValue({
+      notifications: [
+        alert("pc", "Phone number request", null, {
+          type: "system",
+          metadata: {
+            requestedBy: "Jordan Reyes",
+            note: "New number from today",
+            actionUrl: "/people?section=requests",
+            actionLabel: "Review request",
+          },
+        }),
+      ],
+      nextCursor: null,
+      facets: EMPTY_FACETS,
+    });
+    await renderInbox({ navigate: vi.fn() });
+    await screen.findByRole("button", { name: /^Phone number request/ });
+    expect(screen.getByText("New number from today")).toBeTruthy();
+    expect(screen.queryByText("Jordan Reyes")).toBeNull();
+    expect(screen.queryByText(/Details/)).toBeNull();
+  });
+
+  it("unfolds a platform row's details in place for a gridmaster", async () => {
+    permissions.isGridmaster = true;
+    searchNotifications.mockResolvedValue({
+      notifications: [
+        alert("org", "Subscription canceled", null, {
+          type: "org_subscription_canceled",
+          category: "platform",
+          metadata: {
+            orgId: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+            orgName: "Calm Haven",
+            slug: "calmhaven",
+          },
+        }),
+      ],
+      nextCursor: null,
+      facets: EMPTY_FACETS,
+    });
+    const navigate = vi.fn();
+    await renderInbox({ navigate });
+    const row = await screen.findByRole("button", { name: /^Subscription canceled/ });
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Calm Haven")).toBeNull();
+    fireEvent.click(row);
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Calm Haven")).toBeTruthy();
+    expect(screen.getByText("calmhaven")).toBeTruthy();
+    expect(screen.queryByText(/3f2504e0/)).toBeNull();
+    await waitFor(() => expect(markNotificationsRead).toHaveBeenCalledWith(["org"]));
   });
 });

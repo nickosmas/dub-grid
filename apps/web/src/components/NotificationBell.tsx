@@ -13,7 +13,9 @@ import {
   fetchNotifications,
   fetchUnreadNotificationCount,
   markAllNotificationsRead,
+  markNotificationRead,
 } from "@/features/notifications/client";
+import { resolveAlertDestination } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
@@ -193,8 +195,9 @@ function NotificationIcon({ type }: { type: string }) {
  *   it replaces the default `/alerts` link, e.g. so the gridmaster portal
  *   can route to its own in-portal feed view instead of ejecting to the app.
  * @param onOpenItem Optional override for a row click. Without it a row links
- *   to `/alerts?open=<id>`; the gridmaster portal passes it to open the alert
- *   in its own inbox view.
+ *   to the alert's subject (the schedule, a person, the request board) and
+ *   marks it read on the way; the gridmaster portal passes it to open the
+ *   alert in its own inbox view.
  */
 export default function NotificationBell({
   onViewAll,
@@ -273,6 +276,17 @@ export default function NotificationBell({
       queryKey: queryKeys.notifications.all(userId),
     });
   }, [queryClient, userId]);
+
+  // The reader is leaving for the alert's subject; the read mark must not
+  // hold the navigation, so it runs behind it and the badge follows.
+  async function handleMarkRead(id: string) {
+    try {
+      await markNotificationRead(id);
+      invalidateAll();
+    } catch {
+      // The alerts page and realtime will settle it; nothing to show here.
+    }
+  }
 
   async function handleConfirmMarkAllRead() {
     setMarkingAllRead(true);
@@ -442,7 +456,10 @@ export default function NotificationBell({
                   key={n.id}
                   notification={n}
                   onOpenItem={onOpenItem}
-                  onNavigate={() => setOpen(false)}
+                  onNavigate={() => {
+                    setOpen(false);
+                    if (!n.readAt) void handleMarkRead(n.id);
+                  }}
                 />
               ))
             )}
@@ -543,7 +560,10 @@ function BellRow({
   onNavigate: () => void;
 }) {
   const isUnread = !n.readAt;
-  const label = `${n.title}: ${n.message}${isUnread ? " (unread)" : ""}`;
+  const destination = resolveAlertDestination(n);
+  const label = `${n.title}: ${n.message}${isUnread ? " (unread)" : ""}${
+    destination ? `. ${destination.label}` : ""
+  }`;
   const style = {
     ...ROW_STYLE,
     background: isUnread ? "var(--dg-color-info-bg)" : "transparent",
@@ -571,8 +591,9 @@ function BellRow({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
-              fontSize: "var(--dg-fs-caption)",
+              fontSize: "var(--dg-fs-label)",
               fontWeight: isUnread ? 700 : 600,
+              lineHeight: 1.35,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -592,10 +613,10 @@ function BellRow({
         </div>
         <div
           style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-secondary)",
             marginTop: 2,
-            lineHeight: 1.4,
+            lineHeight: 1.45,
           }}
         >
           {n.message}
@@ -630,7 +651,7 @@ function BellRow({
   }
   return (
     <Link
-      href={`/alerts?open=${n.id}`}
+      href={destination?.href ?? "/alerts"}
       prefetch={false}
       aria-label={label}
       style={style}

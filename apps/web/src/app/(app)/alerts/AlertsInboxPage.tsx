@@ -22,6 +22,8 @@ import {
   Building2,
   Calendar,
   CheckCheck,
+  ChevronDown,
+  ChevronRight,
   CreditCard,
   Inbox,
   Mail,
@@ -38,7 +40,6 @@ import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
-import Modal from "@/components/Modal";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions, type Permissions } from "@/hooks";
@@ -47,8 +48,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   audienceForViewer,
-  extractNotificationAction,
   formatNotificationMetadata,
+  resolveAlertDestination,
   type Audience,
 } from "@dubgrid/domain";
 import {
@@ -256,7 +257,11 @@ function AlertsInboxPage() {
   return (
     <ProtectedRoute>
       <PageContainer maxWidth={1200}>
-        <InboxView openNotificationId={openNotificationId} onOpenHandled={clearOpenParam} />
+        <InboxView
+          openNotificationId={openNotificationId}
+          onOpenHandled={clearOpenParam}
+          navigate={(href) => router.push(href)}
+        />
       </PageContainer>
     </ProtectedRoute>
   );
@@ -267,9 +272,15 @@ interface InboxViewProps {
   openNotificationId?: string | null;
   /** Called once the requested alert is open (or reported missing). */
   onOpenHandled?: () => void;
+  /** Goes to an alert's subject; the page and the portal supply the router. */
+  navigate?: (href: string) => void;
 }
 
-export function InboxView({ openNotificationId = null, onOpenHandled }: InboxViewProps = {}) {
+export function InboxView({
+  openNotificationId = null,
+  onOpenHandled,
+  navigate,
+}: InboxViewProps = {}) {
   const { user } = useAuth();
   const perms = usePermissions();
   const userId = user?.id ?? null;
@@ -507,27 +518,45 @@ export function InboxView({ openNotificationId = null, onOpenHandled }: InboxVie
     }
   }, [refreshFacets]);
 
-  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
+  const audience = audienceForViewer(perms);
+  // A platform row (a gridmaster's) has nowhere to go; its details unfold in place.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const handleRowClick = useCallback(
+  const markReadInPlace = useCallback(
     async (n: Notification) => {
-      setDetailNotification(n);
-      if (!n.readAt) {
-        try {
-          await markNotificationsRead([n.id]);
-          applyOptimistic([n.id], { readAt: new Date().toISOString() });
-          refreshFacets();
-          // The header bell caches its own list and count; realtime would
-          // catch up, but the badge should drop as soon as the alert is read.
-          if (userId) {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all(userId) });
-          }
-        } catch {
-          // best-effort; the detail panel still opens
+      if (n.readAt) return;
+      applyOptimistic([n.id], { readAt: new Date().toISOString() });
+      try {
+        await markNotificationsRead([n.id]);
+        refreshFacets();
+        // The header bell caches its own list and count; realtime would
+        // catch up, but the badge should drop as soon as the alert is read.
+        if (userId) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all(userId) });
         }
+      } catch {
+        applyOptimistic([n.id], { readAt: null });
       }
     },
     [applyOptimistic, refreshFacets, queryClient, userId],
+  );
+
+  const handleRowClick = useCallback(
+    (n: Notification) => {
+      void markReadInPlace(n);
+      const destination = resolveAlertDestination(n);
+      if (destination && navigate) {
+        navigate(destination.href);
+        return;
+      }
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(n.id)) next.delete(n.id);
+        else next.add(n.id);
+        return next;
+      });
+    },
+    [markReadInPlace, navigate],
   );
 
   // Open the alert a deep link or the bell asked for. The first page may not
@@ -554,7 +583,7 @@ export function InboxView({ openNotificationId = null, onOpenHandled }: InboxVie
     const found = loaded.find((n) => n.id === openNotificationId);
     (found ? Promise.resolve(found) : fetchNotificationById(openNotificationId))
       .then((n) => {
-        if (n) void open(n);
+        if (n) open(n);
         else toast.error("That alert is no longer available");
       })
       .catch(() => toast.error("That alert is no longer available"))
@@ -685,6 +714,8 @@ export function InboxView({ openNotificationId = null, onOpenHandled }: InboxVie
                   isFirst={idx === 0}
                   isLast={idx === notifications.length - 1}
                   selected={selectedIds.has(n.id)}
+                  audience={audience}
+                  expanded={expandedIds.has(n.id)}
                   onToggleSelect={() => handleToggleSelect(n.id)}
                   onClick={() => handleRowClick(n)}
                   onArchive={() => handleBulk("archive", [n.id])}
@@ -711,14 +742,6 @@ export function InboxView({ openNotificationId = null, onOpenHandled }: InboxVie
         </main>
       </div>
 
-      {detailNotification && (
-        <NotificationDetailModal
-          notification={detailNotification}
-          audience={audienceForViewer(perms)}
-          onClose={() => setDetailNotification(null)}
-        />
-      )}
-
       {confirmingMarkAllRead && (
         <ConfirmDialog
           title="Mark all read?"
@@ -735,120 +758,6 @@ export function InboxView({ openNotificationId = null, onOpenHandled }: InboxVie
         />
       )}
     </div>
-  );
-}
-
-interface NotificationDetailModalProps {
-  notification: Notification;
-  audience: Audience;
-  onClose: () => void;
-}
-
-function formatFullTimestamp(value: string): string {
-  return new Date(value).toLocaleString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function NotificationDetailModal({
-  notification,
-  audience,
-  onClose,
-}: NotificationDetailModalProps) {
-  const entries = useMemo(
-    () => formatNotificationMetadata(notification.metadata, { audience }),
-    [notification.metadata, audience],
-  );
-  const action = useMemo(
-    () => extractNotificationAction(notification.metadata),
-    [notification.metadata],
-  );
-
-  return (
-    <Modal title={notification.title} onClose={onClose} headerSafe>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <span
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
-          }}
-        >
-          {formatFullTimestamp(notification.createdAt)}
-          {notification.channel === "email" ? " • Sent via email" : ""}
-        </span>
-        <p
-          style={{
-            margin: 0,
-            color: "var(--dg-color-text-primary)",
-            fontSize: "var(--dg-fs-body)",
-            lineHeight: 1.5,
-          }}
-        >
-          {notification.message}
-        </p>
-
-        {entries.length > 0 && (
-          <div
-            style={{
-              border: "1px solid var(--dg-color-border-light)",
-              borderRadius: "var(--dg-radius-md)",
-              padding: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              background: "var(--dg-color-bg-secondary)",
-            }}
-          >
-            <span className="dg-type-content-group-heading">Details</span>
-            {entries.map((entry) => (
-              <div
-                key={entry.label}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)",
-                  gap: 12,
-                  alignItems: "baseline",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  {entry.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-primary)",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {entry.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {action && (
-          <Link
-            href={action.href}
-            className="dg-btn dg-btn-primary"
-            onClick={onClose}
-            style={{ alignSelf: "flex-start" }}
-          >
-            {action.label}
-          </Link>
-        )}
-      </div>
-    </Modal>
   );
 }
 
@@ -1261,6 +1170,8 @@ interface NotificationRowProps {
   isFirst: boolean;
   isLast: boolean;
   selected: boolean;
+  audience: Audience;
+  expanded: boolean;
   onToggleSelect: () => void;
   onClick: () => void;
   onArchive: () => void;
@@ -1273,6 +1184,8 @@ function NotificationRow({
   notification,
   isLast,
   selected,
+  audience,
+  expanded,
   onToggleSelect,
   onClick,
   onArchive,
@@ -1282,6 +1195,11 @@ function NotificationRow({
 }: NotificationRowProps) {
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
+  const destination = resolveAlertDestination(notification);
+  const details = formatNotificationMetadata(notification.metadata, { audience });
+  // An organization's own notes read inline; platform rows unfold on demand.
+  const inlineDetails = audience === "org" ? details : [];
+  const disclosure = audience === "platform" && !destination ? details : [];
 
   const rowStyle: CSSProperties = {
     display: "grid",
@@ -1326,7 +1244,10 @@ function NotificationRow({
       <Button
         type="button"
         onClick={onClick}
-        aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}`}
+        aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}. ${
+          destination ? destination.label : expanded ? "Hide details" : "Show details"
+        }`}
+        aria-expanded={destination ? undefined : expanded}
         style={{
           textAlign: "left",
           background: "none",
@@ -1337,8 +1258,9 @@ function NotificationRow({
           color: "inherit",
           display: "flex",
           flexDirection: "column",
-          gap: 2,
+          gap: 4,
           minWidth: 0,
+          whiteSpace: "normal",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1358,8 +1280,9 @@ function NotificationRow({
           )}
           <span
             style={{
-              fontSize: "var(--dg-fs-label)",
+              fontSize: "var(--dg-fs-body-sm)",
               fontWeight: isUnread ? 700 : 600,
+              lineHeight: 1.35,
               color: "var(--dg-color-text-primary)",
             }}
           >
@@ -1402,22 +1325,76 @@ function NotificationRow({
         </div>
         <span
           style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+            color: "var(--dg-color-text-secondary)",
             lineHeight: 1.5,
           }}
         >
           {notification.message}
         </span>
+        {inlineDetails.map((entry) => (
+          <span
+            key={entry.label}
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--dg-color-text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            <span style={{ color: "var(--dg-color-text-muted)" }}>{entry.label}: </span>
+            {entry.value}
+          </span>
+        ))}
         <span
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
             fontSize: "var(--dg-fs-footnote)",
             color: "var(--dg-color-text-subtle)",
           }}
         >
           {formatRelativeTime(notification.createdAt)}
           {notification.channel === "email" ? " • Sent via email" : ""}
+          {disclosure.length > 0 && (
+            <>
+              <span aria-hidden> • </span>
+              {expanded ? (
+                <ChevronDown size={12} aria-hidden />
+              ) : (
+                <ChevronRight size={12} aria-hidden />
+              )}
+              Details
+            </>
+          )}
         </span>
+        {expanded && disclosure.length > 0 && (
+          <span
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, auto) minmax(0, 1fr)",
+              gap: "4px 12px",
+              marginTop: 4,
+              padding: 10,
+              border: "1px solid var(--dg-color-border-light)",
+              borderRadius: "var(--dg-radius-md)",
+              background: "var(--dg-color-bg-secondary)",
+              fontSize: "var(--dg-fs-label)",
+            }}
+          >
+            <span className="dg-type-content-group-heading" style={{ gridColumn: "1 / -1" }}>
+              Details
+            </span>
+            {disclosure.map((entry) => (
+              <Fragment key={entry.label}>
+                <span style={{ color: "var(--dg-color-text-muted)" }}>{entry.label}</span>
+                <span style={{ color: "var(--dg-color-text-primary)", wordBreak: "break-word" }}>
+                  {entry.value}
+                </span>
+              </Fragment>
+            ))}
+          </span>
+        )}
       </Button>
       <div
         style={{
@@ -1427,27 +1404,6 @@ function NotificationRow({
           flexShrink: 0,
         }}
       >
-        {(() => {
-          const actionUrl =
-            typeof notification.metadata?.actionUrl === "string"
-              ? (notification.metadata.actionUrl as string)
-              : null;
-          const actionLabel =
-            typeof notification.metadata?.actionLabel === "string"
-              ? (notification.metadata.actionLabel as string)
-              : null;
-          if (!actionUrl || !actionLabel) return null;
-          return (
-            <Link
-              href={actionUrl}
-              className="dg-btn dg-btn-secondary"
-              onClick={onClick}
-              style={{ whiteSpace: "nowrap" }}
-            >
-              {actionLabel}
-            </Link>
-          );
-        })()}
         <Button
           type="button"
           aria-label={isUnread ? "Mark as read" : "Mark as unread"}

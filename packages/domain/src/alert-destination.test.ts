@@ -125,9 +125,7 @@ describe("resolveAlertDestination", () => {
       "invitation_revoked",
       "invitation_expired",
     ]) {
-      expect(resolveAlertDestination({ type, metadata: {} })?.href).toBe(
-        "/people?section=invitations",
-      );
+      expect(resolveAlertDestination({ type, metadata: {} })?.href).toBe("/people");
     }
   });
 
