@@ -213,7 +213,16 @@ export function MyScheduleCard({
                         key={segment.key}
                         style={[
                           styles.shiftPill,
-                          segment.pill ? { backgroundColor: segment.pill.color } : null,
+                          // `border` is the faint text-derived tint every
+                          // coloured pill in the app wears; `borderSubtle`
+                          // below is tuned against white and vanishes on a
+                          // fill, so a shift or absence card read borderless.
+                          segment.pill
+                            ? {
+                                backgroundColor: segment.pill.color,
+                                borderColor: segment.pill.border,
+                              }
+                            : null,
                         ]}
                       >
                         <Text
