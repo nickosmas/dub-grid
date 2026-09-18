@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";

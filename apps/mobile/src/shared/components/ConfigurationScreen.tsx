@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
 import {

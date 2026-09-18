@@ -1,5 +1,6 @@
 import { useMemo, type PropsWithChildren } from "react";
-import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE, mobileText, type MobileColors } from "../theme/tokens";
 

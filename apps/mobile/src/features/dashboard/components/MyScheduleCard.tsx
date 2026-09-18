@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
 import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";

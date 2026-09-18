@@ -14,12 +14,12 @@ import {
   Animated,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type AppStateStatus,
   type GestureResponderEvent,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
@@ -1497,10 +1497,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const meStickyHeader = !isTeamScope ? (
     <View style={styles.meWeekNavigator}>
       <View style={styles.meWeekNavigatorCopy}>
-        <Text numberOfLines={1} style={styles.meWeekNavigatorTitle}>
+        {/* Two lines, not one: beside three 44pt controls a raised text size
+            left "Today, Sep 18" as "Toda…". The date drops under "Today,". */}
+        <Text numberOfLines={2} style={styles.meWeekNavigatorTitle}>
           {selectedDateLabel}
         </Text>
-        <Text numberOfLines={1} style={styles.meWeekNavigatorRangeLabel}>
+        <Text numberOfLines={2} style={styles.meWeekNavigatorRangeLabel}>
           {weekRangeLabel}
         </Text>
       </View>

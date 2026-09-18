@@ -4,11 +4,11 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
+import { Text } from "./Text";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAsyncAction } from "../hooks/useAsyncAction";

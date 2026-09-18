@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
+import { StyleSheet, type StyleProp, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileText, type MobileColors } from "../theme/tokens";
 

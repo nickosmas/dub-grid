@@ -217,6 +217,33 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Every mobile text goes through `shared/components/Text`, which applies
+    // the app's text-size ceiling by default. The raw import scales to the OS
+    // maximum, which is how a hero's time wrapped one character per line at
+    // an accessibility size while the capped button beside it stayed small.
+    files: ["apps/mobile/src/**/*.{ts,tsx}", "apps/mobile/app/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/mobile/src/**/*.test.{ts,tsx}",
+      "apps/mobile/src/test/**",
+      "apps/mobile/src/shared/components/Text.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react-native",
+              importNames: ["Text"],
+              message:
+                "Import Text from shared/components/Text; it applies MAX_FONT_SCALE so OS text scaling has a ceiling.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["packages/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [

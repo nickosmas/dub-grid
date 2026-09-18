@@ -1,6 +1,7 @@
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../../shared/components/Button";

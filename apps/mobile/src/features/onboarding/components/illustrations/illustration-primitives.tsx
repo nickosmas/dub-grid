@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../../shared/components/Text";
 import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,

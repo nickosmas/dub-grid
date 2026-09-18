@@ -11,7 +11,8 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { toastToneTokens } from "@dubgrid/design-tokens";
-import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
+import { StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { Text } from "../components/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { useNetworkRecovery } from "./NetworkRecoveryProvider";

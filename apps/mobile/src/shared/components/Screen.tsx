@@ -14,11 +14,11 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "./Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Pressable } from "./Pressable";

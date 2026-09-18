@@ -4,7 +4,8 @@ import { REQUEST_TYPE_LABEL, REQUEST_TYPE_TONE } from "../lib/request-type";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type {

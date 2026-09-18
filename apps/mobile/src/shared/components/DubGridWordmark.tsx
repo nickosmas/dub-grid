@@ -1,4 +1,5 @@
-import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { StyleSheet, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { Text } from "./Text";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE_FIXED, mobileBrandTypography } from "../theme/tokens";
 

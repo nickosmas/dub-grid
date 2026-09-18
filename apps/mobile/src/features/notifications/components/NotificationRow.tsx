@@ -1,6 +1,7 @@
 import { useMemo, useRef, type MutableRefObject } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";

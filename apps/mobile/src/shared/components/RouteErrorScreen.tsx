@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Button } from "./Button";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";

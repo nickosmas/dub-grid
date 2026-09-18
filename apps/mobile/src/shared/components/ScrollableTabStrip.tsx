@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Text } from "./Text";
 import { NumericBadge } from "./NumericBadge";
 import { Pressable } from "./Pressable";
 import { hapticSelection } from "../lib/haptics";

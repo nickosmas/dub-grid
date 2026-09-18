@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, type ComponentProps } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";

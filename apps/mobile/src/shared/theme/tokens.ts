@@ -429,6 +429,18 @@ export function mobileDarkenTone(tone: MobilePillTone, isDark: boolean): MobileP
 export const MAX_FONT_SCALE = 1.5;
 export const MAX_FONT_SCALE_FIXED = 1.3;
 
+/**
+ * The second limit, in points rather than as a multiplier: no text renders
+ * larger than this, whatever the OS setting. Headlines are already large, so
+ * they need the least help from text scaling and break a layout soonest: at
+ * 1.5x a 28pt `display` became 42pt and a hero title broke mid-word beside
+ * its date tile. Under this ceiling `display` scales to about 1.14x,
+ * `heroMetric` 1.33x, `screenTitle` 1.45x, and everything from `title` down
+ * keeps the full `MAX_FONT_SCALE`. `Text` applies it from the style's
+ * `fontSize`; a style without one gets the multiplier alone.
+ */
+export const MAX_TEXT_SIZE = 32;
+
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 
 export const mobileTabularText = {

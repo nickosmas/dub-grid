@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButton";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";

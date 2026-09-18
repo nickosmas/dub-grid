@@ -6,11 +6,11 @@ import { getOrgRoleLabel } from "@dubgrid/domain";
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { AppText } from "../../../shared/components/AppText";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";

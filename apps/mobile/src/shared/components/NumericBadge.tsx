@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Text } from "./Text";
 import { formatBadgeCount, numericBadgeSize, type NumericBadgeSize } from "@dubgrid/design-tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {

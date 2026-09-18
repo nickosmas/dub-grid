@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {

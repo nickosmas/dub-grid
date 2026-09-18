@@ -11,7 +11,6 @@ import {
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type StyleProp,
@@ -19,6 +18,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Text } from "../../../shared/components/Text";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
