@@ -177,6 +177,9 @@ presentation="inline"`, `FullPageSheet overlay`), and Close no longer
   read in full.
 - 2026-09-18, requests, Available: "Evening Shift" broke beside its time.
   Fixed in place: the time wraps under the name when there is no room.
+- 2026-09-18, dashboard, Your schedule: shift and absence cards read
+  borderless (the hairline was tuned against white). Fixed in place: a
+  coloured card takes the faint text-derived border its colours carry.
 - 2026-09-18, dashboard at accessibility extra-large: the greeting cut to
   "Morni...", the shift pills to "Day..." and their hour, a coverage row's
   name to its first letter beside its figures. Fixed in place: the strip

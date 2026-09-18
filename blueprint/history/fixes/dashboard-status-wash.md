@@ -172,6 +172,10 @@ glow on a black page.
   pull-to-refresh switch off for a skeleton. Bisected and verified on
   device (cold-open Alerts collapses; People, Requests, staff profile
   unchanged).
+- `54f9ea0a`: every shift and absence card in the strip has a faint edge.
+  The `borderSubtle` hairline is tuned against white and vanished on a
+  coloured fill; a coloured pill takes the text-derived border its colours
+  already carry, the same edge every other pill in the app wears.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 
