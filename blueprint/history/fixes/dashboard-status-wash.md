@@ -201,6 +201,19 @@ glow on a black page.
     activity, Pending approvals, staff home, shift detail, person detail,
     Profile details, Notifications, Devices, Add person (no placeholder
     needed, the form paints from cache).
+- `57ee7791`: choice groups (wings, certifications, roles, employment) as
+  grouped lists in place of the chip cloud on Add to Schedule, Add Person,
+  Person detail and Profile > Work. A caption over a framed list of 44pt
+  rows with a 22pt mark at the end: pick-many rows wear a ring that fills
+  brand blue with a check when chosen; pick-one rows (`selection="single"`)
+  show nothing until the chosen one. Long names wrap; the chosen label goes
+  medium; rows are checkbox or radio to assistive tech; the panels that
+  held the groups are gone. `db7b7ed1` tried a dropdown (value row plus
+  picker sheet) for pick-one groups; the user rejected it on sight and
+  `d6fa4688` reverts it. The web keeps its `CustomSelect` plus
+  `SelectableTag` pair: at 480 to 640px the tags wrap tidily and the
+  selected fill is unmistakable, so the platforms share the pick-one /
+  pick-many split, not the control.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 

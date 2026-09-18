@@ -180,6 +180,12 @@ presentation="inline"`, `FullPageSheet overlay`), and Close no longer
 - 2026-09-18, dashboard, Your schedule: shift and absence cards read
   borderless (the hairline was tuned against white). Fixed in place: a
   coloured card takes the faint text-derived border its colours carry.
+- 2026-09-18, Add to Schedule and the three sibling editors: twenty
+  selection chips of every width in a ragged cloud, a pale selected state,
+  role names too long for a pill, and no cue for pick-one against
+  pick-many. Replaced by grouped lists (caption, framed 44pt rows, a ring
+  that fills for pick-many, a check on the chosen row for pick-one); a
+  dropdown for pick-one was tried and reverted at the user's call.
 - 2026-09-18, skeletons (cold-route audit with fetches delayed on device):
   pushed pages sat blank before the placeholder faded in; list placeholders
   stopped halfway down the page; the profile hero's name collapsed to a
