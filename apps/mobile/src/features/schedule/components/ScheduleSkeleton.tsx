@@ -7,6 +7,7 @@ import {
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -18,15 +19,20 @@ import {
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
 
 /**
- * The staff home: the rounded hero, the open-shifts strip, then the week's
- * card of 132pt rows.
+ * The staff home: the rounded hero, then the week's card of 132pt rows. No
+ * open-shifts strip: it appears only when there are shifts to offer, and a
+ * placeholder strip that then vanished dropped the week's card by a whole
+ * section on load.
  *
  * Every surface is the screen's own style, borrowed from
  * `scheduleScreenStyles`, so the placeholder cannot drift from the page.
  */
-export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
+export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
+  // The week's 132pt rows; reserved for the sticky header and the hero.
+  const fillRows = useSkeletonFillCount(132, 420);
+  const rowCount = rows ?? fillRows;
   const scheduleStyles = useMemo(
     () => createScheduleStyles(mobileColors, isDark),
     [mobileColors, isDark],
@@ -57,32 +63,11 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
 
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
-          <SkeletonLine variant="sectionTitle" width="40%" style={styles.grow} />
-          <SkeletonLine variant="label" width={52} />
-        </View>
-        <View style={styles.openShiftStrip}>
-          {skeletonRows(2, (index) => (
-            <View
-              key={`open-shift-skeleton-${index}`}
-              style={[scheduleStyles.openShiftCard, styles.openShiftCardFill]}
-            >
-              <SkeletonLine variant="cardTitle" width="56%" />
-              <SkeletonLine variant="body" width="48%" />
-              <SkeletonLine variant="body" width="62%" />
-              <SkeletonLine variant="meta" width="54%" />
-              <SkeletonPill height={mobileControl.md} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={scheduleStyles.upcomingSectionBlock}>
-        <View style={scheduleStyles.upcomingSectionHeader}>
           <SkeletonLine variant="sectionTitle" width="46%" style={styles.grow} />
           <SkeletonPill height={mobileControl.sm} width={132} />
         </View>
         <View style={scheduleStyles.upcomingShiftsCard}>
-          {skeletonRows(rows, (index) => (
+          {skeletonRows(rowCount, (index) => (
             <View
               key={`upcoming-skeleton-${index}`}
               style={[
@@ -109,7 +94,7 @@ export function ScheduleMeSkeleton({ rows = 3 }: { rows?: number }) {
  * 48pt avatar, the name, and on some a status badge at the end.
  */
 export function ScheduleTeamSkeleton({
-  groups = 2,
+  groups = 3,
   rowsPerGroup = 3,
 }: {
   groups?: number;
@@ -190,18 +175,5 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       gap: mobileSpace.sm,
       minWidth: 0,
-    },
-    // Two cards of the strip, the second cut by the screen edge as it is at
-    // rest; the strip does not scroll while it is a placeholder.
-    openShiftStrip: {
-      flexDirection: "row",
-      gap: mobileSpace.md,
-      overflow: "hidden",
-    },
-    openShiftCardFill: {
-      width: 320,
-      backgroundColor: mobileColors.surface,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
     },
   });

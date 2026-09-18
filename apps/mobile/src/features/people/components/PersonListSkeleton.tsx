@@ -6,6 +6,7 @@ import {
   SkeletonGroup,
   SkeletonLine,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
@@ -21,16 +22,19 @@ const AVATAR_SIZE = 44;
  * at the same 76pt minimum height the real row uses so nothing shifts on
  * arrival.
  */
-export function PersonListSkeleton({ rows = 6 }: { rows?: number }) {
+export function PersonListSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  // The row's 76pt minimum; reserved for the large title and search row.
+  const fillRows = useSkeletonFillCount(76, 220);
+  const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup style={styles.list}>
-      {skeletonRows(rows, (index) => (
+      {skeletonRows(rowCount, (index) => (
         <View
           key={`person-skeleton-${index}`}
-          style={[styles.row, index < rows - 1 ? styles.rowDivider : null]}
+          style={[styles.row, index < rowCount - 1 ? styles.rowDivider : null]}
         >
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.copy}>

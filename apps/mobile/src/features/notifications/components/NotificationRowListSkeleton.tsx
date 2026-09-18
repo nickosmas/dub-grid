@@ -5,6 +5,7 @@ import {
   SkeletonGroup,
   SkeletonLine,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -20,16 +21,23 @@ import {
  * lines of message, a hairline between rows. Not cards: the list stopped
  * being cards, and a placeholder that still was announced the wrong screen.
  */
-export function NotificationRowListSkeleton({ rows = 5 }: { rows?: number }) {
+export function NotificationRowListSkeleton({ rows }: { rows?: number }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  // Title line, two message lines and the row padding; reserved for the
+  // large title, search field, filter strip and unread row above the list.
+  const fillRows = useSkeletonFillCount(
+    mobileListRow.paddingVertical * 2 + mobileText.body.lineHeight + mobileText.meta.lineHeight * 2,
+    300,
+  );
+  const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup>
-      {skeletonRows(rows, (index) => (
+      {skeletonRows(rowCount, (index) => (
         <View
           key={`alert-row-skeleton-${index}`}
-          style={[styles.row, index < rows - 1 ? styles.rowDivider : null]}
+          style={[styles.row, index < rowCount - 1 ? styles.rowDivider : null]}
         >
           <View style={styles.leading}>
             {index % 3 !== 2 ? <SkeletonCircle size={mobileSpace.sm} /> : null}

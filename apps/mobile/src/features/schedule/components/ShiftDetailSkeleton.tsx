@@ -7,6 +7,7 @@ import {
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -26,11 +27,16 @@ import { createStyles as createShiftDetailStyles } from "../screens/shiftDetailS
  */
 export function ShiftDetailSkeleton({
   infoRows = 2,
-  shiftmates = 3,
+  shiftmates,
 }: {
   infoRows?: number;
+  /** Defaults to enough rows to reach the bottom of the screen under the card. */
   shiftmates?: number;
 }) {
+  // A 42pt avatar row at its padding; reserved for the header, the card and
+  // the section title above the list.
+  const fillShiftmates = useSkeletonFillCount(42 + mobileSpace.md * 2, 470);
+  const shiftmateCount = shiftmates ?? fillShiftmates;
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const detailStyles = useMemo(
@@ -83,7 +89,7 @@ export function ShiftDetailSkeleton({
       <View style={detailStyles.sectionBlock}>
         <SkeletonLine variant="screenTitle" width="48%" />
         <View style={detailStyles.shiftmatesList}>
-          {skeletonRows(shiftmates, (index) => (
+          {skeletonRows(shiftmateCount, (index) => (
             <View
               key={`shiftmate-skeleton-${index}`}
               style={[
@@ -93,8 +99,7 @@ export function ShiftDetailSkeleton({
             >
               <SkeletonCircle size={42} />
               <View style={detailStyles.shiftmateContent}>
-                <SkeletonLine variant="rowTitle" width="54%" />
-                <SkeletonLine variant="caption" width="36%" />
+                <SkeletonLine variant="rowTitle" width={index % 2 === 0 ? "54%" : "42%"} />
               </View>
             </View>
           ))}

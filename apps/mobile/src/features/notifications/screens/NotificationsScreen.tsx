@@ -358,7 +358,7 @@ export default function NotificationsScreen() {
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <NotificationRowListSkeleton rows={5} />
+          <NotificationRowListSkeleton />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner

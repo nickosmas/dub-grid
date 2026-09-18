@@ -874,7 +874,7 @@ export default function PeopleScreen() {
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <PersonListSkeleton rows={6} />
+          <PersonListSkeleton />
         ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
