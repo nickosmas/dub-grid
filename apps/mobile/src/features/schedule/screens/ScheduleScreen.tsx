@@ -2984,9 +2984,15 @@ function OpenShiftsSection({
        * behind an open sheet anyway.
        */
       runAction?: (action: () => void) => void;
+      /** Cards on the day sheet sit on its surface and take the quieter lift. */
+      surface?: "carousel" | "sheet";
     },
   ) => {
     const runAction = options?.runAction ?? ((action: () => void) => action());
+    const cardStyle = [
+      styles.openShiftCard,
+      options?.surface === "sheet" ? styles.openShiftSheetCard : null,
+    ];
     const cardSurfaceProps =
       options?.onToggle != null
         ? {
@@ -3083,7 +3089,7 @@ function OpenShiftsSection({
           : null;
 
       return (
-        <View key={item.key} style={styles.openShiftCard}>
+        <View key={item.key} style={cardStyle}>
           {cardSurface}
           {volunteerBlockReason ? (
             <Text style={styles.scheduleRowMeta}>{volunteerBlockReason}</Text>
@@ -3177,7 +3183,7 @@ function OpenShiftsSection({
     );
 
     return (
-      <View key={item.key} style={styles.openShiftCard}>
+      <View key={item.key} style={cardStyle}>
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
@@ -3308,6 +3314,7 @@ function OpenShiftsSection({
                 setOpenDate(null);
                 handoff(action);
               },
+              surface: "sheet",
             }),
           )}
         </View>

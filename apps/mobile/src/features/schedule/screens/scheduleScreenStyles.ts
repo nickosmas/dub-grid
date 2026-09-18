@@ -838,11 +838,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     openShiftDateCardItems: {
       gap: mobileSpace.md,
     },
-    // Cards in the day sheet stack vertically with the same shadow room the
-    // carousel keeps under its last card.
+    // The day sheet's scroll view clips at both edges, so the list keeps the
+    // cards' shadow reach above the first and below the last one.
     openShiftSheetList: {
       gap: mobileSpace.md,
-      paddingBottom: mobileElevationExtent("card", isDark).bottom,
+      paddingTop: mobileElevationExtent("raised", isDark).top,
+      paddingBottom: mobileElevationExtent("raised", isDark).bottom,
+    },
+    // On the sheet's own surface a full card lift reads as too much depth.
+    openShiftSheetCard: {
+      ...mobileElevation("raised", isDark),
     },
     openShiftDateCardItemsStacked: {
       gap: 0,

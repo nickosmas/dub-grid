@@ -1,7 +1,6 @@
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Platform } from "react-native";
 import { mobileMotion, mobileTypography, type MobileColors } from "../theme/tokens";
-import { HeaderBackButton } from "./HeaderBackButton";
 
 const isIOS = Platform.OS === "ios";
 
@@ -113,17 +112,6 @@ export function createTopLevelStackOptions(
   };
 }
 
-/**
- * iOS draws its own back control in JS: react-native-screens 4.16's native
- * one goes deaf on iOS 26 after a re-push above a `headerShown: false` screen
- * (see `HeaderBackButton`). Android's native arrow is unaffected and keeps
- * the platform's own look.
- */
-const IOS_JS_BACK_CONTROL = {
-  headerBackVisible: false,
-  headerLeft: () => <HeaderBackButton />,
-} satisfies NativeStackNavigationOptions;
-
 export function createDetailStackOptions(
   mobileColors: MobileColors,
   title: string,
@@ -144,7 +132,6 @@ export function createDetailStackOptions(
       : isIOS && scrollEdge
         ? SCROLL_EDGE_PLAIN_TITLE_HEADER
         : PLAIN_TITLE_HEADER),
-    ...(isIOS ? IOS_JS_BACK_CONTROL : {}),
     // Leave the back gesture to UIKit's standard left-edge interaction. The
     // full-screen variant can capture a diagonal vertical scroll and flash the
     // native navigation controller behind the header during an interrupted pop.

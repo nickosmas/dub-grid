@@ -8,11 +8,7 @@ vi.mock("react-native", () => ({
     OS: "ios",
     select: (value: Record<string, unknown>) => value.ios ?? value.default ?? null,
   },
-  Pressable: () => null,
-  StyleSheet: { create: (styles: unknown) => styles },
 }));
-vi.mock("expo-router", () => ({ router: {} }));
-vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 
 let createTopLevelStackOptions: (typeof import("./top-level-stack"))["createTopLevelStackOptions"];
 let createDetailStackOptions: (typeof import("./top-level-stack"))["createDetailStackOptions"];
@@ -24,21 +20,6 @@ beforeAll(async () => {
 });
 
 describe("top-level stack options on iOS", () => {
-  // react-native-screens 4.16's native back button goes deaf on iOS 26 after
-  // a re-push above a `headerShown: false` screen, so pushed screens draw
-  // their own; the root-of-stack options never showed one to begin with.
-  it("replaces the native back button with the JS control on pushed screens", () => {
-    const options = createDetailStackOptions(mobileColors, "Shift Detail");
-
-    expect(options.headerBackVisible).toBe(false);
-    expect(options.headerLeft).toEqual(expect.any(Function));
-    expect(createDetailStackOptions(mobileColors, "Alerts", { largeTitle: true })).toMatchObject({
-      headerBackVisible: false,
-      headerLargeTitle: true,
-    });
-    expect(createTopLevelStackOptions(mobileColors, "People").headerLeft).toBeUndefined();
-  });
-
   it("asks UIKit for the native large title", () => {
     expect(createTopLevelStackOptions(mobileColors, "People")).toMatchObject({
       title: "People",
