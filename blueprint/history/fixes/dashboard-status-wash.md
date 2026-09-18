@@ -155,6 +155,11 @@ glow on a black page.
   renders them inline inside whichever sheet is up, as ordinary modals only
   when none is. Verified on device: Call off, Sick, Submit, the question
   over the sheet; Cancel; Close.
+- `82859ce9`: the dashboard at accessibility extra-large. The strip's and
+  the coverage rows' raw `Text` took the `MAX_FONT_SCALE` cap every
+  `AppText` has, the pill width grows with the text, the greeting may take
+  two lines, and a coverage row's figures wrap under its name. Captured as
+  `dashboard-ios-light-ax-admin`.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 

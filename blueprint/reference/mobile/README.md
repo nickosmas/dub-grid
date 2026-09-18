@@ -69,6 +69,7 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | Cell                                                                                         | Status   | Shows                                                                                                                                                                                                                                                  |
 | -------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | dashboard-ios-light-default-admin                                                            | captured | Two-word greeting and period; toggle track in the theme ground; Your schedule first, its strip on the page with no card; one Coverage card (figure, three focus-area meters, centred stats at the foot); See all on every card; rows as text, no pills |
+| dashboard-ios-light-ax-admin                                                                 | captured | Accessibility extra-large: greeting on one line, shift pills grown with the text, coverage figures wrapped under the name; the period toggle truncates its labels by the feature 23 rule                                                               |
 | coverage-list-ios-light-default-admin                                                        | captured | Coverage See all: back, title, "1 section" with Filter, the same focus-area rows                                                                                                                                                                       |
 | my-schedule-ios-light-default-admin                                                          | captured | Your schedule See all: the staff home on the brand aurora through its header, hero, Your Week card                                                                                                                                                     |
 | open-shifts-list-ios-light-default-admin                                                     | captured | Open shifts See all: "6 shifts" with Filter, rows as text with the count and urgency word; a row lands on Requests, Available                                                                                                                          |
@@ -157,6 +158,13 @@ noted in the archive of the feature that captured them.
   draws as an overlay inside the sheet (`ConfirmationModal
 presentation="inline"`, `FullPageSheet overlay`), and Close no longer
   remounts the card.
+- 2026-09-18, dashboard at accessibility extra-large: the greeting cut to
+  "Morni...", the shift pills to "Day..." and their hour, a coverage row's
+  name to its first letter beside its figures. Fixed in place: the strip
+  and the coverage rows take the app-wide font cap, the pill width grows
+  with the text, the greeting may take two lines, the figures wrap. The
+  period toggle still truncates ("D...", "W...", "2 We..."): a segmented
+  control stays one line and truncates by the feature 23 rule, left as is.
 - 2026-09-18, drop sheet (device pass): Submit on a call-off did nothing on
   device. The "Submit this call-off?" confirmation was a root-level Modal
   while the bottom sheet's own Modal was up, and UIKit refused it. Fixed in
