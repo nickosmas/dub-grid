@@ -468,6 +468,8 @@ export default function ShiftRequestBoard({
                 borderRadius: "var(--dg-radius-md)",
                 fontSize: "var(--dg-fs-caption)",
                 fontFamily: "inherit",
+                color: "var(--dg-color-text-primary)",
+                background: "var(--dg-color-surface)",
                 resize: "vertical",
                 outline: "none",
                 boxSizing: "border-box",

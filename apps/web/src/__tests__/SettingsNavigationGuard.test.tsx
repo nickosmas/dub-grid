@@ -173,7 +173,7 @@ describe("settings panels guard navigation", () => {
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(navigate).not.toHaveBeenCalled();
     // Opening the confirmation preserves the draft in the underlying panel.
-    expect(staffInput).toHaveValue(3);
+    expect(staffInput).toHaveValue("3");
     expect(within(dialog).getByRole("button", { name: "Keep editing" })).toHaveFocus();
   });
 
@@ -186,7 +186,7 @@ describe("settings panels guard navigation", () => {
     await user.click(screen.getByRole("button", { name: "Keep editing" }));
 
     expect(navigate).not.toHaveBeenCalled();
-    expect(screen.getByRole("spinbutton")).toHaveValue(3);
+    expect(screen.getByRole("spinbutton")).toHaveValue("3");
   });
 
   it("leaves once the discard is confirmed", async () => {

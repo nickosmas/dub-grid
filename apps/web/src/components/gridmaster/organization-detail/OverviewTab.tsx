@@ -6,6 +6,7 @@ import OrganizationLocationFields from "@/components/organization/OrganizationLo
 import { InfoRow, MiniStat } from "@/components/gridmaster/organization-detail/shared";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { NumberField } from "@/components/ui/number-field";
 import {
   archiveGridmasterOrganization,
   restoreGridmasterOrganization,
@@ -361,13 +362,14 @@ export function OverviewTab({
                   </label>
                 </div>
                 <div>
-                  <label style={labelStyle}>Data retention (days)</label>
-                  <input
-                    className="dg-input"
-                    type="number"
+                  <label style={labelStyle} htmlFor="editDataRetentionDays">
+                    Data retention (days)
+                  </label>
+                  <NumberField
+                    id="editDataRetentionDays"
                     min={1}
                     value={editDataRetentionDays}
-                    onChange={(e) => setEditDataRetentionDays(Number(e.target.value))}
+                    onChange={setEditDataRetentionDays}
                   />
                 </div>
               </div>

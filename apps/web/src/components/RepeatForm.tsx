@@ -22,6 +22,7 @@ import {
   ShiftJobSegment,
 } from "@/types";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
+import { NumberField } from "@/components/ui/number-field";
 import * as Sentry from "@/lib/sentry";
 import { addDays, cn } from "@/lib/utils";
 import { generateSeriesDates } from "@/lib/series-dates";
@@ -643,17 +644,12 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                     : "After N occurrences"}
               </span>
               {type === "after_n" && endType === "after_n" && (
-                <input
-                  type="number"
+                <NumberField
+                  aria-label="Number of occurrences"
                   min={1}
                   max={MAX_SERIES_OCCURRENCES}
                   value={afterN}
-                  onChange={(e) =>
-                    setAfterN(
-                      Math.min(MAX_SERIES_OCCURRENCES, Math.max(1, parseInt(e.target.value) || 1)),
-                    )
-                  }
-                  className="dg-input"
+                  onChange={setAfterN}
                   style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 8px", width: 70 }}
                 />
               )}

@@ -747,6 +747,7 @@ export function ManagementStaffPanel({
               <div>
                 <label style={labelStyle}>Phone</label>
                 <input
+                  type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   onBlur={() => {

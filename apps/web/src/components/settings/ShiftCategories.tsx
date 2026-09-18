@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { NumberField } from "@/components/ui/number-field";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -655,19 +656,18 @@ function ShiftCategoriesSettings({
             />
           </div>
           <div>
-            <label style={labelStyle}>Break (min)</label>
-            <input
-              type="number"
+            <label style={labelStyle} htmlFor={`shift-category-${cat.id}-break`}>
+              Break (min)
+            </label>
+            <NumberField
+              nullable
+              id={`shift-category-${cat.id}-break`}
               min={0}
               max={480}
-              value={cat.breakMinutes ?? ""}
-              onChange={(e) => {
-                const val =
-                  e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
-                handleChange(cat.id, "breakMinutes", val);
-              }}
+              value={cat.breakMinutes ?? null}
+              onChange={(value) => handleChange(cat.id, "breakMinutes", value)}
               placeholder="None"
-              style={{ ...inputStyle, width: 100 }}
+              style={{ width: 100 }}
               disabled={!canManageScheduleDefinitions}
             />
           </div>

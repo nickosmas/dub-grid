@@ -128,10 +128,18 @@ Input and label vocabularies are not interchangeable:
 - `dg-auth-input` / `dg-auth-link` / `dg-auth-heading` — public auth flows
   (pairs with `<AuthCard>` and `<PageShell>`).
 
+Every text-entry control paints its own field surface (`dg-input` does this;
+an ad-hoc `<input style={...}>` must set `background: var(--dg-color-surface)`
+itself, because Tailwind's preflight makes inputs transparent). Integer entry
+goes through `<NumberField>` (`components/ui/number-field.tsx`), never
+`type="number"`: a number input bound to numeric state cannot be emptied,
+takes `e`/`+`/`-`/`.`, and changes value under the scroll wheel. Phone fields
+are `type="tel"`.
+
 Shared primitives — use before creating alternatives:
 `<PageContainer>`, `<Switch>`, `<EditorActionRow>`, `<SectionCard>`,
 `<EmptyState size="...">`, `<ConfirmDialog>`, `<Modal>`, `<ErrorBoundary>`,
-`<NotFoundBoundary>`, `<CustomSelect>`.
+`<NotFoundBoundary>`, `<CustomSelect>`, `<NumberField>`.
 
 Product UI and ordinary copy use Inter (`var(--font-sans)`). The DubGrid
 wordmark and landing or marketing headings use DM Sans through the explicit

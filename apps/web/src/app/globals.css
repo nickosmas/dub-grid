@@ -1370,6 +1370,12 @@ button {
   box-shadow: 0 0 0 3px var(--dg-danger-ring);
 }
 
+/* Integer entry (NumberField). Centred tabular digits; width is the caller's. */
+.dg-input-number {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Label System ──────────────────────────────────────── */
 .dg-label {
   font-size: var(--dg-type-field-title-size);
