@@ -496,7 +496,7 @@
         detail modal goes for organization users and gridmasters get a
         Details disclosure in the row; `?open=` redirects to the destination;
         web rows get the title-versus-content hierarchy.
-  - [ ] 39c. **Web alerts page single toolbar** - the sidebar, the read tabs,
+  - [x] 39c. **Web alerts page single toolbar** - the sidebar, the read tabs,
         and the header button fold into one toolbar above the list: Inbox /
         Archived, All / Unread / Read, search, category, priority, sort,
         select-all with bulk actions, and Mark all read, at every supported

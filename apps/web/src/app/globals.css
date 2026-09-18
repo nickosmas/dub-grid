@@ -4876,44 +4876,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-decoration: underline;
 }
 
-.dg-alerts-layout {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 16px;
-}
-
-.dg-alerts-sidebar {
-  display: flex;
-  width: 100%;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-.dg-alerts-sidebar > * {
-  flex: 1 1 0;
-}
-
-@media (min-width: 768px) {
-  .dg-alerts-layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 24px;
-  }
-
-  .dg-alerts-sidebar {
-    position: sticky;
-    top: calc(var(--dg-app-shell-header-height) + 16px);
-    width: 200px;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .dg-alerts-sidebar > * {
-    flex: none;
-  }
-}
-
 /* ── Auth card (responsive padding) ────────────────────── */
 .dg-auth-card {
   padding: 48px 44px 44px;

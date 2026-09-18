@@ -212,25 +212,6 @@ const DEFAULT_FILTERS: FilterState = {
   sort: "desc",
 };
 
-// The page heading mirrors the active Status filter so the user always sees
-// which section ("Inbox", "Archived"...) they're looking at. Read/unread is a
-// view toggle inside each section, not a section of its own.
-function activeViewMeta(filters: FilterState): {
-  title: string;
-  description: string;
-} {
-  if (filters.includeArchived) {
-    return {
-      title: "Archived",
-      description: "Alerts you've archived. Restore any to send it back to your inbox.",
-    };
-  }
-  return {
-    title: "Inbox",
-    description: "Search, filter, and review every alert you've received.",
-  };
-}
-
 function filtersToQuery(filters: FilterState): NotificationSearchParams {
   return {
     limit: PAGE_SIZE,
@@ -590,157 +571,134 @@ export function InboxView({
       .finally(() => done?.());
   }, [openNotificationId, loadingPage]);
 
-  const activeView = activeViewMeta(filters);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-type-page-title-size)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            {activeView.title}
-          </h1>
-          <p
-            style={{
-              margin: "4px 0 0",
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-label)",
-            }}
-          >
-            {activeView.description}
-          </p>
-        </div>
-        <Button
-          type="button"
-          className="dg-btn dg-btn-secondary"
-          onClick={() => setConfirmingMarkAllRead(true)}
-          disabled={busy || (facets?.totalUnread ?? 0) === 0}
-          aria-label="Mark all alerts as read"
+      <header>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-type-page-title-size)",
+            fontWeight: 700,
+            color: "var(--dg-color-text-primary)",
+          }}
         >
-          <CheckCheck size={14} style={{ marginRight: 6 }} />
-          Mark all read
-        </Button>
+          Alerts
+        </h1>
+        <p
+          style={{
+            margin: "4px 0 0",
+            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+          }}
+        >
+          Everything that needs your attention, newest first. Open one to go to what it is about.
+        </p>
       </header>
 
-      <div className="dg-alerts-layout">
-        <FilterSidebar filters={filters} facets={facets} onChange={setFilters} />
+      <main style={{ minWidth: 0 }}>
+        <Toolbar
+          search={filters.search}
+          sort={filters.sort}
+          read={filters.read}
+          isAllSelected={isAllSelected}
+          hasNotifications={notifications.length > 0}
+          totalSelected={totalSelected}
+          busy={busy}
+          includeArchived={filters.includeArchived}
+          category={filters.category}
+          priority={filters.priority}
+          categories={visibleCategories}
+          facets={facets}
+          // Switching sections never carries a read filter over from the last one.
+          onSectionChange={(includeArchived) =>
+            setFilters((prev) => ({ ...prev, read: "all", includeArchived }))
+          }
+          onReadChange={(value) => setFilters((prev) => ({ ...prev, read: value }))}
+          canMarkAllRead={!busy && (facets?.totalUnread ?? 0) > 0}
+          onMarkAllRead={() => setConfirmingMarkAllRead(true)}
+          onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+          onClearSearch={() => setFilters((prev) => ({ ...prev, search: "" }))}
+          onSortToggle={() =>
+            setFilters((prev) => ({
+              ...prev,
+              sort: prev.sort === "desc" ? "asc" : "desc",
+            }))
+          }
+          onCategoryChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
+          onPriorityChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
+          onToggleSelectAll={handleToggleSelectAll}
+          onBulk={handleBulk}
+          selectedIds={[...selectedIds]}
+        />
 
-        <main style={{ flex: 1, minWidth: 0 }}>
-          <ReadFilterTabs
-            value={filters.read}
-            unreadCount={facets?.totalUnread ?? 0}
-            onChange={(value) => setFilters((prev) => ({ ...prev, read: value }))}
+        {loadingPage ? (
+          <ListPlaceholder />
+        ) : error ? (
+          <EmptyState
+            icon={<Bell size={28} />}
+            heading="Couldn't load alerts"
+            description={error}
           />
-          <Toolbar
-            search={filters.search}
-            sort={filters.sort}
-            isAllSelected={isAllSelected}
-            hasNotifications={notifications.length > 0}
-            totalSelected={totalSelected}
-            busy={busy}
-            includeArchived={filters.includeArchived}
-            category={filters.category}
-            priority={filters.priority}
-            categories={visibleCategories}
-            facets={facets}
-            onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-            onClearSearch={() => setFilters((prev) => ({ ...prev, search: "" }))}
-            onSortToggle={() =>
-              setFilters((prev) => ({
-                ...prev,
-                sort: prev.sort === "desc" ? "asc" : "desc",
-              }))
+        ) : notifications.length === 0 ? (
+          <EmptyState
+            icon={<Inbox size={28} />}
+            heading="No alerts"
+            description={
+              debouncedSearch ||
+              filters.read !== "all" ||
+              filters.category !== "all" ||
+              filters.priority !== "all" ||
+              filters.includeArchived
+                ? "Try clearing or loosening your filters."
+                : "You're all caught up."
             }
-            onCategoryChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
-            onPriorityChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
-            onToggleSelectAll={handleToggleSelectAll}
-            onBulk={handleBulk}
-            selectedIds={[...selectedIds]}
           />
+        ) : (
+          <ul
+            role="list"
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              borderRadius: "var(--dg-radius-lg)",
+              overflow: "hidden",
+            }}
+          >
+            {notifications.map((n, idx) => (
+              <NotificationRow
+                key={n.id}
+                notification={n}
+                isFirst={idx === 0}
+                isLast={idx === notifications.length - 1}
+                selected={selectedIds.has(n.id)}
+                audience={audience}
+                expanded={expandedIds.has(n.id)}
+                onToggleSelect={() => handleToggleSelect(n.id)}
+                onClick={() => handleRowClick(n)}
+                onArchive={() => handleBulk("archive", [n.id])}
+                onMarkUnread={() => handleBulk("unread", [n.id])}
+                onMarkRead={() => handleBulk("read", [n.id])}
+                onUnarchive={() => handleBulk("unarchive", [n.id])}
+              />
+            ))}
+          </ul>
+        )}
 
-          {loadingPage ? (
-            <ListPlaceholder />
-          ) : error ? (
-            <EmptyState
-              icon={<Bell size={28} />}
-              heading="Couldn't load alerts"
-              description={error}
-            />
-          ) : notifications.length === 0 ? (
-            <EmptyState
-              icon={<Inbox size={28} />}
-              heading="No alerts"
-              description={
-                debouncedSearch ||
-                filters.read !== "all" ||
-                filters.category !== "all" ||
-                filters.priority !== "all" ||
-                filters.includeArchived
-                  ? "Try clearing or loosening your filters."
-                  : "You're all caught up."
-              }
-            />
-          ) : (
-            <ul
-              role="list"
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                background: "var(--dg-color-surface)",
-                border: "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-lg)",
-                overflow: "hidden",
-              }}
+        {hasMore && notifications.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
             >
-              {notifications.map((n, idx) => (
-                <NotificationRow
-                  key={n.id}
-                  notification={n}
-                  isFirst={idx === 0}
-                  isLast={idx === notifications.length - 1}
-                  selected={selectedIds.has(n.id)}
-                  audience={audience}
-                  expanded={expandedIds.has(n.id)}
-                  onToggleSelect={() => handleToggleSelect(n.id)}
-                  onClick={() => handleRowClick(n)}
-                  onArchive={() => handleBulk("archive", [n.id])}
-                  onMarkUnread={() => handleBulk("unread", [n.id])}
-                  onMarkRead={() => handleBulk("read", [n.id])}
-                  onUnarchive={() => handleBulk("unarchive", [n.id])}
-                />
-              ))}
-            </ul>
-          )}
-
-          {hasMore && notifications.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
-              <Button
-                type="button"
-                className="dg-btn dg-btn-secondary"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-              >
-                <ButtonLoading loading={loadingMore}>Load more</ButtonLoading>
-              </Button>
-            </div>
-          )}
-        </main>
-      </div>
+              <ButtonLoading loading={loadingMore}>Load more</ButtonLoading>
+            </Button>
+          </div>
+        )}
+      </main>
 
       {confirmingMarkAllRead && (
         <ConfirmDialog
@@ -761,129 +719,40 @@ export function InboxView({
   );
 }
 
-interface FilterSidebarProps {
-  filters: FilterState;
-  facets: NotificationFacets | null;
-  onChange: (next: FilterState) => void;
-}
-
-function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
-  // Setting includeArchived must also reset `read` to "all" in a single
-  // update — switching sections should never carry over a read filter that
-  // the user set inside the previous section.
-  const setSection = (includeArchived: boolean) =>
-    onChange({ ...filters, read: "all", includeArchived });
-
-  const totalArchived = facets?.totalArchived ?? 0;
-
-  return (
-    <aside className="dg-alerts-sidebar">
-      <FilterChip
-        active={!filters.includeArchived}
-        onClick={() => setSection(false)}
-        icon={<Inbox size={14} />}
-        label="Inbox"
-      />
-      <FilterChip
-        active={filters.includeArchived}
-        onClick={() => setSection(true)}
-        icon={<Archive size={14} />}
-        label="Archived"
-        count={totalArchived || undefined}
-      />
-    </aside>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ReactNode;
+interface Segment<T extends string> {
+  value: T;
   label: string;
   count?: number;
-}) {
-  return (
-    <Button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-active={active ? "true" : undefined}
-      className={
-        active
-          ? "bg-[var(--dg-color-nav-active-bg)] text-[var(--dg-color-text-primary)]"
-          : "hover:bg-[var(--dg-color-bg-secondary)]"
-      }
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        height: 36,
-        padding: "0 12px",
-        border: "none",
-        borderRadius: "var(--dg-radius-md)",
-        cursor: "pointer",
-        fontSize: "var(--dg-fs-label)",
-        color: active ? undefined : "var(--dg-color-text-primary)",
-        background: active ? undefined : "transparent",
-        fontWeight: active ? 600 : 500,
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%",
-        transition: "background 120ms ease, color 120ms ease",
-      }}
-    >
-      {icon && <span style={{ display: "inline-flex" }}>{icon}</span>}
-      <span style={{ flex: 1 }}>{label}</span>
-      {count !== undefined && count > 0 && (
-        <span
-          style={{
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {count}
-        </span>
-      )}
-    </Button>
-  );
+  icon?: React.ReactNode;
 }
 
-function ReadFilterTabs({
+/** A row of exclusive choices in the toolbar, in the shared tab-shell look. */
+function Segments<T extends string>({
+  label,
   value,
-  unreadCount,
+  segments,
   onChange,
 }: {
-  value: ReadFilter;
-  unreadCount: number;
-  onChange: (value: ReadFilter) => void;
+  label: string;
+  value: T;
+  segments: Segment<T>[];
+  onChange: (value: T) => void;
 }) {
-  const tabs: { value: ReadFilter; label: string; count?: number }[] = [
-    { value: "all", label: "All" },
-    { value: "unread", label: "Unread", count: unreadCount || undefined },
-    { value: "read", label: "Read" },
-  ];
   return (
     <div
-      role="tablist"
-      aria-label="Filter by read state"
+      role="group"
+      aria-label={label}
       className="dg-span-tabs dg-span-tabs--light"
       // `.dg-span-tabs` is unlayered and sets `display: flex`, so this has to
       // be inline to shrink-wrap the control. Same override as PrintOptionsModal.
-      style={{ display: "inline-flex", marginBottom: 12 }}
+      style={{ display: "inline-flex", flexShrink: 0 }}
     >
-      {tabs.map((tab, index) => {
-        const active = value === tab.value;
-        const prevActive = index > 0 && value === tabs[index - 1].value;
+      {segments.map((segment, index) => {
+        const active = value === segment.value;
+        const prevActive = index > 0 && value === segments[index - 1].value;
         const showDivider = index > 0 && !active && !prevActive;
         return (
-          <Fragment key={tab.value}>
+          <Fragment key={segment.value}>
             {index > 0 && (
               <div
                 style={{
@@ -897,14 +766,16 @@ function ReadFilterTabs({
             )}
             <Button
               type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onChange(tab.value)}
+              aria-pressed={active}
+              onClick={() => onChange(segment.value)}
               className={`dg-span-tab${active ? " active" : ""}`}
             >
-              {tab.label}
+              {segment.icon && (
+                <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
+              )}
+              {segment.label}
               <NumericBadge
-                count={tab.count ?? 0}
+                count={segment.count ?? 0}
                 tone={active ? "onAccent" : "neutral"}
                 style={{ marginLeft: 6 }}
               />
@@ -919,6 +790,7 @@ function ReadFilterTabs({
 interface ToolbarProps {
   search: string;
   sort: "asc" | "desc";
+  read: ReadFilter;
   isAllSelected: boolean;
   hasNotifications: boolean;
   totalSelected: number;
@@ -929,6 +801,10 @@ interface ToolbarProps {
   priority: NotificationPriority | "all";
   categories: CategoryFilter[];
   facets: NotificationFacets | null;
+  onSectionChange: (includeArchived: boolean) => void;
+  onReadChange: (value: ReadFilter) => void;
+  canMarkAllRead: boolean;
+  onMarkAllRead: () => void;
   onSearchChange: (value: string) => void;
   onClearSearch: () => void;
   onSortToggle: () => void;
@@ -941,6 +817,7 @@ interface ToolbarProps {
 function Toolbar({
   search,
   sort,
+  read,
   isAllSelected,
   hasNotifications,
   totalSelected,
@@ -951,6 +828,10 @@ function Toolbar({
   priority,
   categories,
   facets,
+  onSectionChange,
+  onReadChange,
+  canMarkAllRead,
+  onMarkAllRead,
   onSearchChange,
   onClearSearch,
   onSortToggle,
@@ -988,8 +869,13 @@ function Toolbar({
     [facets],
   );
 
+  const totalArchived = facets?.totalArchived ?? 0;
+  const totalUnread = facets?.totalUnread ?? 0;
+
   return (
     <div
+      role="toolbar"
+      aria-label="Alerts"
       className="dg-toolbar-type"
       style={{
         display: "flex",
@@ -999,26 +885,31 @@ function Toolbar({
         flexWrap: "wrap",
       }}
     >
-      <label
-        htmlFor="alerts-select-all"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 6px",
-          color: "var(--dg-color-text-muted)",
-          cursor: hasNotifications ? "pointer" : "default",
-        }}
-      >
-        <input
-          id="alerts-select-all"
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={onToggleSelectAll}
-          disabled={!hasNotifications}
-        />
-        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
-      </label>
+      <Segments
+        label="Section"
+        value={includeArchived ? "archived" : "inbox"}
+        onChange={(value) => onSectionChange(value === "archived")}
+        segments={[
+          { value: "inbox", label: "Inbox", icon: <Inbox size={14} /> },
+          {
+            value: "archived",
+            label: "Archived",
+            icon: <Archive size={14} />,
+            count: totalArchived || undefined,
+          },
+        ]}
+      />
+
+      <Segments
+        label="Read state"
+        value={read}
+        onChange={onReadChange}
+        segments={[
+          { value: "all", label: "All" },
+          { value: "unread", label: "Unread", count: totalUnread || undefined },
+          { value: "read", label: "Read" },
+        ]}
+      />
 
       <div
         style={{
@@ -1090,6 +981,27 @@ function Toolbar({
         {sort === "desc" ? "Newest first" : "Oldest first"}
       </Button>
 
+      <label
+        htmlFor="alerts-select-all"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "0 6px",
+          color: "var(--dg-color-text-muted)",
+          cursor: hasNotifications ? "pointer" : "default",
+        }}
+      >
+        <input
+          id="alerts-select-all"
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={onToggleSelectAll}
+          disabled={!hasNotifications}
+        />
+        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
+      </label>
+
       {totalSelected > 0 && (
         <BulkActions
           selectedIds={selectedIds}
@@ -1098,6 +1010,18 @@ function Toolbar({
           onBulk={onBulk}
         />
       )}
+
+      <Button
+        type="button"
+        className="dg-btn dg-btn-secondary"
+        onClick={onMarkAllRead}
+        disabled={!canMarkAllRead}
+        aria-label="Mark all alerts as read"
+        style={{ marginLeft: "auto" }}
+      >
+        <CheckCheck size={14} style={{ marginRight: 6 }} />
+        Mark all read
+      </Button>
     </div>
   );
 }
