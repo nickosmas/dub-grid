@@ -9,8 +9,6 @@ export {
   type AnimatedLogoTiming,
 } from "./animated-logo";
 
-export { STARTUP_STATUS_DELAY_MS, STARTUP_TIMEOUT_MS, STARTUP_MIN_SPLASH_MS } from "./startup";
-
 export { getAvatarTone, resolveAvatarSeed, type AvatarTone } from "./avatar-tone";
 export { getAvatarTypography } from "./avatar-typography";
 export {

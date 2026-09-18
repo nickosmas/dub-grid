@@ -461,7 +461,7 @@
         (loading, empty, error, sheet, confirmation) saved under
         `blueprint/reference/mobile/`, with every defect fixed in place or
         logged in `blueprint/context/findings.md`.
-- [x] 39. **Static branded startup loading and recovery** - keep the approved
+- [ ] 39. **Static branded startup loading and recovery** - keep the approved
       DubGrid logo unchanged and static while the app initializes. Hand off
       from the native splash to a branded loading screen with an accessible
       progress indicator, delayed status copy after 2-3 seconds, and a timeout

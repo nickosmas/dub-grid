@@ -42,19 +42,19 @@ interface GridProps {
 }
 
 export function LogoGrid({ size, color = COLORS.light }: GridProps) {
-  const gap = size * 0.045;
-  const cell = (size - gap) / 2;
-  const radius = cell * 0.2;
-  const offset = cell + gap;
-  // The pinwheel: solid from top-right to bottom-left, tinted on the other
-  // diagonal. Same geometry as `DubGridLogo`, expressed in the inline styles
-  // Satori can read.
-  const cells = [
-    { x: 0, y: 0, opacity: 0.3 },
-    { x: offset, y: 0, opacity: 1 },
-    { x: 0, y: offset, opacity: 1 },
-    { x: offset, y: offset, opacity: 0.3 },
-  ];
+  const cells = [];
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 4; col++) {
+      let opacity = 0.3;
+      if (row === 0 || col === 0) opacity = 1;
+      else if (row + col <= 4) opacity = 0.75;
+      cells.push({ row, col, opacity });
+    }
+  }
+
+  const cell = size / 4;
+  const gap = cell * 0.1;
+  const r = cell * 0.2;
 
   return (
     <div
@@ -66,18 +66,18 @@ export function LogoGrid({ size, color = COLORS.light }: GridProps) {
         background: "transparent",
       }}
     >
-      {cells.map((rect) => (
+      {cells.map(({ row, col, opacity }) => (
         <div
-          key={`${rect.x}-${rect.y}`}
+          key={`${row}-${col}`}
           style={{
             position: "absolute",
-            left: rect.x,
-            top: rect.y,
-            width: cell,
-            height: cell,
-            borderRadius: radius,
+            left: col * cell + gap,
+            top: row * cell + gap,
+            width: cell - gap * 2,
+            height: cell - gap * 2,
+            borderRadius: r,
             background: color,
-            opacity: rect.opacity,
+            opacity,
           }}
         />
       ))}

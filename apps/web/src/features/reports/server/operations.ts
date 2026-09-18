@@ -1521,23 +1521,30 @@ function estimatePdfTextWidth(value: string, size: number): number {
 }
 
 function pdfDubGridLogoCommands(x: number, top: number, size = 24): string[] {
-  const gap = size * 0.045;
-  const cell = (size - gap) / 2;
-  const offset = cell + gap;
-  // Report PDFs print the mark in ink rather than brand blue, so the pinwheel
-  // separates by tone: the solid diagonal in ink, the other in the light tone.
+  const cell = size / 4;
+  const gap = cell * 0.1;
+  const square = cell - gap * 2;
   const ink: [number, number, number] = [0.059, 0.09, 0.141];
+  const medium: [number, number, number] = [0.294, 0.318, 0.356];
   const light: [number, number, number] = [0.718, 0.727, 0.742];
-  const cells: Array<{ dx: number; dy: number; color: [number, number, number] }> = [
-    { dx: 0, dy: 0, color: light },
-    { dx: offset, dy: 0, color: ink },
-    { dx: 0, dy: offset, color: ink },
-    { dx: offset, dy: offset, color: light },
-  ];
+  const commands: string[] = [];
 
-  return cells.map((rect) =>
-    pdfFillRgbRectCommand(x + rect.dx, top - rect.dy - cell, cell, cell, rect.color),
-  );
+  for (const row of [0, 1, 2, 3]) {
+    for (const col of [0, 1, 2, 3]) {
+      const color = row === 0 || col === 0 ? ink : row + col <= 4 ? medium : light;
+      commands.push(
+        pdfFillRgbRectCommand(
+          x + col * cell + gap,
+          top - row * cell - gap - square,
+          square,
+          square,
+          color,
+        ),
+      );
+    }
+  }
+
+  return commands;
 }
 
 function pdfImageCommand(

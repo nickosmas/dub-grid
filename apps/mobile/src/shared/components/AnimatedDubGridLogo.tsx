@@ -18,18 +18,19 @@ import {
 } from "@dubgrid/design-tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 
-/** The pinwheel's recessive diagonal, matching the static `DubGridLogo`. */
-const RECESSIVE_CELL_OPACITY = 0.3;
+const ROWS = [0, 1, 2, 3] as const;
+const COLS = [0, 1, 2, 3] as const;
 
 /**
- * Mobile twin of the web AnimatedDubGridLogo: the four-cell pinwheel with each
- * cell pulsing on its own random [duration, delay], generated at mount.
+ * Mobile twin of the web AnimatedDubGridLogo. Cells render as native
+ * <View>s with backgroundColor + borderRadius (visually identical to
+ * the SVG <rect>s on web at this size — no react-native-svg dependency).
+ * Each cell's opacity is driven by a Reanimated shared value running on
+ * the UI thread with random [duration, delay] generated at mount, so the
+ * splash looks fresh every time.
  *
- * Startup surfaces do not use this. They show the static `DubGridLogo` and put
- * their motion in `StartupProgress`, so this is left for any route-level
- * loading state that wants the mark itself to breathe.
- *
- * Under reduced motion it falls back to the static mark's own tones.
+ * When the OS reports reduced-motion preference, falls back to a static
+ * render mirroring the web `DubGridLogo` brand mark.
  */
 export function AnimatedDubGridLogo({
   size = BRAND_ANIMATED_LOGO_SIZE,
@@ -42,16 +43,10 @@ export function AnimatedDubGridLogo({
   const resolvedColor = color ?? mobileColors.brand;
   const reducedMotion = useReducedMotion();
   const timings = useMemo(() => generateAnimatedLogoTimings(), []);
-  const gap = size * 0.045;
-  const cell = (size - gap) / 2;
+  const cell = size / 4;
+  const gap = cell * 0.1;
+  const inner = cell - gap * 2;
   const radius = cell * 0.2;
-  const offset = cell + gap;
-  const cells = [
-    { x: 0, y: 0, restOpacity: RECESSIVE_CELL_OPACITY },
-    { x: offset, y: 0, restOpacity: 1 },
-    { x: 0, y: offset, restOpacity: 1 },
-    { x: offset, y: offset, restOpacity: RECESSIVE_CELL_OPACITY },
-  ];
 
   return (
     <View
@@ -59,35 +54,44 @@ export function AnimatedDubGridLogo({
       accessibilityRole="image"
       style={{ width: size, height: size }}
     >
-      {cells.map((rect, index) => {
-        const [duration, delay] = timings[index];
-        const style = {
-          position: "absolute" as const,
-          left: rect.x,
-          top: rect.y,
-          width: cell,
-          height: cell,
-          borderRadius: radius,
-          backgroundColor: resolvedColor,
-        };
+      {ROWS.map((row) =>
+        COLS.map((col) => {
+          const index = row * 4 + col;
+          const [duration, delay] = timings[index];
+          const style = {
+            position: "absolute" as const,
+            left: col * cell + gap,
+            top: row * cell + gap,
+            width: inner,
+            height: inner,
+            borderRadius: radius,
+            backgroundColor: resolvedColor,
+          };
 
-        if (reducedMotion) {
+          if (reducedMotion) {
+            return (
+              <View key={`${row}-${col}`} style={[style, { opacity: staticOpacity(row, col) }]} />
+            );
+          }
+
           return (
-            <View key={`${rect.x}-${rect.y}`} style={[style, { opacity: rect.restOpacity }]} />
+            <PulseCell
+              key={`${row}-${col}`}
+              style={style}
+              durationMs={duration * 1000}
+              delayMs={delay * 1000}
+            />
           );
-        }
-
-        return (
-          <PulseCell
-            key={`${rect.x}-${rect.y}`}
-            style={style}
-            durationMs={duration * 1000}
-            delayMs={delay * 1000}
-          />
-        );
-      })}
+        }),
+      )}
     </View>
   );
+}
+
+function staticOpacity(row: number, col: number) {
+  if (row === 0 || col === 0) return 1;
+  if (row + col <= 4) return 0.75;
+  return 0.3;
 }
 
 function PulseCell({
