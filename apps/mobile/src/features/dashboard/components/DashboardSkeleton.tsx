@@ -6,8 +6,8 @@ import {
   SkeletonLine,
   SkeletonPill,
   skeletonRows,
+  useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
-import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -16,6 +16,7 @@ import {
   mobileSpace,
   mobileSpacing,
   type MobileColors,
+  mobileText,
 } from "../../../shared/theme/tokens";
 
 /**
@@ -217,34 +218,16 @@ export function DashboardSkeleton({
   );
 }
 
-/** The greeting block that sits in the screen's sticky header slot. */
-export function DashboardHeaderSkeleton() {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  // The bell is the real control: it needs no dashboard data, and drawing it
-  // now means it does not pop in beside the greeting when the page resolves.
-  return (
-    <View style={styles.headerRow}>
-      <View style={styles.header}>
-        <SkeletonLine variant="display" width="58%" />
-        <SkeletonLine variant="meta" width="74%" />
-      </View>
-      <AlertsHeaderButton />
-    </View>
-  );
-}
-
 /**
  * The expanded single-metric routes under `home/`: a filter header, then a
  * borderless list at the real 16pt gap.
  */
 export function DashboardListSkeleton({
-  rows = 4,
+  rows,
   showFilterHeader = true,
   variant = "figure",
 }: {
+  /** Defaults to enough rows to reach the bottom of the screen. */
   rows?: number;
   showFilterHeader?: boolean;
   variant?: DashboardRowVariant;
@@ -252,6 +235,16 @@ export function DashboardListSkeleton({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  // Two lines at the list row's padding, plus the 16pt list gap; the
+  // reserved height is the native header and the filter row above the list.
+  const fillRows = useSkeletonFillCount(
+    mobileListRow.paddingVertical * 2 +
+      mobileText.body.lineHeight +
+      mobileText.caption.lineHeight +
+      16,
+    160,
+  );
+  const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup style={styles.expandedPage}>
@@ -262,7 +255,7 @@ export function DashboardListSkeleton({
         </View>
       ) : null}
       <View style={styles.expandedList}>
-        {skeletonRows(rows, (index) => (
+        {skeletonRows(rowCount, (index) => (
           <DashboardRow key={`expanded-row-${index}`} variant={variant} />
         ))}
       </View>
@@ -288,16 +281,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "space-between",
       gap: mobileSpace.md,
-    },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-    },
-    header: {
-      flex: 1,
-      gap: mobileSpace.xs,
     },
     heroCoverage: {
       gap: mobileSpace.sm,
