@@ -6,7 +6,17 @@ import { mobileRadii, mobileRadius } from "../theme/tokens";
 const hapticSelection = vi.fn();
 const hapticImpact = vi.fn();
 
-vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+const windowDimensions = vi.hoisted(() => ({ fontScale: 1 }));
+vi.mock("react-native", async () => {
+  const native = createReactNativeModule(await import("react"));
+  return {
+    ...native,
+    useWindowDimensions: () => ({
+      ...native.useWindowDimensions(),
+      fontScale: windowDimensions.fontScale,
+    }),
+  };
+});
 
 vi.mock("../lib/haptics", () => ({
   hapticSelection: () => hapticSelection(),
@@ -30,6 +40,7 @@ beforeAll(async () => {
 beforeEach(() => {
   hapticSelection.mockClear();
   hapticImpact.mockClear();
+  windowDimensions.fontScale = 1;
 });
 
 describe("Button", () => {
@@ -247,5 +258,25 @@ describe("Button", () => {
 
     expect(screen.getByRole("button", { name: "Compact" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Small" })).toBeInTheDocument();
+  });
+
+  describe("at a raised text size", () => {
+    it("shrinks a filled label to fit only at the default size", () => {
+      render(<Button label="Cancel" onPress={vi.fn()} />);
+      const label = screen.getByText("Cancel");
+      expect(label).toHaveAttribute("data-adjusts-font-size-to-fit", "true");
+      expect(label).toHaveAttribute("data-number-of-lines", "1");
+    });
+
+    // Both platforms fit against the unscaled size, so a shrunk label sat at
+    // three quarters of the base beside body copy at one and a half. Large
+    // text keeps its size and wraps instead.
+    it("keeps a filled label at the reader's size and lets it wrap", () => {
+      windowDimensions.fontScale = 1.6;
+      render(<Button label="Cancel" onPress={vi.fn()} />);
+      const label = screen.getByText("Cancel");
+      expect(label).not.toHaveAttribute("data-adjusts-font-size-to-fit");
+      expect(label).toHaveAttribute("data-number-of-lines", "2");
+    });
   });
 });

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
 import Animated from "react-native-reanimated";
@@ -83,6 +84,12 @@ const SIZE = {
  * Filled and outlined labels scale down to a legible floor before they
  * truncate, so equal-width peers in an action grid keep whole words. Links
  * skip this: a link is text, and shrinking text reads as a rendering fault.
+ *
+ * Only at the default text size. Once the reader has raised it, both
+ * platforms fit the label against the unscaled size, so "Cancel" landed at
+ * three quarters of the base while the sentence above it sat at one and a
+ * half: a tiny label next to large text. Large text keeps its size and takes
+ * a second line instead.
  */
 const SCALE_THEN_TRUNCATE = { adjustsFontSizeToFit: true, minimumFontScale: 0.75 } as const;
 
@@ -166,6 +173,7 @@ export function Button({
 
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];
+  const isLargeText = useWindowDimensions().fontScale > 1;
   // A link is text, not a filled control. Given a filled button's padding it
   // starved its own label in a tight slot (onboarding's 64pt "Skip" box left
   // 24pt for the word), and iOS then shrank the text far past the floor the
@@ -238,13 +246,14 @@ export function Button({
         {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text
-            {...(isLink ? undefined : SCALE_THEN_TRUNCATE)}
+            {...(isLink || isLargeText ? undefined : SCALE_THEN_TRUNCATE)}
             ellipsizeMode="tail"
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             // A link is a sentence, and at accessibility sizes a one-line
             // link ate its own question ("Need help with your subdom…").
-            // Filled buttons stay on one line by the app-wide rule.
-            numberOfLines={isLink ? 2 : 1}
+            // Filled buttons stay on one line by the app-wide rule at the
+            // default size; large text wraps rather than shrinks.
+            numberOfLines={isLink || isLargeText ? 2 : 1}
             style={[mobileText[LABEL_VARIANT[resolvedSize]], styles.label, { color: labelColor }]}
           >
             {content}

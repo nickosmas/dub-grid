@@ -159,9 +159,11 @@ export function SplitShiftSegmentList({
                 <View style={styles.segmentHeroBody}>
                   <View style={styles.segmentHeroShiftGroup}>
                     <View style={styles.segmentHeroTitleRow}>
+                      {/* Two lines rather than shrink-to-fit: with a raised text
+                          size the shrink undid the reader's setting and left a
+                          shift name tiny beside its badge. */}
                       <Text
-                        adjustsFontSizeToFit
-                        numberOfLines={1}
+                        numberOfLines={2}
                         style={[
                           styles.segmentHeroPrimaryText,
                           styles.segmentHeroTitleText,
@@ -247,8 +249,7 @@ export function SplitShiftSegmentList({
                   <View style={styles.segmentShiftGroup}>
                     <View style={styles.segmentTitleRow}>
                       <Text
-                        adjustsFontSizeToFit
-                        numberOfLines={1}
+                        numberOfLines={2}
                         style={[
                           styles.segmentTitle,
                           styles.segmentTitleMain,
