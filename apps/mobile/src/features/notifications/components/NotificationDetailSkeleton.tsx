@@ -24,8 +24,10 @@ import {
  * its action pills.
  */
 export function NotificationDetailSkeleton({
-  messageLines = 4,
-  metadataRows = 3,
+  messageLines = 2,
+  // Most alerts carry no metadata, so the Details card is off by default;
+  // a placeholder card that then vanished read as a load failure.
+  metadataRows = 0,
 }: {
   messageLines?: number;
   metadataRows?: number;
@@ -52,14 +54,16 @@ export function NotificationDetailSkeleton({
           />
         ))}
       </View>
-      <View style={styles.metadataCard}>
-        {skeletonRows(metadataRows, (index) => (
-          <View key={`alert-metadata-${index}`} style={styles.metadataRow}>
-            <SkeletonLine variant="caption" width="32%" style={styles.grow} />
-            <SkeletonLine variant="caption" width="42%" style={styles.grow} />
-          </View>
-        ))}
-      </View>
+      {metadataRows > 0 ? (
+        <View style={styles.metadataCard}>
+          {skeletonRows(metadataRows, (index) => (
+            <View key={`alert-metadata-${index}`} style={styles.metadataRow}>
+              <SkeletonLine variant="caption" width="32%" style={styles.grow} />
+              <SkeletonLine variant="caption" width="42%" style={styles.grow} />
+            </View>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.actionsRow}>
         <SkeletonBlock height={40} radius={mobileRadii.control} width={128} />
         <SkeletonBlock height={40} radius={mobileRadii.control} width={104} />

@@ -36,10 +36,12 @@ import {
 } from "../../../shared/lib/mobile-query-keys";
 import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
+import { SkeletonLine, SkeletonPill } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
+  mobileControl,
   mobileElevation,
   mobileRadii,
   mobilePillOverflow,
@@ -333,6 +335,14 @@ export default function NotificationsScreen() {
           />
         )}
       </View>
+      {/* The unread row is almost always there once the facets land, so the
+          placeholder holds its height and the list does not drop on load. */}
+      {contentState.kind === "loading" && contentState.showSkeleton ? (
+        <View style={styles.actionRow}>
+          <SkeletonLine variant="sectionTitle" width={104} />
+          <SkeletonPill height={mobileControl.sm} width={124} />
+        </View>
+      ) : null}
       {unreadCount > 0 ? (
         <View style={styles.actionRow}>
           <Text style={styles.actionCopy}>{unreadCount} unread</Text>
