@@ -148,6 +148,13 @@ glow on a black page.
   gained `presentation="inline"`, `FullPageSheet` an `overlay` slot above
   its header and footer, and Close only calls `onDismiss`. Verified on
   device: pick a target, Close, "Discard this request?" over the sheet.
+- `c987c8f4`: the same defect on the drop sheet: "Submit this call-off?"
+  was a root-level Modal while the bottom sheet's Modal was up, so Submit
+  did nothing. `BottomSheetModal` gained the `overlay` slot too, and the
+  shift detail builds both confirmations once (`requestConfirmations`) and
+  renders them inline inside whichever sheet is up, as ordinary modals only
+  when none is. Verified on device: Call off, Sick, Submit, the question
+  over the sheet; Cancel; Close.
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 

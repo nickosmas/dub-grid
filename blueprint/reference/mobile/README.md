@@ -82,7 +82,10 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | alerts-swipe-ios-light-default-admin                                                         | captured | A row swiped left revealing Read and Archive                                                                                                                                                                                                           |
 | request-sheet-ios-light-default-admin                                                        | captured | Drop shift: title, X outside the pan area, Offer for pickup and Call off, no footer band before a choice                                                                                                                                               |
 | shift-detail-ios-light-default-admin                                                         | captured | Your own upcoming shift: Drop shift and Swap as peer controls, Working with rows                                                                                                                                                                       |
-| request-sheet-\* (pickup, call-off confirmation, error)                                      | pending  | Needs the request flow driven past the first choice by hand                                                                                                                                                                                            |
+| request-sheet-calloff-ios-light-default-admin                                                | captured | Call off chosen: the red card checked, the absence reason chips                                                                                                                                                                                        |
+| request-sheet-calloff-review-ios-light-default-admin                                         | captured | A reason chosen: Sick alone under Absence reason, Back and Submit in the footer                                                                                                                                                                        |
+| request-sheet-calloff-confirm-ios-light-default-admin                                        | captured | Submit: "Submit this call-off?" drawn inside the sheet, Cancel and Submit Call-off                                                                                                                                                                     |
+| request-sheet-\* (pickup, error)                                                             | pending  | Offer for pickup with a teammate; a failed submit                                                                                                                                                                                                      |
 | swap-sheet-ios-light-default-admin                                                           | captured | Swap as an iOS page sheet: title with X, Your shift panel, Eligible teammates with the week strip and counts, teammate rows                                                                                                                            |
 | swap-sheet-target-ios-light-default-admin                                                    | captured | A target chosen: You give / You get panels, the selection sentence, Back and Submit in the footer                                                                                                                                                      |
 | swap-sheet-discard-ios-light-default-admin                                                   | captured | Close with a target chosen: the discard question drawn inside the sheet (Keep Editing / Discard)                                                                                                                                                       |
@@ -152,6 +155,13 @@ noted in the archive of the feature that captured them.
   draws as an overlay inside the sheet (`ConfirmationModal
 presentation="inline"`, `FullPageSheet overlay`), and Close no longer
   remounts the card.
+- 2026-09-18, drop sheet (device pass): Submit on a call-off did nothing on
+  device. The "Submit this call-off?" confirmation was a root-level Modal
+  while the bottom sheet's own Modal was up, and UIKit refused it. Fixed in
+  place: `BottomSheetModal` gained the same `overlay` slot as the page
+  sheet, and the shift detail routes both of its confirmations through
+  whichever request sheet is showing. Close on the drop sheet has no discard
+  question by design: its choices are single taps.
 - 2026-09-18, environment: on this dev build the request buttons can take
   several seconds to respond right after the shift detail opens (its queries
   settle first); a tap that lands earlier is dropped. The app console (via
