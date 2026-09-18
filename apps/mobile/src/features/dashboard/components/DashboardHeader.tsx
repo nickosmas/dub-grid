@@ -4,6 +4,7 @@ import { AlertsHeaderButton } from "../../../shared/navigation/AlertsHeaderButto
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileSpace,
   mobileTabularText,
   mobileText,
@@ -77,7 +78,7 @@ export function DashboardHeader({
   return (
     <View style={styles.row}>
       <View style={styles.copy}>
-        <Text numberOfLines={1} style={styles.greeting}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={2} style={styles.greeting}>
           {greeting}
         </Text>
         {periodLabel ? <Text style={styles.meta}>{periodLabel}</Text> : null}

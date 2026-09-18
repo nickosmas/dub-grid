@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
 import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
 import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-tokens";
@@ -9,6 +9,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileElevation,
   mobileRadius,
   mobileText,
@@ -163,9 +164,14 @@ export function MyScheduleCard({
 }) {
   const mobileColors = useMobileColors();
   const isDarkTheme = useIsDarkMode();
+  // The pill's width follows its text: at the larger accessibility sizes a
+  // fixed 124pt cut "Day Shift" to "Day..." and the time to its hour. The
+  // text itself is capped at MAX_FONT_SCALE, so the width caps there too.
+  const { fontScale } = useWindowDimensions();
+  const pillWidth = Math.round(PILL_WIDTH * Math.min(Math.max(fontScale, 1), MAX_FONT_SCALE));
   const styles = useMemo(
-    () => createStyles(mobileColors, isDarkTheme),
-    [mobileColors, isDarkTheme],
+    () => createStyles(mobileColors, isDarkTheme, pillWidth),
+    [mobileColors, isDarkTheme, pillWidth],
   );
   // The screens that render this card fold the same query into their content
   // state, so by the time the card mounts the data is there. No local loading
@@ -197,7 +203,7 @@ export function MyScheduleCard({
 
             return (
               <View key={dateIso} style={styles.dayCard}>
-                <Text style={styles.dayHeader}>
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.dayHeader}>
                   {weekday} {dayNumber}
                 </Text>
                 {segmentPills.length > 0 ? (
@@ -211,6 +217,7 @@ export function MyScheduleCard({
                         ]}
                       >
                         <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
                           numberOfLines={1}
                           style={[
                             styles.shiftName,
@@ -223,6 +230,7 @@ export function MyScheduleCard({
                             when absent) so every pill has the same
                             three-line height. */}
                         <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
                           numberOfLines={1}
                           style={[
                             styles.shiftJobName,
@@ -232,6 +240,7 @@ export function MyScheduleCard({
                           {segment.jobName ?? " "}
                         </Text>
                         <Text
+                          maxFontSizeMultiplier={MAX_FONT_SCALE}
                           numberOfLines={1}
                           style={[
                             styles.shiftTime,
@@ -247,7 +256,9 @@ export function MyScheduleCard({
                   // Nothing scheduled at all. Absences no longer land here —
                   // they render as their own coloured pill above.
                   <View style={styles.emptyPill}>
-                    <Text style={styles.emptyText}>—</Text>
+                    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.emptyText}>
+                      —
+                    </Text>
                   </View>
                 )}
               </View>
@@ -285,7 +296,7 @@ export function MyScheduleCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, pillWidth: number) =>
   StyleSheet.create({
     // Cancels the screen gutter so the strip runs to the screen edges; the
     // same gutter comes back as content padding, so the first and last day
@@ -306,7 +317,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // hairline around the day only drew a second container inside the card:
     // the day header and the gap between days do that job on their own.
     dayCard: {
-      minWidth: PILL_WIDTH,
+      minWidth: pillWidth,
       gap: 8,
     },
     dayHeader: {
@@ -324,7 +335,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // subtle edge keep it legible when a shift colour lands close to the
     // page behind it.
     shiftPill: {
-      width: PILL_WIDTH,
+      width: pillWidth,
       gap: mobileSpace.xs,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
@@ -354,7 +365,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textMuted,
     },
     emptyPill: {
-      width: PILL_WIDTH,
+      width: pillWidth,
       minHeight: SHIFT_PILL_MIN_HEIGHT,
       justifyContent: "center",
     },

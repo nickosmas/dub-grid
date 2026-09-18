@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
+  MAX_FONT_SCALE,
   mobileListRow,
   mobileRadii,
   mobileSpace,
@@ -38,14 +39,19 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
     >
       <View style={styles.rowBody}>
         <View style={styles.rowHeader}>
-          <Text numberOfLines={1} style={styles.label}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} style={styles.label}>
             {section.focusAreaName}
           </Text>
           <View style={styles.rowNumbers}>
-            <Text style={styles.filledText}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.filledText}>
               {section.filledTotal} / {section.requiredTotal} filled
             </Text>
-            <Text style={[styles.pctText, { color: pctColor }]}>{section.pct}%</Text>
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
+              style={[styles.pctText, { color: pctColor }]}
+            >
+              {section.pct}%
+            </Text>
           </View>
         </View>
         <View style={styles.track}>
@@ -69,8 +75,11 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       gap: mobileSpace.sm,
     },
+    // Wraps so that at the larger text sizes the figures drop under the
+    // name instead of squeezing it to its first letter.
     rowHeader: {
       flexDirection: "row",
+      flexWrap: "wrap",
       justifyContent: "space-between",
       alignItems: "baseline",
       gap: mobileSpace.sm,
