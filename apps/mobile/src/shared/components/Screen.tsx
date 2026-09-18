@@ -151,17 +151,17 @@ export function Screen({
    *
    * A placeholder standing in for content should not scroll, and there is
    * nothing to pull-to-refresh while the thing is still loading. Full-page
-   * error and empty states deliberately do *not* use this: they keep the
-   * scroll view, because `contentContainerStyle`'s `flexGrow: 1` already gives
-   * a `fillScreen` child real space to claim, and leaving scroll mode costs an
-   * iOS `headerLargeTitle` the ability to collapse (it sits permanently
-   * expanded, pushing the page down) as well as pull-to-refresh itself.
+   * error and empty states deliberately do *not* use this: `contentContainerStyle`'s
+   * `flexGrow: 1` already gives a `fillScreen` child real space to claim.
    *
-   * Swaps the `ScrollView` for a plain `flex: 1` `View`. `stickyHeader` still
-   * renders, in normal flow rather than floating. `onRefresh`, `onScroll` and
-   * `scrollViewRef` all do nothing here, and content taller than the viewport
-   * is clipped rather than reachable — which is the intended trade for a
-   * skeleton and the wrong one for anything else.
+   * The `ScrollView` stays mounted either way. It used to be swapped for a
+   * plain `View`, and on iOS that cost every screen whose data arrived after
+   * it appeared its large title: UIKit binds the title's collapse to the
+   * scroll view present when the screen appears, and one mounted later is
+   * never tracked, so the title sat expanded for the life of the screen
+   * (Alerts, every time). Now only scrolling, bouncing and pull-to-refresh
+   * switch off; the sticky header floats exactly as it does once loaded, so
+   * nothing shifts when the content resolves.
    */
   scrollEnabled?: boolean;
 }>) {
@@ -295,6 +295,8 @@ export function Screen({
       contentInset={iosContentInset}
       contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
+      scrollEnabled={scrollEnabled}
+      bounces={scrollEnabled}
       // UIKit will otherwise let a mostly-vertical drag briefly rubber-band on
       // the horizontal axis. That exposes the navigation controller behind the
       // page as a white corner at the top-right of a light screen.
@@ -304,7 +306,7 @@ export function Screen({
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
       refreshControl={
-        onRefresh ? (
+        onRefresh && scrollEnabled ? (
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
@@ -340,50 +342,6 @@ export function Screen({
   const footerBar = footer ? (
     <View style={[styles.footer, { paddingBottom: resolvedFooterBottomPadding }]}>{footer}</View>
   ) : null;
-
-  if (!scrollEnabled) {
-    // Without a sticky header this branch assumes a native header above it, and
-    // every caller today has one. A headerless skeleton screen of its own would
-    // need a sticky header, or `stickyHeaderTopPadding`, to clear the status bar.
-    return (
-      <View style={styles.root}>
-        {pageBackground}
-        {stickyHeader ? (
-          // Nothing scrolls under it here, so it needs none of the floating
-          // shell's `position: absolute` and scroll-under chrome — just the
-          // same fill, padding and hairline, in normal flow above the content.
-          <View
-            style={[
-              styles.stickyHeaderShell,
-              styles.nonScrollStickyHeaderShell,
-              stickyHeaderShellStyle,
-              { paddingTop: resolvedStickyHeaderTopPadding },
-            ]}
-          >
-            {stickyHeaderBackground}
-            {stickyHeader}
-          </View>
-        ) : null}
-        <View
-          style={[
-            styles.content,
-            // Same rule as the scrolling branch: content under a sticky header
-            // is held off it by one section gap. Hardcoding `contentDefault`
-            // here gave a skeleton no top padding at all, so it sat flush
-            // against the header where the real content it stands in for is
-            // inset — the placeholder has to occupy the same space, or the page
-            // visibly shifts the moment it resolves.
-            stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
-            styles.nonScrollContent,
-            { paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding },
-          ]}
-        >
-          {children}
-        </View>
-        {footerBar}
-      </View>
-    );
-  }
 
   if (shouldExposeNativeScrollRoot) {
     return scrollView;
@@ -537,9 +495,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     contentWithStickyHeader: {
       paddingTop: mobileSpacing.sectionGap,
     },
-    nonScrollContent: {
-      flex: 1,
-    },
     footer: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
@@ -584,14 +539,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // the earlier sibling, so it loses ties. The floating case gets its
       // shadow from the `stickyHeaderShadow` wrapper instead; putting it here
       // too would just be clipped by this view's own `overflow: "hidden"`.
-    },
-    nonScrollStickyHeaderShell: {
-      // Nothing scrolls under this variant, so it sits in normal flow
-      // instead of floating and carries its own (harmless, since nothing
-      // passes beneath it) shadow directly rather than needing the floating
-      // case's separate unclipped wrapper.
-      position: "relative",
-      ...(hasPageBackground ? null : mobileElevation("header", isDark)),
     },
     overlayLayer: {
       ...StyleSheet.absoluteFillObject,
