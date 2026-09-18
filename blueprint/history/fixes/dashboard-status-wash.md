@@ -160,6 +160,18 @@ glow on a black page.
   `AppText` has, the pill width grows with the text, the greeting may take
   two lines, and a coverage row's figures wrap under its name. Captured as
   `dashboard-ios-light-ax-admin`.
+- `2ddac557`, `887dad3e`: the three observations closed. The period toggle
+  takes the row once text is scaled up (`SegmentedControl stretch`) and its
+  labels take the font cap; the alerts list and detail join the root stack
+  (native back); a request card's time wraps under a long shift name.
+- `13819b99`: every large title collapses. `Screen` swapped its ScrollView
+  for a plain View while a skeleton showed; iOS binds a large title's
+  collapse to the scroll view present when the screen appears, so a screen
+  whose data arrived later (Alerts, every time) kept its title expanded.
+  The ScrollView stays mounted now and only scrolling, bouncing and
+  pull-to-refresh switch off for a skeleton. Bisected and verified on
+  device (cold-open Alerts collapses; People, Requests, staff profile
+  unchanged).
 
 ## Completion pass (2026-09-17, after the follow-up rounds)
 

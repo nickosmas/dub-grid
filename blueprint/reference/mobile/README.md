@@ -134,13 +134,13 @@ noted in the archive of the feature that captured them.
   lines, team rows a 44pt avatar and a round arrow, dashboard rows badges;
   and every percentage-wide line laid out in a row collapsed to nothing.
   Fixed in place, see the dashboard-status-wash archive's follow-ups.
-- 2026-09-17, requests, Available (observation, open): "Evening Shift" wraps
-  to two lines beside its time in the card header at default text size.
-  Not changed in this pass.
+- 2026-09-17, requests, Available: "Evening Shift" wraps to two lines beside
+  its time in the card header at default text size. Fixed on 2026-09-18,
+  see below.
 - 2026-09-17, alerts (observation, open): the list is a root stack screen
   with its header hidden and draws no back control of its own, so leaving it
-  relies on the iOS edge swipe; the alert detail does draw one. Not changed
-  in this pass.
+  relies on the iOS edge swipe; the alert detail does draw one. Fixed on
+  2026-09-18, see below.
 - 2026-09-17, shift detail (device pass): the drop and swap sheets showed a
   hairline over an empty band under the body before any choice was made.
   Fixed in place: the footer is passed only when it has content.
@@ -158,6 +158,25 @@ noted in the archive of the feature that captured them.
   draws as an overlay inside the sheet (`ConfirmationModal
 presentation="inline"`, `FullPageSheet overlay`), and Close no longer
   remounts the card.
+- 2026-09-18, every large title (device pass): the Alerts large title never
+  collapsed, in the nested stack it used to have and in the root stack alike,
+  while People, Requests and the staff profile collapsed. Bisected on device:
+  `Screen` swapped its ScrollView for a plain View while a skeleton showed,
+  and iOS binds a large title's collapse to the scroll view present when the
+  screen appears, so a screen whose data landed after it appeared kept its
+  title expanded for good. Fixed in place, app-wide: the ScrollView stays
+  mounted for a skeleton and only scrolling, bouncing and pull-to-refresh
+  switch off. Alerts verified collapsing on a cold open after the fix.
+- 2026-09-18, alerts (device pass): no back control. Fixed in place: the
+  alerts list and detail join the root stack, so the list draws the native
+  back like every drill-in.
+- 2026-09-18, period toggle at accessibility sizes: "D...", "W...", "2 We...".
+  Fixed in place: the control takes the row once text is scaled up
+  (`SegmentedControl stretch`) and its labels take the app-wide font cap.
+  Verified by test; the device capture is pending a LAN address change
+  (the simulator lost the API mid-pass).
+- 2026-09-18, requests, Available: "Evening Shift" broke beside its time.
+  Fixed in place: the time wraps under the name when there is no room.
 - 2026-09-18, dashboard at accessibility extra-large: the greeting cut to
   "Morni...", the shift pills to "Day..." and their hour, a coverage row's
   name to its first letter beside its figures. Fixed in place: the strip
