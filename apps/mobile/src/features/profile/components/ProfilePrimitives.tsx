@@ -312,7 +312,7 @@ export function ProfileList({
         insideSheet ? styles.flatInSheet : null,
       ]}
     >
-      {children}
+      <View style={variant === "plain" ? null : styles.listClip}>{children}</View>
     </View>
   );
 }
@@ -495,40 +495,42 @@ export function ProfileChoiceGroup<TId extends string | number>({
     <View style={styles.choiceGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.list}>
-        {items.map((item, index) => {
-          const selected = selectedIds.includes(item.id);
-          return (
-            <PressableRow
-              accessibilityLabel={
-                item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
-              }
-              accessibilityRole={selection === "single" ? "radio" : "checkbox"}
-              checked={selected}
-              disabled={item.disabled}
-              key={item.id}
-              onPress={() => onToggle(item.id)}
-              style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
-            >
-              <Text
-                maxFontSizeMultiplier={MAX_FONT_SCALE}
-                style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+        <View style={styles.listClip}>
+          {items.map((item, index) => {
+            const selected = selectedIds.includes(item.id);
+            return (
+              <PressableRow
+                accessibilityLabel={
+                  item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
+                }
+                accessibilityRole={selection === "single" ? "radio" : "checkbox"}
+                checked={selected}
+                disabled={item.disabled}
+                key={item.id}
+                onPress={() => onToggle(item.id)}
+                style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
               >
-                {item.name}
-              </Text>
-              <View
-                style={[
-                  styles.choiceMark,
-                  selection === "multiple" && !selected && styles.choiceMarkRing,
-                  selected && styles.choiceMarkSelected,
-                ]}
-              >
-                {selected ? (
-                  <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
-                ) : null}
-              </View>
-            </PressableRow>
-          );
-        })}
+                <Text
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+                >
+                  {item.name}
+                </Text>
+                <View
+                  style={[
+                    styles.choiceMark,
+                    selection === "multiple" && !selected && styles.choiceMarkRing,
+                    selected && styles.choiceMarkSelected,
+                  ]}
+                >
+                  {selected ? (
+                    <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
+                  ) : null}
+                </View>
+              </PressableRow>
+            );
+          })}
+        </View>
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -865,13 +867,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       padding: 16,
       ...mobileElevation("card", isDark),
     },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    listClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     listPlain: {
       gap: 0,

@@ -53,8 +53,10 @@ export {
 export {
   darkMobileElevationTokens,
   getMobileElevation,
+  getMobileElevationExtent,
   mobileElevationTokens,
   type MobileElevation,
+  type MobileElevationExtent,
   type MobileElevationLevel,
 } from "./elevation";
 

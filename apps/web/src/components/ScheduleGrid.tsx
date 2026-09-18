@@ -121,6 +121,7 @@ import {
   getGridCellKey,
   getBulkSelectionRingStyle,
   cellLevelDiffBadge,
+  publishCellLevelBadge,
   cellShowsDraftDiffBadge,
   formatActiveRequestLabel,
   buildPublishTooltip,
@@ -2397,11 +2398,7 @@ const SectionBlock = memo(function SectionBlock({
                                     : null;
 
                                   const publishCellBadge = isPubDiff
-                                    ? (cellLevelDiffBadge(publishDiffSummary) ??
-                                      (publishDiffSummary?.cellBadge?.kind === "new" &&
-                                      publishDiff?.isNewAddition !== false
-                                        ? publishDiffSummary.cellBadge
-                                        : null))
+                                    ? publishCellLevelBadge(publishDiffSummary, labels.length)
                                     : null;
                                   const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
                                     ? {
@@ -2452,11 +2449,10 @@ const SectionBlock = memo(function SectionBlock({
                                     descriptor: ShiftDiffBadgeDescriptor | null | undefined;
                                   }): GridDiffBadgeConfig | null => {
                                     const { source, descriptor } = args;
+                                    // A draft "New" is already the dashed border.
                                     if (
                                       !descriptor ||
-                                      (descriptor.kind === "new" &&
-                                        (source === "draft" ||
-                                          publishDiff?.isNewAddition === false))
+                                      (descriptor.kind === "new" && source === "draft")
                                     ) {
                                       return null;
                                     }

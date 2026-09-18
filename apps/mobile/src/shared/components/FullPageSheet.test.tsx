@@ -1,9 +1,28 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../test/native";
 import { getVisibleSheetCount, resetSheetPresentationTracking } from "../lib/modal-presentation";
 
-vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+const nativeModal = vi.hoisted(() => ({
+  allowSwipeDismissal: undefined as boolean | undefined,
+  mounts: 0,
+  requestClose: undefined as undefined | (() => void),
+}));
+vi.mock("react-native", async () => {
+  const React = await import("react");
+  const native = createReactNativeModule(React);
+  return {
+    ...native,
+    Modal: (props: Record<string, unknown>) => {
+      nativeModal.allowSwipeDismissal = props.allowSwipeDismissal as boolean | undefined;
+      nativeModal.requestClose = props.onRequestClose as () => void;
+      React.useEffect(() => {
+        nativeModal.mounts += 1;
+      }, []);
+      return React.createElement(native.Modal, props);
+    },
+  };
+});
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
 );
@@ -17,6 +36,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetSheetPresentationTracking();
+  nativeModal.allowSwipeDismissal = undefined;
+  nativeModal.mounts = 0;
+  nativeModal.requestClose = undefined;
 });
 
 describe("FullPageSheet", () => {
@@ -65,5 +87,50 @@ describe("FullPageSheet", () => {
     expect(close).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(close);
     expect(onDismiss).not.toHaveBeenCalled();
+    expect(nativeModal.allowSwipeDismissal).toBe(false);
+    act(() => nativeModal.requestClose?.());
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("lets a clean sheet be swiped away and closes it through the funnel", () => {
+    const onDismiss = vi.fn();
+
+    render(
+      <FullPageSheet title="Swap" visible onDismiss={onDismiss}>
+        <span>Body</span>
+      </FullPageSheet>,
+    );
+
+    expect(nativeModal.allowSwipeDismissal).toBe(true);
+    act(() => nativeModal.requestClose?.());
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses the swipe over unsaved changes but still reports the attempt", () => {
+    const onDismiss = vi.fn();
+
+    render(
+      <FullPageSheet hasUnsavedChanges title="Swap" visible onDismiss={onDismiss}>
+        <span>Body</span>
+      </FullPageSheet>,
+    );
+
+    expect(nativeModal.allowSwipeDismissal).toBe(false);
+    act(() => nativeModal.requestClose?.());
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the same card mounted when a refused swipe leaves it visible", () => {
+    render(
+      <FullPageSheet hasUnsavedChanges title="Swap" visible onDismiss={vi.fn()}>
+        <span>Body</span>
+      </FullPageSheet>,
+    );
+
+    expect(nativeModal.mounts).toBe(1);
+    act(() => nativeModal.requestClose?.());
+
+    expect(nativeModal.mounts).toBe(1);
+    expect(screen.getByText("Body")).toBeInTheDocument();
   });
 });

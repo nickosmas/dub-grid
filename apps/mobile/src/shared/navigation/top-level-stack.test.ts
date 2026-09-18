@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mobileColors } from "../theme/tokens";
+
+// `HeaderBackButton` pulls in expo-router, which ships untranspiled TSX.
+vi.mock("expo-router", () => ({ router: {} }));
+vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 import {
   createCommonStackOptions,
   createDetailStackOptions,

@@ -7,6 +7,7 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
+import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 import {
   mobileRadii,
   mobileText,
@@ -364,8 +365,8 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 4,
     },
     badgeInverse: {
-      backgroundColor: "rgba(255, 255, 255, 0.16)",
-      borderColor: "rgba(255, 255, 255, 0.28)",
+      backgroundColor: HERO_INVERSE_CHIP_FILL,
+      borderColor: HERO_INVERSE_CHIP_BORDER,
     },
     badgeText: {
       ...mobileText.badge,

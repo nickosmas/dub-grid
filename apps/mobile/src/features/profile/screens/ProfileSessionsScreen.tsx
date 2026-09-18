@@ -236,14 +236,16 @@ export default function ProfileSessionsScreen() {
               />
             ) : (
               <View style={styles.sessionList}>
-                {active.map((session, index) => (
-                  <SessionRow
-                    key={session.id}
-                    isLast={index === active.length - 1}
-                    session={session}
-                    onPress={() => setOpenSession(session)}
-                  />
-                ))}
+                <View style={styles.sessionListClip}>
+                  {active.map((session, index) => (
+                    <SessionRow
+                      key={session.id}
+                      isLast={index === active.length - 1}
+                      session={session}
+                      onPress={() => setOpenSession(session)}
+                    />
+                  ))}
+                </View>
               </View>
             )}
           </ProfileSection>
@@ -251,28 +253,30 @@ export default function ProfileSessionsScreen() {
           {stale.length > 0 ? (
             <ProfileSection>
               <View style={styles.sessionList}>
-                <PressableRow
-                  accessibilityLabel={`Inactive devices (${stale.length})`}
-                  style={[styles.disclosureRow, isStaleOpen && styles.sessionRowDivider]}
-                  onPress={() => setStaleOpen((open) => !open)}
-                >
-                  <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
-                  <Ionicons
-                    color={mobileColors.textSubtle}
-                    name={isStaleOpen ? "chevron-up" : "chevron-down"}
-                    size={20}
-                  />
-                </PressableRow>
-                <Collapsible open={isStaleOpen}>
-                  {stale.map((session, index) => (
-                    <SessionRow
-                      key={session.id}
-                      isLast={index === stale.length - 1}
-                      session={session}
-                      onPress={() => setOpenSession(session)}
+                <View style={styles.sessionListClip}>
+                  <PressableRow
+                    accessibilityLabel={`Inactive devices (${stale.length})`}
+                    style={[styles.disclosureRow, isStaleOpen && styles.sessionRowDivider]}
+                    onPress={() => setStaleOpen((open) => !open)}
+                  >
+                    <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
+                    <Ionicons
+                      color={mobileColors.textSubtle}
+                      name={isStaleOpen ? "chevron-up" : "chevron-down"}
+                      size={20}
                     />
-                  ))}
-                </Collapsible>
+                  </PressableRow>
+                  <Collapsible open={isStaleOpen}>
+                    {stale.map((session, index) => (
+                      <SessionRow
+                        key={session.id}
+                        isLast={index === stale.length - 1}
+                        session={session}
+                        onPress={() => setOpenSession(session)}
+                      />
+                    ))}
+                  </Collapsible>
+                </View>
               </View>
             </ProfileSection>
           ) : null}
@@ -365,13 +369,19 @@ function SessionRow({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     sessionList: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    sessionListClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     sessionRow: {
       alignItems: "center",

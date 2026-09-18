@@ -146,6 +146,22 @@ export function cellLevelDiffBadge(
 }
 
 /**
+ * The badge a published cell carries as a whole. A plain "New" is admitted
+ * only while the cell has at most one pill: with two pills the cell-level
+ * marker sits over the first one, which is exactly the pill that may not be
+ * new (a second shift added beside a published one), so each pill carries its
+ * own marker instead and the badge follows the ring.
+ */
+export function publishCellLevelBadge(
+  summary: ShiftDiffDescriptorResult | null | undefined,
+  pillCount: number,
+): ShiftDiffBadgeDescriptor | null {
+  const cellBadge = cellLevelDiffBadge(summary);
+  if (cellBadge) return cellBadge;
+  return pillCount <= 1 && summary?.cellBadge?.kind === "new" ? summary.cellBadge : null;
+}
+
+/**
  * Tooltip for the request corner fold: what kind of request is on this shift
  * and whether anyone still has to act on it.
  */

@@ -14,3 +14,8 @@ export const HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 export const HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
 export const HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 export const HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
+// A chip that sits on the hero gradient lightens the gradient rather than
+// bringing a surface of its own; `SplitShiftBadge` and `ShiftChangeBadge`
+// share these so the two chips in the hero's title row match.
+export const HERO_INVERSE_CHIP_FILL = "rgba(255, 255, 255, 0.16)";
+export const HERO_INVERSE_CHIP_BORDER = "rgba(255, 255, 255, 0.28)";

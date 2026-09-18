@@ -9,8 +9,10 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import {
+  alignSegmentsToBefore,
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   formatCompactScheduleDate,
+  formatScheduleTimeRange,
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryBaseTimeRange,
   getScheduleEntryCustomTimeRange,
@@ -21,6 +23,7 @@ import {
   getSplitShiftSegmentLabel,
   getSplitShiftSegmentsForEntry,
   sortScheduleEntries,
+  unclaimedBeforeIndices,
   type FeaturedMeScheduleSegment,
 } from "./schedule";
 import {
@@ -82,19 +85,155 @@ function areScheduleSegmentsEqual(
   );
 }
 
+/**
+ * A cell-level change read for one of its segments. `previousSegment` is the
+ * published segment this one continues (a `modified` cell only), and
+ * `removedSegments` are the published segments no current segment continues,
+ * carried by the first surviving one so a removal is still said somewhere.
+ */
+export type MobileScheduleSegmentChange = NonNullable<MobileScheduleEntry["change"]> & {
+  previousSegment?: MobileScheduleEntrySegment | null;
+  removedSegments?: MobileScheduleEntrySegment[];
+};
+
+/** An absence segment has no shift or job, so it only ever pairs by position. */
+export function getScheduleSegmentAlignmentKey(segment: MobileScheduleEntrySegment): string | null {
+  if (!("shiftId" in segment) && !("jobId" in segment)) {
+    return null;
+  }
+
+  return `${segment.shiftId ?? "general"}:${segment.jobId ?? "none"}`;
+}
+
+function getPreviousPresentationSegments(
+  previous: NonNullable<NonNullable<MobileScheduleEntry["change"]>["previousPresentation"]>,
+): MobileScheduleEntrySegment[] {
+  if (previous.segments.length > 0) {
+    return previous.segments;
+  }
+
+  return [
+    {
+      label: previous.label,
+      shiftName: previous.shiftName ?? previous.label,
+      startTime: previous.startTime,
+      endTime: previous.endTime,
+      focusAreaId: previous.focusAreaId,
+      displayFocusAreaName: previous.displayFocusAreaName,
+    },
+  ];
+}
+
 export function getScheduleEntrySegmentChange(
   entry: MobileScheduleEntry,
   segment: MobileScheduleEntrySegment,
-): MobileScheduleEntry["change"] {
+): MobileScheduleSegmentChange | null {
   const change = entry.change;
-  if (!change || change.kind !== "modified") {
+  if (!change || change.kind !== "modified" || !change.previousPresentation) {
     return change;
   }
 
-  const segmentIndex = getScheduleEntrySegments(entry).indexOf(segment);
-  const previousSegment = change.previousPresentation?.segments[segmentIndex] ?? null;
+  // The single-segment accessor path builds a fresh object per call, so an
+  // identity miss falls back to a content match.
+  const currentSegments = getScheduleEntrySegments(entry);
+  const identityIndex = currentSegments.indexOf(segment);
+  const segmentIndex =
+    identityIndex >= 0
+      ? identityIndex
+      : currentSegments.findIndex((candidate) => doScheduleSegmentsMatch(candidate, segment));
+  if (segmentIndex < 0) {
+    return change;
+  }
 
-  return previousSegment && areScheduleSegmentsEqual(segment, previousSegment) ? null : change;
+  const previousSegments = getPreviousPresentationSegments(change.previousPresentation);
+  const alignment = alignSegmentsToBefore(
+    previousSegments,
+    currentSegments,
+    getScheduleSegmentAlignmentKey,
+  );
+  const previousIndex = alignment[segmentIndex];
+  if (previousIndex == null) {
+    // A segment added to a cell that was already published is an addition by
+    // definition; the first-publication baseline rule does not apply.
+    return { kind: "new", isNewAddition: true, previousPresentation: change.previousPresentation };
+  }
+
+  const previousSegment = previousSegments[previousIndex]!;
+  const removedSegments = unclaimedBeforeIndices(alignment, previousSegments.length).map(
+    (index) => previousSegments[index]!,
+  );
+
+  if (areScheduleSegmentsEqual(segment, previousSegment)) {
+    const firstSurvivorIndex = alignment.findIndex((index) => index != null);
+    return removedSegments.length > 0 && segmentIndex === firstSurvivorIndex
+      ? { ...change, previousSegment: null, removedSegments }
+      : null;
+  }
+
+  return {
+    ...change,
+    previousSegment,
+    ...(removedSegments.length > 0 ? { removedSegments } : {}),
+  };
+}
+
+export function getScheduleSegmentTitle(segment: MobileScheduleEntrySegment): string {
+  return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
+}
+
+/** `Day Shift · 7:00 AM - 3:30 PM · Skilled Nursing`, dropping what a segment lacks. */
+export function summariseScheduleSegment(segment: MobileScheduleEntrySegment): string {
+  const timeRange = formatScheduleTimeRange(segment.startTime, segment.endTime);
+  const focusAreaName =
+    segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
+
+  return [getScheduleSegmentTitle(segment), timeRange, focusAreaName]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(" · ");
+}
+
+/**
+ * One line per thing that changed in a published cell, for the detail
+ * screen's history sheet: `Added Evening Shift`, `Night Shift was Day Shift ·
+ * 7:00 AM - 3:30 PM`, `Removed Admin`. Empty when nothing user-facing changed.
+ */
+export function describeScheduleEntryChanges(entry: MobileScheduleEntry): string[] {
+  const change = entry.change;
+  if (!change) {
+    return [];
+  }
+
+  const currentSegments = getScheduleEntrySegments(entry);
+  if (change.kind === "new") {
+    return change.isNewAddition
+      ? currentSegments.map((segment) => `Added ${getScheduleSegmentTitle(segment)}`)
+      : [];
+  }
+  if (change.kind === "deleted") {
+    const previousSegments = change.previousPresentation
+      ? getPreviousPresentationSegments(change.previousPresentation)
+      : [];
+    return previousSegments.map((segment) => `Removed ${summariseScheduleSegment(segment)}`);
+  }
+
+  const lines: string[] = [];
+  for (const segment of currentSegments) {
+    const segmentChange = getScheduleEntrySegmentChange(entry, segment);
+    if (!segmentChange) continue;
+    if (segmentChange.kind === "new") {
+      lines.push(`Added ${getScheduleSegmentTitle(segment)}`);
+      continue;
+    }
+    if (segmentChange.previousSegment) {
+      lines.push(
+        `${getScheduleSegmentTitle(segment)} was ${summariseScheduleSegment(segmentChange.previousSegment)}`,
+      );
+    }
+    for (const removed of segmentChange.removedSegments ?? []) {
+      lines.push(`Removed ${summariseScheduleSegment(removed)}`);
+    }
+  }
+  return lines;
 }
 
 export function getScheduleItemJobName(item: FeaturedMeScheduleSegment["item"]): string | null {

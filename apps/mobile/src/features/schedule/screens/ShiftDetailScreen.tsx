@@ -87,7 +87,11 @@ import {
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
-import { getScheduleEntrySegmentChange } from "../lib/scheduleScreenChips";
+import {
+  describeScheduleEntryChanges,
+  getScheduleEntrySegmentChange,
+} from "../lib/scheduleScreenChips";
+import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import {
   addDaysIso,
   buildShiftmateSegmentGroups,
@@ -1442,7 +1446,7 @@ export default function ShiftDetailScreen() {
                         >
                           {detailCardTitle}
                         </Text>
-                        <DetailShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
+                        <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                       </View>
                     ) : null}
                     {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
@@ -1454,9 +1458,7 @@ export default function ShiftDetailScreen() {
                           />
                         ) : null}
                         {!shouldShowDetailTitle ? (
-                          <DetailShiftChangeBadge
-                            change={hasSplitShift ? null : shiftEntry.change}
-                          />
+                          <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                         ) : null}
                       </View>
                     ) : null}
@@ -1533,7 +1535,7 @@ export default function ShiftDetailScreen() {
               </View>
             ) : null}
 
-            <PreviousShiftFooter change={shiftEntry.change} />
+            <PreviousShiftFooter entry={shiftEntry} />
 
             {publishedSummary ? (
               <DetailPublishedFooter
@@ -1601,6 +1603,7 @@ export default function ShiftDetailScreen() {
       <FullPageSheet
         dismissDisabled={createRequestMutation.isPending}
         footer={requestSheetFooter}
+        hasUnsavedChanges={requestGuard.isDirty}
         title={getRequestModeTitle("swap")}
         visible={requestMode === "swap"}
         onDismiss={requestGuard.requestClose}
@@ -1734,36 +1737,6 @@ function getPreviousPresentationTitle(
   return presentation?.shiftName?.trim() || presentation?.label?.trim() || "Shift";
 }
 
-const DETAIL_SHIFT_CHANGE_LABELS = {
-  deleted: "Deleted",
-  modified: "Edited",
-  new: "New",
-} as const;
-
-function DetailShiftChangeBadge({ change }: { change: MobileScheduleEntry["change"] }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
-  if (!change || (change.kind === "new" && !change.isNewAddition)) {
-    return null;
-  }
-
-  return (
-    <View
-      accessibilityLabel={`Shift ${DETAIL_SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
-      style={[
-        styles.detailShiftChangeBadge,
-        change.kind === "modified" && styles.detailShiftChangeBadgeModified,
-        change.kind === "deleted" && styles.detailShiftChangeBadgeDeleted,
-      ]}
-    >
-      <Text style={styles.detailShiftChangeBadgeText}>
-        {DETAIL_SHIFT_CHANGE_LABELS[change.kind]}
-      </Text>
-    </View>
-  );
-}
-
 function getPreviousSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
@@ -1786,11 +1759,12 @@ function getPreviousPresentationFocusAreaName(
   return presentation.displayFocusAreaName?.trim() || null;
 }
 
-function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"] }) {
+function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [showPreviousShift, setShowPreviousShift] = useState(false);
-  const previous = change?.previousPresentation ?? null;
+  const previous = entry.change?.previousPresentation ?? null;
+  const changeLines = useMemo(() => describeScheduleEntryChanges(entry), [entry]);
 
   if (!previous) {
     return null;
@@ -1823,6 +1797,25 @@ function PreviousShiftFooter({ change }: { change: MobileScheduleEntry["change"]
         visible={showPreviousShift}
         onDismiss={() => setShowPreviousShift(false)}
       >
+        {changeLines.length > 0 ? (
+          <View
+            accessibilityLabel={`What changed: ${changeLines.join("; ")}`}
+            style={styles.previousShiftChangeSummary}
+          >
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.previousShiftChangeLabel}>
+              What changed
+            </Text>
+            {changeLines.map((line) => (
+              <Text
+                key={line}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                style={styles.previousShiftChangeLine}
+              >
+                {line}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {hasMultiplePreviousSegments ? (
           <View style={styles.previousShiftSegmentList}>
             {previousSegments.map((segment, index) => {
@@ -2175,7 +2168,7 @@ function ShiftmateRow({
           ) : null}
         </View>
         {shouldShowSegments ? (
-          <ShiftEntrySegmentList entry={entry} variant="supporting" />
+          <ShiftEntrySegmentList entry={entry} showChangeLabels={false} variant="supporting" />
         ) : metaItems.length > 0 ? (
           <Text style={styles.shiftmateMeta}>{metaItems.join(" · ")}</Text>
         ) : null}
@@ -2443,7 +2436,12 @@ function SwapOptionCard({
       ) : null}
       {detailLabel ? <Text style={styles.swapOptionDetail}>{detailLabel}</Text> : null}
       {showSegments && segmentIndex == null ? (
-        <ShiftEntrySegmentList entry={entry} showSegmentLabels={false} variant="supporting" />
+        <ShiftEntrySegmentList
+          entry={entry}
+          showChangeLabels={false}
+          showSegmentLabels={false}
+          variant="supporting"
+        />
       ) : null}
     </Pressable>
   );
@@ -2451,11 +2449,17 @@ function SwapOptionCard({
 
 function ShiftEntrySegmentList({
   entry,
+  /**
+   * Off for someone else's shifts listed as context (a swap candidate, a
+   * shiftmate): what matters there is what they work, not what changed.
+   */
+  showChangeLabels = true,
   showSegmentLabels = true,
   suppressCountAccessibilityLabel = false,
   variant,
 }: {
   entry: MobileScheduleEntry;
+  showChangeLabels?: boolean;
   showSegmentLabels?: boolean;
   suppressCountAccessibilityLabel?: boolean;
   variant: "detail" | "supporting";
@@ -2466,10 +2470,11 @@ function ShiftEntrySegmentList({
 
   return (
     <SplitShiftSegmentList
-      getSegmentStatusLabel={(segment) => {
-        const change = getScheduleEntrySegmentChange(entry, segment);
-        return change ? DETAIL_SHIFT_CHANGE_LABELS[change.kind] : null;
-      }}
+      getSegmentStatusLabel={
+        showChangeLabels
+          ? (segment) => getShiftChangeLabel(getScheduleEntrySegmentChange(entry, segment))
+          : undefined
+      }
       includeSegmentLabelInStatus={variant === "supporting"}
       renderSegmentChip={(segment) => (
         <DetailJobPill

@@ -275,6 +275,7 @@ interface RenderGridOptions {
     toSegments?: Array<{ label: string }>;
     fromState?: ScheduleCellState | null;
     toState?: ScheduleCellState | null;
+    isNewAddition?: boolean;
     publishedAt: string;
     publishedBy: string;
   } | null;
@@ -860,6 +861,115 @@ describe("ScheduleGrid", () => {
     for (const pill of pills) {
       expect(pill.style.boxShadow).toMatch(/^0 0 0 2px /);
     }
+  });
+
+  describe("published double shifts carry one badge per pill", () => {
+    const doubleShiftAssignments = [
+      { ...assignments[0], jobId: 101 },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+    const segments = [
+      { shiftId: 1, jobId: 101, position: 0 },
+      { shiftId: 1, jobId: 102, position: 1 },
+    ];
+    const workedState = (cellSegments: typeof segments) => ({
+      kind: "worked" as const,
+      segments: cellSegments,
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
+
+    type PublishDiff = NonNullable<ReturnType<NonNullable<RenderGridOptions["publishDiffForKey"]>>>;
+
+    function renderDoubleShift(
+      publishDiff: Omit<PublishDiff, "empId" | "date" | "publishedAt" | "publishedBy">,
+    ) {
+      renderGrid({
+        assignments: doubleShiftAssignments,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        showPublishDiffOverlay: true,
+        publishDiffForKey: () => ({
+          empId: "emp-1",
+          date: "2024-01-07",
+          publishedAt: "2024-01-07T12:00:00.000Z",
+          publishedBy: "user-1",
+          ...publishDiff,
+        }),
+      });
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const pills = Array.from(
+        firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+      ) as HTMLElement[];
+      expect(pills).toHaveLength(2);
+      return { firstCell, pills };
+    }
+
+    it("marks both pills New when the whole cell is new", () => {
+      const { firstCell, pills } = renderDoubleShift({
+        kind: "new",
+        fromState: null,
+        toState: workedState(segments),
+      });
+
+      expect(firstCell.querySelectorAll('[data-publish-badge="new"]')).toHaveLength(2);
+      for (const pill of pills) {
+        expect(pill.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+        expect(pill.style.boxShadow).toMatch(/^0 0 0 2px /);
+      }
+    });
+
+    it.each([undefined, false])(
+      "marks only the added second shift New (isNewAddition %s)",
+      (isNewAddition) => {
+        const { firstCell, pills } = renderDoubleShift({
+          kind: "modified",
+          isNewAddition,
+          fromState: workedState([segments[0]!]),
+          toState: workedState(segments),
+        });
+
+        expect(firstCell.querySelectorAll("[data-publish-badge]")).toHaveLength(1);
+        expect(pills[0]!.querySelector("[data-publish-badge]")).toBeNull();
+        expect(pills[0]!.style.boxShadow).toBe("none");
+        expect(pills[1]!.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+        expect(pills[1]!.style.boxShadow).toMatch(/^0 0 0 2px /);
+      },
+    );
+  });
+
+  it("keeps the cell-level New badge on a single published pill", () => {
+    renderGrid({
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "new",
+        isNewAddition: true,
+        from: [],
+        to: [1],
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    expect(firstCell.querySelectorAll('[data-publish-badge="new"]')).toHaveLength(1);
   });
 
   it("keeps the normal cell background when show changes is on", () => {

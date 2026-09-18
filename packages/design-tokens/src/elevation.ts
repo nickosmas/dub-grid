@@ -268,3 +268,51 @@ export const darkMobileElevationTokens: Record<MobileElevationLevel, MobileEleva
 export function getMobileElevation(level: MobileElevationLevel, isDark: boolean): MobileElevation {
   return (isDark ? darkMobileElevationTokens : mobileElevationTokens)[level];
 }
+
+/** How far, in points, a level's shadow reaches past each edge of the view that casts it. */
+export type MobileElevationExtent = {
+  top: number;
+  bottom: number;
+  horizontal: number;
+};
+
+/**
+ * The room a clipping ancestor (a ScrollView, an `overflow: hidden` wrapper)
+ * has to leave around an elevated child, or the shadow ends in a hard line
+ * where the ancestor's bounds are. Derived from the token rather than kept as
+ * a literal beside it: the open-shift carousel reserved 18pt on the day the
+ * card shadow was 14pt wide and never heard about the 44pt ambient layer.
+ *
+ * A blur of `b` fades out `b` past the edge it leaves. The iOS layer shadow
+ * spreads twice its radius, which the `boxShadow` layers already state as a
+ * blur radius; Android's `elevation` casts well within either.
+ */
+export function getMobileElevationExtent(
+  level: MobileElevationLevel,
+  isDark: boolean,
+): MobileElevationExtent {
+  const token = getMobileElevation(level, isDark);
+  const layers: Array<{ offsetX: number; offsetY: number; blur: number }> = [
+    ...(token.boxShadow ?? []).map((layer) => ({
+      offsetX: layer.offsetX,
+      offsetY: layer.offsetY,
+      blur: layer.blurRadius,
+    })),
+    ...(token.shadowOpacity > 0
+      ? [
+          {
+            offsetX: token.shadowOffset.width,
+            offsetY: token.shadowOffset.height,
+            blur: token.shadowRadius * 2,
+          },
+        ]
+      : []),
+  ];
+  const reach = (values: number[]) => Math.max(0, ...values.map((value) => Math.ceil(value)));
+
+  return {
+    top: reach(layers.map((layer) => layer.blur - layer.offsetY)),
+    bottom: reach(layers.map((layer) => layer.blur + layer.offsetY)),
+    horizontal: reach(layers.map((layer) => layer.blur + Math.abs(layer.offsetX))),
+  };
+}

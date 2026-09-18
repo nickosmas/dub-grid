@@ -1,4 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { getSoftGradientStops } from "@dubgrid/design-tokens";
+import {
+  HERO_CARD_GRADIENT_DARK,
+  HERO_CARD_GRADIENT_LIGHT,
+  HERO_COLLABORATOR_BACKGROUND_DARK,
+  HERO_COLLABORATOR_BACKGROUND_LIGHT,
+  HERO_INVERSE_CHIP_FILL,
+} from "../../features/schedule/lib/heroCardTheme";
+import { createNumericBadgeToneStyles } from "../components/NumericBadge";
 import { darkMobileColors, mobileColors, mobileElevation } from "./tokens";
 
 /** WCAG 2.1 relative luminance. */
@@ -12,6 +21,20 @@ function relativeLuminance(hex: string): number {
 function contrastRatio(a: string, b: string): number {
   const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+/** `rgba(r, g, b, a)` laid over an opaque hex ground, as the screen composites it. */
+function composite(rgba: string, groundHex: string): string {
+  const [r, g, b, a] = rgba
+    .replace(/rgba?\(|\)/g, "")
+    .split(",")
+    .map((part) => Number(part.trim()));
+  const ground = groundHex.replace("#", "");
+  const channels = [0, 2, 4].map((offset) => parseInt(ground.slice(offset, offset + 2), 16));
+  const blend = (over: number, under: number) => Math.round(over * a! + under * (1 - a!));
+  return `#${[blend(r!, channels[0]!), blend(g!, channels[1]!), blend(b!, channels[2]!)]
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")}`;
 }
 
 /**
@@ -209,4 +232,67 @@ describe("solid button tone contrast", () => {
     expect(mobileColors.buttonWarningBg).toBe(mobileColors.warning);
     expect(contrastRatio(mobileColors.textInverse, mobileColors.warning)).toBeLessThan(AA_TEXT);
   });
+});
+
+/**
+ * The staff Home is washed with the aurora gradient, and the hero card is a
+ * solid brand gradient. A soft brand fill (`brandSoft`) is the same tint as
+ * either ground, which is how the open-shift count pill disappeared, so the
+ * chips placed on those grounds use a solid fill or the hero's inverse chip.
+ */
+describe("brand-tinted ground contrast", () => {
+  const NON_TEXT_UI = 3;
+
+  for (const [theme, colors, isDark] of [
+    ["light", mobileColors, false],
+    ["dark", darkMobileColors, true],
+  ] as const) {
+    it(`keeps a solid brand count pill and its number readable on the ${theme} aurora`, () => {
+      const auroraTop = composite(getSoftGradientStops("aurora", isDark)[0]!, colors.background);
+      const pill = createNumericBadgeToneStyles(colors).brand;
+      expect(contrastRatio(pill.backgroundColor, auroraTop)).toBeGreaterThanOrEqual(NON_TEXT_UI);
+      expect(contrastRatio(pill.color, pill.backgroundColor)).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
+    it(`lifts the inverse chip off every ${theme} hero surface`, () => {
+      const gradient = isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT;
+      const collaborators = isDark
+        ? HERO_COLLABORATOR_BACKGROUND_DARK
+        : HERO_COLLABORATOR_BACKGROUND_LIGHT;
+      for (const ground of [...gradient, collaborators]) {
+        expect(
+          contrastRatio(composite(HERO_INVERSE_CHIP_FILL, ground), ground),
+        ).toBeGreaterThanOrEqual(PERCEIVABLE_FILL);
+      }
+    });
+
+    // The chips sit in the title row over the gradient's dark start; the pale
+    // top-right corner carries no chip label.
+    it(`keeps a white chip label at AA where ${theme} hero chips are placed`, () => {
+      const gradient = isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT;
+      for (const ground of [gradient[0], gradient[1]]) {
+        const chip = composite(HERO_INVERSE_CHIP_FILL, ground);
+        expect(contrastRatio(colors.textInverse, chip), ground).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    });
+
+    // The "+N" overflow disc on the collaborator block: a pale grey disc in
+    // light mode, the inverse chip in dark mode where that grey disappeared.
+    it(`keeps the ${theme} collaborator overflow disc and its count readable`, () => {
+      const block = isDark ? HERO_COLLABORATOR_BACKGROUND_DARK : HERO_COLLABORATOR_BACKGROUND_LIGHT;
+      const disc = isDark ? composite(HERO_INVERSE_CHIP_FILL, block) : colors.surfaceSecondary;
+      const label = isDark ? colors.textInverse : colors.textMuted;
+      expect(contrastRatio(disc, block)).toBeGreaterThanOrEqual(PERCEIVABLE_FILL);
+      expect(contrastRatio(label, disc)).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+
+    it(`keeps every ${theme} count badge number at AA against its own fill`, () => {
+      for (const [tone, style] of Object.entries(createNumericBadgeToneStyles(colors))) {
+        if (tone === "onAccent") continue;
+        expect(contrastRatio(style.color, style.backgroundColor), tone).toBeGreaterThanOrEqual(
+          AA_TEXT,
+        );
+      }
+    });
+  }
 });

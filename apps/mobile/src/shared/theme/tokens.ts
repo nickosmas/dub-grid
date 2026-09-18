@@ -5,6 +5,7 @@ import {
   getAvatarTypography,
   getMobileEasingCurve,
   getMobileElevation,
+  getMobileElevationExtent,
   getMobileIconToneColor,
   getSoftGradientStops,
   mobileMotionTokens,
@@ -23,6 +24,7 @@ import {
   type MobileEasingCurve,
   type MobileEasingName,
   type MobileElevation,
+  type MobileElevationExtent,
   type MobileElevationLevel,
   type MobileIconToneName,
   type MobileSpringConfig,
@@ -344,6 +346,18 @@ export function mobileElevation(
   isDark: boolean,
 ): MobileElevation & ViewStyle {
   return getMobileElevation(level, isDark);
+}
+
+/**
+ * The room a clipping parent must leave around a view at `level`, or the
+ * shadow is cut flat at the parent's bounds (a ScrollView's edge, an
+ * `overflow: hidden` wrapper).
+ */
+export function mobileElevationExtent(
+  level: MobileElevationLevel,
+  isDark: boolean,
+): MobileElevationExtent {
+  return getMobileElevationExtent(level, isDark);
 }
 
 /**

@@ -221,14 +221,16 @@ export function ProfileSkeleton({
         <View key={`profile-section-${sectionIndex}`} style={styles.section}>
           <SkeletonLine variant="label" width="26%" />
           <View style={styles.list}>
-            {skeletonRows(rowsPerSection, (rowIndex) => (
-              <View
-                key={`profile-row-${sectionIndex}-${rowIndex}`}
-                style={rowIndex < rowsPerSection - 1 ? styles.rowDivider : null}
-              >
-                <ProfileRow variant={rowVariant} />
-              </View>
-            ))}
+            <View style={styles.listClip}>
+              {skeletonRows(rowsPerSection, (rowIndex) => (
+                <View
+                  key={`profile-row-${sectionIndex}-${rowIndex}`}
+                  style={rowIndex < rowsPerSection - 1 ? styles.rowDivider : null}
+                >
+                  <ProfileRow variant={rowVariant} />
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       ))}
@@ -310,13 +312,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     section: {
       gap: mobileSpace.md,
     },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children, so the shadow-casting list stays unclipped
+    // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    listClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     row: {
       alignItems: "center",

@@ -12,7 +12,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   AppState,
   Animated,
-  LayoutAnimation,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,6 +36,7 @@ import Reanimated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
@@ -49,6 +49,7 @@ import {
 } from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/ScheduleSkeleton";
+import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import {
   getMySchedule,
@@ -78,6 +79,7 @@ import {
   mobileSoftGradientStops,
 } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -95,9 +97,9 @@ import {
   buildMeShiftRequestSections,
   buildScheduleMonthDays,
   buildScheduleWeekDays,
+  buildTeamScheduleFocusAreaTabs,
   buildUpcomingMeScheduleItems,
   buildWeeklyHoursSummary,
-  buildTeamScheduleFocusAreaTabs,
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
@@ -105,26 +107,27 @@ import {
   formatScheduleDayLabel,
   formatScheduleRange,
   formatScheduleTimeRange,
-  getFeaturedMeScheduleSegment,
   getCompactScheduleDateParts,
-  getScheduleEntryBaseTimeRange,
+  getFeaturedMeScheduleSegment,
+  getIsoDateInTimeZone,
   getScheduleEntryAbsenceTypeId,
-  getScheduleEntryCustomTimeRange,
+  getScheduleEntryBaseTimeRange,
   getScheduleEntryCustomStartTime,
+  getScheduleEntryCustomTimeRange,
   getScheduleEntryEndTime,
   getScheduleEntrySegmentFocusAreaName,
-  getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
+  getScheduleEntrySegmentTimeRange,
   getScheduleEntryStartTime,
   getScheduleEntryTitle,
-  isGeneralScheduleEntrySegment,
   getScheduleMonthStartDate,
   getScheduleMonthWeekIndexForDate,
   getScheduleRangeForDate,
   getSplitShiftSegmentLabel,
   getSplitShiftSegmentsForEntry,
   getSplitShiftSegmentsFromPresentation,
-  getIsoDateInTimeZone,
+  isDeletedScheduleHistory,
+  isGeneralScheduleEntrySegment,
   sortScheduleEntries,
   type AvailableShiftFeedItem,
   type FeaturedMeScheduleSegment,
@@ -167,6 +170,8 @@ import {
   getMeHeroSupplementalSplitSegments,
   getRequestDateLabel,
   getScheduleEntrySegmentChange,
+  summariseScheduleSegment,
+  type MobileScheduleSegmentChange,
   getScheduleItemFocusArea,
   getScheduleItemShiftName,
   getScheduleItemSplitShiftLabel,
@@ -193,7 +198,6 @@ import {
   MONTH_EXPAND_SECTION_GAP,
   MONTH_GRID_ROW_GAP,
   OPEN_SHIFT_CARD_MIN_HEIGHT,
-  OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
   WEEK_STRIP_ROW_HEIGHT,
   createStyles,
 } from "./scheduleScreenStyles";
@@ -228,13 +232,6 @@ const MONTH_EXPAND_TIMING = {
  */
 const SWIPE_CANCEL_SPRING = mobileMotion.spring.gentle;
 const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
-
-// `setLayoutAnimationEnabledExperimental` used to be the Android opt-in for
-// `LayoutAnimation`. Under the New Architecture it does nothing but warn on
-// every launch ("is currently a no-op in the New Architecture"), so calling it
-// bought a permanent LogBox entry and no animation. The `configureNext` calls
-// below stay: they still animate where the platform supports them, and they
-// degrade to an un-animated layout change where it doesn't.
 
 type ScheduleScope = "mine" | "team";
 type RequestActionBody =
@@ -1023,6 +1020,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     [activeEntries, isTeamScope, meHeroState.item, selectedDate],
   );
   const isMeScheduleEmpty = !isTeamScope && !meHeroState.item && meUpcomingItems.length === 0;
+  // Your Week lists every day of the week, so with nothing scheduled it is
+  // seven "Unscheduled" rows under an empty state saying the same thing. A
+  // removed shift is history, not a scheduled day; Alerts already announced it.
+  const hasScheduledWeekDay = useMemo(
+    () => meUpcomingItems.some((item) => !isDeletedScheduleHistory(item.entry)),
+    [meUpcomingItems],
+  );
   const meEmptyPageMinHeight = Math.max(320, viewportHeight - insets.top - insets.bottom - 180);
   const meRequestSections = useMemo(
     () =>
@@ -1829,13 +1833,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 />
               </>
             ) : null}
-            <UpcomingShiftsSection
-              items={meUpcomingItems}
-              onPressEntry={handleOpenShiftDetail}
-              summary={meWeeklyHours}
-              todayDate={todayDate}
-              weekDays={weekDays}
-            />
+            {hasScheduledWeekDay ? (
+              <UpcomingShiftsSection
+                items={meUpcomingItems}
+                onPressEntry={handleOpenShiftDetail}
+                summary={meWeeklyHours}
+                todayDate={todayDate}
+                weekDays={weekDays}
+              />
+            ) : null}
           </View>
         ) : shiftGroups.length === 0 ? (
           <EmptyStateCard
@@ -2243,23 +2249,11 @@ function MeTypePill({
   );
 }
 
-const SHIFT_CHANGE_LABELS = {
-  deleted: "Deleted",
-  modified: "Edited",
-  new: "New",
-} as const;
-
-function getShiftChangeLabel(change: MobileScheduleEntry["change"]): string | null {
-  return change && (change.kind !== "new" || change.isNewAddition)
-    ? SHIFT_CHANGE_LABELS[change.kind]
-    : null;
-}
+type PreviousShiftSummary = { prefix: "Was" | "Removed"; text: string };
 
 function getPreviousShiftSummary(
-  change: MobileScheduleEntry["change"],
-  entry?: MobileScheduleEntry,
-  segment?: MobileScheduleEntrySegment | null,
-): string | null {
+  change: MobileScheduleSegmentChange | null | undefined,
+): PreviousShiftSummary | null {
   // A first publication has no earlier published state. Keep the underlying
   // change type for reconciliation, but never imply history in the UI.
   if (change?.kind === "new") {
@@ -2270,130 +2264,58 @@ function getPreviousShiftSummary(
     return null;
   }
 
-  if (change?.kind === "deleted" && !segment && previous.segments.length > 1) {
-    const summaries = previous.segments.map((previousSegment) => {
-      const title = previousSegment.shiftName?.trim() || previousSegment.label?.trim() || "Shift";
-      const timeRange = formatScheduleTimeRange(previousSegment.startTime, previousSegment.endTime);
-      const focusAreaName =
-        previousSegment.shiftId === null
-          ? null
-          : previousSegment.displayFocusAreaName?.trim() || null;
-
-      return [title, timeRange, focusAreaName]
-        .filter((part): part is string => Boolean(part && part.trim()))
-        .join(" · ");
-    });
-
-    return summaries.join("; ");
+  if (change.kind === "deleted" && previous.segments.length > 1) {
+    return { prefix: "Was", text: previous.segments.map(summariseScheduleSegment).join("; ") };
   }
 
-  const segmentIndex = segment && entry ? getScheduleEntrySegments(entry).indexOf(segment) : -1;
-  const previousSegment =
-    change?.kind === "modified" && previous.segments.length > 1 && segmentIndex >= 0
-      ? (previous.segments[segmentIndex] ?? null)
-      : null;
-  const title =
-    previousSegment?.shiftName?.trim() ||
-    previousSegment?.label?.trim() ||
-    previous.shiftName?.trim() ||
-    previous.label?.trim() ||
-    null;
-  const timeRange = formatScheduleTimeRange(
-    previousSegment?.startTime ?? previous.startTime,
-    previousSegment?.endTime ?? previous.endTime,
-  );
-  const focusAreaName =
-    previousSegment?.shiftId === null
-      ? null
-      : previousSegment?.displayFocusAreaName?.trim() ||
-        previous.displayFocusAreaName?.trim() ||
-        null;
+  // A `modified` cell read for one segment names the published segment that
+  // segment continues; a survivor with no counterpart of its own names what
+  // its removed sibling was instead.
+  if (change.previousSegment) {
+    return { prefix: "Was", text: summariseScheduleSegment(change.previousSegment) };
+  }
+  if (change.removedSegments?.length) {
+    return {
+      prefix: "Removed",
+      text: change.removedSegments.map(summariseScheduleSegment).join("; "),
+    };
+  }
+
+  const title = previous.shiftName?.trim() || previous.label?.trim() || null;
+  const timeRange = formatScheduleTimeRange(previous.startTime, previous.endTime);
+  const focusAreaName = previous.displayFocusAreaName?.trim() || null;
   const parts = [title, timeRange, focusAreaName].filter((part): part is string =>
     Boolean(part && part.trim()),
   );
 
-  return parts.length > 0 ? parts.join(" · ") : null;
-}
-
-function ShiftChangeBadge({
-  change,
-  compactSegment = false,
-  inverse = false,
-}: {
-  change: MobileScheduleEntry["change"];
-  compactSegment?: boolean;
-  inverse?: boolean;
-}) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  if (!change || (change.kind === "new" && !change.isNewAddition)) {
-    return null;
-  }
-
-  return (
-    <View
-      accessibilityLabel={`Shift ${SHIFT_CHANGE_LABELS[change.kind].toLowerCase()}`}
-      style={
-        // The inverse chip replaces the base styling outright so the hero
-        // treatment does not inherit the standard status-chip surface.
-        inverse
-          ? styles.shiftChangeBadgeInverse
-          : [
-              styles.shiftChangeBadge,
-              change.kind === "modified" && styles.shiftChangeBadgeModified,
-              change.kind === "deleted" && styles.shiftChangeBadgeDeleted,
-              compactSegment && styles.shiftChangeBadgeCompactSegment,
-            ]
-      }
-    >
-      <Text
-        style={
-          inverse
-            ? styles.shiftChangeBadgeTextInverse
-            : [
-                styles.shiftChangeBadgeText,
-                compactSegment && styles.shiftChangeBadgeTextCompactSegment,
-              ]
-        }
-      >
-        {SHIFT_CHANGE_LABELS[change.kind]}
-      </Text>
-    </View>
-  );
+  return parts.length > 0 ? { prefix: "Was", text: parts.join(" · ") } : null;
 }
 
 function PreviousShiftRow({
   change,
-  entry,
   inverse = false,
-  segment,
 }: {
-  change: MobileScheduleEntry["change"];
-  entry?: MobileScheduleEntry;
+  change: MobileScheduleSegmentChange | null | undefined;
   inverse?: boolean;
-  segment?: MobileScheduleEntrySegment | null;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const summary = getPreviousShiftSummary(change, entry, segment);
-  const prefix = "Was";
+  const summary = getPreviousShiftSummary(change);
 
   if (!summary) {
     return null;
   }
 
   return (
-    <View accessibilityLabel={`Previous shift: ${summary}`} style={styles.previousShiftRow}>
+    <View accessibilityLabel={`Previous shift: ${summary.text}`} style={styles.previousShiftRow}>
       <Ionicons
         color={inverse ? "rgba(255, 255, 255, 0.74)" : mobileColors.textSubtle}
         name="arrow-undo-outline"
         size={14}
       />
       <Text style={[styles.previousShiftText, inverse && styles.previousShiftTextInverse]}>
-        {prefix} {summary}
+        {summary.prefix} {summary.text}
       </Text>
     </View>
   );
@@ -2699,13 +2621,17 @@ function MeHeroCard({
           ]}
           testID="me-hero-card"
         >
-          {heroGradient}
-          {cardContent}
+          <View style={styles.meHeroCardClip}>
+            {heroGradient}
+            {cardContent}
+          </View>
         </Pressable>
       ) : (
         <View style={[styles.meHeroCard, heroCardThemeStyle]} testID="me-hero-card">
-          {heroGradient}
-          {cardContent}
+          <View style={styles.meHeroCardClip}>
+            {heroGradient}
+            {cardContent}
+          </View>
         </View>
       )}
     </View>
@@ -2824,7 +2750,6 @@ function UpcomingShiftsSection({
                       <PreviousShiftRow
                         key={`${entry.employeeId}:${entry.date}`}
                         change={entry.change}
-                        entry={entry}
                       />
                     ))}
                   </View>
@@ -2881,7 +2806,6 @@ function UpcomingShiftsSection({
                                       ) : null}
                                       <ShiftChangeBadge
                                         change={splitSegments.length > 1 ? null : change}
-                                        compactSegment={change?.kind === "modified"}
                                       />
                                     </View>
                                   ) : null}
@@ -2910,11 +2834,7 @@ function UpcomingShiftsSection({
                                   </Text>
                                 </View>
                               ) : null}
-                              <PreviousShiftRow
-                                change={change}
-                                entry={item.entry}
-                                segment={item.segment}
-                              />
+                              <PreviousShiftRow change={change} />
                             </View>
                           </Pressable>
                         </Fragment>
@@ -2924,7 +2844,7 @@ function UpcomingShiftsSection({
                       <Fragment key={`${entry.employeeId}:${entry.date}`}>
                         <UpcomingShiftDashedDivider />
                         <View style={styles.upcomingDeletedHistoryRow}>
-                          <PreviousShiftRow change={entry.change} entry={entry} />
+                          <PreviousShiftRow change={entry.change} />
                         </View>
                       </Fragment>
                     ))}
@@ -2991,7 +2911,10 @@ function OpenShiftsSection({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { pushToast } = useToast();
-  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  // The day whose full list is open in the sheet; the carousel itself never
+  // grows, a stacked day is a deck the reader taps to open.
+  const [openDate, setOpenDate] = useState<string | null>(null);
+  const handoff = useModalHandoff();
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   useEffect(() => {
     if (requestsError) {
@@ -3033,20 +2956,24 @@ function OpenShiftsSection({
       };
     });
   }, []);
-  const toggleExpandedDate = useCallback((date: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedDates((currentDates) => ({
-      ...currentDates,
-      [date]: !currentDates[date],
-    }));
-  }, []);
+  const openGroup =
+    openDate != null ? (dateGroups.find((group) => group.date === openDate) ?? null) : null;
   const renderFeedCard = (
     item: AvailableShiftFeedItem,
     options?: {
       accessibilityLabel?: string;
       onToggle?: () => void;
+      /**
+       * Wraps Volunteer and Claim inside the day sheet: the sheet closes first
+       * and the action runs once it has left. Its confirmation is a Modal of
+       * its own, which UIKit refuses to present while the sheet is still
+       * dismissing, and the toast that reports the result would be hidden
+       * behind an open sheet anyway.
+       */
+      runAction?: (action: () => void) => void;
     },
   ) => {
+    const runAction = options?.runAction ?? ((action: () => void) => action());
     const cardSurfaceProps =
       options?.onToggle != null
         ? {
@@ -3161,7 +3088,7 @@ function OpenShiftsSection({
               if (item.openShift.canVolunteer === false) {
                 return;
               }
-              onVolunteer(item.openShift);
+              runAction(() => onVolunteer(item.openShift));
             }}
             tone="secondary"
           />
@@ -3250,7 +3177,7 @@ function OpenShiftsSection({
             />
           }
           loading={isClaimLoading}
-          onPress={() => onClaim(item.request.id)}
+          onPress={() => runAction(() => onClaim(item.request.id))}
           tone="secondary"
         />
       </View>
@@ -3274,19 +3201,12 @@ function OpenShiftsSection({
       >
         {dateGroups.map((group) => {
           const dateLabel = formatCompactScheduleDate(group.date);
-          const isExpandedDay = expandedDates[group.date] === true;
-          const isExpandableDay = group.items.length > 1;
-          const visibleItems = isExpandedDay
-            ? group.items
-            : group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
-          const isCollapsedStack = !isExpandedDay && visibleItems.length > 1;
-          const hiddenStackCount = isCollapsedStack ? visibleItems.length - 1 : 0;
-          const stackedDeckHeight =
-            hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT + OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
+          const deckItems = group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
+          const isStack = deckItems.length > 1;
+          const hiddenStackCount = isStack ? deckItems.length - 1 : 0;
+          const stackedDeckHeight = hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT;
           const stackCardHeight = stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
-          const cardToggleLabel = isExpandedDay
-            ? `Collapse open shifts for ${dateLabel}`
-            : `Expand open shifts for ${dateLabel}`;
+          const openSheetLabel = `Show all open shifts for ${dateLabel}`;
 
           return (
             <View key={group.date} style={styles.openShiftDateCard}>
@@ -3295,22 +3215,22 @@ function OpenShiftsSection({
                 <NumericBadge
                   count={group.itemCount}
                   label={formatOpenShiftCardCountLabel(group.itemCount)}
-                  tone="brandSoft"
+                  tone="brand"
                 />
               </View>
               <View
                 style={[
                   styles.openShiftDateCardItems,
-                  isCollapsedStack && styles.openShiftDateCardItemsStacked,
-                  isCollapsedStack && {
+                  isStack && styles.openShiftDateCardItemsStacked,
+                  isStack && {
                     minHeight: stackCardHeight,
                     paddingBottom: stackedDeckHeight,
                   },
                 ]}
               >
-                {isCollapsedStack ? (
+                {isStack ? (
                   <>
-                    {visibleItems.slice(1).map((item, index) => {
+                    {deckItems.slice(1).map((item, index) => {
                       const stackIndex = index + 1;
                       const top = stackIndex * OPEN_SHIFT_STACK_PEEK_HEIGHT;
                       const inset = stackIndex * OPEN_SHIFT_STACK_SIDE_INSET;
@@ -3327,7 +3247,7 @@ function OpenShiftsSection({
                               left: inset,
                               right: inset,
                               top,
-                              zIndex: visibleItems.length - stackIndex,
+                              zIndex: deckItems.length - stackIndex,
                             },
                           ]}
                         />
@@ -3339,30 +3259,46 @@ function OpenShiftsSection({
                       }}
                       style={styles.openShiftCardLead}
                     >
-                      {renderFeedCard(visibleItems[0] as AvailableShiftFeedItem, {
-                        accessibilityLabel: cardToggleLabel,
-                        onToggle: () => toggleExpandedDate(group.date),
+                      {renderFeedCard(deckItems[0] as AvailableShiftFeedItem, {
+                        accessibilityLabel: openSheetLabel,
+                        onToggle: () => setOpenDate(group.date),
                       })}
                     </View>
                   </>
                 ) : (
-                  visibleItems.map((item, index) =>
-                    renderFeedCard(
-                      item,
-                      isExpandableDay && index === 0
-                        ? {
-                            accessibilityLabel: cardToggleLabel,
-                            onToggle: () => toggleExpandedDate(group.date),
-                          }
-                        : undefined,
-                    ),
-                  )
+                  deckItems.map((item) => renderFeedCard(item))
                 )}
               </View>
             </View>
           );
         })}
       </ScrollView>
+      <BottomSheetModal
+        accessibilityLabel="Dismiss open shifts"
+        debugName="Open shifts for a day"
+        header={
+          openGroup ? (
+            <SheetHeader
+              subtitle={`${openGroup.itemCount} open shift${openGroup.itemCount === 1 ? "" : "s"}`}
+              title={formatCompactScheduleDate(openGroup.date)}
+            />
+          ) : undefined
+        }
+        scrollable
+        visible={openGroup != null}
+        onDismiss={() => setOpenDate(null)}
+      >
+        <View style={styles.openShiftSheetList}>
+          {openGroup?.items.map((item) =>
+            renderFeedCard(item, {
+              runAction: (action) => {
+                setOpenDate(null);
+                handoff(action);
+              },
+            }),
+          )}
+        </View>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -3556,7 +3492,7 @@ function TeamShiftMemberRow({
             <ShiftChangeBadge change={change} />
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
-          <PreviousShiftRow change={change} entry={entry} segment={segment} />
+          <PreviousShiftRow change={change} />
           {alternateShiftLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>
               <SplitShiftBadge

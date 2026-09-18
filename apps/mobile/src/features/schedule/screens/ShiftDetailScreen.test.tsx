@@ -1137,6 +1137,89 @@ describe("ShiftDetailScreen", () => {
     expect(detailCard.getByText("Emergency")).toBeInTheDocument();
   });
 
+  it("labels only the added second shift as New and says what changed", () => {
+    const daySegment = {
+      shiftId: 1,
+      jobId: 10,
+      shiftName: "Day Shift",
+      jobName: "Nurse",
+      startTime: "07:30:00",
+      endTime: "15:30:00",
+      displayFocusAreaName: "ICU",
+    };
+    const eveningSegment = {
+      shiftId: 2,
+      jobId: 20,
+      shiftName: "Evening Shift",
+      jobName: "Lead",
+      startTime: "15:30:00",
+      endTime: "23:30:00",
+      displayFocusAreaName: "ICU",
+    };
+    const selectedEntry = {
+      employeeId: "emp-1",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      assignmentIds: [1, 2],
+      shiftLabel: "D/E",
+      assignmentLabel: "D/E",
+      shiftName: "Day Shift / Evening Shift",
+      absenceTypeId: null,
+      focusAreaId: 2,
+      focusAreaName: "ICU",
+      displayFocusAreaName: "ICU",
+      startTime: "07:30:00",
+      endTime: "23:30:00",
+      segments: [daySegment, eveningSegment],
+      change: {
+        kind: "modified",
+        previousPresentation: {
+          label: "D",
+          shiftName: "Day Shift",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "07:30:00",
+          endTime: "15:30:00",
+          segments: [daySegment],
+        },
+      },
+      publishedAt: "2026-04-15T18:30:00.000Z",
+      publishedByName: "Mina Diaz",
+    };
+
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => ({
+      data:
+        queryKey[1] === "requests"
+          ? { requests: [], openShifts: [] }
+          : { entries: [selectedEntry] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    const detailCard = within(screen.getByTestId("shift-detail-card"));
+    expect(detailCard.queryAllByLabelText("New")).toHaveLength(1);
+    expect(detailCard.queryByLabelText("Edited")).toBeNull();
+    expect(detailCard.queryByLabelText("Shift edited")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
+
+    expect(screen.getByLabelText("What changed: Added Evening Shift")).toHaveTextContent(
+      "Added Evening Shift",
+    );
+    expect(screen.getByText("Previous shift")).toBeInTheDocument();
+  });
+
   it("does not show drop and swap split-shift guidance for another employee", () => {
     const selectedEntry = {
       employeeId: "emp-2",
@@ -1815,6 +1898,20 @@ describe("ShiftDetailScreen", () => {
                 endTime: "23:00:00",
                 customStartTime: null,
                 customEndTime: null,
+                // A teammate's own published edit is noise in a swap list.
+                change: {
+                  kind: "modified",
+                  previousPresentation: {
+                    label: "D",
+                    shiftName: "Day Shift",
+                    focusAreaId: 1,
+                    focusAreaName: "Emergency",
+                    displayFocusAreaName: "Emergency",
+                    startTime: "07:00:00",
+                    endTime: "15:00:00",
+                    segments: [],
+                  },
+                },
                 publishedAt: "2026-04-15T18:30:00.000Z",
                 publishedByName: "Mina Diaz",
               },
@@ -1935,6 +2032,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Chris Hall")).not.toBeInTheDocument();
     expect(screen.queryByText("Dana Moss")).not.toBeInTheDocument();
     expect(screen.queryByText("Evan Cole")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edited/)).toBeNull();
+    expect(screen.queryByText(/Edited/)).toBeNull();
 
     fireEvent.click(screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"));
 

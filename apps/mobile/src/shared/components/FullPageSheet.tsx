@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +22,15 @@ import { Pressable } from "./Pressable";
  * on screen, and the same `onDismiss` funnel as the bottom sheet, so an
  * unsaved-changes guard can veto every exit the same way.
  *
+ * The swipe is the system's, and UIKit decides whether it completes. While
+ * the sheet is clean it may: the card leaves, `onRequestClose` fires, and the
+ * caller drops `visible`. With unsaved changes the swipe is refused, so the
+ * card bounces back and UIKit reports the attempt through the same
+ * `onRequestClose`; the guard then raises its discard question inside the
+ * still-presented card via `overlay`. Neither path re-presents the Modal:
+ * remounting a live card here made UIKit refuse the replacement ("already
+ * presenting") and the sheet vanished with its state still open.
+ *
  * Registers as a task `sheet`, so it obeys the one-task-sheet rule and a
  * confirmation may still sit on top of it.
  */
@@ -31,6 +40,7 @@ export function FullPageSheet({
   title,
   subtitle,
   dismissDisabled = false,
+  hasUnsavedChanges = false,
   footer,
   overlay,
   children,
@@ -42,6 +52,11 @@ export function FullPageSheet({
   subtitle?: string;
   /** A request in flight: Close disables and the swipe is refused. */
   dismissDisabled?: boolean;
+  /**
+   * The system swipe is refused while true, so the guard's discard question
+   * can be raised over a card that is still on screen.
+   */
+  hasUnsavedChanges?: boolean;
   footer?: ReactNode;
   /**
    * Drawn over the whole card, header and footer included: a confirmation
@@ -66,42 +81,17 @@ export function FullPageSheet({
     return registerModalPresentation("sheet", titleRef.current);
   }, [visible]);
 
-  // iOS reports a completed swipe-down through `onRequestClose` after the
-  // card has already left the screen. If the caller keeps `visible` true (a
-  // guard raising its discard question), the modal has to be presented again,
-  // which React Native only does on a fresh mount: bump the key. Android's
-  // back button reaches the same handler without dismissing anything, so it
-  // never remounts.
-  //
-  // The Close button must not take that path. The card is still on screen,
-  // and a remount tears it down while the guard's confirmation is presenting
-  // from inside it; iOS then refuses to present the new card ("already
-  // presenting") and the sheet vanishes with its state still open.
-  const [presentation, setPresentation] = useState(0);
-  const visibleRef = useRef(visible);
-  useEffect(() => {
-    visibleRef.current = visible;
-  }, [visible]);
-  const handleClose = () => {
+  const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();
-  };
-  const handleRequestClose = () => {
-    if (dismissDisabled) return;
-    onDismiss();
-    if (Platform.OS === "ios") {
-      setTimeout(() => {
-        if (visibleRef.current) setPresentation((count) => count + 1);
-      }, 0);
-    }
   };
 
   return (
     <Modal
-      key={presentation}
+      allowSwipeDismissal={!dismissDisabled && !hasUnsavedChanges}
       animationType="slide"
       navigationBarTranslucent
-      onRequestClose={handleRequestClose}
+      onRequestClose={handleDismiss}
       presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
       statusBarTranslucent
       visible={visible}
@@ -125,7 +115,7 @@ export function FullPageSheet({
               accessibilityState={{ disabled: dismissDisabled }}
               disabled={dismissDisabled}
               hitSlop={10}
-              onPress={handleClose}
+              onPress={handleDismiss}
               style={[styles.closeButton, dismissDisabled && styles.closeButtonDisabled]}
             >
               <Ionicons color={mobileColors.textPrimary} name="close" size={20} />

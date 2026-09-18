@@ -11,15 +11,20 @@ import {
   type MobileColors,
 } from "../theme/tokens";
 
-export type NumericBadgeTone = "danger" | "brand" | "brandSoft" | "neutral" | "onAccent";
+export type NumericBadgeTone = "danger" | "brand" | "neutral" | "onAccent";
 
-function createToneStyles(
+/**
+ * The solid tones take the button fills rather than the shared semantic
+ * colours: a white number on dark-mode `brand` (#2075FF) measures 4.16:1 and
+ * on red-500 `danger` 3.76:1, both under AA, which the one-step-darker button
+ * fills were chosen to clear. `contrast.test.ts` holds every pair.
+ */
+export function createNumericBadgeToneStyles(
   mobileColors: MobileColors,
 ): Record<NumericBadgeTone, { backgroundColor: string; color: string }> {
   return {
-    danger: { backgroundColor: mobileColors.danger, color: mobileColors.textInverse },
-    brand: { backgroundColor: mobileColors.brand, color: mobileColors.textInverse },
-    brandSoft: { backgroundColor: mobileColors.brandSoft, color: mobileColors.brand },
+    danger: { backgroundColor: mobileColors.buttonDangerBg, color: mobileColors.textInverse },
+    brand: { backgroundColor: mobileColors.buttonPrimaryBg, color: mobileColors.textInverse },
     neutral: { backgroundColor: mobileColors.surface, color: mobileColors.textMuted },
     // Sits on a filled control (a selected segment, the brand filter button),
     // so it lightens that fill instead of picking a surface of its own.
@@ -55,7 +60,7 @@ export function NumericBadge({
   style?: StyleProp<ViewStyle>;
 }) {
   const mobileColors = useMobileColors();
-  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
+  const toneStyle = useMemo(() => createNumericBadgeToneStyles(mobileColors), [mobileColors])[tone];
   const text = formatBadgeCount(count, max);
   if (text === null) return null;
 

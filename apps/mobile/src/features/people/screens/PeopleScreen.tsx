@@ -826,48 +826,53 @@ export default function PeopleScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>People requests</Text>
           <View style={styles.linkList}>
-            {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
-              <View
-                key={request.id}
-                style={[styles.requestRow, index < profileRequests.length - 1 && styles.rowDivider]}
-              >
-                <View style={styles.requestCopy}>
-                  <Text style={styles.personName}>{request.requesterName}</Text>
-                  <Text style={styles.personSubtitle}>
-                    {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
-                  </Text>
-                </View>
-                <ActionButtons
-                  primaryAction={
+            <View style={styles.linkListClip}>
+              {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
+                <View
+                  key={request.id}
+                  style={[
+                    styles.requestRow,
+                    index < profileRequests.length - 1 && styles.rowDivider,
+                  ]}
+                >
+                  <View style={styles.requestCopy}>
+                    <Text style={styles.personName}>{request.requesterName}</Text>
+                    <Text style={styles.personSubtitle}>
+                      {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
+                    </Text>
+                  </View>
+                  <ActionButtons
+                    primaryAction={
+                      <Button
+                        compact
+                        disabled={resolveRequestMutation.isPending}
+                        label="Approve"
+                        onPress={() => {
+                          setProfileRequestConfirmation({
+                            request,
+                            action: "approve",
+                          });
+                        }}
+                      />
+                    }
+                    style={styles.requestActions}
+                  >
                     <Button
                       compact
                       disabled={resolveRequestMutation.isPending}
-                      label="Approve"
+                      label="Reject"
                       onPress={() => {
                         setProfileRequestConfirmation({
                           request,
-                          action: "approve",
+                          action: "reject",
                         });
                       }}
+                      tone="neutral"
                     />
-                  }
-                  style={styles.requestActions}
-                >
-                  <Button
-                    compact
-                    disabled={resolveRequestMutation.isPending}
-                    label="Reject"
-                    onPress={() => {
-                      setProfileRequestConfirmation({
-                        request,
-                        action: "reject",
-                      });
-                    }}
-                    tone="neutral"
-                  />
-                </ActionButtons>
-              </View>
-            ))}
+                  </ActionButtons>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       ) : null}
@@ -1249,13 +1254,18 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       width: 46,
     },
+    // The clip sits on an inner view: iOS drops a view's own shadow when the
+    // same view clips its children.
     linkList: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       borderColor: mobileColors.cardBorder,
-      overflow: "hidden",
       ...mobileElevation("card", isDark),
+    },
+    linkListClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card - 1,
     },
     personRow: {
       alignItems: "center",

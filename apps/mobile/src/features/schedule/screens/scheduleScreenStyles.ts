@@ -4,6 +4,7 @@ import {
   mobilePillOverflow,
   mobileAvatarText,
   mobileElevation,
+  mobileElevationExtent,
   mobileMotion,
   mobileRadii,
   mobileRadius,
@@ -14,13 +15,22 @@ import {
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
+import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
  */
 export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
-export const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
+/**
+ * How far the open-shift carousel bleeds into the page gutter so a card's side
+ * shadow is not cut at the strip's edge, and how much room the section keeps
+ * below its cards. The vertical room the shadow actually needs comes from the
+ * elevation token, and the strip's bottom margin takes back whatever exceeds
+ * this so the rhythm to the next section does not move with the token.
+ */
+export const OPEN_SHIFT_CARD_SIDE_BLEED = 18;
+export const OPEN_SHIFT_CARD_FOOTROOM = 36;
 export const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
 /**
  * Height of every control in the header row — the week chevrons, Today and the
@@ -138,12 +148,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // and lands at 4.499:1 in dark, which is under the line.
       color: mobileColors.controlSecondaryFg,
     },
+    // The shadow lives on this view and the clip on the one inside: iOS clips
+    // a view's own shadow when it also clips its children, which is why the
+    // hero's blue glow never rendered there.
     meHeroCard: {
       position: "relative",
-      overflow: "hidden",
       borderRadius: mobileRadii.card,
-      paddingHorizontal: mobileSpace.lg,
-      paddingVertical: mobileSpace.lg,
       shadowOffset: {
         width: 0,
         height: 14,
@@ -151,6 +161,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       shadowOpacity: 1,
       shadowRadius: 28,
       elevation: 5,
+    },
+    meHeroCardClip: {
+      overflow: "hidden",
+      borderRadius: mobileRadii.card,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.lg,
     },
     meHeroCardMuted: {
       backgroundColor: "#E2E8F0",
@@ -312,61 +328,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroContextGroup: {
       gap: 8,
-    },
-    shiftChangeBadge: {
-      alignSelf: "flex-start",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 999,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    shiftChangeBadgeNew: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    shiftChangeBadgeModified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    shiftChangeBadgeDeleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    shiftChangeBadgeCompactSegment: {
-      paddingVertical: 4,
-    },
-    // The hero's lone change chip stands in for the `Shift N · Edited` pill a
-    // split shift shows in the same slot, so it copies `SplitShiftBadge`.
-    shiftChangeBadgeInverse: {
-      alignSelf: "flex-start",
-      alignItems: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.16)",
-      borderColor: "rgba(255, 255, 255, 0.28)",
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-    },
-    shiftChangeBadgeText: {
-      ...mobileTextWeighted("micro", "bold"),
-      color: mobileColors.textSecondary,
-      textTransform: "uppercase",
-      // Android's font padding pushes uppercase glyphs high inside a pill this
-      // tight, leaving the label visibly off-center in its own chip.
-      includeFontPadding: false,
-      textAlignVertical: "center",
-    },
-    shiftChangeBadgeTextInverse: {
-      ...mobileText.badge,
-      color: mobileColors.textInverse,
-      textTransform: "none",
-    },
-    shiftChangeBadgeTextCompactSegment: {
-      ...mobileText.badge,
-      color: mobileColors.brand,
-      textTransform: "none",
     },
     previousShiftRow: {
       flexDirection: "row",
@@ -556,19 +517,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroCollaboratorAvatarText: {
       ...mobileAvatarText(38),
     },
+    // A pale disc reads on the light navy block, but the same grey vanished
+    // against the dark theme's deeper navy, so dark mode lightens the block
+    // like the hero's other chips instead.
     meHeroCollaboratorOverflow: {
       width: 38,
       height: 38,
       borderRadius: 19,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: isDark ? HERO_INVERSE_CHIP_BORDER : mobileColors.borderSubtle,
+      backgroundColor: isDark ? HERO_INVERSE_CHIP_FILL : mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
     },
     meHeroCollaboratorOverflowText: {
       ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
+      color: isDark ? mobileColors.textInverse : mobileColors.textMuted,
     },
     meSectionBlock: {
       gap: 12,
@@ -587,16 +551,18 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       color: mobileColors.textPrimary,
     },
+    // The secondary control pair rather than the soft brand fill: on the
+    // aurora-washed page `brandSoft` is the same tint as the ground.
     upcomingHoursBadge: {
       borderRadius: mobileRadii.control,
-      backgroundColor: mobileColors.brandSoft,
+      backgroundColor: mobileColors.controlSecondaryBg,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
     },
     upcomingHoursBadgeText: {
       ...mobileText.bodyStrong,
       ...mobileTabularText,
-      color: mobileColors.brand,
+      color: mobileColors.controlSecondaryFg,
     },
     upcomingShiftsCard: {
       backgroundColor: mobileColors.surface,
@@ -843,15 +809,21 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,
     },
+    // A horizontal ScrollView clips to its bounds, so the card shadow needs
+    // the token's own reach below the last card or it ends in a hard line.
     openShiftCarousel: {
-      marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      marginHorizontal: -OPEN_SHIFT_CARD_SIDE_BLEED,
+      marginBottom: Math.min(
+        0,
+        OPEN_SHIFT_CARD_FOOTROOM - mobileElevationExtent("card", isDark).bottom,
+      ),
     },
     openShiftCarouselContent: {
       gap: mobileSpace.md,
-      paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      paddingHorizontal: OPEN_SHIFT_CARD_SIDE_BLEED,
       paddingTop: 4,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-      paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
+      paddingBottom: mobileElevationExtent("card", isDark).bottom,
+      paddingRight: OPEN_SHIFT_CARD_SIDE_BLEED + 4,
     },
     openShiftDateCard: {
       width: 320,
@@ -865,7 +837,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     openShiftDateCardItems: {
       gap: mobileSpace.md,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+    },
+    // Cards in the day sheet stack vertically with the same shadow room the
+    // carousel keeps under its last card.
+    openShiftSheetList: {
+      gap: mobileSpace.md,
+      paddingBottom: mobileElevationExtent("card", isDark).bottom,
     },
     openShiftDateCardItemsStacked: {
       gap: 0,
@@ -891,9 +868,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     openShiftCardLead: {
       zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
     },
+    // The peeking ghosts sit under the lead card, so they take the quieter
+    // level on both platforms; overriding one iOS property left the full
+    // `boxShadow` cast in place.
     openShiftCardStacked: {
       position: "absolute",
-      shadowRadius: 14,
+      ...mobileElevation("raised", isDark),
     },
     requestList: {
       gap: mobileSpace.md,

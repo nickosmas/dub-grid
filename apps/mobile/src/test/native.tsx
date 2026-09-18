@@ -52,6 +52,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "transparent" ||
       key === "visible" ||
       key === "onRequestClose" ||
+      key === "allowSwipeDismissal" ||
       key === "horizontal" ||
       key === "showsHorizontalScrollIndicator" ||
       key === "showsVerticalScrollIndicator" ||

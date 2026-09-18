@@ -2,6 +2,7 @@ import { StyleSheet } from "react-native";
 import {
   mobileAvatarText,
   mobileElevation,
+  mobileElevationExtent,
   mobileRadii,
   mobileRadius,
   mobileSpace,
@@ -34,7 +35,9 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       // Borderless in light mode, hairline in dark: matches the shared Card.
       borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.cardBorder,
-      marginTop: 12,
+      // The card is the first thing in the scroll view, whose top edge clips;
+      // the token's upward reach is the room its shadow needs.
+      marginTop: mobileElevationExtent("card", isDark).top,
       marginBottom: 8,
       padding: mobileSpace.xl,
       gap: mobileSpace.lg,
@@ -73,30 +76,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       flexWrap: "wrap",
       gap: mobileSpace.md,
-    },
-    detailShiftChangeBadge: {
-      alignSelf: "flex-start",
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    detailShiftChangeBadgeNew: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-    },
-    detailShiftChangeBadgeModified: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    detailShiftChangeBadgeDeleted: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    detailShiftChangeBadgeText: {
-      ...mobileText.badge,
-      color: mobileColors.brand,
-      textTransform: "none",
     },
     detailHeroTitle: {
       ...mobileText.heroMetric,
@@ -220,6 +199,21 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     previousShiftSheetDetails: {
       gap: mobileSpace.md,
+    },
+    previousShiftChangeSummary: {
+      gap: mobileSpace.xs,
+      paddingBottom: mobileSpace.md,
+      marginBottom: mobileSpace.md,
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.borderSubtle,
+    },
+    previousShiftChangeLabel: {
+      ...mobileText.label,
+      color: mobileColors.textMuted,
+    },
+    previousShiftChangeLine: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
     },
     previousShiftSegmentList: {
       gap: mobileSpace.sm,
