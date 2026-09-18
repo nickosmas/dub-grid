@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { STARTUP_STATUS_DELAY_MS, STARTUP_TIMEOUT_MS } from "@dubgrid/design-tokens";
 import { Button } from "@/components/Button";
-import ButtonSpinner from "@/components/ButtonSpinner";
 import { useLogout } from "@/hooks/useLogout";
 import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
+
+const STATUS_DELAY_SECONDS = STARTUP_STATUS_DELAY_MS / 1_000;
+const TIMEOUT_SECONDS = STARTUP_TIMEOUT_MS / 1_000;
 
 type TransitionPhase = "signing-in" | "workspace" | "onboarding";
 
@@ -27,6 +30,12 @@ const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
  * Visible, bounded feedback for an authenticated handoff. Unlike AuthSplash,
  * which is intentionally reserved for logout teardown, this is announced to
  * assistive technology and always provides a way out of a prolonged wait.
+ *
+ * What says the app is working is the indeterminate progress bar, the status
+ * copy once the wait passes `STARTUP_STATUS_DELAY_MS`, and the escape actions
+ * once it passes `STARTUP_TIMEOUT_MS`. Both thresholds are shared with the
+ * mobile splash so one launch does not go quiet for a different length of time
+ * depending on the platform.
  */
 export default function AuthTransitionScreen({
   phase,
@@ -43,17 +52,17 @@ export default function AuthTransitionScreen({
 }) {
   const { signOut } = useLogout();
   const [startedAt] = useState(() => getAuthTransitionStartedAt() ?? Date.now());
-  const [elapsedSeconds, setElapsedSeconds] = useState(() =>
-    Math.floor((Date.now() - startedAt) / 1_000),
-  );
+  const [elapsedSeconds, setElapsedSeconds] = useState(() => (Date.now() - startedAt) / 1_000);
   const copy = PHASE_COPY[phase];
-  const isSlow = elapsedSeconds >= 15;
-  const showEscape = showActionsImmediately || elapsedSeconds >= 30;
+  const isSlow = elapsedSeconds >= STATUS_DELAY_SECONDS;
+  const showEscape = showActionsImmediately || elapsedSeconds >= TIMEOUT_SECONDS;
 
+  // Ticks faster than once a second because the thresholds are no longer whole
+  // seconds: at a 1s tick, a 2.5s threshold would not be met until 3s.
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1_000));
-    }, 1_000);
+      setElapsedSeconds((Date.now() - startedAt) / 1_000);
+    }, 250);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -81,7 +90,14 @@ export default function AuthTransitionScreen({
     >
       <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-          <ButtonSpinner size={32} color="var(--dg-color-brand)" />
+          <div
+            aria-label="Loading"
+            className="dg-startup-progress"
+            data-startup-progress
+            role="progressbar"
+          >
+            <div className="dg-startup-progress-bar" />
+          </div>
         </div>
         <h1
           style={{

@@ -5554,6 +5554,39 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   flex-shrink: 0;
 }
 
+/* ── Startup progress ──────────────────────────────────────────────────────
+ * The indeterminate bar on the startup surface. The brand mark beside it is
+ * static by contract, so this is what says the app is working. Startup has no
+ * measurable percentage to report, hence a sweeping band rather than a fill.
+ * Under reduced motion the global rule below flattens the sweep and the bar
+ * rests part-filled, which still separates "loading" from "stuck".
+ * ──────────────────────────────────────────────────────────────────────── */
+@keyframes dg-startup-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(150%);
+  }
+}
+
+.dg-startup-progress {
+  width: 240px;
+  max-width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dg-color-border-subtle);
+  overflow: hidden;
+}
+
+.dg-startup-progress-bar {
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dg-color-brand);
+  animation: dg-startup-sweep 1.2s ease-in-out infinite alternate;
+}
+
 /* ── Reduced motion ────────────────────────────────────────────────────────
  * Disables non-essential animations and transitions for users who have
  * enabled the "reduce motion" accessibility setting in their OS.
