@@ -35,7 +35,7 @@ const DAY_CARD_GAP = 10;
 // The chip step of the shared ramp (card 20 / panel 12 / chip 8).
 const PILL_RADIUS = mobileRadius.md;
 // The coloured cards' edge, as an alpha of their text colour.
-const PILL_EDGE_ALPHA = 0.2;
+const PILL_EDGE_ALPHA = 0.12;
 // Room for the pills' shadow inside the strip. A ScrollView clips at its
 // bounds, so without it the cast ends in a hard line under each pill; the
 // same room is taken back as a negative margin so the section's rhythm is
