@@ -10,6 +10,7 @@ import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
+  mobileBorderColorFromText,
   mobileElevation,
   mobileRadius,
   mobileText,
@@ -33,6 +34,8 @@ const DAY_CARD_GAP = 10;
 // radius the strip reads at rather than a nested corner inside a bigger one.
 // The chip step of the shared ramp (card 20 / panel 12 / chip 8).
 const PILL_RADIUS = mobileRadius.md;
+// The coloured cards' edge, as an alpha of their text colour.
+const PILL_EDGE_ALPHA = 0.2;
 // Room for the pills' shadow inside the strip. A ScrollView clips at its
 // bounds, so without it the cast ends in a hard line under each pill; the
 // same room is taken back as a negative margin so the section's rhythm is
@@ -213,14 +216,17 @@ export function MyScheduleCard({
                         key={segment.key}
                         style={[
                           styles.shiftPill,
-                          // `border` is the faint text-derived tint every
-                          // coloured pill in the app wears; `borderSubtle`
-                          // below is tuned against white and vanishes on a
-                          // fill, so a shift or absence card read borderless.
+                          // A tint of the pill's own text, fainter than the
+                          // edge other pills wear: `borderSubtle` below is
+                          // tuned against white and vanishes on a fill, and
+                          // the standard 0.35 read as a drawn outline here.
                           segment.pill
                             ? {
                                 backgroundColor: segment.pill.color,
-                                borderColor: segment.pill.border,
+                                borderColor: mobileBorderColorFromText(
+                                  segment.pill.text,
+                                  PILL_EDGE_ALPHA,
+                                ),
                               }
                             : null,
                         ]}
