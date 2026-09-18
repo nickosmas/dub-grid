@@ -69,7 +69,7 @@ they need; run `scripts/mobile-matrix.sh <screen>-<role>` per screen.
 | Cell                                                                                         | Status   | Shows                                                                                                                                                                                                                                                  |
 | -------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | dashboard-ios-light-default-admin                                                            | captured | Two-word greeting and period; toggle track in the theme ground; Your schedule first, its strip on the page with no card; one Coverage card (figure, three focus-area meters, centred stats at the foot); See all on every card; rows as text, no pills |
-| dashboard-ios-light-ax-admin                                                                 | captured | Accessibility extra-large: greeting on one line, shift pills grown with the text, coverage figures wrapped under the name; the period toggle truncates its labels by the feature 23 rule                                                               |
+| dashboard-ios-light-ax-admin                                                                 | captured | Accessibility extra-large: greeting on one line, the period toggle across the row with every label in full, shift pills grown with the text, coverage figures wrapped under the name                                                                   |
 | coverage-list-ios-light-default-admin                                                        | captured | Coverage See all: back, title, "1 section" with Filter, the same focus-area rows                                                                                                                                                                       |
 | my-schedule-ios-light-default-admin                                                          | captured | Your schedule See all: the staff home on the brand aurora through its header, hero, Your Week card                                                                                                                                                     |
 | open-shifts-list-ios-light-default-admin                                                     | captured | Open shifts See all: "6 shifts" with Filter, rows as text with the count and urgency word; a row lands on Requests, Available                                                                                                                          |
@@ -173,8 +173,8 @@ presentation="inline"`, `FullPageSheet overlay`), and Close no longer
 - 2026-09-18, period toggle at accessibility sizes: "D...", "W...", "2 We...".
   Fixed in place: the control takes the row once text is scaled up
   (`SegmentedControl stretch`) and its labels take the app-wide font cap.
-  Verified by test; the device capture is pending a LAN address change
-  (the simulator lost the API mid-pass).
+  Captured as `dashboard-ios-light-ax-admin`: Day, Week and 2 Weeks all
+  read in full.
 - 2026-09-18, requests, Available: "Evening Shift" broke beside its time.
   Fixed in place: the time wraps under the name when there is no room.
 - 2026-09-18, dashboard at accessibility extra-large: the greeting cut to
