@@ -72,3 +72,29 @@ test.describe("alerts states", () => {
     await expect(page.locator('main [aria-busy="true"]')).toHaveCount(0);
   });
 });
+
+// No route mocks here: the bell row lands on /alerts?open=<id>, and the inbox
+// resolves that id through the same search endpoint the tests above stub.
+test.describe("alerts from the header bell", () => {
+  test("opens the clicked alert on the alerts page", async ({ page }) => {
+    test.setTimeout(90_000);
+    await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
+    await page.goto(`${QA_CALM_HAVEN_ORIGIN}/schedule`);
+
+    await page.getByRole("button", { name: /^Alerts/ }).click();
+    const popover = page.getByRole("region", { name: "Alerts" });
+    await expect(popover).toBeVisible();
+    const rows = popover.locator("a[href^='/alerts?open=']");
+    const empty = popover.getByText("No alerts");
+    await expect(rows.first().or(empty)).toBeVisible({ timeout: 15_000 });
+    test.skip(await empty.isVisible(), "the QA inbox holds no alerts to open");
+
+    const title = (await rows.first().innerText()).split("\n")[0]?.trim() ?? "";
+    await rows.first().click();
+
+    await expect(page).toHaveURL(/\/alerts$/, { timeout: 20_000 });
+    await expect(popover).toBeHidden();
+    const dialog = page.getByRole("dialog", { name: title });
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+  });
+});

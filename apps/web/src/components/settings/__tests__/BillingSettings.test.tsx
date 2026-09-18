@@ -175,10 +175,9 @@ describe("BillingSettings", () => {
     expect(
       await screen.findByRole("dialog", { name: "Billing activity details" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Stripe Event Type")).toBeInTheDocument();
-    expect(screen.getByText("Customer Subscription Deleted")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(screen.getByText("Canceled")).toBeInTheDocument();
+    // The Stripe payload is never flattened raw; a cancellation has no rows to add.
+    expect(screen.queryByText("Stripe Event Type")).not.toBeInTheDocument();
+    expect(screen.queryByText("Customer Subscription Deleted")).not.toBeInTheDocument();
     expect(screen.getByText("Record type")).toBeInTheDocument();
     expect(screen.queryByText("Billing sub_123")).not.toBeInTheDocument();
     expect(screen.queryByText("sub_123")).not.toBeInTheDocument();

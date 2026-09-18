@@ -22,7 +22,7 @@ import { useMobileContentState } from "../../../src/shared/hooks/useMobileConten
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
-const ACTIVITY_TYPES: ActivityType[] = ["publish", "shift_change", "request", "user_signup"];
+const ACTIVITY_TYPES: ActivityType[] = ["publish", "request", "user_signup"];
 type TypeFilter = "all" | ActivityType;
 
 export default function ActivityExpandedScreen() {

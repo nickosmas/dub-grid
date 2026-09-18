@@ -1,9 +1,11 @@
+import type { Audience } from "./audience";
+
 /**
  * Shared helpers for rendering notification metadata in user-facing surfaces
- * (bell, inbox, mobile detail). The notifications table can carry arbitrary
- * metadata, but most keys are either technical plumbing (ids, hrefs, type
- * discriminators) or user-facing details. This module hides the former and
- * humanizes the latter.
+ * (inbox modal, mobile detail). The notifications table can carry arbitrary
+ * metadata. An organization's own people only ever see the human-written
+ * notes; the message already carries everything else they can act on.
+ * Platform staff see the rest, minus plumbing (ids, hrefs, discriminators).
  */
 
 /** Keys that are wiring/plumbing and must never surface in the UI. */
@@ -21,6 +23,11 @@ const TECHNICAL_METADATA_KEYS = new Set<string>([
   "acceptedUserId",
   "targetUserId",
   "affectedUserId",
+  "session_id",
+  "gridmaster_id",
+  "target_user_id",
+  "stripeInvoiceId",
+  "orgId",
   // routing / wiring
   "href",
   "action",
@@ -60,6 +67,9 @@ const METADATA_FRIENDLY_LABELS: Record<string, string> = {
   planName: "Plan",
   amountCents: "Amount",
 };
+
+/** The only metadata an organization's own people see, in display order. */
+const ORG_VISIBLE_METADATA_KEYS = ["note", "adminNote"] as const;
 
 /**
  * Turn a camelCase or snake_case key into human-readable text:
@@ -113,13 +123,19 @@ export interface NotificationDetailEntry {
 
 /**
  * Convert a notification's metadata into a curated, ordered list of
- * { label, value } pairs ready to render. Technical keys are stripped;
- * known keys get friendly labels; unknown keys are humanized.
+ * { label, value } pairs ready to render for the given audience.
  */
 export function formatNotificationMetadata(
   metadata: Record<string, unknown> | null | undefined,
+  options: { audience: Audience },
 ): NotificationDetailEntry[] {
   if (!metadata) return [];
+  if (options.audience === "org") {
+    return ORG_VISIBLE_METADATA_KEYS.flatMap((key) => {
+      const value = formatValue(metadata[key]);
+      return value === null ? [] : [{ label: METADATA_FRIENDLY_LABELS[key], value }];
+    });
+  }
   const entries: NotificationDetailEntry[] = [];
   for (const [key, raw] of Object.entries(metadata)) {
     if (TECHNICAL_METADATA_KEYS.has(key)) continue;

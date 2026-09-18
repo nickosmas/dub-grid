@@ -10,6 +10,7 @@ import {
   type CSSProperties,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -44,9 +45,15 @@ import { usePermissions, type Permissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { queryKeys } from "@/lib/query-keys";
 import { formatRelativeTime } from "@/lib/utils";
-import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/domain";
+import {
+  audienceForViewer,
+  extractNotificationAction,
+  formatNotificationMetadata,
+  type Audience,
+} from "@dubgrid/domain";
 import {
   archiveNotifications,
+  fetchNotificationById,
   fetchNotificationFacets,
   markAllNotificationsRead,
   markNotificationsRead,
@@ -236,16 +243,33 @@ function filtersToQuery(filters: FilterState): NotificationSearchParams {
 }
 
 function AlertsInboxPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const openNotificationId = useSearchParams().get("open");
+  // Clearing the param once the alert is open means closing the modal does
+  // not leave a stale deep link, and re-opening the same alert from the bell
+  // is a fresh change of the prop.
+  const clearOpenParam = useCallback(
+    () => router.replace(pathname, { scroll: false }),
+    [router, pathname],
+  );
   return (
     <ProtectedRoute>
       <PageContainer maxWidth={1200}>
-        <InboxView />
+        <InboxView openNotificationId={openNotificationId} onOpenHandled={clearOpenParam} />
       </PageContainer>
     </ProtectedRoute>
   );
 }
 
-export function InboxView() {
+interface InboxViewProps {
+  /** An alert to open on arrival, e.g. from the header bell. */
+  openNotificationId?: string | null;
+  /** Called once the requested alert is open (or reported missing). */
+  onOpenHandled?: () => void;
+}
+
+export function InboxView({ openNotificationId = null, onOpenHandled }: InboxViewProps = {}) {
   const { user } = useAuth();
   const perms = usePermissions();
   const userId = user?.id ?? null;
@@ -493,13 +517,49 @@ export function InboxView() {
           await markNotificationsRead([n.id]);
           applyOptimistic([n.id], { readAt: new Date().toISOString() });
           refreshFacets();
+          // The header bell caches its own list and count; realtime would
+          // catch up, but the badge should drop as soon as the alert is read.
+          if (userId) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all(userId) });
+          }
         } catch {
           // best-effort; the detail panel still opens
         }
       }
     },
-    [applyOptimistic, refreshFacets],
+    [applyOptimistic, refreshFacets, queryClient, userId],
   );
+
+  // Open the alert a deep link or the bell asked for. The first page may not
+  // hold it (filters, pagination, archived), so fall back to a lookup by id.
+  // The collaborators live in a ref so a re-render mid-lookup (a realtime
+  // reload, the portal passing a fresh callback) cannot cancel or repeat it.
+  const openCollaboratorsRef = useRef({ notifications, handleRowClick, onOpenHandled });
+  useEffect(() => {
+    openCollaboratorsRef.current = { notifications, handleRowClick, onOpenHandled };
+  });
+  const handledOpenIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openNotificationId) {
+      handledOpenIdRef.current = null;
+      return;
+    }
+    if (loadingPage || handledOpenIdRef.current === openNotificationId) return;
+    handledOpenIdRef.current = openNotificationId;
+    const {
+      notifications: loaded,
+      handleRowClick: open,
+      onOpenHandled: done,
+    } = openCollaboratorsRef.current;
+    const found = loaded.find((n) => n.id === openNotificationId);
+    (found ? Promise.resolve(found) : fetchNotificationById(openNotificationId))
+      .then((n) => {
+        if (n) void open(n);
+        else toast.error("That alert is no longer available");
+      })
+      .catch(() => toast.error("That alert is no longer available"))
+      .finally(() => done?.());
+  }, [openNotificationId, loadingPage]);
 
   const activeView = activeViewMeta(filters);
 
@@ -654,6 +714,7 @@ export function InboxView() {
       {detailNotification && (
         <NotificationDetailModal
           notification={detailNotification}
+          audience={audienceForViewer(perms)}
           onClose={() => setDetailNotification(null)}
         />
       )}
@@ -679,6 +740,7 @@ export function InboxView() {
 
 interface NotificationDetailModalProps {
   notification: Notification;
+  audience: Audience;
   onClose: () => void;
 }
 
@@ -693,10 +755,14 @@ function formatFullTimestamp(value: string): string {
   });
 }
 
-function NotificationDetailModal({ notification, onClose }: NotificationDetailModalProps) {
+function NotificationDetailModal({
+  notification,
+  audience,
+  onClose,
+}: NotificationDetailModalProps) {
   const entries = useMemo(
-    () => formatNotificationMetadata(notification.metadata),
-    [notification.metadata],
+    () => formatNotificationMetadata(notification.metadata, { audience }),
+    [notification.metadata, audience],
   );
   const action = useMemo(
     () => extractNotificationAction(notification.metadata),

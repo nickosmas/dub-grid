@@ -417,6 +417,7 @@ export default function GridmasterPortal() {
     OrganizationDetailTab | undefined
   >();
   const [view, setView] = useState<GridmasterView>("dashboard");
+  const [openAlertId, setOpenAlertId] = useState<string | null>(null);
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
   const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
 
@@ -791,6 +792,12 @@ export default function GridmasterPortal() {
               setSelectedId(null);
               setSelectedOrgInitialTab(undefined);
             }}
+            onOpenItem={(id) => {
+              setView("notifications");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+              setOpenAlertId(id);
+            }}
           />
         </div>
         {!isMobile && (
@@ -1160,7 +1167,12 @@ export default function GridmasterPortal() {
 
           {view === "impersonation-history" && <ImpersonationHistory />}
 
-          {view === "notifications" && <AlertsInboxView />}
+          {view === "notifications" && (
+            <AlertsInboxView
+              openNotificationId={openAlertId}
+              onOpenHandled={() => setOpenAlertId(null)}
+            />
+          )}
         </main>
       </SidebarProvider>
     </div>

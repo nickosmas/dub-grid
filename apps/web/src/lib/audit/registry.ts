@@ -16,13 +16,17 @@ import {
   AuditDetails,
   type DetailItem,
   formatDateRange,
+  formatMinorUnits,
   formatScalar,
+  formatShortDate,
   formatValue,
   friendlyLabel,
   pluralize,
   titleCase,
 } from "./details";
+import { formatBillingStatusLabel } from "@/lib/client-facing";
 import { diffPermissions, permissionLabel } from "@/lib/permission-labels";
+import type { Audience } from "@dubgrid/domain";
 
 // ── Categories ───────────────────────────────────────────────────────────────
 
@@ -38,6 +42,7 @@ export const AUDIT_CATEGORY_LABELS = {
   impersonation: "Impersonation",
   billing: "Billing",
   data: "Data & privacy",
+  security: "Security",
   platform: "Platform",
 } as const;
 
@@ -78,6 +83,13 @@ export interface AuditActionSpec {
    * that renders its own rows is already deciding what to show.
    */
   suppressKeys?: readonly string[];
+  /**
+   * Who may read the row. Omitted means `org`: the organization's own admins
+   * see it, and so do gridmasters. `platform` keeps tooling (impersonation,
+   * feature flags, sign-in evidence, gridmaster billing operations) out of the
+   * organization's own log.
+   */
+  audience?: Audience;
 }
 
 /**
@@ -331,6 +343,64 @@ function configRecordSpecs(
 }
 
 // ── The registry ─────────────────────────────────────────────────────────────
+
+/** Sign-in style events read as outcome first; a rejection names why. */
+function securityHeadline(d: AuditDetails, succeeded: string, noun: string): string {
+  const outcome = d.text("outcome");
+  const surface = d.text("surface") === "mobile" ? " from the mobile app" : "";
+  if (outcome === "succeeded") return `${succeeded}${surface}`;
+  const reason = d.text("reason");
+  const why =
+    reason === "invalid_credentials"
+      ? "wrong password"
+      : reason === "policy_denied"
+        ? "not allowed"
+        : reason === "rate_limited"
+          ? "too many attempts"
+          : reason === "service_unavailable"
+            ? "service unavailable"
+            : null;
+  const verb = outcome === "throttled" ? "throttled" : outcome === "failed" ? "failed" : "rejected";
+  return `${noun} ${verb}${surface}${why ? `: ${why}` : ""}`;
+}
+
+/** Seats and status for a subscription row; a change reads "previous -> new". */
+function subscriptionRows(d: AuditDetails): DetailItem[] {
+  const rows: DetailItem[] = [];
+  const seats = d.number("quantity");
+  const previousSeats = d.number("previous_quantity");
+  if (seats !== null) {
+    rows.push({
+      label: "Seats",
+      value:
+        previousSeats !== null && previousSeats !== seats
+          ? `${previousSeats} -> ${seats}`
+          : String(seats),
+    });
+  }
+  const status = d.text("status");
+  const previousStatus = d.text("previous_status");
+  if (status) {
+    rows.push({
+      label: "Status",
+      value:
+        previousStatus && previousStatus !== status
+          ? `${formatBillingStatusLabel(previousStatus)} -> ${formatBillingStatusLabel(status)}`
+          : formatBillingStatusLabel(status),
+    });
+  }
+  const renewsOn = d.text("current_period_end");
+  if (renewsOn) rows.push({ label: "Current period ends", value: formatShortDate(renewsOn) });
+  return rows;
+}
+
+/** The invoice amount in the customer's currency; Stripe records minor units. */
+function amountRows(d: AuditDetails, key: string): DetailItem[] {
+  const amount = d.number(key);
+  const currency = d.text("currency");
+  if (amount === null || !currency) return [];
+  return [{ label: "Amount", value: formatMinorUnits(amount, currency) }];
+}
 
 export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   // ── People ─────────────────────────────────────────────────────────────────
@@ -643,6 +713,19 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
   },
 
+  "invitation.auto_revoked": {
+    category: "invitations",
+    severity: "warning",
+    headline: (d) => {
+      const email = d.text("invitation_email");
+      return email
+        ? `Withdrew the pending invitation for ${email} because the team member's email changed`
+        : "Withdrew a pending invitation because the team member's email changed";
+    },
+    // The row carries the old and new email; the headline says what happened.
+    details: () => [],
+  },
+
   "invitation.expired": {
     category: "invitations",
     severity: "warning",
@@ -827,6 +910,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
   },
   "feature_flags.updated": {
+    audience: "platform",
     category: "organization",
     severity: "warning",
     headline: () => "Changed which features are turned on",
@@ -845,6 +929,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
 
   // ── Impersonation ──────────────────────────────────────────────────────────
   "impersonation.started": {
+    audience: "platform",
     category: "impersonation",
     severity: "warning",
     headline: (d, ctx) => {
@@ -855,6 +940,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     suppressKeys: ["justification"],
   },
   "impersonation.ended": {
+    audience: "platform",
     category: "impersonation",
     severity: "update",
     headline: (d) => {
@@ -869,23 +955,31 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "billing",
     severity: "create",
     headline: () => "Started the subscription",
+    details: (d) => subscriptionRows(d),
   },
   "billing.subscription_updated": {
     category: "billing",
     severity: "update",
     headline: () => "Updated the subscription",
+    details: (d) => subscriptionRows(d),
   },
   "billing.subscription_cancel_scheduled": {
     category: "billing",
     severity: "warning",
     headline: () => "Scheduled the subscription to end",
+    details: (d) => {
+      const endsOn = d.text("cancel_at");
+      return endsOn ? [{ label: "Ends on", value: formatShortDate(endsOn) }] : [];
+    },
   },
   "billing.subscription_canceled": {
     category: "billing",
     severity: "delete",
     headline: () => "Canceled the subscription",
+    details: () => [],
   },
   "billing.trial_extended": {
+    audience: "platform",
     category: "billing",
     severity: "update",
     headline: () => "Extended the trial",
@@ -894,28 +988,37 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "billing",
     severity: "delete",
     headline: () => "A payment didn't go through",
+    details: (d) => amountRows(d, "amount_due"),
   },
   "billing.payment_succeeded": {
     category: "billing",
     severity: "create",
     headline: () => "A payment went through",
+    details: (d) => amountRows(d, "amount_paid"),
   },
   "billing.payment_method_updated": {
     category: "billing",
     severity: "update",
     headline: () => "Updated the payment method",
+    details: (d) => {
+      const type = d.text("payment_method_type");
+      return type ? [{ label: "Payment method", value: titleCase(type) }] : [];
+    },
   },
   "billing.billing_details_updated": {
     category: "billing",
     severity: "update",
     headline: () => "Updated the billing details",
+    details: () => [],
   },
   "billing.portal_opened": {
+    audience: "platform",
     category: "billing",
     severity: "update",
     headline: () => "Opened the billing portal",
   },
   "billing.seats_synced": {
+    audience: "platform",
     category: "billing",
     severity: "update",
     headline: (d) => {
@@ -927,11 +1030,13 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     suppressKeys: ["seats", "quantity"],
   },
   "billing.status_overridden": {
+    audience: "platform",
     category: "billing",
     severity: "warning",
     headline: () => "Overrode the billing status",
   },
   "billing.synced": {
+    audience: "platform",
     category: "billing",
     severity: "update",
     headline: () => "Refreshed the billing details",
@@ -953,6 +1058,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: () => "Downloaded a copy of their personal data",
   },
   "audit.exported": {
+    audience: "platform",
     category: "data",
     severity: "warning",
     headline: (d) => {
@@ -975,28 +1081,75 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => `Erased the personal data for ${who(d, ctx, "a team member")}`,
   },
 
+  // ── Security (platform-only evidence) ──────────────────────────────────────
+  "security.auth.login": {
+    audience: "platform",
+    category: "security",
+    severity: "update",
+    headline: (d) => securityHeadline(d, "Signed in", "Sign-in"),
+    details: () => [],
+  },
+  "security.auth.recovery": {
+    audience: "platform",
+    category: "security",
+    severity: "warning",
+    headline: (d) => securityHeadline(d, "Reset their password", "Password reset"),
+    details: () => [],
+  },
+  "security.auth.mfa": {
+    audience: "platform",
+    category: "security",
+    severity: "warning",
+    headline: (d) => {
+      const reason = d.text("reason");
+      if (reason === "factor_enrollment_started")
+        return "Started setting up two-factor authentication";
+      if (reason === "factor_removed") return "Turned off two-factor authentication";
+      if (reason === "reauthenticated") return "Confirmed their identity again";
+      return securityHeadline(d, "Passed a two-factor check", "Two-factor check");
+    },
+    details: () => [],
+  },
+  "security.auth.session": {
+    audience: "platform",
+    category: "security",
+    severity: "warning",
+    headline: (d) => {
+      const scope = d.text("scope");
+      if (scope === "others") return "Signed out their other devices";
+      if (scope === "global") return "Signed out everywhere";
+      return "Signed out";
+    },
+    details: () => [],
+  },
+
   // ── Platform (gridmaster) ──────────────────────────────────────────────────
   "gridmaster_account.promoted": {
+    audience: "platform",
     category: "platform",
     severity: "warning",
     headline: (d, ctx) => `Gave ${who(d, ctx, "an account")} gridmaster access`,
   },
   "gridmaster_account.demoted": {
+    audience: "platform",
     category: "platform",
     severity: "warning",
     headline: (d, ctx) => `Removed gridmaster access from ${who(d, ctx, "an account")}`,
   },
   "gridmaster_account.deactivated": {
+    audience: "platform",
     category: "platform",
     severity: "delete",
     headline: (d, ctx) => `Deactivated the gridmaster account for ${who(d, ctx, "a teammate")}`,
   },
   "gridmaster_account.reactivated": {
+    audience: "platform",
     category: "platform",
     severity: "create",
     headline: (d, ctx) => `Reactivated the gridmaster account for ${who(d, ctx, "a teammate")}`,
   },
   "platform_feature_flags.created": {
+    audience: "platform",
     category: "platform",
     severity: "create",
     headline: (d) => {
@@ -1008,6 +1161,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     suppressKeys: ["key", "flagName"],
   },
   "platform_feature_flags.updated": {
+    audience: "platform",
     category: "platform",
     severity: "warning",
     headline: (d) => {
@@ -1130,6 +1284,30 @@ export const PERSON_ACTIVITY_CATEGORIES: readonly AuditCategory[] = [
 export const ORG_ACTIVITY_CATEGORIES: readonly AuditCategory[] = (
   Object.keys(AUDIT_CATEGORY_LABELS) as AuditCategory[]
 ).filter((category) => category !== "platform");
+
+/**
+ * Whether a row may be shown to an audience. An unregistered action has no
+ * spec, so it is platform-only: the organization's log never shows copy the
+ * registry did not write.
+ */
+export function isVisibleToAudience(action: string, audience: Audience): boolean {
+  if (audience === "platform") return true;
+  const spec = AUDIT_ACTIONS[action];
+  return spec !== undefined && (spec.audience ?? "org") === "org";
+}
+
+/** Every action an organization's own admins may read, sorted for stable queries. */
+export const ORG_AUDIENCE_ACTIONS: readonly string[] = Object.entries(AUDIT_ACTIONS)
+  .filter(([, spec]) => (spec.audience ?? "org") === "org")
+  .map(([action]) => action)
+  .sort();
+
+/** The categories with at least one org-visible action, in label order. */
+export const ORG_AUDIENCE_CATEGORIES: readonly AuditCategory[] = (
+  Object.keys(AUDIT_CATEGORY_LABELS) as AuditCategory[]
+).filter((category) =>
+  ORG_AUDIENCE_ACTIONS.some((action) => AUDIT_ACTIONS[action]?.category === category),
+);
 
 export function matchesAuditCategory(action: string, categoryValue: string): boolean {
   if (categoryValue === "all") return true;

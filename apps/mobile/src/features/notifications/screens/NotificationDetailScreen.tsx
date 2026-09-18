@@ -75,7 +75,8 @@ function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const entries = formatNotificationMetadata(metadata);
+  // Mobile has no platform surfaces, so every viewer is one of the org's own.
+  const entries = formatNotificationMetadata(metadata, { audience: "org" });
   if (!entries.length) return null;
   return (
     <View style={styles.metadataCard}>

@@ -14,6 +14,7 @@ export interface NotificationCursor {
 }
 
 export interface NotificationSearchParams {
+  id?: string;
   limit?: number;
   cursor?: NotificationCursor | null;
   read?: "unread" | "read" | null;
@@ -103,6 +104,12 @@ export async function searchNotifications(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
+}
+
+/** One of the caller's alerts by id, read or archived or not; null when gone. */
+export async function fetchNotificationById(id: string): Promise<Notification | null> {
+  const response = await searchNotifications({ id });
+  return response.notifications[0] ?? null;
 }
 
 export async function fetchNotificationFacets(): Promise<NotificationFacets> {

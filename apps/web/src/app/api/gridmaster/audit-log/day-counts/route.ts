@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
+import { resolveAuditActionScope } from "@/lib/audit/audience";
 import { authorizeAuditLogRead } from "@/lib/audit/authorize";
 import { bucketAuditDays } from "@/lib/audit/day-counts";
 
@@ -69,12 +70,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
-    const authorized = await authorizeAuditLogRead(req, parsed.data.orgId);
-    if ("response" in authorized) {
-      return authorized.response;
+    const reader = await authorizeAuditLogRead(req, parsed.data.orgId);
+    if ("response" in reader) {
+      return reader.response;
     }
 
-    let query = authorized
+    // The same scope the rows route applies, so the period total matches them.
+    const scope = resolveAuditActionScope(reader.audience, parsed.data.actionPrefixes);
+    if (scope.kind === "allowlist" && scope.actions.length === 0) {
+      return NextResponse.json(bucketAuditDays([], parsed.data.timeZone ?? null, MAX_ROWS));
+    }
+
+    let query = reader.serviceClient
       .from("audit_log")
       .select("created_at")
       .gte("created_at", parsed.data.startDate)
@@ -88,10 +95,10 @@ export async function GET(req: NextRequest) {
     if (parsed.data.resourceType) {
       query = query.eq("resource_type", parsed.data.resourceType);
     }
-    if (parsed.data.actionPrefixes?.length) {
-      query = query.or(
-        parsed.data.actionPrefixes.map((prefix) => `action.like.${prefix}%`).join(","),
-      );
+    if (scope.kind === "allowlist") {
+      query = query.in("action", scope.actions);
+    } else if (scope.prefixes?.length) {
+      query = query.or(scope.prefixes.map((prefix) => `action.like.${prefix}%`).join(","));
     }
 
     const { data, error } = await query;

@@ -126,7 +126,7 @@ export function NotificationRow({
       <PressableRow
         accessibilityLabel={`${isUnread ? "Unread: " : ""}${notification.title}`}
         onPress={onPress}
-        style={styles.row}
+        style={[styles.row, isUnread ? styles.rowUnread : null]}
       >
         <View style={styles.leading}>
           {pending ? (
@@ -181,6 +181,10 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: mobileListRow.paddingVertical,
       paddingHorizontal: getScreenGutter(),
       backgroundColor: mobileColors.background,
+    },
+    // The same tint web gives an unread row (brandSoft matches --dg-color-info-bg).
+    rowUnread: {
+      backgroundColor: mobileColors.brandSoft,
     },
     // A fixed column so read and unread titles line up; the dot sits on the
     // title's first line rather than centred on a two-line row.

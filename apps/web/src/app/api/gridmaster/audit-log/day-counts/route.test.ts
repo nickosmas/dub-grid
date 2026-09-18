@@ -21,6 +21,7 @@ function makeQuery(rows: Array<{ created_at: string }>) {
     gte: vi.fn(() => query),
     lte: vi.fn(() => query),
     eq: vi.fn(() => query),
+    in: vi.fn(() => query),
     or: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
@@ -45,7 +46,10 @@ describe("GET /api/gridmaster/audit-log/day-counts", () => {
       { created_at: "2026-09-04T16:00:00.000Z" },
       { created_at: "2026-09-01T16:00:00.000Z" },
     ]);
-    authorizeAuditLogRead.mockResolvedValue({ from: vi.fn(() => query) });
+    authorizeAuditLogRead.mockResolvedValue({
+      serviceClient: { from: vi.fn(() => query) },
+      audience: "platform",
+    });
   });
 
   it("counts a period's days in the organization's zone", async () => {
@@ -89,6 +93,36 @@ describe("GET /api/gridmaster/audit-log/day-counts", () => {
 
     expect(query.or).toHaveBeenCalledWith("action.like.billing.%,action.like.role.%");
     expect(query.eq).toHaveBeenCalledWith("resource_type", "employee");
+  });
+
+  it("counts only org-visible actions for an organization's own admin", async () => {
+    authorizeAuditLogRead.mockResolvedValue({
+      serviceClient: { from: vi.fn(() => query) },
+      audience: "org",
+    });
+
+    await GET(makeRequest({ orgId: ORG_ID, startDate: START, endDate: END }));
+
+    expect(query.in).toHaveBeenCalledWith("action", expect.arrayContaining(["shift.created"]));
+    const [, actions] = query.in.mock.calls[0] as unknown as [string, string[]];
+    expect(actions).not.toContain("impersonation.started");
+    expect(actions).not.toContain("security.auth.login");
+    expect(query.or).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty period to an org admin asking for a platform-only category", async () => {
+    authorizeAuditLogRead.mockResolvedValue({
+      serviceClient: { from: vi.fn(() => query) },
+      audience: "org",
+    });
+
+    const response = await GET(
+      makeRequest({ orgId: ORG_ID, startDate: START, endDate: END, actionPrefixes: "security." }),
+    );
+
+    expect(await response.json()).toEqual({ counts: {}, total: 0, truncated: false });
+    expect(query.in).not.toHaveBeenCalled();
+    expect(query.select).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed range or time zone before querying", async () => {

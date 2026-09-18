@@ -92,7 +92,6 @@ function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
 const TYPE_FILTERS = [
   { value: "all", label: "All" },
   { value: "publish", label: "Published" },
-  { value: "shift_change", label: "Shift changes" },
   { value: "request", label: "Requests" },
   { value: "user_signup", label: "User sign-ups" },
 ] as const;

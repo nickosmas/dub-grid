@@ -81,6 +81,17 @@ export function formatDateRange(start: string, end: string): string {
 /**
  * Turn "1 thing" / "2 things" without the "(s)" the copy guide bans.
  */
+/** "$49.00" from Stripe's minor units; a currency Intl does not know falls back to "49.00 XYZ". */
+export function formatMinorUnits(amount: number, currency: string): string {
+  const code = currency.toUpperCase();
+  const major = amount / 100;
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(major);
+  } catch {
+    return `${major.toFixed(2)} ${code}`;
+  }
+}
+
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }

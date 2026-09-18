@@ -102,3 +102,62 @@ describe("POST /api/notifications/search org-scoping", () => {
     expect(builder.or).not.toHaveBeenCalledWith(expect.stringContaining("org_id.eq."));
   });
 });
+
+describe("POST /api/notifications/search by id", () => {
+  const NOTIFICATION_ID = "22222222-2222-4222-8222-222222222222";
+  let calls: Array<[string, ...unknown[]]>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateCsrfOrigin.mockReturnValue(null);
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: USER_ID },
+      session: { access_token: "test-token" },
+      claims: { sub: USER_ID, org_id: ORG_ID },
+    });
+
+    // Distinct spies per method so a filter that must be skipped is provable.
+    calls = [];
+    const builder = {} as MockBuilder;
+    const record =
+      (name: string) =>
+      (...args: unknown[]) => {
+        calls.push([name, ...args]);
+        return builder;
+      };
+    builder.eq = vi.fn(record("eq"));
+    builder.is = vi.fn(record("is"));
+    builder.not = vi.fn(record("not"));
+    builder.or = vi.fn(record("or"));
+    builder.order = vi.fn(record("order"));
+    builder.limit = vi.fn(record("limit"));
+    builder.then = (resolve) => resolve({ data: [], error: null });
+    createRequestSupabaseClient.mockReturnValue({
+      from: vi.fn(() => ({ select: vi.fn(() => builder) })),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    });
+  });
+
+  it("scopes the id lookup to the caller and skips the inbox filters", async () => {
+    const response = await POST(
+      makeRequest({ id: NOTIFICATION_ID, read: "unread", includeArchived: false, search: "x" }),
+    );
+    expect(response.status).toBe(200);
+
+    expect(calls).toContainEqual(["eq", "user_id", USER_ID]);
+    expect(calls).toContainEqual(["eq", "channel", "in_app"]);
+    expect(calls).toContainEqual(["or", `org_id.eq.${ORG_ID},org_id.is.null`]);
+    expect(calls).toContainEqual(["eq", "id", NOTIFICATION_ID]);
+    expect(calls).toContainEqual(["limit", 1]);
+    expect(calls.filter(([name]) => name === "is")).toEqual([]);
+    expect(calls.filter(([name]) => name === "not")).toEqual([]);
+    expect(calls.filter(([name, arg]) => name === "or" && String(arg).includes("ilike"))).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a malformed id", async () => {
+    const response = await POST(makeRequest({ id: "not-a-uuid" }));
+    expect(response.status).toBe(400);
+  });
+});
