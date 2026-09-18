@@ -65,12 +65,21 @@ export function FullPageSheet({
   // which React Native only does on a fresh mount: bump the key. Android's
   // back button reaches the same handler without dismissing anything, so it
   // never remounts.
+  //
+  // The Close button must not take that path. The card is still on screen,
+  // and a remount tears it down while the guard's confirmation is presenting
+  // from inside it; iOS then refuses to present the new card ("already
+  // presenting") and the sheet vanishes with its state still open.
   const [presentation, setPresentation] = useState(0);
   const visibleRef = useRef(visible);
   useEffect(() => {
     visibleRef.current = visible;
   }, [visible]);
-  const handleDismiss = () => {
+  const handleClose = () => {
+    if (dismissDisabled) return;
+    onDismiss();
+  };
+  const handleRequestClose = () => {
     if (dismissDisabled) return;
     onDismiss();
     if (Platform.OS === "ios") {
@@ -85,7 +94,7 @@ export function FullPageSheet({
       key={presentation}
       animationType="slide"
       navigationBarTranslucent
-      onRequestClose={handleDismiss}
+      onRequestClose={handleRequestClose}
       presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
       statusBarTranslucent
       visible={visible}
@@ -109,7 +118,7 @@ export function FullPageSheet({
               accessibilityState={{ disabled: dismissDisabled }}
               disabled={dismissDisabled}
               hitSlop={10}
-              onPress={handleDismiss}
+              onPress={handleClose}
               style={[styles.closeButton, dismissDisabled && styles.closeButtonDisabled]}
             >
               <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
