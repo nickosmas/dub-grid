@@ -19,14 +19,32 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     section: {
       gap: mobileSpace.md,
     },
-    dateGroup: {
-      gap: mobileSpace.md,
+    // A day's tile and its cards side by side. The groups carry their own
+    // spacing as bottom padding rather than a list gap so the rail's line
+    // can run through it and meet the next tile.
+    dateGroupList: {
+      gap: 0,
     },
-    dateGroupLabel: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
+    dateGroup: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: mobileSpace.md,
+      paddingBottom: mobileSpace.lg,
+    },
+    dateRail: {
+      alignItems: "center",
+      gap: mobileSpace.xs,
+    },
+    dateRailLine: {
+      flex: 1,
+      width: 2,
+      borderRadius: 999,
+      backgroundColor: mobileColors.borderSubtle,
+      marginBottom: -mobileSpace.lg + mobileSpace.xs,
     },
     dateGroupItems: {
+      flex: 1,
+      minWidth: 0,
       gap: mobileSpace.md,
     },
     requestCard: {

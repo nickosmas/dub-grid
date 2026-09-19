@@ -49,6 +49,7 @@ import {
 } from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/ScheduleSkeleton";
+import { ScheduleDateTile } from "../components/ScheduleDateTile";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import {
@@ -2749,7 +2750,6 @@ function UpcomingShiftsSection({
 
       <View style={styles.upcomingShiftsCard}>
         {groupedItems.map((group, groupIndex) => {
-          const dateParts = getCompactScheduleDateParts(group.date);
           const isToday = group.date === todayDate;
           return (
             <View
@@ -2766,21 +2766,11 @@ function UpcomingShiftsSection({
               testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
             >
               <View style={styles.upcomingDateColumn}>
-                <View style={styles.upcomingDateTile}>
-                  <Text fit="fixed" style={styles.upcomingDateWeekday}>
-                    {dateParts.weekdayLabel}
-                  </Text>
-                  <Text fit="fixed" style={styles.upcomingDateDay}>
-                    {dateParts.dayLabel}
-                  </Text>
-                  {isToday ? (
-                    <View
-                      pointerEvents="none"
-                      style={styles.upcomingDateTodayDot}
-                      testID={`upcoming-today-date-dot-${group.date}`}
-                    />
-                  ) : null}
-                </View>
+                <ScheduleDateTile
+                  date={group.date}
+                  isToday={isToday}
+                  todayDotTestID={`upcoming-today-date-dot-${group.date}`}
+                />
               </View>
 
               <View style={styles.upcomingDateShiftStack}>

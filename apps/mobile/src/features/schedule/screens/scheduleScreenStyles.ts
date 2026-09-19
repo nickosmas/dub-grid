@@ -653,33 +653,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderBottomLeftRadius: mobileRadii.card,
       borderBottomRightRadius: mobileRadii.card,
     },
-    upcomingDateTile: {
-      minWidth: 60,
-      minHeight: 68,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: mobileSpace.sm,
-    },
-    upcomingDateWeekday: {
-      ...mobileTextWeighted("badge", "semibold"),
-      color: mobileColors.textSubtle,
-    },
-    upcomingDateDay: {
-      ...mobileTextWeighted("title", "bold"),
-      ...mobileTabularText,
-      color: mobileColors.textSecondary,
-    },
-    upcomingDateTodayDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 999,
-      backgroundColor: mobileColors.danger,
-      marginTop: 1,
-    },
     upcomingShiftCopy: {
       flex: 1,
       minWidth: 0,

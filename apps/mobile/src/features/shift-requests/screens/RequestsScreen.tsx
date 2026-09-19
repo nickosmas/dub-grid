@@ -76,6 +76,7 @@ import {
   getSplitShiftSegmentsFromPresentation,
   hasShiftRequestStarted,
 } from "../../schedule/lib/schedule";
+import { ScheduleDateTile } from "../../schedule/components/ScheduleDateTile";
 import { createStyles } from "./requestsScreenStyles";
 
 const ACTIVE_REQUEST_STATUSES = new Set(["open", "pending_approval"]);
@@ -873,38 +874,50 @@ export default function RequestsScreen() {
               title="Nothing to pick up"
             />
           ) : (
-            availableOpenShiftFeed.groups.map((group) => (
-              <View key={group.date} style={styles.dateGroup}>
-                <Text style={styles.dateGroupLabel}>
-                  {formatScheduleDayLabel(group.date, now, timeZone)}
-                </Text>
-                <View style={styles.dateGroupItems}>
-                  {group.items.map((item) =>
-                    item.kind === "open_shift" ? (
-                      <OpenShiftCard
-                        key={item.key}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.openShift.id, body)}
-                        openShift={item.openShift}
-                        showDate={false}
-                      />
-                    ) : (
-                      <RequestCard
-                        key={item.key}
-                        canApprove={false}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.request.id, body)}
-                        highlighted={highlightedRequestId === item.request.id}
-                        request={item.request}
-                        showDate={false}
-                      />
-                    ),
-                  )}
+            <View style={styles.dateGroupList}>
+              {availableOpenShiftFeed.groups.map((group, groupIndex) => (
+                <View key={group.date} style={styles.dateGroup}>
+                  {/* The day fronts its cards from a rail: the same tile as
+                    Home's Your Week, joined to the next day by a line so the
+                    feed reads as one timeline rather than labelled piles. */}
+                  <View style={styles.dateRail}>
+                    <ScheduleDateTile
+                      accessibilityLabel={formatScheduleDayLabel(group.date, now, timeZone)}
+                      date={group.date}
+                      isToday={group.date === todayDate}
+                    />
+                    {groupIndex < availableOpenShiftFeed.groups.length - 1 ? (
+                      <View pointerEvents="none" style={styles.dateRailLine} />
+                    ) : null}
+                  </View>
+                  <View style={styles.dateGroupItems}>
+                    {group.items.map((item) =>
+                      item.kind === "open_shift" ? (
+                        <OpenShiftCard
+                          key={item.key}
+                          linkedEmployeeId={linkedEmployeeId}
+                          pendingAction={pendingAction}
+                          onAction={(body) => runRequestAction(item.openShift.id, body)}
+                          openShift={item.openShift}
+                          showDate={false}
+                        />
+                      ) : (
+                        <RequestCard
+                          key={item.key}
+                          canApprove={false}
+                          linkedEmployeeId={linkedEmployeeId}
+                          pendingAction={pendingAction}
+                          onAction={(body) => runRequestAction(item.request.id, body)}
+                          highlighted={highlightedRequestId === item.request.id}
+                          request={item.request}
+                          showDate={false}
+                        />
+                      ),
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))
+              ))}
+            </View>
           )}
         </View>
       ) : activeTab === "all" ? (
