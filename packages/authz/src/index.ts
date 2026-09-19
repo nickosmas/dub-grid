@@ -191,27 +191,33 @@ export function buildPermissionContext(
   let permissions: AdminPermissions;
   if (isGridmaster || isSuperAdmin) {
     permissions = ALL_PERMS;
-  } else if (role === "admin" || role === "user") {
+  } else if (role === "admin") {
     // The role baseline is the base, not just the fallback: `adminPerms` is an
     // unvalidated JSONB column (PUT /api/organizations/access accepts any
     // `z.record(z.string(), z.boolean())`), so a partial object would otherwise
     // leave keys `undefined` rather than a boolean. It also means a key added
     // to AdminPermissions later resolves correctly against rows written before
-    // it existed. Admins land on ADMIN_DEFAULT_PERMS, users on READ_ONLY_PERMS.
+    // it existed.
     //
-    // The three overrides restate guarantees the design gives regardless of
+    // The two overrides restate guarantees the design gives regardless of
     // what is stored: canViewSchedule/canViewStaff are true for every
     // authenticated user, and canManageOrgSettings is super_admin-only and
     // never delegatable.
-    const baseline = role === "admin" ? ADMIN_DEFAULT_PERMS : READ_ONLY_PERMS;
     permissions = {
-      ...baseline,
+      ...ADMIN_DEFAULT_PERMS,
       ...(adminPerms ?? {}),
       canViewSchedule: true,
       canViewStaff: true,
       canManageOrgSettings: false,
     };
   } else {
+    // A user is the read-only baseline and nothing else. The JSONB is an
+    // admin-tier column (`check_admin_permission` in SQL reads it for admins
+    // only and "users always fail", and the access route nulls it on
+    // demotion), so a row that still carries one, a stale demotion or the QA
+    // seed's "view everything" set, must not widen what a regular member sees.
+    // Honouring it here is how a seeded regular user saw the roster's ID,
+    // employment, account and access columns.
     permissions = READ_ONLY_PERMS;
   }
 

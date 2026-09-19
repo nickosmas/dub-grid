@@ -34,6 +34,12 @@ interface StaffReadOnlyDetailPanelProps {
   certificationLabel: string;
   departments?: NamedItem[];
   departmentLabel?: string;
+  /**
+   * Whether the viewer holds employee details. Employment is an HR fact the
+   * roster hides from regular users behind the same permission, so the panel
+   * hides it too instead of printing in the panel what the row withheld.
+   */
+  canViewEmployeeDetails?: boolean;
   onClose: () => void;
 }
 
@@ -66,6 +72,7 @@ export function StaffReadOnlyDetailPanel({
   certificationLabel,
   departments,
   departmentLabel,
+  canViewEmployeeDetails = false,
   onClose,
 }: StaffReadOnlyDetailPanelProps) {
   const { resolvedTheme } = useTheme();
@@ -93,6 +100,10 @@ export function StaffReadOnlyDetailPanel({
     employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "—";
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const isOnSchedule = employee.focusAreaIds.length > 0;
+  const showEmployment = isOnSchedule && canViewEmployeeDetails;
+  // The employees API blanks a coworker's email and phone for viewers without
+  // employee details, so for them this section was two dashes under a heading.
+  const showContact = Boolean(employee.email || employee.phone);
   const displayName = getEmployeeDisplayName(employee);
   const initials = getInitials(displayName);
 
@@ -165,7 +176,7 @@ export function StaffReadOnlyDetailPanel({
                   {displayName}
                 </span>
                 <AccessInsignia orgRole={orgRole} size="md" />
-                {isOnSchedule && (
+                {showEmployment && (
                   <span
                     style={{
                       display: "inline-flex",
@@ -219,11 +230,13 @@ export function StaffReadOnlyDetailPanel({
             />
             {isOnSchedule && (
               <>
-                <ReadOnlyRow
-                  icon={<Briefcase size={15} strokeWidth={1.8} />}
-                  label="Employment"
-                  value={employmentLabel}
-                />
+                {showEmployment && (
+                  <ReadOnlyRow
+                    icon={<Briefcase size={15} strokeWidth={1.8} />}
+                    label="Employment"
+                    value={employmentLabel}
+                  />
+                )}
                 <ReadOnlyRow
                   icon={<Tag size={15} strokeWidth={1.8} />}
                   label={roleLabel}
@@ -244,49 +257,51 @@ export function StaffReadOnlyDetailPanel({
             )}
           </ReadOnlySection>
 
-          <ReadOnlySection title="Contact">
-            <ReadOnlyRow
-              icon={<Mail size={15} strokeWidth={1.8} />}
-              label="Email"
-              value={
-                employee.email ? (
-                  <a
-                    href={`mailto:${employee.email}`}
-                    style={{
-                      color: "var(--dg-color-link)",
-                      textDecoration: "none",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {employee.email}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
-                )
-              }
-            />
-            <ReadOnlyRow
-              icon={<Phone size={15} strokeWidth={1.8} />}
-              label="Phone"
-              value={
-                employee.phone ? (
-                  <a
-                    href={`tel:${employee.phone}`}
-                    style={{
-                      color: "var(--dg-color-link)",
-                      textDecoration: "none",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {employee.phone}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
-                )
-              }
-              isLast
-            />
-          </ReadOnlySection>
+          {showContact && (
+            <ReadOnlySection title="Contact">
+              <ReadOnlyRow
+                icon={<Mail size={15} strokeWidth={1.8} />}
+                label="Email"
+                value={
+                  employee.email ? (
+                    <a
+                      href={`mailto:${employee.email}`}
+                      style={{
+                        color: "var(--dg-color-link)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {employee.email}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                  )
+                }
+              />
+              <ReadOnlyRow
+                icon={<Phone size={15} strokeWidth={1.8} />}
+                label="Phone"
+                value={
+                  employee.phone ? (
+                    <a
+                      href={`tel:${employee.phone}`}
+                      style={{
+                        color: "var(--dg-color-link)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {employee.phone}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                  )
+                }
+                isLast
+              />
+            </ReadOnlySection>
+          )}
 
           {departments && departments.length > 0 && departmentIds.length > 0 && (
             <ReadOnlySection title={departmentLabel ?? "Departments"}>

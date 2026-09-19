@@ -102,7 +102,7 @@ import { isRoleCertificationBlocked } from "../../profile/lib/role-certification
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
 import { hasManagementAccess } from "../lib/managementAccess";
-import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
+import { getHighlightedOrgRole, getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
 import { SectionNotice } from "../components/SectionNotice";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import {
@@ -234,7 +234,13 @@ export default function PersonDetailScreen() {
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   // Employee numbers are an employee-details fact, not a directory one: web
   // keeps its ID column and staff detail page behind the same permission.
-  const canViewEmployeeDetails = Boolean(bootstrapQuery.data?.permissions.canViewEmployeeDetails);
+  // Managing employees implies viewing their details (authz applies that
+  // implication server-side); restated here so a bootstrap that carries only
+  // the manage flag still reads as a staff manager.
+  const canViewEmployeeDetails = Boolean(
+    bootstrapQuery.data?.permissions.canViewEmployeeDetails ||
+    bootstrapQuery.data?.permissions.canManageEmployees,
+  );
   // A person's own employee record belongs to the Profile tab. Resolve that
   // from bootstrap before enabling this query so a pasted /person/[id] URL
   // cannot briefly fetch and render the duplicate teammate-profile surface.
@@ -781,22 +787,32 @@ export default function PersonDetailScreen() {
     (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
   // Only the two states someone might act on get a banner. A person who
   // already has an account needs no announcement that they do, and the body
-  // line naming the next move is for the managers who can make it.
-  const invitationBanner = person.userId
+  // line naming the next move is for the managers who can make it. A viewer
+  // without employee details never sees one: the API redacts `userId` and
+  // the invitation for them, so every colleague would read "No app access".
+  const invitationBanner = !canViewEmployeeDetails
     ? null
-    : person.pendingInvitation
-      ? {
-          title: "Invitation pending",
-          body: person.pendingInvitation.email
-            ? `Sent to ${person.pendingInvitation.email}.`
-            : undefined,
-          tone: "warning" as const,
-        }
-      : {
-          title: "No app access",
-          body: canManageEmployees ? "Send an invitation to give app access." : undefined,
-          tone: "info" as const,
-        };
+    : person.userId
+      ? null
+      : person.pendingInvitation
+        ? {
+            title: "Invitation pending",
+            body: person.pendingInvitation.email
+              ? `Sent to ${person.pendingInvitation.email}.`
+              : undefined,
+            tone: "warning" as const,
+          }
+        : {
+            title: "No app access",
+            body: canManageEmployees ? "Send an invitation to give app access." : undefined,
+            tone: "info" as const,
+          };
+  // The access tier is management information. A regular viewer sees it only
+  // when it says something about the colleague, an Admin or Super admin
+  // insignia; a plain "User" pill on every colleague told them nothing.
+  const showOrgRoleBadge =
+    canViewEmployeeDetails || getHighlightedOrgRole(getPersonOrgRole(person)) != null;
+  const showContact = Boolean(person.phone || person.email);
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
@@ -969,7 +985,7 @@ export default function PersonDetailScreen() {
           Deactivate button and the "Status updated" row below. */}
       <ProfileHero
         align="center"
-        badge={orgRoleBadge.label}
+        badge={showOrgRoleBadge ? orgRoleBadge.label : undefined}
         badgeAccessibilityLabel={`App access: ${orgRoleBadge.label}`}
         badgeTone={orgRoleBadge.tone}
         onBadgePress={
@@ -991,32 +1007,36 @@ export default function PersonDetailScreen() {
         title={fullName}
       />
 
-      {!editing ? (
+      {/* Only actions that do something. A viewer the API redacts contact
+          details for used to get two disabled buttons and nothing to press. */}
+      {!editing && (showContact || canEdit) ? (
         <ProfileQuickActions>
-          <Button
-            compact
-            disabled={!person.phone}
-            label="Call"
-            leadingAccessory={
-              <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
-            }
-            onPress={() => {
-              if (person.phone) void Linking.openURL(`tel:${person.phone}`);
-            }}
-            tone="plain"
-          />
-          <Button
-            compact
-            disabled={!person.email}
-            label="Email"
-            leadingAccessory={
-              <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
-            }
-            onPress={() => {
-              if (person.email) void Linking.openURL(`mailto:${person.email}`);
-            }}
-            tone="plain"
-          />
+          {person.phone ? (
+            <Button
+              compact
+              label="Call"
+              leadingAccessory={
+                <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
+              }
+              onPress={() => {
+                void Linking.openURL(`tel:${person.phone}`);
+              }}
+              tone="plain"
+            />
+          ) : null}
+          {person.email ? (
+            <Button
+              compact
+              label="Email"
+              leadingAccessory={
+                <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
+              }
+              onPress={() => {
+                void Linking.openURL(`mailto:${person.email}`);
+              }}
+              tone="plain"
+            />
+          ) : null}
           {canEdit ? (
             <Button
               compact
@@ -1074,21 +1094,27 @@ export default function PersonDetailScreen() {
         />
       ) : (
         <>
-          <ProfileSection title="Contact">
-            <ProfileList>
-              <ProfileInfoRow
-                iconName="mail-outline"
-                label="Email"
-                value={person.email || "No email on file"}
-              />
-              <ProfileInfoRow
-                iconName="call-outline"
-                isLast
-                label="Phone"
-                value={person.phone || "No phone on file"}
-              />
-            </ProfileList>
-          </ProfileSection>
+          {/* Contact details are a manager's view; the API blanks them for
+              everyone else, and "No email on file" would state a blank as a
+              fact. Managers still see the placeholder for a genuinely empty
+              field. */}
+          {canViewEmployeeDetails ? (
+            <ProfileSection title="Contact">
+              <ProfileList>
+                <ProfileInfoRow
+                  iconName="mail-outline"
+                  label="Email"
+                  value={person.email || "No email on file"}
+                />
+                <ProfileInfoRow
+                  iconName="call-outline"
+                  isLast
+                  label="Phone"
+                  value={person.phone || "No phone on file"}
+                />
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
 
           {/* Split the way the edit panel below splits the same fields: what
               the person is hired as here, where they are placed under
@@ -1107,11 +1133,15 @@ export default function PersonDetailScreen() {
                   value={`#${person.employeeNumber}`}
                 />
               ) : null}
-              <ProfileInfoRow
-                iconName="briefcase-outline"
-                label="Employment"
-                value={employmentLabel}
-              />
+              {/* Full-time or part-time is an HR fact; the web roster hides
+                  the column from regular users and so does this row. */}
+              {canViewEmployeeDetails ? (
+                <ProfileInfoRow
+                  iconName="briefcase-outline"
+                  label="Employment"
+                  value={employmentLabel}
+                />
+              ) : null}
               <ProfileInfoRow
                 iconName="ribbon-outline"
                 isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}

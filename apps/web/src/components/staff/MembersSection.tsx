@@ -2290,6 +2290,7 @@ export function MembersSection({
 
       {selectedEmployee && !canManageEmployees && selectedEmployee.status === "active" && (
         <StaffReadOnlyDetailPanel
+          canViewEmployeeDetails={canViewEmployeeDetails}
           employee={selectedEmployee}
           orgRole={effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null}
           focusAreas={focusAreas}

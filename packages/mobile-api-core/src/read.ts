@@ -77,16 +77,40 @@ export type MobileBootstrapContext = MobileServiceContext &
     user: MobileUserLike;
   };
 
+type MobilePublisherViewerPermissions = Pick<MobilePermissionsLike, "canPublishSchedule" | "level">;
+
 export type MobileMeScheduleContext = MobileServiceContext & {
   user: Pick<MobileUserLike, "id">;
+  permissions: MobilePublisherViewerPermissions;
 };
 
 export type MobileOrgScheduleContext = MobileServiceContext & {
   permissions: Pick<
     MobilePermissionsLike,
     "canViewSchedule" | "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees"
-  >;
+  > &
+    MobilePublisherViewerPermissions;
 };
+
+/**
+ * Who published a shift is process detail for the people who publish: the web
+ * keeps its publish history behind `canPublishSchedule` (or super admin), so
+ * the mobile payload keeps the publisher's name behind the same gate. The
+ * publish time stays for everyone; it says whether the schedule is current.
+ */
+export function canSeeSchedulePublisher(permissions: MobilePublisherViewerPermissions): boolean {
+  return permissions.canPublishSchedule || permissions.level >= 3;
+}
+
+function withoutPublisherName<TEntry extends { publishedByName: string | null }>(
+  entries: TEntry[],
+  permissions: MobilePublisherViewerPermissions,
+): TEntry[] {
+  if (canSeeSchedulePublisher(permissions)) return entries;
+  return entries.map((entry) =>
+    entry.publishedByName === null ? entry : { ...entry, publishedByName: null },
+  );
+}
 
 export type MobilePeopleContext = MobileServiceContext & {
   permissions: Pick<
@@ -353,7 +377,7 @@ export async function loadMobileMeSchedulePayload(
       departmentIds: linkedEmployee.departmentIds,
     },
     range,
-    entries,
+    entries: withoutPublisherName(entries, auth.permissions),
   };
 }
 
@@ -382,7 +406,7 @@ export async function loadMobileOrgSchedulePayload(
 
   return {
     range,
-    entries,
+    entries: withoutPublisherName(entries, auth.permissions),
   };
 }
 

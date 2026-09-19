@@ -337,9 +337,104 @@ describe("PersonDetailScreen", () => {
 
     expect(screen.queryByText("Employee ID")).not.toBeInTheDocument();
     expect(screen.queryByText("#12")).not.toBeInTheDocument();
-    // The rest of the Staffing section still renders, so this is the one row
-    // being withheld rather than the section collapsing.
-    expect(screen.getByText("Employment")).toBeInTheDocument();
+    // Employment is HR information too; the web roster hides that column
+    // from regular users. The rest of the Staffing section still renders.
+    expect(screen.queryByText("Employment")).not.toBeInTheDocument();
+    expect(screen.getByText("Certification")).toBeInTheDocument();
+  });
+
+  // The API redacts a colleague's userId, invitation and contact details for a
+  // regular viewer, so anything built from them would state a blank as a fact:
+  // every colleague read "No app access" with two dead Call and Email buttons.
+  it("shows a regular user only directory facts about a colleague", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        user: { id: "user-9" },
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [],
+        roles: [],
+        certifications: [],
+        departments: [],
+        permissions: { canManageEmployees: false, canViewEmployeeDetails: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        person: makePerson({
+          orgRole: "user",
+          email: "",
+          phone: "",
+          userId: null,
+          pendingInvitation: null,
+        }),
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invitation pending")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Email" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Contact")).not.toBeInTheDocument();
+    expect(screen.queryByText("No email on file")).not.toBeInTheDocument();
+    // A plain "User" tier says nothing about a colleague; only an Admin or
+    // Super admin insignia would.
+    expect(screen.queryByText("User")).not.toBeInTheDocument();
+    expect(screen.getByText("Assignments")).toBeInTheDocument();
+  });
+
+  it("keeps an Admin insignia visible to a regular user", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        user: { id: "user-9" },
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Departments",
+          },
+        },
+        focusAreas: [],
+        roles: [],
+        certifications: [],
+        departments: [],
+        permissions: { canManageEmployees: false, canViewEmployeeDetails: false },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        person: makePerson({ orgRole: "admin", email: "", phone: "", userId: null }),
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByText("Admin")).toBeInTheDocument();
   });
 
   // The management label is fixed, never composed from the org's own noun for
