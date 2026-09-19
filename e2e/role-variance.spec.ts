@@ -201,9 +201,8 @@ test.describe("role variance: interaction contract", () => {
     });
     await ownCell.click();
     // ShiftEditPanel in detail mode (allowShiftEdits false): the viewer's own
-    // shift and its request entry points. Its aria-label still says "Edit
-    // shift" even here, so match on the rendered content, not the label.
-    const ownShiftPanel = page.getByRole("dialog").filter({ hasText: "Shift requests" });
+    // shift and its request entry points, announced as "Shift details".
+    const ownShiftPanel = page.getByRole("dialog", { name: "Shift details" });
     await expect(ownShiftPanel).toBeVisible({ timeout: 15_000 });
     await expect(ownShiftPanel.getByText("QA Regular")).toBeVisible();
     await expectNoManageControls(page, ownShiftPanel);
@@ -275,7 +274,7 @@ test.describe("role variance: interaction contract", () => {
       timeout: 15_000,
     });
     await ownCell.click();
-    const ownShiftPanel = page.getByRole("dialog").filter({ hasText: "Shift requests" });
+    const ownShiftPanel = page.getByRole("dialog", { name: "Shift details" });
     await expect(ownShiftPanel).toBeVisible({ timeout: 15_000 });
     await expect(ownShiftPanel.getByText("QA Management")).toBeVisible();
     await expectNoManageControls(page, ownShiftPanel);

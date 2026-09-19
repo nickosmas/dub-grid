@@ -400,6 +400,8 @@ export default function UserDashboard(props: DashboardContentProps) {
   // itself never scrolls.
   const stackLayout = isMobile || isTablet;
 
+  // The top grid follows the same breakpoint as the shell: a tablet used to
+  // stack the page but keep the two-column hero/requests composition (F-45).
   const topGrid = (
     <div
       data-testid="user-dashboard-top-grid"
@@ -407,7 +409,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         alignItems: "stretch",
         columnGap: "var(--dg-space-xl)",
         display: "grid",
-        gridTemplateColumns: isMobile
+        gridTemplateColumns: stackLayout
           ? "minmax(0, 1fr)"
           : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
         rowGap: "var(--dg-space-lg)",
@@ -417,9 +419,9 @@ export default function UserDashboard(props: DashboardContentProps) {
         <div
           data-testid="user-dashboard-hero-shell"
           style={{
-            gridColumn: isMobile ? undefined : "1",
-            gridRow: isMobile ? undefined : "1 / span 2",
-            maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
+            gridColumn: stackLayout ? undefined : "1",
+            gridRow: stackLayout ? undefined : "1 / span 2",
+            maxWidth: stackLayout ? "none" : `${HERO_MAX_WIDTH}px`,
             width: "100%",
           }}
         >
@@ -433,7 +435,7 @@ export default function UserDashboard(props: DashboardContentProps) {
             shiftmates={heroShiftmates}
             status={hero.status}
             timing={heroTiming}
-            stretch={isMobile ? false : true}
+            stretch={!stackLayout}
           />
         </div>
       ) : null}
@@ -441,16 +443,16 @@ export default function UserDashboard(props: DashboardContentProps) {
       <CoverRequestsSection
         requests={coverRequests}
         style={{
-          gridColumn: isMobile ? undefined : "2",
-          gridRow: isMobile ? undefined : "1",
+          gridColumn: stackLayout ? undefined : "2",
+          gridRow: stackLayout ? undefined : "1",
         }}
       />
       <AvailableShiftsSection
         isTwoWeekView={isTwoWeekView}
         items={availableShiftItems}
         style={{
-          gridColumn: isMobile ? undefined : "2",
-          gridRow: isMobile ? undefined : "2",
+          gridColumn: stackLayout ? undefined : "2",
+          gridRow: stackLayout ? undefined : "2",
         }}
       />
     </div>

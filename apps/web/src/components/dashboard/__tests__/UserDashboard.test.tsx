@@ -503,6 +503,27 @@ describe("UserDashboard", () => {
     });
   });
 
+  it("stacks the top grid at tablet width, matching the stacked shell", () => {
+    const todayKey = formatDateKey(new Date());
+    const shiftMap = makeShiftMap(todayKey);
+    const props = makeProps({
+      activeEmployees: [employee, coworker, teammate],
+      allShifts: shiftMap,
+      currentPeriodShifts: shiftMap,
+      employees: [employee, coworker, teammate],
+      isTablet: true,
+    });
+
+    render(<UserDashboard {...props} />);
+
+    expect(screen.getByTestId("user-dashboard-top-grid")).toHaveStyle({
+      gridTemplateColumns: "minmax(0, 1fr)",
+    });
+    const heroShell = screen.getByTestId("user-dashboard-hero-shell");
+    expect(heroShell.style.gridRow).toBe("");
+    expect(heroShell).toHaveStyle({ maxWidth: "none" });
+  });
+
   it("marks a recently published hero shift as edited", () => {
     const todayKey = formatDateKey(new Date());
     render(

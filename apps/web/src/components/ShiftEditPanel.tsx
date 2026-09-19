@@ -3429,7 +3429,7 @@ export default function ShiftEditPanel({
         className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Edit shift"
+        aria-label={allowShiftEdits ? "Edit shift" : "Shift details"}
       >
         {/* Panel Header */}
         <div

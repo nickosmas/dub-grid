@@ -264,6 +264,7 @@ function renderPanel(
     shiftDisplayMode?: ShiftDisplayMode;
     indicatorTypesOverride?: IndicatorType[];
     canEditScheduleIndicators?: boolean;
+    allowShiftEdits?: boolean;
     getActiveIndicatorIds?: (focusAreaId: number) => number[];
     onNoteToggle?: ReturnType<typeof vi.fn>;
     auditInfo?: {
@@ -302,6 +303,7 @@ function renderPanel(
       auditInfo={overrides.auditInfo}
       indicatorTypes={overrides.indicatorTypesOverride}
       canEditScheduleIndicators={overrides.canEditScheduleIndicators}
+      allowShiftEdits={overrides.allowShiftEdits}
       getActiveIndicatorIds={overrides.getActiveIndicatorIds}
       onNoteToggle={overrides.onNoteToggle}
     />,
@@ -660,6 +662,18 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText(/^Supervisor$/)).toBeInTheDocument();
       expect(screen.getByText(/^North$/)).toBeInTheDocument();
       expect(screen.queryByText(/^D$/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Accessible name", () => {
+    it("announces the editor as Edit shift and the read-only panel as Shift details", () => {
+      const editable = renderPanel({ currentShift: "D" });
+      expect(screen.getByRole("dialog", { name: "Edit shift" })).toBeInTheDocument();
+      editable.unmount();
+
+      renderPanel({ currentShift: "D", allowShiftEdits: false });
+      expect(screen.getByRole("dialog", { name: "Shift details" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Edit shift" })).not.toBeInTheDocument();
     });
   });
 

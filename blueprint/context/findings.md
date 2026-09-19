@@ -43,7 +43,7 @@ shared scroll architecture and needs its own spec, not a cleanup pass.
 **Suggested fix:** Move the feed to FlatList or another virtualized list, place search/filter controls in its header, preserve pull-to-refresh and empty/error states, and avoid index-staggered entrance animations for recycled rows.
 **Resolution:**
 
-### F-42 [P2] open - MembersSection tests finish with unwrapped responsive updates
+### F-42 [P2] fixed - MembersSection tests finish with unwrapped responsive updates
 
 **File:** apps/web/src/**tests**/MembersSection.test.tsx:659-779; apps/web/src/hooks/useMediaQuery.ts:18-32
 **Found:** 2026-09-02 by /audit (scope: current; lens: tests)
@@ -56,18 +56,18 @@ capable of hiding timing-dependent regressions.
 MembersSection test harness, or await the initial responsive update inside an
 `act`-aware helper before asserting. Keep separate targeted coverage for actual
 media-query transitions.
-**Resolution:** Re-reviewed 2026-09-02 by `/audit current`: the focused 29-test
+**Resolution:** Re-reviewed 2026-09-02 by `/audit current`: the focused 29-test Fixed 2026-09-20. The source was not `useMediaQuery` (its layout effect runs inside render's act, and matchMedia is stubbed synchronously) but the managing viewer's `fetchOrganizationInvitations` promise committing `pendingInvitations` after the eight synchronous tests had returned. Those tests now await an act-wrapped microtask flush (`settleInvitations`) before asserting: 31 pass, 0 act warnings (was 8). Requires `/audit` re-review before closing.
 MembersSection run still emits the same eight unwrapped-update warnings. The
 test mock continues to spread the real hooks module without replacing
 `useMediaQuery`, so the original timing defect remains open.
 
-### F-45 [P2] open - Tablet user dashboard mixes a stacked shell with a desktop top grid
+### F-45 [P2] fixed - Tablet user dashboard mixes a stacked shell with a desktop top grid
 
 **File:** apps/web/src/components/dashboard/UserDashboard.tsx:363-420
 **Found:** 2026-09-02 by /audit (scope: full web; lenses: quality, tests)
 **Why it matters:** At 768-1024px, `stackLayout` deliberately switches the page to normal-flow tablet layout, but `topGrid` still uses a two-column hero/requests composition because only `isMobile` selects one column. This leaves the main dashboard surface at its narrowest sustained desktop layout during viewport resizes rather than the intended tablet stack. The existing unit test asserts only the desktop grid, and authenticated browser validation is currently unavailable locally.
 **Suggested fix:** Use the same tablet-or-smaller condition for `topGrid` and its child placement as `stackLayout`, then add a tablet-width regression case alongside the existing desktop layout assertion.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The top grid, hero shell, cover requests and available shifts all key their columns and placement off `stackLayout` (mobile or tablet) instead of `isMobile`; the hero stops stretching in the stack. New test asserts a single column and no row span at tablet width. Requires `/audit` re-review before closing.
 
 ### F-46 [P3] fixed - Three parallel button systems, two of them near-dead
 
@@ -139,12 +139,13 @@ The remaining 52 are blocked on a contract decision, not effort. Neither `client
 **Suggested fix:** Either replace the raw 9 with a token, or add `ScheduleGrid.tsx` to `documentedMicroTextCounts` if 9px is deliberate for that cell-editor affordance.
 **Resolution:** Fixed 2026-09-05 by documenting the exception. The 9px is deliberate and the code comment says why: two initials at badge size run wider than the 20px marker circle, so the marker sizes its text off the ring. Tokenising it would reintroduce the overflow, so `components/ScheduleGrid.tsx: 1` was added to `documentedMicroTextCounts` instead. The typography suite is green again.
 
-### F-55 [P2] open - Delete dependency checks read every schedule cell in the org
+### F-55 [P2] fixed - Delete dependency checks read every schedule cell in the org
 
 **File:** apps/web/src/lib/db/config.ts:103-126
 **Found:** 2026-09-05 by /audit (scope: full; lens: performance)
 **Why it matters:** `loadActiveScheduleCellDependencies` selects every `schedule_cells` row for the org with nested `schedule_cell_snapshots` and `schedule_cell_segments`, no date filter and no count-only projection, then filters in JS. It backs the delete-dependency checks in Jobs, AbsenceTypes, and ShiftCategories settings, so answering "is this job used anywhere?" pulls a multi-MB payload for an org with a year of history. Surfaced while auditing action feedback (see [[F-54]]); those call sites do spin correctly, so this is cost rather than a missing signal.
 **Suggested fix:** Replace the row fetch with a count-only query or an RPC that answers existence server-side.
+**Resolution:** Fixed 2026-09-20. Migration 025 adds `count_schedule_cell_usage(org, shift, job, absence_type)` (service-role only, counts distinct cells of unarchived employees), and the settings route's job, shift-category and absence-type checks call it instead of loading every cell; the "referenced anywhere" checks became head counts on `schedule_cell_segments` / `schedule_cell_snapshots`, which carry `org_id`. Dry run against the local seed: RPC and the old in-memory count agree (171/184/176) for three organizations. The dead browser-side copies in `lib/db/config.ts` and their test were removed. Route test asserts the RPC is used and `schedule_cells` is never read. Requires `/audit` re-review before closing.
 
 ### F-56 [P2] fixed - Web confirmations allow alternate dismissal while their action is pending
 
@@ -214,21 +215,21 @@ Commands: `npx vitest run --config apps/web/vitest.config.mts apps/web/src/__tes
 **Suggested fix:** Publish the measured group height as a CSS custom property from the existing geometry effect (it already measures the grid) and use it in the calc, or accept the constant and name it beside `CHIP_OVERHANG_PX`.
 **Resolution:** Repaired 2026-09-07 in the same session: the geometry effect publishes `--dg-grid-sticky-height` on the section and the row scroll margin reads it, keeping `80px` only as the fallback.
 
-### F-67 [P3] open - Read-only shift detail panel is announced as "Edit shift"
+### F-67 [P3] fixed - Read-only shift detail panel is announced as "Edit shift"
 
 **File:** apps/web/src/components/ShiftEditPanel.tsx:3430-3433
 **Found:** 2026-09-17 by feature 25d2b Step 3 (role variance, `qa-regular` and `qa-management`)
 **Why it matters:** When a viewer without edit rights opens their own cell, `ShiftEditPanel` renders in detail mode (`allowShiftEdits` false) but keeps the static `aria-label="Edit shift"`, so a screen reader announces a read-only panel as an editor. The request-only return block already labels itself "Shift requests"; only this branch is mislabeled. `e2e/role-variance.spec.ts` matches the panel on its rendered content for that reason.
 **Suggested fix:** Derive the dialog label from the mode (for example "Shift details" when `!allowShiftEdits`), then let the role-variance test assert the accessible name.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. The dialog label is `allowShiftEdits ? "Edit shift" : "Shift details"`; unit test covers both, and `e2e/role-variance.spec.ts` now matches the read-only panel by its accessible name. Requires `/audit` re-review before closing.
 
-### F-68 [P3] open - Shell renders nothing while the organization bootstrap retries a 5xx
+### F-68 [P3] fixed - Shell renders nothing while the organization bootstrap retries a 5xx
 
 **File:** apps/web/src/features/organization/client/api.ts:125-144; apps/web/src/components/onboarding/OnboardingGate.tsx:237-254; apps/web/src/components/SetupGuard.tsx:43-44
 **Found:** 2026-09-17 by feature 25d2b Step 5 (role variance, bootstrap states)
 **Why it matters:** A 5xx from `/api/organization/bootstrap` is retried up to three times with jittered backoff (worst case about 7s) before the query errors and `OrganizationBootstrapRecovery` appears. During that window `SetupGuard` returns null and no page-level progress bar is mounted, so every role sees a blank shell with no header and no loading affordance. The role-variance probe measured 4-5s of empty `body` on Firefox before the recovery copy rendered. Role-independent, so not a 25d2b contract violation.
 **Suggested fix:** Keep a loading affordance mounted while the bootstrap query is retrying (the shared progress bar above `SetupGuard`, or `AuthTransitionScreen` with its workspace phase), so a transient failure never reads as a hung page.
-**Resolution:**
+**Resolution:** Fixed 2026-09-20. `SetupGuard` renders `AuthTransitionScreen` (workspace phase) instead of `null` while the bootstrap is loading with nothing cached, so a retrying 5xx shows progress rather than an empty shell; new `SetupGuard.test.tsx`. Requires `/audit` re-review before closing.
 
 ### F-69 [P3] fixed - Impersonation end accepts any reason, then answers a constraint violation with a 500
 
